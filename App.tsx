@@ -5,6 +5,7 @@ import Login from './features/auth/Login';
 import Layout from './components/Layout';
 import Dashboard from './features/dashboard/Dashboard';
 import EventsList from './features/events/EventsList';
+import EventRegistration from './features/events/EventRegistration';
 import ParticipantsList from './features/participants/ParticipantsList';
 import BadgePrint from './features/participants/BadgePrint';
 import Scanner from './features/scanner/Scanner';
@@ -31,6 +32,9 @@ const App: React.FC = () => {
       <Router>
         <Routes>
           <Route path="/" element={<Login />} />
+          
+          {/* Public Registration Route */}
+          <Route path="/register/:eventId" element={<EventRegistration />} />
           
           {/* Admin Routes */}
           <Route path="/dashboard" element={

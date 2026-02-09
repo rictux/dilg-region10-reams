@@ -1,13 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Calendar } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Copy, Check } from 'lucide-react';
 import { format } from 'date-fns';
+import QRCode from 'react-qr-code';
 
 const EventsList: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [copied, setCopied] = useState(false);
   
   // Form State
   const [formData, setFormData] = useState<Partial<Event>>({
@@ -50,6 +54,23 @@ const EventsList: React.FC = () => {
       } else {
         fetchEvents();
       }
+  };
+
+  const openShareModal = (event: Event) => {
+      setSelectedEvent(event);
+      setShowShareModal(true);
+      setCopied(false);
+  };
+
+  const getRegistrationLink = (eventId: number) => {
+      return `${window.location.origin}${window.location.pathname}#/register/${eventId}`;
+  };
+
+  const copyToClipboard = () => {
+      if (!selectedEvent) return;
+      navigator.clipboard.writeText(getRegistrationLink(selectedEvent.event_id));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -105,7 +126,14 @@ const EventsList: React.FC = () => {
                                         {event.status.toUpperCase()}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4">
+                                <td className="px-6 py-4 flex items-center gap-3">
+                                    <button 
+                                        onClick={() => openShareModal(event)}
+                                        className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                                        title="Share Registration Link"
+                                    >
+                                        <Share2 size={18} />
+                                    </button>
                                     <button onClick={() => handleDelete(event.event_id)} className="text-slate-400 hover:text-red-600 transition-colors">
                                         <Trash2 size={18} />
                                     </button>
@@ -125,7 +153,50 @@ const EventsList: React.FC = () => {
         </div>
       )}
 
-      {/* Enhanced Modal */}
+      {/* Share / Registration Modal */}
+      {showShareModal && selectedEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowShareModal(false)}></div>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative z-10 animate-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-slate-800">Event Registration</h3>
+                    <button onClick={() => setShowShareModal(false)} className="text-slate-400 hover:text-slate-600">
+                        <X size={24} />
+                    </button>
+                </div>
+                
+                <div className="space-y-6 flex flex-col items-center">
+                    <div className="p-4 border-2 border-indigo-100 rounded-lg bg-indigo-50/50">
+                        <QRCode value={getRegistrationLink(selectedEvent.event_id)} size={180} />
+                    </div>
+                    
+                    <div className="w-full">
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Registration Link</label>
+                        <div className="flex gap-2">
+                            <input 
+                                readOnly 
+                                value={getRegistrationLink(selectedEvent.event_id)}
+                                className="flex-1 block w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 bg-slate-50 focus:outline-none"
+                            />
+                            <button 
+                                onClick={copyToClipboard}
+                                className={`px-3 py-2 rounded-lg border flex items-center gap-2 transition-all
+                                    ${copied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'}
+                                `}
+                            >
+                                {copied ? <Check size={18} /> : <Copy size={18} />}
+                            </button>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-2 text-center">
+                            Share this link or QR code with participants to let them register for <strong>{selectedEvent.event_name}</strong>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Create Event Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
