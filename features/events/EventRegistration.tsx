@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Event } from '../../types/database';
+import { Event, Participant } from '../../types/database';
 import QRCode from 'react-qr-code';
-import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2 } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Search } from 'lucide-react';
 import { format } from 'date-fns';
 
 const EventRegistration: React.FC = () => {
@@ -14,6 +14,10 @@ const EventRegistration: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Auto-suggestion state
+  const [suggestions, setSuggestions] = useState<Participant[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -43,6 +47,42 @@ const EventRegistration: React.FC = () => {
     setLoading(false);
   };
 
+  const handleNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData(prev => ({ ...prev, full_name: value }));
+
+    if (value.length >= 2) {
+        const { data } = await supabase
+            .from('participants')
+            .select('*')
+            .ilike('full_name', `%${value}%`)
+            .limit(5);
+        
+        if (data && data.length > 0) {
+            setSuggestions(data);
+            setShowSuggestions(true);
+        } else {
+            setSuggestions([]);
+            setShowSuggestions(false);
+        }
+    } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+    }
+  };
+
+  const selectSuggestion = (p: Participant) => {
+      setFormData({
+          full_name: p.full_name,
+          email: p.email,
+          gender: p.gender || 'Male',
+          position: p.position,
+          office: p.office
+      });
+      setSuggestions([]);
+      setShowSuggestions(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -63,7 +103,13 @@ const EventRegistration: React.FC = () => {
 
         if (existingUser) {
             participantId = existingUser.participant_id;
-            // Optional: Update details if they changed? Skipping for simplicity/speed
+            // Update existing participant details to match current form data
+            await supabase.from('participants').update({
+                full_name: formData.full_name,
+                gender: formData.gender,
+                position: formData.position,
+                office: formData.office
+            }).eq('participant_id', participantId);
         } else {
             // Create new participant
             // Generate a unique code: Initials + Timestamp + Random
@@ -227,10 +273,30 @@ const EventRegistration: React.FC = () => {
                                 required 
                                 type="text"
                                 className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                                placeholder="John Doe"
+                                placeholder="Type your name..."
                                 value={formData.full_name}
-                                onChange={e => setFormData({...formData, full_name: e.target.value})}
+                                onChange={handleNameChange}
+                                onFocus={() => { if(formData.full_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
+                                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                autoComplete="off"
                             />
+                            {showSuggestions && suggestions.length > 0 && (
+                                <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                                    {suggestions.map((p) => (
+                                        <li 
+                                            key={p.participant_id}
+                                            onClick={() => selectSuggestion(p)}
+                                            className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
+                                        >
+                                            <div className="flex justify-between items-center">
+                                                <div className="font-medium text-slate-800 group-hover:text-indigo-700">{p.full_name}</div>
+                                                <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Select</span>
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-0.5">{p.email} • {p.office}</div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </div>
                     </div>
 
