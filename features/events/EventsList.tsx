@@ -1,26 +1,35 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Copy, Check } from 'lucide-react';
-import { format } from 'date-fns';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy } from 'lucide-react';
+import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 
 const EventsList: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  
+  // Modal States
+  const [showEventModal, setShowEventModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  
+  // Selection States
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [viewingParticipants, setViewingParticipants] = useState<any[]>([]);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [copied, setCopied] = useState(false);
   
   // Form State
-  const [formData, setFormData] = useState<Partial<Event>>({
+  const initialFormState = {
       event_name: '',
       venue: '',
       start_date: '',
       end_date: '',
-      status: 'Scheduled'
-  });
+      status: 'Scheduled' as const
+  };
+  const [formData, setFormData] = useState<Partial<Event>>(initialFormState);
 
   useEffect(() => {
     fetchEvents();
@@ -33,19 +42,102 @@ const EventsList: React.FC = () => {
     setLoading(false);
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const fetchEventParticipants = async (eventId: number) => {
+    setLoadingParticipants(true);
+    const { data, error } = await supabase
+        .from('event_participants')
+        .select(`
+            registration_status,
+            registered_at,
+            participants (
+                full_name,
+                participant_code,
+                email,
+                position,
+                office
+            )
+        `)
+        .eq('event_id', eventId);
+    
+    if (!error && data) {
+        setViewingParticipants(data);
+    }
+    setLoadingParticipants(false);
+  };
+
+  // --- Date Formatting Logic ---
+  const formatEventDate = (start: string, end: string) => {
+    if (!start) return 'TBD';
+    const startDate = parseISO(start);
+    const endDate = end ? parseISO(end) : startDate;
+
+    if (start === end) {
+        return format(startDate, 'MMM d, yyyy');
+    }
+
+    if (isSameMonth(startDate, endDate) && isSameYear(startDate, endDate)) {
+        return `${format(startDate, 'MMM d')}-${format(endDate, 'd, yyyy')}`;
+    }
+
+    if (!isSameMonth(startDate, endDate) && isSameYear(startDate, endDate)) {
+        return `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
+    }
+
+    return `${format(startDate, 'MMM d, yyyy')} - ${format(endDate, 'MMM d, yyyy')}`;
+  };
+
+  // --- Handlers ---
+
+  const openCreateModal = () => {
+      setEditingEventId(null);
+      setFormData(initialFormState);
+      setShowEventModal(true);
+  };
+
+  const openEditModal = (e: React.MouseEvent, event: Event) => {
+      e.stopPropagation(); // Prevent row click
+      setEditingEventId(event.event_id);
+      setFormData({
+          event_name: event.event_name,
+          venue: event.venue,
+          start_date: event.start_date,
+          end_date: event.end_date,
+          status: event.status
+      });
+      setShowEventModal(true);
+  };
+
+  const handleSaveEvent = async (e: React.FormEvent) => {
       e.preventDefault();
-      const { error } = await supabase.from('events').insert([formData]);
+      
+      let error;
+      if (editingEventId) {
+          // Update
+          const { error: updateError } = await supabase
+            .from('events')
+            .update(formData)
+            .eq('event_id', editingEventId);
+          error = updateError;
+      } else {
+          // Create
+          const { error: insertError } = await supabase
+            .from('events')
+            .insert([formData]);
+          error = insertError;
+      }
+
       if (!error) {
-          setShowModal(false);
-          setFormData({ event_name: '', venue: '', start_date: '', end_date: '', status: 'Scheduled' });
+          setShowEventModal(false);
+          setEditingEventId(null);
+          setFormData(initialFormState);
           fetchEvents();
       } else {
-        alert("Error creating event: " + error.message);
+        alert("Error saving event: " + error.message);
       }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (e: React.MouseEvent, id: number) => {
+      e.stopPropagation(); // Prevent row click
       if(!confirm('Are you sure? This will delete all attendance logs associated with this event.')) return;
       
       const { error } = await supabase.from('events').delete().eq('event_id', id);
@@ -56,10 +148,17 @@ const EventsList: React.FC = () => {
       }
   };
 
-  const openShareModal = (event: Event) => {
+  const openShareModal = (e: React.MouseEvent, event: Event) => {
+      e.stopPropagation(); // Prevent row click
       setSelectedEvent(event);
       setShowShareModal(true);
       setCopied(false);
+  };
+
+  const handleRowClick = (event: Event) => {
+      setSelectedEvent(event);
+      setShowParticipantsModal(true);
+      fetchEventParticipants(event.event_id);
   };
 
   const getRegistrationLink = (eventId: number) => {
@@ -78,7 +177,7 @@ const EventsList: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-2xl font-bold text-slate-800">Event Management</h2>
         <button 
-            onClick={() => setShowModal(true)}
+            onClick={openCreateModal}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition-colors"
         >
             <CalendarPlus size={20} /> New Event
@@ -104,11 +203,17 @@ const EventsList: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {events.map((event) => (
-                            <tr key={event.event_id} className="hover:bg-slate-50 transition-colors">
-                                <td className="px-6 py-4 font-medium text-slate-800">{event.event_name}</td>
+                            <tr 
+                                key={event.event_id} 
+                                onClick={() => handleRowClick(event)}
+                                className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                            >
+                                <td className="px-6 py-4 font-medium text-slate-800 group-hover:text-indigo-600 transition-colors">
+                                    {event.event_name}
+                                </td>
                                 <td className="px-6 py-4 text-slate-600">{event.venue}</td>
-                                <td className="px-6 py-4 text-slate-600">
-                                    {event.start_date ? format(new Date(event.start_date), 'MMM d, yyyy') : 'TBD'}
+                                <td className="px-6 py-4 text-slate-600 font-medium">
+                                    {formatEventDate(event.start_date, event.end_date)}
                                 </td>
                                 <td className="px-6 py-4">
                                     <span className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1
@@ -126,15 +231,26 @@ const EventsList: React.FC = () => {
                                         {event.status.toUpperCase()}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 flex items-center gap-3">
+                                <td className="px-6 py-4 flex items-center gap-2">
                                     <button 
-                                        onClick={() => openShareModal(event)}
-                                        className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                                        onClick={(e) => openShareModal(e, event)}
+                                        className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-colors"
                                         title="Share Registration Link"
                                     >
                                         <Share2 size={18} />
                                     </button>
-                                    <button onClick={() => handleDelete(event.event_id)} className="text-slate-400 hover:text-red-600 transition-colors">
+                                    <button 
+                                        onClick={(e) => openEditModal(e, event)}
+                                        className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                                        title="Edit Event"
+                                    >
+                                        <Edit size={18} />
+                                    </button>
+                                    <button 
+                                        onClick={(e) => handleDelete(e, event.event_id)} 
+                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                        title="Delete Event"
+                                    >
                                         <Trash2 size={18} />
                                     </button>
                                 </td>
@@ -187,17 +303,91 @@ const EventsList: React.FC = () => {
                                 {copied ? <Check size={18} /> : <Copy size={18} />}
                             </button>
                         </div>
-                        <p className="text-xs text-slate-400 mt-2 text-center">
-                            Share this link or QR code with participants to let them register for <strong>{selectedEvent.event_name}</strong>.
-                        </p>
                     </div>
                 </div>
             </div>
         </div>
       )}
 
-      {/* Create Event Modal */}
-      {showModal && (
+      {/* Participants List Modal */}
+      {showParticipantsModal && selectedEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowParticipantsModal(false)}></div>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col relative z-10 animate-in zoom-in-95 duration-200">
+                {/* Header */}
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-xl">
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <Users className="text-indigo-600" size={24} /> 
+                            {selectedEvent.event_name}
+                        </h3>
+                        <p className="text-sm text-slate-500 mt-1">
+                            {formatEventDate(selectedEvent.start_date, selectedEvent.end_date)} • {selectedEvent.venue}
+                        </p>
+                    </div>
+                    <button onClick={() => setShowParticipantsModal(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                {/* Table Content */}
+                <div className="flex-1 overflow-auto p-0">
+                    {loadingParticipants ? (
+                        <div className="h-full flex items-center justify-center text-slate-400 gap-2">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div> Loading participants...
+                        </div>
+                    ) : (
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-slate-50 text-slate-500 font-semibold sticky top-0 shadow-sm">
+                                <tr>
+                                    <th className="px-6 py-4 w-16 text-center">#</th>
+                                    <th className="px-6 py-4">Participant Name</th>
+                                    <th className="px-6 py-4">Position</th>
+                                    <th className="px-6 py-4">Office</th>
+                                    <th className="px-6 py-4">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {viewingParticipants.map((record, index) => (
+                                    <tr key={index} className="hover:bg-slate-50">
+                                        <td className="px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
+                                        <td className="px-6 py-3">
+                                            <div className="font-medium text-slate-800">{record.participants?.full_name}</div>
+                                            <div className="text-xs text-slate-500">{record.participants?.email}</div>
+                                        </td>
+                                        <td className="px-6 py-3 text-slate-600">{record.participants?.position}</td>
+                                        <td className="px-6 py-3 text-slate-600">{record.participants?.office}</td>
+                                        <td className="px-6 py-3">
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold
+                                                ${record.registration_status === 'Registered' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}
+                                            `}>
+                                                {record.registration_status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {viewingParticipants.length === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="text-center py-10 text-slate-400">
+                                            No participants registered yet.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+                
+                {/* Footer stats */}
+                <div className="p-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 rounded-b-xl flex justify-between">
+                    <span>Total Participants: <b>{viewingParticipants.length}</b></span>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Create/Edit Event Modal */}
+      {showEventModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
             
@@ -205,7 +395,7 @@ const EventsList: React.FC = () => {
             <div 
                 className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
                 aria-hidden="true"
-                onClick={() => setShowModal(false)}
+                onClick={() => setShowEventModal(false)}
             ></div>
 
             {/* Modal Panel */}
@@ -215,10 +405,10 @@ const EventsList: React.FC = () => {
               <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-white flex items-center gap-2" id="modal-title">
                   <CalendarPlus className="h-5 w-5 text-indigo-100" />
-                  Create New Event
+                  {editingEventId ? 'Edit Event' : 'Create New Event'}
                 </h3>
                 <button 
-                  onClick={() => setShowModal(false)}
+                  onClick={() => setShowEventModal(false)}
                   className="text-indigo-100 hover:text-white hover:bg-white/10 p-1 rounded-full transition-all"
                 >
                   <X size={20} />
@@ -226,7 +416,7 @@ const EventsList: React.FC = () => {
               </div>
 
               {/* Form body */}
-              <form onSubmit={handleCreate} className="p-6 space-y-5">
+              <form onSubmit={handleSaveEvent} className="p-6 space-y-5">
                 
                 {/* Event Name */}
                 <div>
@@ -292,7 +482,7 @@ const EventsList: React.FC = () => {
 
                 {/* Status */}
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Initial Status</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
                     <div className="relative group">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <Clock className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
@@ -317,7 +507,7 @@ const EventsList: React.FC = () => {
                 <div className="mt-8 flex justify-end gap-3 pt-5 border-t border-slate-100">
                     <button 
                       type="button" 
-                      onClick={() => setShowModal(false)} 
+                      onClick={() => setShowEventModal(false)} 
                       className="px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all shadow-sm"
                     >
                       Cancel
@@ -326,7 +516,7 @@ const EventsList: React.FC = () => {
                       type="submit" 
                       className="px-6 py-2.5 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-md hover:shadow-lg transition-all"
                     >
-                      Create Event
+                      {editingEventId ? 'Save Changes' : 'Create Event'}
                     </button>
                 </div>
 

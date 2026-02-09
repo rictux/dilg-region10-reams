@@ -9,7 +9,8 @@ import {
   LogOut, 
   Menu, 
   X,
-  FileBarChart
+  FileBarChart,
+  ClipboardList
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -94,7 +95,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <nav className="flex-1 px-4 space-y-2 mt-4 md:mt-0">
             <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" />
             <NavItem to="/events" icon={CalendarDays} label="Events" />
-            <NavItem to="/participants" icon={Users} label="Participants" />
+            <NavItem to="/attendance" icon={ClipboardList} label="Attendance" />
             <NavItem to="/reports" icon={FileBarChart} label="Reports" />
             {/* Admins can also scan if they want */}
             <NavItem to="/scan" icon={ScanLine} label="Scan Mode" />

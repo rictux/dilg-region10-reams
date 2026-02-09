@@ -18,10 +18,12 @@
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
-    "paths": {      
-      "@/*": ["./*"] 
-    }
-  },
-  "include": ["."],
-  "exclude": ["node_modules", "dist"]
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  }
 }

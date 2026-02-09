@@ -49,7 +49,7 @@ const App: React.FC = () => {
             </ProtectedRoute>
           } />
           
-          <Route path="/participants" element={
+          <Route path="/attendance" element={
             <ProtectedRoute allowedRoles={['Admin', 'EventManager']}>
               <Layout><ParticipantsList /></Layout>
             </ProtectedRoute>
@@ -74,6 +74,9 @@ const App: React.FC = () => {
               <Layout><Scanner /></Layout>
             </ProtectedRoute>
           } />
+
+          {/* Catch all - Redirect to Dashboard */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
 
         </Routes>
       </Router>
