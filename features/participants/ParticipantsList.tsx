@@ -166,7 +166,7 @@ const AttendanceList: React.FC = () => {
   const FilterButton = ({ label }: { label: string }) => (
       <button
         onClick={() => setFilter(label)}
-        className={`px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-medium rounded-lg transition-all border whitespace-nowrap ${
+        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all border whitespace-nowrap ${
             filter === label 
             ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' 
             : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
@@ -178,61 +178,68 @@ const AttendanceList: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-                <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                    Attendance 
-                    {events.length === 0 && !loading && (
-                        <span className="text-sm font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">No Events Today</span>
-                    )}
-                    <button 
-                        onClick={handleRefresh} 
-                        className="ml-2 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
-                        title="Refresh Data"
-                    >
-                        <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
-                    </button>
-                </h2>
-                <p className="text-slate-500 text-sm mt-1">
-                    {format(new Date(), 'EEEE, MMMM d, yyyy')}
-                </p>
-            </div>
+      
+      {/* Header Section */}
+      <div>
+        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            Attendance 
+            {events.length === 0 && !loading && (
+                <span className="text-sm font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">No Events Today</span>
+            )}
+            <button 
+                onClick={handleRefresh} 
+                className="ml-2 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                title="Refresh Data"
+            >
+                <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+            </button>
+        </h2>
+        <p className="text-slate-500 text-sm mt-1">
+            {format(new Date(), 'EEEE, MMMM d, yyyy')}
+        </p>
+      </div>
 
-            {/* Event Selector */}
-            {events.length > 0 && (
-                <div className="w-full md:w-auto min-w-[250px]">
-                    <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <select
-                            value={selectedEventId || ''}
-                            onChange={(e) => setSelectedEventId(Number(e.target.value))}
-                            className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer"
-                        >
-                            {events.map(e => (
-                                <option key={e.event_id} value={e.event_id}>
-                                    {e.event_name}
-                                </option>
-                            ))}
-                        </select>
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </div>
+      {/* Toolbar Section: Event Dropdown (Left) & Filters (Right) */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+        
+        {/* Left: Event Selector */}
+        <div className="w-full md:w-auto min-w-[280px]">
+            {events.length > 0 ? (
+                <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <select
+                        value={selectedEventId || ''}
+                        onChange={(e) => setSelectedEventId(Number(e.target.value))}
+                        className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer"
+                    >
+                        {events.map(e => (
+                            <option key={e.event_id} value={e.event_id}>
+                                {e.event_name}
+                            </option>
+                        ))}
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                     </div>
                 </div>
+            ) : (
+                <div className="text-slate-500 text-sm italic py-2">No active events found for today.</div>
             )}
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2 pb-2 overflow-x-auto no-scrollbar">
-            <FilterButton label="Show All" />
-            <FilterButton label="No Logs" />
-            <FilterButton label="With AM" />
-            <FilterButton label="No PM" />
-            <FilterButton label="Complete Logs" />
+        {/* Right: Filters */}
+        <div className="w-full md:w-auto overflow-x-auto no-scrollbar">
+            <div className="flex gap-2">
+                <FilterButton label="Show All" />
+                <FilterButton label="No Logs" />
+                <FilterButton label="With AM" />
+                <FilterButton label="No PM" />
+                <FilterButton label="Complete Logs" />
+            </div>
         </div>
       </div>
 
+      {/* Table Section */}
       {loading && data.length === 0 ? (
         <div className="flex justify-center py-10">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
