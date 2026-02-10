@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Participant, Event } from '../../types/database';
-import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users } from 'lucide-react';
+import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { format } from 'date-fns';
 
@@ -19,6 +19,7 @@ const AttendanceList: React.FC = () => {
   const [filter, setFilter] = useState('Show All');
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
   const [qrToken, setQrToken] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Event Selection State
   const [events, setEvents] = useState<Event[]>([]);
@@ -187,6 +188,11 @@ const AttendanceList: React.FC = () => {
   const filteredData = data.filter(row => {
     const hasAM = !!row.amLog;
     const hasPM = !!row.pmLog;
+
+    // Search Filter
+    if (searchQuery && !row.participant.full_name.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+    }
     
     switch (filter) {
         case 'No Logs': return !hasAM && !hasPM;
@@ -301,35 +307,51 @@ const AttendanceList: React.FC = () => {
       </div>
 
       {/* Toolbar Section: Event Dropdown (Left) & Filters (Right) */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
         
-        {/* Left: Event Selector */}
-        <div className="w-full md:w-auto min-w-[280px]">
-            {events.length > 0 ? (
-                <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <select
-                        value={selectedEventId || ''}
-                        onChange={(e) => setSelectedEventId(Number(e.target.value))}
-                        className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer"
-                    >
-                        {events.map(e => (
-                            <option key={e.event_id} value={e.event_id}>
-                                {e.event_name}
-                            </option>
-                        ))}
-                    </select>
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                        <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+        <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
+            {/* Left: Event Selector */}
+            <div className="w-full md:w-72">
+                {events.length > 0 ? (
+                    <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <select
+                            value={selectedEventId || ''}
+                            onChange={(e) => setSelectedEventId(Number(e.target.value))}
+                            className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer"
+                        >
+                            {events.map(e => (
+                                <option key={e.event_id} value={e.event_id}>
+                                    {e.event_name}
+                                </option>
+                            ))}
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
                     </div>
-                </div>
-            ) : (
-                <div className="text-slate-500 text-sm italic py-2">No active events found for today.</div>
-            )}
+                ) : (
+                    <div className="text-slate-500 text-sm italic py-2">No active events found for today.</div>
+                )}
+            </div>
+
+            {/* Search Bar */}
+            <div className="w-full md:w-64 relative">
+                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                     <Search size={18} />
+                 </div>
+                 <input 
+                    type="text" 
+                    placeholder="Search participants..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                 />
+            </div>
         </div>
 
         {/* Right: Filters */}
-        <div className="w-full md:w-auto overflow-x-auto no-scrollbar">
+        <div className="w-full xl:w-auto overflow-x-auto no-scrollbar">
             <div className="flex gap-2">
                 <FilterButton label="Show All" />
                 <FilterButton label="No Logs" />
