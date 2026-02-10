@@ -123,7 +123,7 @@ const AttendanceSheetPrint: React.FC = () => {
             const rows = getRowsForDate(date);
             
             return (
-                <div key={date.toISOString()} className="w-[297mm] h-[210mm] mx-auto bg-white shadow-xl print:shadow-none print:w-full print:h-screen print:max-w-none page-break-after relative overflow-hidden flex flex-col">
+                <div key={date.toISOString()} className="w-[297mm] h-[210mm] mx-auto bg-white shadow-xl mb-10 print:mb-0 print:shadow-none print:w-full print:h-screen print:max-w-none page-break-after relative overflow-hidden flex flex-col">
                     
                     {/* Header - Matches reference image design */}
                     <div className="flex items-center pt-8 px-8 mb-2">
@@ -151,7 +151,7 @@ const AttendanceSheetPrint: React.FC = () => {
                         <div className="text-sm font-sans text-slate-700 uppercase">
                             {event.venue}
                         </div>
-                        <div className="text-sm font-sans text-slate-900 mt-1">
+                        <div className="text-sm font-sans text-slate-900 font-bold mt-1">
                             {format(date, 'MMMM d, yyyy')}
                         </div>
                     </div>
