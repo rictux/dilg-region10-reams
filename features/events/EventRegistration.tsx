@@ -95,14 +95,18 @@ const EventRegistration: React.FC = () => {
 
         // 1. Check if participant exists by email
         let participantId: number;
+        let finalParticipantCode: string = '';
+
         const { data: existingUser } = await supabase
             .from('participants')
-            .select('participant_id')
+            .select('participant_id, participant_code')
             .eq('email', formData.email)
             .single();
 
         if (existingUser) {
             participantId = existingUser.participant_id;
+            finalParticipantCode = existingUser.participant_code;
+            
             // Update existing participant details to match current form data
             await supabase.from('participants').update({
                 full_name: formData.full_name,
@@ -127,6 +131,7 @@ const EventRegistration: React.FC = () => {
             
             if (createError) throw createError;
             participantId = newUser.participant_id;
+            finalParticipantCode = newUser.participant_code;
         }
 
         // 2. Register for Event
@@ -143,25 +148,8 @@ const EventRegistration: React.FC = () => {
             throw regError;
         }
 
-        // 3. Ensure QR Token Exists
-        let token = '';
-        const { data: qrData } = await supabase
-            .from('participant_qr')
-            .select('qr_token')
-            .eq('participant_id', participantId)
-            .single();
-
-        if (qrData) {
-            token = qrData.qr_token;
-        } else {
-            token = `evt-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-            await supabase.from('participant_qr').insert({
-                participant_id: participantId,
-                qr_token: token
-            });
-        }
-
-        setQrToken(token);
+        // 3. Set QR Token (Use Participant Code)
+        setQrToken(finalParticipantCode);
         setSuccess(true);
 
     } catch (err: any) {
@@ -219,6 +207,7 @@ const EventRegistration: React.FC = () => {
                           <p className="font-bold text-slate-800 text-lg">{formData.full_name}</p>
                           <p className="text-slate-500">{formData.email}</p>
                           <p className="text-slate-500 text-sm mt-1">{formData.position} • {formData.office}</p>
+                          <p className="text-xs text-slate-300 font-mono mt-2">ID: {qrToken}</p>
                       </div>
                       
                       <button 

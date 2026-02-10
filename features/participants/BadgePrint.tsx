@@ -20,18 +20,11 @@ const BadgePrint: React.FC = () => {
         
         // 1. Get Participant
         const { data: pData } = await supabase.from('participants').select('*').eq('participant_id', participantId).single();
-        if (pData) setParticipant(pData);
-
-        // 2. Get QR
-        const { data: qData } = await supabase.from('participant_qr').select('qr_token').eq('participant_id', participantId).single();
-        if (qData) {
-            setQrToken(qData.qr_token);
-        } else {
-            // Auto generate if visited directly and missing
-            const token = `evt-${Date.now()}`;
-            await supabase.from('participant_qr').insert({ participant_id: participantId, qr_token: token });
-            setQrToken(token);
+        if (pData) {
+            setParticipant(pData);
+            setQrToken(pData.participant_code);
         }
+
         setLoading(false);
     };
     fetchData();

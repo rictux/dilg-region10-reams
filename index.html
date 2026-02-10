@@ -35,6 +35,18 @@
         .print-only {
           display: block !important;
         }
+        .page-break-after {
+            page-break-after: always;
+            break-after: page;
+        }
+        body {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        @page {
+            margin: 0.5cm;
+            size: landscape;
+        }
       }
     </style>
   <script type="importmap">
@@ -56,6 +68,5 @@
 </head>
   <body>
     <div id="root"></div>
-      <script type="module" src="/index.tsx"></script>
   </body>
 </html>

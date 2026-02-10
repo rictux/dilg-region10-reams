@@ -77,7 +77,11 @@ const Scanner: React.FC = () => {
   const startScanner = async () => {
     await cleanupScanner(); // Ensure clean state
 
-    const html5QrCode = new Html5Qrcode(readerId);
+    // Move formatsToSupport to constructor
+    const html5QrCode = new Html5Qrcode(readerId, { 
+      formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ],
+      verbose: false 
+    });
     scannerRef.current = html5QrCode;
 
     try {
@@ -87,7 +91,6 @@ const Scanner: React.FC = () => {
                 fps: 10,
                 qrbox: { width: 250, height: 250 },
                 aspectRatio: window.innerWidth / window.innerHeight,
-                formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
             },
             (decodedText) => {
                 handleScan(decodedText);
@@ -120,27 +123,18 @@ const Scanner: React.FC = () => {
         const eventId = parseInt(selectedEventId);
         if (isNaN(eventId)) throw new Error("No event selected");
 
-        // 1. Find Participant by QR
-        const { data: qrData, error: qrError } = await supabase
-            .from('participant_qr')
-            .select('participant_id')
-            .eq('qr_token', qrToken)
+        // 1. Find Participant by Code (matches participant_code)
+        const { data: partData, error: partError } = await supabase
+            .from('participants')
+            .select('participant_id, full_name, position, office')
+            .eq('participant_code', qrToken)
             .single();
 
-        if (qrError || !qrData) {
-            throw new Error("QR Code not found in system.");
+        if (partError || !partData) {
+            throw new Error("Participant not found.");
         }
 
-        const participantId = qrData.participant_id;
-
-        // 2. Fetch Participant Details
-        const { data: partData } = await supabase
-            .from('participants')
-            .select('full_name, position, office')
-            .eq('participant_id', participantId)
-            .single();
-        
-        if (!partData) throw new Error("Participant details not found.");
+        const participantId = partData.participant_id;
         
         setParticipantDetails({
             name: partData.full_name,
@@ -175,6 +169,8 @@ const Scanner: React.FC = () => {
             .single();
 
         if (existingLog) {
+            // Note: We don't save to DB for duplicates because unique constraint prevents it
+            // We just trigger the UI feedback
             await logScan(eventId, participantId, 'Duplicate', 'Already Scanned');
             triggerFeedback('Duplicate', `Already scanned for ${session}.`);
             return;
@@ -193,21 +189,32 @@ const Scanner: React.FC = () => {
 
   const logScan = async (eventId: number, participantId: number, status: 'Valid' | 'Invalid' | 'Duplicate', notes?: string) => {
       if (!user) return;
-      if (participantId === 0) return; // Don't log unknown participants 
       
+      // If status is duplicate, the DB unique constraint (event, participant, date, session) 
+      // will block the insert. So we skip the DB call to prevent errors.
+      if (status === 'Duplicate') return;
+
       const today = new Date().toISOString().split('T')[0];
       
-      await supabase.from('attendance_logs').insert({
-          event_id: eventId,
-          participant_id: participantId,
+      // Handle Invalid scans where ID might be 0. Convert to null to respect Foreign Key constraints.
+      const dbEventId = eventId === 0 ? null : eventId;
+      const dbParticipantId = participantId === 0 ? null : participantId;
+
+      const { error } = await supabase.from('attendance_logs').insert({
+          event_id: dbEventId,
+          participant_id: dbParticipantId,
           user_id: user.user_id,
           scan_status: status,
-          scan_time: new Date().toISOString(),
+          // scan_time: omitted to let DB use default now() which is safer
           attendance_date: today,
           action_session: session,
           remarks: notes,
           scanner_device: navigator.userAgent
       });
+
+      if (error) {
+          console.error("Error saving attendance log:", error);
+      }
   };
 
   const triggerFeedback = (type: 'Valid' | 'Invalid' | 'Duplicate', msg: string) => {

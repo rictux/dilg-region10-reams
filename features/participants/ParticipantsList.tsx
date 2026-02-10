@@ -17,7 +17,6 @@ const AttendanceList: React.FC = () => {
   const [filter, setFilter] = useState('Show All');
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
   const [qrToken, setQrToken] = useState<string>('');
-  const [modalLoading, setModalLoading] = useState(false);
   
   // Event Selection State
   const [events, setEvents] = useState<Event[]>([]);
@@ -131,28 +130,9 @@ const AttendanceList: React.FC = () => {
     }
   });
 
-  const handleRowClick = async (p: Participant) => {
+  const handleRowClick = (p: Participant) => {
     setSelectedParticipant(p);
-    setModalLoading(true);
-    
-    // Fetch or Generate QR Token
-    const { data: qData } = await supabase
-        .from('participant_qr')
-        .select('qr_token')
-        .eq('participant_id', p.participant_id)
-        .single();
-    
-    if (qData) {
-        setQrToken(qData.qr_token);
-    } else {
-        const token = `evt-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        await supabase.from('participant_qr').insert({ 
-            participant_id: p.participant_id, 
-            qr_token: token 
-        });
-        setQrToken(token);
-    }
-    setModalLoading(false);
+    setQrToken(p.participant_code);
   };
 
   const handleRefresh = () => {
@@ -333,31 +313,25 @@ const AttendanceList: React.FC = () => {
 
                 {/* Badge Content */}
                 <div className="p-8 flex flex-col items-center text-center">
-                     {modalLoading ? (
-                         <div className="py-10">
-                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                         </div>
-                     ) : (
-                         <>
-                            <div className="border-4 border-slate-900 p-3 rounded-xl mb-6 bg-white shadow-sm">
-                                {qrToken && <QRCode value={qrToken} size={160} />}
-                            </div>
-                            
-                            <h2 className="text-xl font-bold text-slate-800">{selectedParticipant.full_name}</h2>
-                            <p className="text-indigo-600 font-medium mb-1">{selectedParticipant.position}</p>
-                            <p className="text-slate-500 text-sm">{selectedParticipant.office}</p>
-                            
-                            <div className="mt-6 pt-6 border-t border-slate-100 w-full">
-                                <p className="text-xs text-slate-400 font-mono mb-4">{selectedParticipant.participant_code}</p>
-                                <button 
-                                    onClick={() => window.print()}
-                                    className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
-                                >
-                                    <Printer size={18} /> Print Badge
-                                </button>
-                            </div>
-                         </>
-                     )}
+                     <>
+                        <div className="border-4 border-slate-900 p-3 rounded-xl mb-6 bg-white shadow-sm">
+                            {qrToken && <QRCode value={qrToken} size={160} />}
+                        </div>
+                        
+                        <h2 className="text-xl font-bold text-slate-800">{selectedParticipant.full_name}</h2>
+                        <p className="text-indigo-600 font-medium mb-1">{selectedParticipant.position}</p>
+                        <p className="text-slate-500 text-sm">{selectedParticipant.office}</p>
+                        
+                        <div className="mt-6 pt-6 border-t border-slate-100 w-full">
+                            <p className="text-xs text-slate-400 font-mono mb-4">{selectedParticipant.participant_code}</p>
+                            <button 
+                                onClick={() => window.print()}
+                                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
+                            >
+                                <Printer size={18} /> Print Badge
+                            </button>
+                        </div>
+                     </>
                 </div>
             </div>
         </div>

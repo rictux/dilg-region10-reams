@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
@@ -10,7 +10,13 @@ import {
   Menu, 
   X,
   FileBarChart,
-  ClipboardList
+  ClipboardList,
+  KeyRound,
+  Loader2,
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
+  User
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -18,17 +24,69 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, changePassword } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Password Modal State
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [pwForm, setPwForm] = useState({ new: '', confirm: '' });
+  const [pwStatus, setPwStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [pwMessage, setPwMessage] = useState('');
 
   // If scanner role, strictly show simplified layout or redirect
   const isScanner = user?.role === 'Scanner';
 
+  // Click outside listener for dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsProfileDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwStatus('loading');
+    setPwMessage('');
+
+    if (pwForm.new !== pwForm.confirm) {
+        setPwStatus('error');
+        setPwMessage("New passwords do not match.");
+        return;
+    }
+
+    if (pwForm.new.length < 4) {
+        setPwStatus('error');
+        setPwMessage("Password must be at least 4 characters.");
+        return;
+    }
+
+    try {
+        await changePassword(pwForm.new);
+        setPwStatus('success');
+        setPwMessage("Password changed successfully.");
+        setPwForm({ new: '', confirm: '' });
+        setTimeout(() => {
+            setIsPasswordModalOpen(false);
+            setPwStatus('idle');
+            setPwMessage('');
+        }, 1500);
+    } catch (err: any) {
+        setPwStatus('error');
+        setPwMessage(err.message || "Failed to change password.");
+    }
   };
 
   const NavItem = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => {
@@ -51,6 +109,73 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     );
   };
 
+  const PasswordModal = () => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" 
+            onClick={() => setIsPasswordModalOpen(false)}
+        ></div>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 flex justify-between items-center text-white">
+                <h3 className="font-semibold flex items-center gap-2">
+                    <KeyRound size={20} /> Change Password
+                </h3>
+                <button 
+                    onClick={() => setIsPasswordModalOpen(false)} 
+                    className="text-indigo-100 hover:text-white p-1 hover:bg-white/20 rounded-full transition"
+                >
+                    <X size={20} />
+                </button>
+            </div>
+            
+            <div className="p-6">
+                {pwStatus === 'success' ? (
+                    <div className="flex flex-col items-center justify-center py-6 text-center text-green-600">
+                        <CheckCircle size={48} className="mb-3" />
+                        <p className="font-bold text-lg">Password Updated!</p>
+                    </div>
+                ) : (
+                    <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                        {pwStatus === 'error' && (
+                            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-100">
+                                {pwMessage}
+                            </div>
+                        )}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">New Password</label>
+                            <input 
+                                type="password" 
+                                required
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                value={pwForm.new}
+                                onChange={e => setPwForm({...pwForm, new: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Confirm New Password</label>
+                            <input 
+                                type="password" 
+                                required
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                value={pwForm.confirm}
+                                onChange={e => setPwForm({...pwForm, confirm: e.target.value})}
+                            />
+                        </div>
+                        <button 
+                            type="submit" 
+                            disabled={pwStatus === 'loading'}
+                            className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-all flex justify-center items-center gap-2 mt-2"
+                        >
+                            {pwStatus === 'loading' && <Loader2 className="animate-spin" size={18} />}
+                            Update Password
+                        </button>
+                    </form>
+                )}
+            </div>
+        </div>
+    </div>
+  );
+
   // Scanner Layout (Minimal)
   if (isScanner) {
     return (
@@ -58,13 +183,43 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         {/* Top Bar for Scanner */}
         <header className="bg-white shadow-sm p-4 flex justify-between items-center z-10 sticky top-0">
           <h1 className="text-xl font-bold text-indigo-600">EventPulse Scan</h1>
-          <button onClick={handleSignOut} className="text-slate-500 hover:text-red-500">
-            <LogOut size={24} />
-          </button>
+          <div className="relative" ref={dropdownRef}>
+            <button 
+                onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 py-1.5 px-3 rounded-full transition-colors text-slate-700"
+            >
+                <div className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center">
+                    <User size={14} />
+                </div>
+                <span className="text-sm font-medium hidden sm:block">{user?.username}</span>
+                <ChevronDown size={14} />
+            </button>
+
+            {isProfileDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                    <button
+                        onClick={() => {
+                            setIsPasswordModalOpen(true);
+                            setIsProfileDropdownOpen(false);
+                        }}
+                        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                    >
+                        <KeyRound size={16} /> Change Password
+                    </button>
+                    <button
+                        onClick={handleSignOut}
+                        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                        <LogOut size={16} /> Sign Out
+                    </button>
+                </div>
+            )}
+          </div>
         </header>
         <main className="flex-1 relative overflow-hidden">
             {children}
         </main>
+        {isPasswordModalOpen && <PasswordModal />}
       </div>
     );
   }
@@ -101,17 +256,45 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <NavItem to="/scan" icon={ScanLine} label="Scan Mode" />
           </nav>
 
-          <div className="p-4 border-t border-slate-200">
-            <div className="mb-4 px-4">
-              <p className="text-sm font-semibold text-slate-700 truncate">{user?.full_name}</p>
-              <p className="text-xs text-slate-500 capitalize">{user?.role}</p>
-            </div>
-            <button
-              onClick={handleSignOut}
-              className="flex items-center space-x-3 w-full px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          <div className="p-4 border-t border-slate-200 relative" ref={dropdownRef}>
+            
+            {/* Pop-up Dropdown Menu */}
+            {isProfileDropdownOpen && (
+                <div className="absolute bottom-full left-4 right-4 mb-2 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in slide-in-from-bottom-2 duration-200">
+                    <button
+                        onClick={() => {
+                            setIsPasswordModalOpen(true);
+                            setIsProfileDropdownOpen(false);
+                        }}
+                        className="flex items-center gap-3 w-full px-4 py-3 text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                    >
+                        <KeyRound size={18} /> Change Password
+                    </button>
+                    <div className="h-px bg-slate-100 mx-2 my-1"></div>
+                    <button
+                        onClick={handleSignOut}
+                        className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                        <LogOut size={18} /> Sign Out
+                    </button>
+                </div>
+            )}
+
+            {/* User Profile Trigger */}
+            <button 
+                onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                className={`flex items-center w-full p-2.5 rounded-lg transition-all ${isProfileDropdownOpen ? 'bg-indigo-50 border-indigo-100' : 'hover:bg-slate-50 border border-transparent'}`}
             >
-              <LogOut size={20} />
-              <span>Sign Out</span>
+                <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg mr-3">
+                    {user?.full_name.charAt(0)}
+                </div>
+                <div className="flex-1 text-left overflow-hidden">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{user?.full_name}</p>
+                    <p className="text-xs text-slate-500 capitalize truncate">{user?.role}</p>
+                </div>
+                <div className="text-slate-400">
+                    {isProfileDropdownOpen ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                </div>
             </button>
           </div>
         </div>
@@ -129,6 +312,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
+
+      {/* Global Password Modal */}
+      {isPasswordModalOpen && <PasswordModal />}
     </div>
   );
 };

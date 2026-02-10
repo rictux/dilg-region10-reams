@@ -184,90 +184,112 @@ const EventsList: React.FC = () => {
         </button>
       </div>
 
-      {loading ? (
-          <div className="flex justify-center py-10">
-             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                      <tr>
+                          <th className="px-6 py-4">Event Name</th>
+                          <th className="px-6 py-4">Venue</th>
+                          <th className="px-6 py-4">Date</th>
+                          <th className="px-6 py-4">Status</th>
+                          <th className="px-6 py-4">Actions</th>
+                      </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                      {loading ? (
+                          // Skeleton Rows
+                          [...Array(5)].map((_, i) => (
+                              <tr key={i} className="animate-pulse">
+                                  <td className="px-6 py-4">
+                                      <div className="h-5 bg-slate-200 rounded w-48 mb-2"></div>
+                                      <div className="h-3 bg-slate-100 rounded w-24"></div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                      <div className="h-4 bg-slate-200 rounded w-32"></div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                      <div className="h-4 bg-slate-200 rounded w-24"></div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                      <div className="h-6 bg-slate-200 rounded-full w-20"></div>
+                                  </td>
+                                  <td className="px-6 py-4 flex gap-2">
+                                      <div className="h-8 w-8 bg-slate-200 rounded"></div>
+                                      <div className="h-8 w-8 bg-slate-200 rounded"></div>
+                                      <div className="h-8 w-8 bg-slate-200 rounded"></div>
+                                  </td>
+                              </tr>
+                          ))
+                      ) : (
+                          <>
+                              {events.map((event) => (
+                                  <tr 
+                                      key={event.event_id} 
+                                      onClick={() => handleRowClick(event)}
+                                      className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                                  >
+                                      <td className="px-6 py-4 font-medium text-slate-800 group-hover:text-indigo-600 transition-colors">
+                                          {event.event_name}
+                                      </td>
+                                      <td className="px-6 py-4 text-slate-600">{event.venue}</td>
+                                      <td className="px-6 py-4 text-slate-600 font-medium">
+                                          {formatEventDate(event.start_date, event.end_date)}
+                                      </td>
+                                      <td className="px-6 py-4">
+                                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1
+                                              ${event.status === 'Ongoing' ? 'bg-green-100 text-green-700' : ''}
+                                              ${event.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' : ''}
+                                              ${event.status === 'Completed' ? 'bg-slate-100 text-slate-700' : ''}
+                                              ${event.status === 'Cancelled' ? 'bg-red-100 text-red-700' : ''}
+                                          `}>
+                                              <span className={`w-1.5 h-1.5 rounded-full 
+                                                  ${event.status === 'Ongoing' ? 'bg-green-500' : ''}
+                                                  ${event.status === 'Scheduled' ? 'bg-blue-500' : ''}
+                                                  ${event.status === 'Completed' ? 'bg-slate-500' : ''}
+                                                  ${event.status === 'Cancelled' ? 'bg-red-500' : ''}
+                                              `}></span>
+                                              {event.status.toUpperCase()}
+                                          </span>
+                                      </td>
+                                      <td className="px-6 py-4 flex items-center gap-2">
+                                          <button 
+                                              onClick={(e) => openShareModal(e, event)}
+                                              className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-colors"
+                                              title="Share Registration Link"
+                                          >
+                                              <Share2 size={18} />
+                                          </button>
+                                          <button 
+                                              onClick={(e) => openEditModal(e, event)}
+                                              className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                                              title="Edit Event"
+                                          >
+                                              <Edit size={18} />
+                                          </button>
+                                          <button 
+                                              onClick={(e) => handleDelete(e, event.event_id)} 
+                                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                              title="Delete Event"
+                                          >
+                                              <Trash2 size={18} />
+                                          </button>
+                                      </td>
+                                  </tr>
+                              ))}
+                              {events.length === 0 && (
+                                  <tr>
+                                      <td colSpan={5} className="text-center py-8 text-slate-400">
+                                          No events found. Create one to get started.
+                                      </td>
+                                  </tr>
+                              )}
+                          </>
+                      )}
+                  </tbody>
+              </table>
           </div>
-      ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                    <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
-                        <tr>
-                            <th className="px-6 py-4">Event Name</th>
-                            <th className="px-6 py-4">Venue</th>
-                            <th className="px-6 py-4">Date</th>
-                            <th className="px-6 py-4">Status</th>
-                            <th className="px-6 py-4">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {events.map((event) => (
-                            <tr 
-                                key={event.event_id} 
-                                onClick={() => handleRowClick(event)}
-                                className="hover:bg-slate-50 transition-colors cursor-pointer group"
-                            >
-                                <td className="px-6 py-4 font-medium text-slate-800 group-hover:text-indigo-600 transition-colors">
-                                    {event.event_name}
-                                </td>
-                                <td className="px-6 py-4 text-slate-600">{event.venue}</td>
-                                <td className="px-6 py-4 text-slate-600 font-medium">
-                                    {formatEventDate(event.start_date, event.end_date)}
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1
-                                        ${event.status === 'Ongoing' ? 'bg-green-100 text-green-700' : ''}
-                                        ${event.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' : ''}
-                                        ${event.status === 'Completed' ? 'bg-slate-100 text-slate-700' : ''}
-                                        ${event.status === 'Cancelled' ? 'bg-red-100 text-red-700' : ''}
-                                    `}>
-                                        <span className={`w-1.5 h-1.5 rounded-full 
-                                            ${event.status === 'Ongoing' ? 'bg-green-500' : ''}
-                                            ${event.status === 'Scheduled' ? 'bg-blue-500' : ''}
-                                            ${event.status === 'Completed' ? 'bg-slate-500' : ''}
-                                            ${event.status === 'Cancelled' ? 'bg-red-500' : ''}
-                                        `}></span>
-                                        {event.status.toUpperCase()}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 flex items-center gap-2">
-                                    <button 
-                                        onClick={(e) => openShareModal(e, event)}
-                                        className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-colors"
-                                        title="Share Registration Link"
-                                    >
-                                        <Share2 size={18} />
-                                    </button>
-                                    <button 
-                                        onClick={(e) => openEditModal(e, event)}
-                                        className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                                        title="Edit Event"
-                                    >
-                                        <Edit size={18} />
-                                    </button>
-                                    <button 
-                                        onClick={(e) => handleDelete(e, event.event_id)} 
-                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                        title="Delete Event"
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                        {events.length === 0 && (
-                            <tr>
-                                <td colSpan={5} className="text-center py-8 text-slate-400">
-                                    No events found. Create one to get started.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-      )}
+      </div>
 
       {/* Share / Registration Modal */}
       {showShareModal && selectedEvent && (

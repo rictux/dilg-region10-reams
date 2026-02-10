@@ -8,6 +8,7 @@ interface AuthContextType {
   login: (username: string, passwordHash: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  changePassword: (newPw: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -85,6 +86,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const changePassword = async (newPw: string) => {
+    if (!user) throw new Error("No user logged in");
+    
+    // Direct update without checking old password
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ password_hash: newPw })
+      .eq('user_id', user.user_id);
+
+    if (updateError) throw new Error("Failed to update password. Please try again.");
+  };
+
   const refreshProfile = async () => {
     if (user) {
       await refreshUserProfile(user.user_id);
@@ -97,7 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, loading, login, signOut, refreshProfile, changePassword }}>
       {children}
     </AuthContext.Provider>
   );
