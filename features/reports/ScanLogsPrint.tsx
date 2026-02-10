@@ -196,7 +196,7 @@ const ScanLogsPrint: React.FC = () => {
                         <p className="font-bold uppercase text-slate-900 text-sm border-b border-black min-w-[200px] pb-1">
                             {user?.full_name}
                         </p>
-                        <p className="text-[10px] text-slate-500 uppercase mt-1">{user?.role}</p>
+                        <p className="text-[10px] text-slate-500 uppercase mt-1">{user?.position || user?.role}</p>
                     </div>
                 </div>
             </div>
