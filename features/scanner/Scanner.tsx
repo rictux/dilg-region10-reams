@@ -11,9 +11,7 @@ import {
   AlertTriangle, 
   History, 
   User, 
-  MapPin, 
-  Clock,
-  ChevronRight
+  MapPin
 } from 'lucide-react';
 import { Event } from '../../types/database';
 import { format } from 'date-fns';
@@ -44,6 +42,13 @@ const Scanner: React.FC = () => {
   
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const readerId = "qr-reader-viewport";
+  
+  // Ref to hold selectedEventId to avoid restarting scanner on change
+  const eventIdRef = useRef(selectedEventId);
+
+  useEffect(() => {
+    eventIdRef.current = selectedEventId;
+  }, [selectedEventId]);
 
   // 1. Load Events
   useEffect(() => {
@@ -72,16 +77,27 @@ const Scanner: React.FC = () => {
 
   // 2. Initialize Scanner logic
    useEffect(() => {
-    // Only start if we have an event selected and not currently showing a result
+    // Start condition: Have event, no result on screen, not currently scanning
     if (selectedEventId && !scanResult && !scanning) {
        startScanner();
+    } 
+    // Stop condition: No event selected (and is scanning), or Result is showing (and is scanning)
+    // Note: handleScan usually stops it before showing result, but this acts as a safety
+    else if ((!selectedEventId || scanResult) && scanning) {
+        cleanupScanner();
     }
     
-    return () => {
-      cleanupScanner();
-    };
+    // We intentionally DO NOT cleanup on every render to keep camera alive when switching events.
+    // Cleanup is handled by the mount/unmount effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEventId, scanResult]);
+  }, [selectedEventId, scanResult, scanning]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+      return () => {
+          cleanupScanner();
+      };
+  }, []);
 
   const cleanupScanner = async () => {
     if (scannerRef.current) {
@@ -99,7 +115,10 @@ const Scanner: React.FC = () => {
   };
 
   const startScanner = async () => {
-    await cleanupScanner(); 
+    // Ensure clean state before starting
+    if (scannerRef.current) {
+        await cleanupScanner();
+    }
 
     const html5QrCode = new Html5Qrcode(readerId, { 
       formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ],
@@ -140,7 +159,10 @@ const Scanner: React.FC = () => {
     } catch (e) { console.error(e) }
 
     try {
-        const eventId = parseInt(selectedEventId);
+        // Use Ref to get the latest event ID without needing to restart scanner closure
+        const currentEventIdStr = eventIdRef.current;
+        const eventId = parseInt(currentEventIdStr);
+        
         if (isNaN(eventId)) throw new Error("No event selected");
 
         // 1. Find Participant
