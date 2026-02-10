@@ -11,6 +11,7 @@ import BadgePrint from './features/participants/BadgePrint';
 import Scanner from './features/scanner/Scanner';
 import Reports from './features/reports/Reports';
 import AttendanceSheetPrint from './features/participants/AttendanceSheetPrint';
+import ScanLogsPrint from './features/reports/ScanLogsPrint';
 
 const ProtectedRoute = ({ children, allowedRoles }: React.PropsWithChildren<{ allowedRoles?: string[] }>) => {
   const { user, loading } = useAuth();
@@ -73,6 +74,13 @@ const App: React.FC = () => {
           <Route path="/print-attendance/:eventId" element={
             <ProtectedRoute allowedRoles={['Admin', 'EventManager']}>
               <AttendanceSheetPrint />
+            </ProtectedRoute>
+          } />
+
+          {/* Scan Logs Print View - (Printable, no layout) */}
+          <Route path="/print-scan-logs/:eventId?" element={
+            <ProtectedRoute allowedRoles={['Admin', 'EventManager']}>
+              <ScanLogsPrint />
             </ProtectedRoute>
           } />
 

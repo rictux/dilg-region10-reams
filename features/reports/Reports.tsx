@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Download, Printer, FileText, Calendar } from 'lucide-react';
+import { Printer, Calendar, ScrollText } from 'lucide-react';
 import { Event } from '../../types/database';
 import { useNavigate } from 'react-router-dom';
 
@@ -23,55 +23,10 @@ const Reports: React.FC = () => {
     setLoading(false);
   };
 
-  const downloadCSV = async () => {
-    let query = supabase
-        .from('attendance_logs')
-        .select(`
-            attendance_date,
-            scan_time,
-            action_session,
-            scan_status,
-            events (event_name),
-            participants (full_name, participant_code, office)
-        `)
-        .order('scan_time', { ascending: false });
-
-    // Filter by event if selected
-    if (selectedEventId) {
-        query = query.eq('event_id', parseInt(selectedEventId));
-    }
-
-    const { data, error } = await query;
-
-    if (error || !data) {
-        alert("Failed to fetch data: " + (error?.message || ""));
-        return;
-    }
-
-    // Flatten data
-    const csvRows = [
-        ['Date', 'Time', 'Event', 'Participant Name', 'Code', 'Office', 'Session', 'Status'],
-        ...data.map((row: any) => [
-            row.attendance_date,
-            new Date(row.scan_time).toLocaleTimeString(),
-            row.events?.event_name || 'N/A',
-            row.participants?.full_name || 'N/A',
-            row.participants?.participant_code || 'N/A',
-            row.participants?.office || 'N/A',
-            row.action_session,
-            row.scan_status
-        ])
-    ];
-
-    const csvContent = "data:text/csv;charset=utf-8," 
-        + csvRows.map(e => e.join(",")).join("\n");
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `attendance_report_${selectedEventId ? 'event_' + selectedEventId : 'all'}_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
+  const handlePrintScanLogs = () => {
+    // Navigate to the print scan logs page, optionally with an event ID
+    const url = selectedEventId ? `/print-scan-logs/${selectedEventId}` : '/print-scan-logs';
+    navigate(url);
   };
 
   const handlePrintAttendance = () => {
@@ -100,7 +55,7 @@ const Reports: React.FC = () => {
                             onChange={(e) => setSelectedEventId(e.target.value)}
                             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                         >
-                            <option value="">All Events (CSV Only)</option>
+                            <option value="">All Events (Master Log)</option>
                             {events.map(e => (
                                 <option key={e.event_id} value={e.event_id}>{e.event_name}</option>
                             ))}
@@ -113,24 +68,24 @@ const Reports: React.FC = () => {
         {/* Actions Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
-            {/* CSV Export Card */}
+            {/* Print Scan Logs Card */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
                 <div className="bg-emerald-100 p-3 rounded-lg text-emerald-600 mb-4">
-                    <FileText size={24} />
+                    <ScrollText size={24} />
                 </div>
-                <h3 className="text-lg font-bold text-slate-800 mb-2">Raw Data Export</h3>
+                <h3 className="text-lg font-bold text-slate-800 mb-2">Print Scan Logs</h3>
                 <p className="text-slate-500 text-sm mb-6 flex-1">
-                    Download a complete CSV file of attendance scans. Useful for spreadsheets and custom analysis.
+                    Generate a detailed log of every scan transaction, including timestamps, scanner operator details, and participant info.
                 </p>
                 <button 
-                    onClick={downloadCSV}
+                    onClick={handlePrintScanLogs}
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
                 >
-                    <Download size={18} /> Download CSV
+                    <Printer size={18} /> Print Scan Logs
                 </button>
             </div>
 
-            {/* Print Attendance Card */}
+            {/* Print Attendance Sheet Card */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
                 <div className="bg-indigo-100 p-3 rounded-lg text-indigo-600 mb-4">
                     <Printer size={24} />

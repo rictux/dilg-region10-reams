@@ -5,7 +5,7 @@ import { User } from '../types/database';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (username: string, passwordHash: string) => Promise<void>;
+  login: (username: string, passwordHash: string, remember?: boolean) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   changePassword: (newPw: string) => Promise<void>;
@@ -17,9 +17,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user from local storage on mount
+  // Load user from local storage or session storage on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem('eventpulse_user');
+    const storedUser = localStorage.getItem('eventpulse_user') || sessionStorage.getItem('eventpulse_user');
     if (storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
@@ -27,6 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         refreshUserProfile(parsedUser.user_id);
       } catch (e) {
         localStorage.removeItem('eventpulse_user');
+        sessionStorage.removeItem('eventpulse_user');
         setLoading(false);
       }
     } else {
@@ -48,7 +49,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signOut();
       } else {
         setUser(data as User);
-        localStorage.setItem('eventpulse_user', JSON.stringify(data));
+        // Update storage if it exists there to keep data fresh
+        if (localStorage.getItem('eventpulse_user')) {
+            localStorage.setItem('eventpulse_user', JSON.stringify(data));
+        } else if (sessionStorage.getItem('eventpulse_user')) {
+            sessionStorage.setItem('eventpulse_user', JSON.stringify(data));
+        }
       }
     } catch (err) {
       console.error('Error refreshing profile', err);
@@ -57,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const login = async (username: string, passwordHash: string) => {
+  const login = async (username: string, passwordHash: string, remember: boolean = false) => {
     setLoading(true);
     try {
       // Direct query to check credentials
@@ -77,7 +83,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const loggedInUser = data as User;
       setUser(loggedInUser);
-      localStorage.setItem('eventpulse_user', JSON.stringify(loggedInUser));
+      
+      if (remember) {
+        localStorage.setItem('eventpulse_user', JSON.stringify(loggedInUser));
+      } else {
+        sessionStorage.setItem('eventpulse_user', JSON.stringify(loggedInUser));
+      }
     } catch (error: any) {
       setLoading(false);
       throw error;
@@ -106,6 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     localStorage.removeItem('eventpulse_user');
+    sessionStorage.removeItem('eventpulse_user');
     setUser(null);
   };
 

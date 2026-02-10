@@ -6,6 +6,7 @@ import { Lock, User } from 'lucide-react';
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -17,10 +18,10 @@ const Login: React.FC = () => {
     setError(null);
 
     try {
-      await login(username, password);
+      await login(username, password, rememberMe);
       // Navigation is handled in the component, but we check role here or rely on ProtectedRoute redirect
       // For better UX, we can redirect based on role immediately
-      const storedUser = localStorage.getItem('eventpulse_user');
+      const storedUser = localStorage.getItem('eventpulse_user') || sessionStorage.getItem('eventpulse_user');
       if (storedUser) {
         const user = JSON.parse(storedUser);
         if (user.role === 'Scanner') {
@@ -79,6 +80,20 @@ const Login: React.FC = () => {
                 placeholder="••••••••"
               />
             </div>
+          </div>
+
+          <div className="flex items-center">
+            <input
+              id="remember-me"
+              name="remember-me"
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-700">
+              Remember me
+            </label>
           </div>
 
           <button

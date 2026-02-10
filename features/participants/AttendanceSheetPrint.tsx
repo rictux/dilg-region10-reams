@@ -151,7 +151,7 @@ const AttendanceSheetPrint: React.FC = () => {
                         <div className="text-sm font-sans text-slate-700 uppercase">
                             {event.venue}
                         </div>
-                        <div className="text-sm font-sans text-slate-900 font-bold mt-1">
+                        <div className="text-sm font-sans text-slate-900 mt-1">
                             {format(date, 'MMMM d, yyyy')}
                         </div>
                     </div>
@@ -185,7 +185,7 @@ const AttendanceSheetPrint: React.FC = () => {
                                     rows.map((row, index) => (
                                         <tr key={row.participant.participant_id} className="text-center h-8 hover:bg-slate-50 print:hover:bg-transparent">
                                             <td className="px-2 py-1.5">{index + 1}</td>
-                                            <td className="px-3 py-1.5 text-left font-bold uppercase">{row.participant.full_name}</td>
+                                            <td className="px-3 py-1.5 text-left capitalize">{row.participant.full_name}</td>
                                             <td className="px-2 py-1.5">{row.participant.position}</td>
                                             <td className="px-2 py-1.5">{row.participant.office}</td>
                                             
