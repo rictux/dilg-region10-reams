@@ -54,10 +54,8 @@ const AttendanceSheetPrint: React.FC = () => {
         
         setAllLogs(logs || []);
         
-        // Get set of participant IDs that have at least one log
-        const presentParticipantIds = new Set((logs || []).map((l: any) => l.participant_id));
-
-        // 3. Fetch Participants
+        // 3. Fetch All Registered Participants
+        // We fetch all because we need to filter them PER DATE based on logs
         const { data: eventParticipants } = await supabase
             .from('event_participants')
             .select('participants(*)')
@@ -65,10 +63,7 @@ const AttendanceSheetPrint: React.FC = () => {
 
         const fetchedParticipants = eventParticipants
             ?.map((ep: any) => ep.participants)
-            .filter((p: any) => p !== null)
-            // FILTER: Only include participants who have attendance logs
-            .filter((p: any) => presentParticipantIds.has(p.participant_id))
-            .sort((a: any, b: any) => a.full_name.localeCompare(b.full_name)) || [];
+            .filter((p: any) => p !== null) || [];
         
         setParticipants(fetchedParticipants);
 
@@ -81,29 +76,35 @@ const AttendanceSheetPrint: React.FC = () => {
 
   const getRowsForDate = (date: Date) => {
       const dateStr = format(date, 'yyyy-MM-dd');
+      // Filter logs strictly for this date
       const daysLogs = allLogs.filter(l => l.attendance_date === dateStr);
+      
+      // Identify participants present on this date
+      const presentIds = new Set(daysLogs.map(l => l.participant_id));
 
-      return participants.map(p => {
-          // Find logs for this participant on this day
-          // We pick the earliest Valid scan for AM and PM
-          const pLogs = daysLogs.filter(l => l.participant_id === p.participant_id);
-          
-          const amLogs = pLogs.filter(l => l.action_session === 'AM').sort((a,b) => a.scan_time.localeCompare(b.scan_time));
-          const pmLogs = pLogs.filter(l => l.action_session === 'PM').sort((a,b) => a.scan_time.localeCompare(b.scan_time));
+      // Map and Filter
+      return participants
+          .filter(p => presentIds.has(p.participant_id))
+          .map(p => {
+              const pLogs = daysLogs.filter(l => l.participant_id === p.participant_id);
+              
+              const amLogs = pLogs.filter(l => l.action_session === 'AM').sort((a,b) => a.scan_time.localeCompare(b.scan_time));
+              const pmLogs = pLogs.filter(l => l.action_session === 'PM').sort((a,b) => a.scan_time.localeCompare(b.scan_time));
 
-          return {
-              participant: p,
-              amLog: amLogs.length > 0 ? { time: amLogs[0].scan_time, status: amLogs[0].scan_status } : undefined,
-              pmLog: pmLogs.length > 0 ? { time: pmLogs[0].scan_time, status: pmLogs[0].scan_status } : undefined,
-          };
-      });
+              return {
+                  participant: p,
+                  amLog: amLogs.length > 0 ? { time: amLogs[0].scan_time, status: amLogs[0].scan_status } : undefined,
+                  pmLog: pmLogs.length > 0 ? { time: pmLogs[0].scan_time, status: pmLogs[0].scan_status } : undefined,
+              };
+          })
+          .sort((a, b) => a.participant.full_name.localeCompare(b.participant.full_name));
   };
 
   if (loading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin text-blue-600" /></div>;
   if (!event) return <div>Event not found</div>;
 
   return (
-    <div className="min-h-screen bg-white text-black p-8 font-serif print:p-0">
+    <div className="min-h-screen bg-slate-50 p-8 font-serif print:p-0 print:bg-white">
         {/* Controls */}
         <div className="max-w-[297mm] mx-auto mb-8 flex justify-between no-print">
             <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium">
@@ -122,110 +123,98 @@ const AttendanceSheetPrint: React.FC = () => {
             const rows = getRowsForDate(date);
             
             return (
-                <div key={date.toISOString()} className="max-w-[297mm] mx-auto bg-white print:w-full print:max-w-none print:h-screen page-break-after">
+                <div key={date.toISOString()} className="w-[297mm] h-[210mm] mx-auto bg-white shadow-xl print:shadow-none print:w-full print:h-screen print:max-w-none page-break-after relative overflow-hidden flex flex-col">
                     
-                    {/* Header */}
-                    <div className="flex items-center mb-6 pt-4 px-4">
-                        <div className="w-24 h-24 mr-6 flex-shrink-0">
-                            {/* DILG Logo Placeholder */}
+                    {/* Header - Matches reference image design */}
+                    <div className="flex items-center pt-8 px-8 mb-2">
+                        <div className="w-24 h-24 mr-4 flex-shrink-0 flex items-center justify-center">
                             <img 
-                                src="https://upload.wikimedia.org/wikipedia/commons/6/6f/DILG_Seal.svg" 
+                                src="/assets/dilg_logo.png" 
                                 alt="DILG Logo" 
                                 className="w-full h-full object-contain"
+                                onError={(e) => {
+                                    (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/6/6f/DILG_Seal.svg';
+                                }}
                             />
                         </div>
-                        <div className="flex-1">
+                        <div className="flex flex-col justify-center">
                             <h1 className="text-lg font-bold font-sans text-slate-900">DILG Region 10 - Northern Mindanao</h1>
-                            <h2 className="text-4xl font-black text-black tracking-wide mt-1 uppercase font-sans">ATTENDANCE SHEET</h2>
-                            
-                            <div className="mt-4 flex flex-col items-center justify-center text-center w-full pr-24">
-                                <div className="text-xl font-bold font-serif mb-1 uppercase">
-                                    {event.event_name}
-                                </div>
-                                <div className="text-sm font-sans text-slate-700">
-                                    {event.venue}
-                                </div>
-                                <div className="text-sm font-sans text-slate-700 font-bold">
-                                    {format(date, 'MMMM d, yyyy')}
-                                </div>
-                            </div>
+                            <h2 className="text-2xl font-black text-black tracking-wide mt-1 uppercase font-sans">ATTENDANCE SHEET</h2>
+                        </div>
+                    </div>
+
+                    {/* Centered Event Details */}
+                    <div className="flex flex-col items-center justify-center text-center w-full mb-6">
+                        <div className="text-xl font-bold font-serif mb-1 uppercase tracking-wide">
+                            {event.event_name}
+                        </div>
+                        <div className="text-sm font-sans text-slate-700 uppercase">
+                            {event.venue}
+                        </div>
+                        <div className="text-sm font-sans text-slate-900 font-bold mt-1">
+                            {format(date, 'MMMM d, yyyy')}
                         </div>
                     </div>
 
                     {/* Table */}
-                    <div className="px-4">
-                        <table className="w-full border-collapse border border-black text-sm">
+                    <div className="px-8 flex-1">
+                        <table className="w-full text-xs">
                             <thead>
-                                <tr className="bg-gray-300 text-center font-bold uppercase font-sans text-xs">
-                                    <th rowSpan={2} className="border border-black px-2 py-3 w-10">No.</th>
-                                    <th rowSpan={2} className="border border-black px-4 py-3">NAME</th>
-                                    <th rowSpan={2} className="border border-black px-4 py-3">POSITION</th>
-                                    <th rowSpan={2} className="border border-black px-4 py-3">OFFICE</th>
-                                    <th colSpan={2} className="border border-black px-2 py-1 w-24">GENDER</th>
-                                    <th rowSpan={2} className="border border-black px-4 py-3 w-32">AM</th>
-                                    <th rowSpan={2} className="border border-black px-4 py-3 w-32">PM</th>
+                                <tr className="bg-gray-200 text-center font-bold uppercase font-sans print:bg-gray-200 print:print-color-adjust-exact">
+                                    <th rowSpan={2} className="border border-black px-2 py-2 w-10">No.</th>
+                                    <th rowSpan={2} className="border border-black px-4 py-2 text-left">NAME</th>
+                                    <th rowSpan={2} className="border border-black px-4 py-2">POSITION</th>
+                                    <th rowSpan={2} className="border border-black px-4 py-2">OFFICE</th>
+                                    <th colSpan={2} className="border border-black px-2 py-1 w-20">GENDER</th>
+                                    <th rowSpan={2} className="border border-black px-4 py-2 w-28">AM</th>
+                                    <th rowSpan={2} className="border border-black px-4 py-2 w-28">PM</th>
                                 </tr>
-                                <tr className="bg-gray-300 text-center font-bold uppercase font-sans text-xs">
+                                <tr className="bg-gray-200 text-center font-bold uppercase font-sans print:bg-gray-200 print:print-color-adjust-exact">
                                     <th className="border border-black px-1 py-1 w-10">M</th>
                                     <th className="border border-black px-1 py-1 w-10">F</th>
                                 </tr>
                             </thead>
-                            <tbody className="font-sans">
-                                {rows.map((row, index) => (
-                                    <tr key={row.participant.participant_id} className="text-center h-10">
-                                        <td className="border border-black px-2">{index + 1}</td>
-                                        <td className="border border-black px-3 text-left font-medium uppercase text-xs">{row.participant.full_name}</td>
-                                        <td className="border border-black px-2 text-xs">{row.participant.position}</td>
-                                        <td className="border border-black px-2 text-xs">{row.participant.office}</td>
-                                        
-                                        {/* Gender Checks */}
-                                        <td className="border border-black px-1">
-                                            {(row.participant.gender === 'Male' || row.participant.gender === 'M') && <span className="font-bold text-black">✓</span>}
-                                        </td>
-                                        <td className="border border-black px-1">
-                                            {(row.participant.gender === 'Female' || row.participant.gender === 'F') && <span className="font-bold text-black">✓</span>}
-                                        </td>
-
-                                        {/* AM Log */}
-                                        <td className="border border-black px-2">
-                                            {row.amLog ? (
-                                                <span className="font-mono text-xs">{format(new Date(row.amLog.time), 'h:mm a')}</span>
-                                            ) : null}
-                                        </td>
-
-                                        {/* PM Log */}
-                                        <td className="border border-black px-2">
-                                            {row.pmLog ? (
-                                                <span className="font-mono text-xs">{format(new Date(row.pmLog.time), 'h:mm a')}</span>
-                                            ) : null}
+                            <tbody className="font-sans text-xs">
+                                {rows.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={9} className="text-center py-12 text-slate-500 italic">
+                                            No attendance recorded for this date.
                                         </td>
                                     </tr>
-                                ))}
-                                {/* Blank Rows to fill page roughly (standard A4 can fit ~20-25 rows with this height) */}
-                                {rows.length < 20 && Array.from({ length: 20 - rows.length }).map((_, i) => (
-                                    <tr key={`blank-${i}`} className="text-center h-10">
-                                        <td className="border border-black"></td>
-                                        <td className="border border-black"></td>
-                                        <td className="border border-black"></td>
-                                        <td className="border border-black"></td>
-                                        <td className="border border-black"></td>
-                                        <td className="border border-black"></td>
-                                        <td className="border border-black"></td>
-                                        <td className="border border-black"></td>
-                                    </tr>
-                                ))}
+                                ) : (
+                                    rows.map((row, index) => (
+                                        <tr key={row.participant.participant_id} className="text-center h-8 hover:bg-slate-50 print:hover:bg-transparent">
+                                            <td className="px-2 py-1.5">{index + 1}</td>
+                                            <td className="px-3 py-1.5 text-left font-bold uppercase">{row.participant.full_name}</td>
+                                            <td className="px-2 py-1.5">{row.participant.position}</td>
+                                            <td className="px-2 py-1.5">{row.participant.office}</td>
+                                            
+                                            <td className="px-1 py-1.5 font-bold">
+                                                {(row.participant.gender === 'Male' || row.participant.gender === 'M') && '✓'}
+                                            </td>
+                                            <td className="px-1 py-1.5 font-bold">
+                                                {(row.participant.gender === 'Female' || row.participant.gender === 'F') && '✓'}
+                                            </td>
+
+                                            <td className="px-2 py-1.5 font-mono">
+                                                {row.amLog ? format(new Date(row.amLog.time), 'h:mm a') : ''}
+                                            </td>
+
+                                            <td className="px-2 py-1.5 font-mono">
+                                                {row.pmLog ? format(new Date(row.pmLog.time), 'h:mm a') : ''}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
                     
                     {/* Footer */}
-                    <div className="mt-4 px-4 flex justify-between text-[10px] text-slate-500 font-sans print:fixed print:bottom-4 print:w-full print:px-8">
-                        <div>Generated by R10 Event Portal</div>
+                    <div className="w-full px-10 pb-6 pt-2 flex justify-between text-[10px] text-slate-400 font-sans uppercase">
+                        <div>System Generated Report</div>
                         <div>Page {dateIndex + 1} of {eventDates.length}</div>
                     </div>
-                    
-                    {/* Spacer for print page break visualization in browser */}
-                    <div className="h-12 w-full print:hidden"></div>
                 </div>
             );
         })}
