@@ -22,20 +22,53 @@ const AttendanceList: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 
+  // Subscribe to new events creation
   useEffect(() => {
     fetchEventsToday();
+
+    const channel = supabase
+        .channel('participants_events_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
+            fetchEventsToday();
+        })
+        .subscribe();
+    
+    return () => {
+        supabase.removeChannel(channel);
+    };
   }, []);
 
+  // Subscribe to data changes for the selected event
   useEffect(() => {
     if (selectedEventId) {
       fetchAttendance(selectedEventId);
+
+      const channel = supabase
+        .channel(`participants_data_${selectedEventId}`)
+        .on('postgres_changes', { 
+            event: '*', 
+            schema: 'public', 
+            table: 'attendance_logs',
+            filter: `event_id=eq.${selectedEventId}`
+        }, () => fetchAttendance(selectedEventId))
+        .on('postgres_changes', { 
+            event: '*', 
+            schema: 'public', 
+            table: 'event_participants',
+            filter: `event_id=eq.${selectedEventId}`
+        }, () => fetchAttendance(selectedEventId))
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     } else if (events.length === 0 && !loading) {
       setData([]);
     }
   }, [selectedEventId]);
 
   const fetchEventsToday = async () => {
-    setLoading(true);
+    // Note: We don't trigger loading=true here to avoid flickering on realtime updates
     const today = new Date().toISOString().split('T')[0];
     
     // Fetch events that include today's date
@@ -54,7 +87,7 @@ const AttendanceList: React.FC = () => {
             // Verify selected event is still in the list, else switch
             const exists = eventsData.find(e => e.event_id === selectedEventId);
             if (!exists) setSelectedEventId(eventsData[0].event_id);
-            else fetchAttendance(selectedEventId); // Refresh if exists
+            // If exists, fetchAttendance is called by the useEffect [selectedEventId] or by the subscription
         }
     } else {
         setEvents([]);
@@ -64,7 +97,7 @@ const AttendanceList: React.FC = () => {
   };
 
   const fetchAttendance = async (eventId: number) => {
-    setLoading(true);
+    if (data.length === 0) setLoading(true); // Only show loading on empty state
     const today = new Date().toISOString().split('T')[0];
     
     try {

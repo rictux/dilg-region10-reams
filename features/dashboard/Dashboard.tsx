@@ -25,10 +25,30 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchDashboardData();
+
+    // Realtime subscriptions
+    const channel = supabase
+      .channel('dashboard_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
+        fetchDashboardData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_participants' }, () => {
+        fetchDashboardData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_logs' }, () => {
+        fetchDashboardData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchDashboardData = async () => {
-    setLoading(true);
+    // Note: We don't set loading(true) here to avoid UI flickering on realtime updates
+    // We only set it initially or manage a separate 'refreshing' state if needed
+    
     const today = new Date().toISOString().split('T')[0];
 
     try {

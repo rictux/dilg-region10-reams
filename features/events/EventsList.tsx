@@ -33,10 +33,48 @@ const EventsList: React.FC = () => {
 
   useEffect(() => {
     fetchEvents();
+
+    const subscription = supabase
+      .channel('events_list_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
+        fetchEvents();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
+  // Realtime updates for the Participants Modal
+  useEffect(() => {
+    if (showParticipantsModal && selectedEvent) {
+        // Initial fetch
+        fetchEventParticipants(selectedEvent.event_id);
+
+        // Subscribe to changes for this specific event's participants
+        const channel = supabase
+            .channel(`modal_participants_${selectedEvent.event_id}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'event_participants',
+                filter: `event_id=eq.${selectedEvent.event_id}`
+            }, () => {
+                fetchEventParticipants(selectedEvent.event_id);
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }
+  }, [showParticipantsModal, selectedEvent]);
+
   const fetchEvents = async () => {
-    setLoading(true);
+    // Only set loading on initial load to avoid UI flicker
+    if (events.length === 0) setLoading(true);
+    
     const { data, error } = await supabase.from('events').select('*').order('start_date', { ascending: false });
     if (!error && data) setEvents(data);
     setLoading(false);
@@ -130,7 +168,8 @@ const EventsList: React.FC = () => {
           setShowEventModal(false);
           setEditingEventId(null);
           setFormData(initialFormState);
-          fetchEvents();
+          // fetchEvents is handled by subscription, but calling it here ensures immediate UI feedback if desired
+          fetchEvents(); 
       } else {
         alert("Error saving event: " + error.message);
       }
@@ -143,9 +182,8 @@ const EventsList: React.FC = () => {
       const { error } = await supabase.from('events').delete().eq('event_id', id);
       if (error) {
         alert("Error deleting event: " + error.message);
-      } else {
-        fetchEvents();
       }
+      // fetchEvents handled by subscription
   };
 
   const openShareModal = (e: React.MouseEvent, event: Event) => {
@@ -158,7 +196,7 @@ const EventsList: React.FC = () => {
   const handleRowClick = (event: Event) => {
       setSelectedEvent(event);
       setShowParticipantsModal(true);
-      fetchEventParticipants(event.event_id);
+      // fetchEventParticipants is called in useEffect when modal opens
   };
 
   const getRegistrationLink = (eventId: number) => {
