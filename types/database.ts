@@ -9,6 +9,7 @@ export interface User {
   username: string;
   password_hash: string;
   created_at?: string;
+  position?: string;
 }
 
 export interface Event {
