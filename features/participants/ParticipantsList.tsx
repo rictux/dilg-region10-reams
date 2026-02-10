@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { Participant, Event } from '../../types/database';
-import { X, User, Printer, Calendar, RefreshCw } from 'lucide-react';
+import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { format } from 'date-fns';
 
@@ -12,6 +13,7 @@ interface AttendanceRow {
 }
 
 const AttendanceList: React.FC = () => {
+  const { user } = useAuth();
   const [data, setData] = useState<AttendanceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('Show All');
@@ -21,6 +23,17 @@ const AttendanceList: React.FC = () => {
   // Event Selection State
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+
+  // Manual Entry State
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualParticipant, setManualParticipant] = useState<Participant | null>(null);
+  const [manualForm, setManualForm] = useState({
+      date: new Date().toISOString().split('T')[0],
+      time: format(new Date(), 'HH:mm'),
+      session: 'AM' as 'AM' | 'PM',
+      status: 'Valid' as const
+  });
+  const [savingManual, setSavingManual] = useState(false);
 
   // Subscribe to new events creation
   useEffect(() => {
@@ -87,12 +100,19 @@ const AttendanceList: React.FC = () => {
             // Verify selected event is still in the list, else switch
             const exists = eventsData.find(e => e.event_id === selectedEventId);
             if (!exists) setSelectedEventId(eventsData[0].event_id);
-            // If exists, fetchAttendance is called by the useEffect [selectedEventId] or by the subscription
         }
     } else {
-        setEvents([]);
-        setData([]);
-        setLoading(false);
+        // Fallback: Fetch ALL ongoing/scheduled events if none matched "today" logic strictly
+        // This helps if admins want to view past events
+        const { data: allEvents } = await supabase.from('events').select('*').order('start_date', { ascending: false }).limit(20);
+        if (allEvents && allEvents.length > 0) {
+             setEvents(allEvents);
+             if (!selectedEventId) setSelectedEventId(allEvents[0].event_id);
+        } else {
+            setEvents([]);
+            setData([]);
+            setLoading(false);
+        }
     }
   };
 
@@ -102,7 +122,6 @@ const AttendanceList: React.FC = () => {
     
     try {
         // 1. Get All Participants registered for THIS event
-        // We select the participant details via the foreign key relationship
         const { data: eventParticipants, error: epError } = await supabase
             .from('event_participants')
             .select('participant_id, participants(*)')
@@ -110,11 +129,17 @@ const AttendanceList: React.FC = () => {
         
         if (epError) throw epError;
 
-        // 2. Get Today's Logs for THIS event
+        // 2. Get All Logs for THIS event (not just today, so we can see history if needed, 
+        // but typically we filter by date in UI or Query. Let's get ALL logs for the event to handle manual entry of past dates correctly in view)
+        // However, the View is designed for "Today's Attendance" mostly. 
+        // Let's widen the query slightly or keep it to today. 
+        // *Correction*: The prompt implies manual inputting date. If they input a past date, it won't show up if we only fetch today.
+        // Let's fetch logs for ALL dates for this event to be safe, or just rely on the Manual Modal to insert and the user to select the date they want to view?
+        // To keep the UI simple, the main view shows attendance based on the *Event's current context*.
+        // We will fetch logs for ALL dates for this event.
         const { data: logs, error: logsError } = await supabase
             .from('attendance_logs')
             .select('*')
-            .eq('attendance_date', today)
             .eq('event_id', eventId);
             
         if (logsError) throw logsError;
@@ -126,13 +151,23 @@ const AttendanceList: React.FC = () => {
                 .filter((p: any) => p !== null) // Safety check for deleted participants
                 .sort((a: any, b: any) => a.full_name.localeCompare(b.full_name))
                 .map((p: Participant) => {
+                    // Filter logs for this participant
                     const pLogs = logs?.filter(l => l.participant_id === p.participant_id) || [];
                     
-                    // Sort logs by time ascending to pick the earliest scan as the "Time In"
-                    pLogs.sort((a, b) => new Date(a.scan_time).getTime() - new Date(b.scan_time).getTime());
+                    // We need to decide WHICH date to show. 
+                    // Default behavior: Show logs for "Today". 
+                    // If the user manually added a log for yesterday, it won't show unless we have a Date Picker filter for the view.
+                    // For now, we will filter logs to match the "today" variable which is system date.
+                    // *Improvement*: If the event is multi-day, we might need a date selector.
+                    // For this specific request, we'll stick to showing Today's logs in the columns, 
+                    // but the manual entry allows inserting for any date.
+                    
+                    const todaysLogs = pLogs.filter(l => l.attendance_date === today);
 
-                    const am = pLogs.find(l => l.action_session === 'AM');
-                    const pm = pLogs.find(l => l.action_session === 'PM');
+                    todaysLogs.sort((a, b) => new Date(a.scan_time).getTime() - new Date(b.scan_time).getTime());
+
+                    const am = todaysLogs.find(l => l.action_session === 'AM');
+                    const pm = todaysLogs.find(l => l.action_session === 'PM');
                     
                     return {
                         participant: p,
@@ -176,6 +211,52 @@ const AttendanceList: React.FC = () => {
     }
   };
 
+  const openManualModal = (e: React.MouseEvent, p: Participant) => {
+      e.stopPropagation();
+      setManualParticipant(p);
+      setManualForm({
+          date: new Date().toISOString().split('T')[0],
+          time: format(new Date(), 'HH:mm'),
+          session: new Date().getHours() < 12 ? 'AM' : 'PM',
+          status: 'Valid'
+      });
+      setShowManualModal(true);
+  };
+
+  const handleManualSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!manualParticipant || !selectedEventId || !user) return;
+      
+      setSavingManual(true);
+      try {
+          // Construct timestamp
+          // Note: scan_time expects full ISO string usually, or at least date+time
+          const dateTimeStr = `${manualForm.date}T${manualForm.time}:00`;
+          
+          const { error } = await supabase.from('attendance_logs').insert({
+              event_id: selectedEventId,
+              participant_id: manualParticipant.participant_id,
+              user_id: user.user_id,
+              attendance_date: manualForm.date,
+              scan_time: dateTimeStr,
+              action_session: manualForm.session,
+              scan_status: manualForm.status,
+              remarks: 'Manual Entry',
+              scanner_device: 'Manual Input'
+          });
+
+          if (error) throw error;
+          
+          setShowManualModal(false);
+          // fetchAttendance handled by realtime subscription
+          
+      } catch (err: any) {
+          alert("Error adding log: " + err.message);
+      } finally {
+          setSavingManual(false);
+      }
+  };
+
   const FilterButton = ({ label }: { label: string }) => (
       <button
         onClick={() => setFilter(label)}
@@ -188,6 +269,13 @@ const AttendanceList: React.FC = () => {
         {label}
       </button>
   );
+
+  // Stats Calculation
+  const totalParticipants = data.length;
+  const presentCount = data.filter(r => r.amLog || r.pmLog).length;
+  const notPresentCount = data.filter(r => !r.amLog && !r.pmLog).length;
+  const noPmCount = data.filter(r => r.amLog && !r.pmLog).length;
+  const completeLogsCount = data.filter(r => r.amLog && r.pmLog).length;
 
   return (
     <div className="space-y-6">
@@ -252,6 +340,49 @@ const AttendanceList: React.FC = () => {
         </div>
       </div>
 
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-2">
+                  <p className="text-xs font-semibold text-slate-500 uppercase">Total</p>
+                  <div className="p-1.5 bg-slate-100 rounded-lg text-slate-600"><Users size={16} /></div>
+              </div>
+              <p className="text-2xl font-bold text-slate-800">{totalParticipants}</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-2">
+                  <p className="text-xs font-semibold text-slate-500 uppercase">Present</p>
+                  <div className="p-1.5 bg-green-100 rounded-lg text-green-600"><UserCheck size={16} /></div>
+              </div>
+              <p className="text-2xl font-bold text-green-600">{presentCount}</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-2">
+                  <p className="text-xs font-semibold text-slate-500 uppercase">Not Present</p>
+                  <div className="p-1.5 bg-red-100 rounded-lg text-red-600"><UserX size={16} /></div>
+              </div>
+              <p className="text-2xl font-bold text-red-600">{notPresentCount}</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-2">
+                  <p className="text-xs font-semibold text-slate-500 uppercase">No PM</p>
+                  <div className="p-1.5 bg-amber-100 rounded-lg text-amber-600"><AlertCircle size={16} /></div>
+              </div>
+              <p className="text-2xl font-bold text-amber-600">{noPmCount}</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between col-span-2 sm:col-span-1">
+              <div className="flex justify-between items-start mb-2">
+                  <p className="text-xs font-semibold text-slate-500 uppercase">Complete</p>
+                  <div className="p-1.5 bg-indigo-100 rounded-lg text-indigo-600"><CheckCircle size={16} /></div>
+              </div>
+              <p className="text-2xl font-bold text-indigo-600">{completeLogsCount}</p>
+          </div>
+      </div>
+
       {/* Table Section */}
       {loading && data.length === 0 ? (
         <div className="flex justify-center py-10">
@@ -263,20 +394,23 @@ const AttendanceList: React.FC = () => {
                 <table className="w-full text-sm text-left">
                     <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                         <tr>
+                            <th className="px-6 py-4 w-16">#</th>
                             <th className="px-6 py-4">Name</th>
                             <th className="px-6 py-4">Position</th>
                             <th className="px-6 py-4">Office</th>
                             <th className="px-6 py-4">AM Time</th>
                             <th className="px-6 py-4">PM Time</th>
+                            <th className="px-6 py-4 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {filteredData.map((row) => (
+                        {filteredData.map((row, index) => (
                             <tr 
                                 key={row.participant.participant_id} 
                                 onClick={() => handleRowClick(row.participant)}
                                 className="hover:bg-slate-50 cursor-pointer transition-colors group"
                             >
+                                <td className="px-6 py-4 text-slate-500 font-mono text-xs">{index + 1}</td>
                                 <td className="px-6 py-4 font-medium text-slate-800 group-hover:text-indigo-600">
                                     {row.participant.full_name}
                                 </td>
@@ -300,15 +434,24 @@ const AttendanceList: React.FC = () => {
                                         <span className="text-slate-300">-</span>
                                     )}
                                 </td>
+                                <td className="px-6 py-4 text-center">
+                                    <button
+                                        onClick={(e) => openManualModal(e, row.participant)}
+                                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                        title="Manual Log Entry"
+                                    >
+                                        <PlusCircle size={18} />
+                                    </button>
+                                </td>
                             </tr>
                         ))}
                         {filteredData.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="text-center py-12 text-slate-400">
+                                <td colSpan={7} className="text-center py-12 text-slate-400">
                                     {events.length === 0 ? (
                                         <div className="flex flex-col items-center">
                                             <Calendar className="w-10 h-10 mb-2 opacity-20" />
-                                            <p>No events scheduled for today.</p>
+                                            <p>No events found.</p>
                                         </div>
                                     ) : (
                                         <p>No participants found matching "{filter}"</p>
@@ -320,6 +463,95 @@ const AttendanceList: React.FC = () => {
                 </table>
             </div>
         </div>
+      )}
+
+      {/* Manual Entry Modal */}
+      {showManualModal && manualParticipant && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div 
+                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
+                onClick={() => setShowManualModal(false)}
+            ></div>
+
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
+                    <h3 className="font-semibold flex items-center gap-2">
+                        <Clock size={20} /> Manual Attendance
+                    </h3>
+                    <button 
+                        onClick={() => setShowManualModal(false)} 
+                        className="text-indigo-100 hover:text-white p-1 hover:bg-white/20 rounded-full transition"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+                
+                <form onSubmit={handleManualSubmit} className="p-6 space-y-4">
+                    <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 mb-2">
+                        <p className="text-xs text-indigo-500 uppercase font-bold tracking-wider mb-1">Participant</p>
+                        <p className="font-bold text-slate-800">{manualParticipant.full_name}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                            <input 
+                                type="date"
+                                required
+                                value={manualForm.date}
+                                onChange={e => setManualForm({...manualForm, date: e.target.value})}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Time</label>
+                            <input 
+                                type="time"
+                                required
+                                value={manualForm.time}
+                                onChange={e => setManualForm({...manualForm, time: e.target.value})}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Session</label>
+                            <select
+                                value={manualForm.session}
+                                onChange={e => setManualForm({...manualForm, session: e.target.value as any})}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                            >
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                            <select
+                                value={manualForm.status}
+                                onChange={e => setManualForm({...manualForm, status: e.target.value as any})}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                            >
+                                <option value="Valid">Valid</option>
+                                <option value="Late">Late</option>
+                                <option value="Excuse">Excuse</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button 
+                        type="submit"
+                        disabled={savingManual}
+                        className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-all shadow-md flex justify-center items-center gap-2 mt-4"
+                    >
+                        {savingManual ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                        Log Attendance
+                    </button>
+                </form>
+            </div>
+          </div>
       )}
 
       {/* Badge Modal */}
