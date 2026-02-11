@@ -229,15 +229,9 @@ const EventsList: React.FC = () => {
       setTimeout(() => setCopied(false), 2000);
   };
 
-  // Calculate accommodation stats
-  const accommodationStats = React.useMemo(() => {
-      return viewingParticipants.reduce((acc, curr) => {
-          if (curr.needs_accommodation) {
-              acc.requests += 1;
-              acc.pax += (curr.accommodation_pax || 0);
-          }
-          return acc;
-      }, { requests: 0, pax: 0 });
+  // Calculate accommodation stats (Count of participants who requested)
+  const accommodationCount = React.useMemo(() => {
+      return viewingParticipants.filter(p => p.needs_accommodation).length;
   }, [viewingParticipants]);
 
   return (
@@ -466,7 +460,7 @@ const EventsList: React.FC = () => {
                                             {record.role || 'Delegate'}
                                             {record.needs_accommodation && (
                                                 <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded flex items-center w-fit gap-1 mt-0.5">
-                                                    <Home size={8} /> Stay ({record.accommodation_pax})
+                                                    <Home size={8} /> Stay
                                                 </span>
                                             )}
                                         </td>
@@ -499,7 +493,7 @@ const EventsList: React.FC = () => {
                     {selectedEvent.has_accommodation && (
                         <div className="flex items-center gap-2 text-purple-700 bg-purple-50 px-3 py-1 rounded-lg border border-purple-100 shadow-sm">
                             <Home size={14} />
-                            <span>Accommodation: <b>{accommodationStats.pax}</b> Pax <span className="text-xs opacity-75 ml-1">({accommodationStats.requests} Requests)</span></span>
+                            <span>With Accommodation: <b>{accommodationCount}</b></span>
                         </div>
                     )}
                 </div>
