@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event, Office } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Printer, Building2, Home } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Building2, Home } from 'lucide-react';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import { useNavigate } from 'react-router-dom';
@@ -316,16 +316,6 @@ const EventsList: React.FC = () => {
                                           </span>
                                       </td>
                                       <td className="px-6 py-4 flex items-center gap-2">
-                                          <button 
-                                              onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  navigate(`/print-participants/${event.event_id}`);
-                                              }} 
-                                              className="p-1.5 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors"
-                                              title="Print Participant List"
-                                          >
-                                              <Printer size={18} />
-                                          </button>
                                           <button 
                                               onClick={(e) => openShareModal(e, event)}
                                               className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-colors"
