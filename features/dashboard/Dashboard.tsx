@@ -22,7 +22,12 @@ import {
     addMonths, 
     subMonths,
     parseISO,
-    isToday
+    isToday,
+    isWithinInterval,
+    startOfDay,
+    endOfDay,
+    isBefore,
+    isAfter
 } from 'date-fns';
 
 interface DashboardEvent {
@@ -170,6 +175,35 @@ const Dashboard: React.FC = () => {
   const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+  // Helper to determine event styling
+  const getEventStyle = (event: DashboardEvent, day: Date) => {
+      const start = parseISO(event.start_date);
+      const end = parseISO(event.end_date);
+      
+      const isStart = isSameDay(day, start);
+      const isEnd = isSameDay(day, end);
+      
+      // Determine color based on status
+      let baseColor = "bg-indigo-100 text-indigo-700 border-indigo-200";
+      if (event.status === 'Ongoing') baseColor = "bg-green-100 text-green-700 border-green-200";
+      if (event.status === 'Completed') baseColor = "bg-slate-100 text-slate-600 border-slate-200";
+      if (event.status === 'Cancelled') baseColor = "bg-red-50 text-red-600 border-red-100";
+
+      return {
+          className: `
+            ${baseColor}
+            text-[10px] h-5 mb-1 px-1 flex items-center
+            ${isStart ? 'rounded-l-md ml-1 border-l' : 'border-l-0 -ml-[1px]'}
+            ${isEnd ? 'rounded-r-md mr-1 border-r' : 'border-r-0 -mr-[1px]'}
+            ${!isStart && !isEnd ? 'rounded-none' : ''}
+            border-y cursor-pointer hover:brightness-95 transition-all
+            truncate block relative z-10
+          `,
+          isStart,
+          isEnd
+      };
+  };
+
   const StatCard = ({ icon: Icon, label, value, color }: any) => (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center space-x-4">
       <div className={`p-3 rounded-full ${color} bg-opacity-10 text-${color.split('-')[1]}-600`}>
@@ -196,7 +230,7 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
         
         {/* LEFT COLUMN: Calendar (2/3 width) */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col h-full min-h-[500px]">
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col h-full min-h-[600px]">
             {/* Calendar Header */}
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -218,7 +252,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Calendar Grid */}
-            <div className="flex-1 p-6">
+            <div className="flex-1 p-4 flex flex-col">
                 <div className="grid grid-cols-7 mb-2">
                     {weekDays.map(day => (
                         <div key={day} className="text-center text-xs font-semibold text-slate-400 uppercase tracking-wider py-2">
@@ -226,63 +260,71 @@ const Dashboard: React.FC = () => {
                         </div>
                     ))}
                 </div>
-                <div className="grid grid-cols-7 gap-2 h-full auto-rows-fr">
+                {/* 
+                   Using auto-rows with a strict minmax height ensures cells don't collapse.
+                   overflow-hidden on the grid prevents the whole component from blowing up.
+                */}
+                <div className="grid grid-cols-7 auto-rows-fr gap-px bg-slate-200 border border-slate-200 rounded-lg overflow-hidden flex-1">
                     {calendarDays.map((day, idx) => {
-                        const dayEvents = calendarEvents.filter(e => isSameDay(parseISO(e.start_date), day));
                         const isCurrentMonth = isSameMonth(day, monthStart);
                         const isTodayDate = isToday(day);
+                        const dayStart = startOfDay(day);
+                        const dayEnd = endOfDay(day);
+
+                        // Find events active on this specific day
+                        const dayEvents = calendarEvents.filter(e => {
+                            const eStart = startOfDay(parseISO(e.start_date));
+                            const eEnd = endOfDay(parseISO(e.end_date));
+                            return isWithinInterval(day, { start: eStart, end: eEnd });
+                        }).sort((a, b) => {
+                            // Sort for consistency across days: Longer events first, then by ID
+                            const durA = new Date(a.end_date).getTime() - new Date(a.start_date).getTime();
+                            const durB = new Date(b.end_date).getTime() - new Date(b.start_date).getTime();
+                            if (durA !== durB) return durB - durA;
+                            return a.event_id - b.event_id;
+                        });
 
                         return (
                             <div 
                                 key={idx} 
                                 className={`
-                                    min-h-[80px] p-2 rounded-lg border flex flex-col relative group transition-colors
-                                    ${isCurrentMonth ? 'bg-white border-slate-100' : 'bg-slate-50/50 border-transparent text-slate-300'}
-                                    ${isTodayDate ? 'ring-2 ring-indigo-500 ring-offset-2 z-10' : ''}
-                                    ${dayEvents.length > 0 && isCurrentMonth ? 'hover:bg-indigo-50 hover:border-indigo-200 cursor-pointer' : ''}
+                                    min-h-[110px] flex flex-col relative
+                                    ${isCurrentMonth ? 'bg-white' : 'bg-slate-50 text-slate-300'}
+                                    ${isTodayDate ? 'bg-indigo-50/30' : ''}
                                 `}
                             >
-                                <span className={`text-sm font-medium ${isTodayDate ? 'text-indigo-600' : 'text-slate-600'}`}>
-                                    {format(day, 'd')}
-                                </span>
-                                
-                                {/* Event Dots */}
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                    {dayEvents.map((e, i) => (
-                                        <div 
-                                            key={i} 
-                                            className={`w-2 h-2 rounded-full 
-                                                ${e.status === 'Completed' ? 'bg-slate-400' : 'bg-indigo-500'}
-                                            `} 
-                                        />
-                                    ))}
+                                <div className={`
+                                    text-xs font-medium p-1.5 flex justify-between items-center
+                                    ${isTodayDate ? 'text-indigo-600 font-bold' : 'text-slate-500'}
+                                `}>
+                                    <span>{format(day, 'd')}</span>
                                 </div>
-
-                                {/* Hover Tooltip/Popover */}
-                                {dayEvents.length > 0 && (
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-800 text-white text-xs rounded-lg p-3 shadow-xl z-50 hidden group-hover:block pointer-events-none animate-in fade-in zoom-in-95 duration-200">
-                                        <div className="font-bold border-b border-slate-600 pb-1 mb-2 text-slate-300">
-                                            {format(day, 'MMMM d, yyyy')}
-                                        </div>
-                                        <div className="space-y-2">
-                                            {dayEvents.map(e => (
-                                                <div key={e.event_id} className="flex flex-col">
-                                                    <span className="font-semibold text-white">{e.event_name}</span>
-                                                    <span className="text-slate-400 text-[10px]">{e.venue}</span>
-                                                    <span className={`text-[9px] px-1.5 rounded w-fit mt-0.5
-                                                        ${e.status === 'Ongoing' ? 'bg-green-500/20 text-green-300' : 
-                                                          e.status === 'Completed' ? 'bg-slate-500/20 text-slate-300' : 
-                                                          'bg-blue-500/20 text-blue-300'}
-                                                    `}>
-                                                        {e.status}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        {/* Tooltip arrow */}
-                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-800"></div>
-                                    </div>
-                                )}
+                                
+                                {/* 
+                                    Scroll container for events within the day cell.
+                                    This prevents the cell from growing infinitely and breaking the grid layout.
+                                */}
+                                <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-1">
+                                    {dayEvents.map((e) => {
+                                        const { className, isStart } = getEventStyle(e, day);
+                                        return (
+                                            <div 
+                                                key={`${e.event_id}-${day.toISOString()}`} 
+                                                className={className}
+                                                title={`${e.event_name} (${e.status})`}
+                                            >
+                                                {/* Only show text on the start day or if it's the first day of the week (Sunday) to re-contextualize */}
+                                                {(isStart || day.getDay() === 0 || day.getDate() === 1) && (
+                                                    <span className="truncate font-medium">{e.event_name}</span>
+                                                )}
+                                                {/* If not start, render empty space so bar color continues but text doesn't repeat awkwardly */}
+                                                {(!isStart && day.getDay() !== 0 && day.getDate() !== 1) && (
+                                                    <span className="opacity-0 select-none">.</span>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         );
                     })}
