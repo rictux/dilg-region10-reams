@@ -211,10 +211,9 @@ const AttendanceSheetPrint: React.FC = () => {
                     </div>
                     
                     {/* Footer */}
-                    <div className="w-full px-10 pb-6 pt-2 flex justify-between text-[10px] text-slate-400 font-sans uppercase">
+                    <div className="w-full px-10 pb-6 pt-2 flex justify-between text-[10px] text-slate-400 font-sans">
                         <div>System Generated Report</div>
-                        <div>Page {dateIndex + 1} of {eventDates.length}</div>
-                    </div>
+                                       </div>
                 </div>
             );
         })}
