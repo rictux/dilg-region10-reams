@@ -19,6 +19,9 @@ const EventRegistration: React.FC = () => {
   const [suggestions, setSuggestions] = useState<Participant[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // Consent State
+  const [consent, setConsent] = useState(false);
+
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -85,6 +88,12 @@ const EventRegistration: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!consent) {
+        setError("You must accept the Data Privacy consent to proceed.");
+        return;
+    }
+
     setSubmitting(true);
     setError(null);
     
@@ -348,19 +357,33 @@ const EventRegistration: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="pt-4">
+                    {/* Data Privacy Consent */}
+                    <div className="flex items-start gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <div className="flex items-center h-5">
+                            <input
+                                id="privacy-consent"
+                                type="checkbox"
+                                required
+                                checked={consent}
+                                onChange={(e) => setConsent(e.target.checked)}
+                                className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                            />
+                        </div>
+                        <label htmlFor="privacy-consent" className="text-xs text-slate-600 leading-relaxed cursor-pointer text-justify">
+                            I hereby authorize the event organizers to collect, store, and process my personal information for purposes related to event registration, attendance tracking, communication, documentation, and post-event reporting. I understand that my data will be protected in compliance with the Data Privacy Act and will not be disclosed without my consent except as required by law.
+                        </label>
+                    </div>
+
+                    <div className="pt-2">
                         <button 
                             type="submit" 
-                            disabled={submitting}
-                            className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition-all shadow-md hover:shadow-lg disabled:opacity-70 flex justify-center items-center gap-2"
+                            disabled={submitting || !consent}
+                            className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
                         >
                             {submitting && <Loader2 className="animate-spin" size={20} />}
                             {submitting ? 'Registering...' : 'Complete Registration'}
                         </button>
                     </div>
-                    <p className="text-center text-xs text-slate-400 mt-4">
-                        By registering, you agree to the event terms and conditions.
-                    </p>
                 </form>
             </div>
         </div>

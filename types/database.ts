@@ -1,5 +1,12 @@
 export type UserRole = 'Admin' | 'Scanner' | 'EventManager';
 
+export interface Office {
+  office_id: number;
+  code: string;
+  name: string;
+  created_at?: string;
+}
+
 export interface User {
   user_id: number;
   full_name: string;
@@ -9,7 +16,8 @@ export interface User {
   username: string;
   password_hash: string;
   created_at?: string;
-  position?: string;
+  position: string;
+  office_id?: number | null;
 }
 
 export interface Event {

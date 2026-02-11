@@ -102,16 +102,10 @@ const AttendanceList: React.FC = () => {
             setSelectedEventId(eventsData[0].event_id);
         } else {
             // If multiple events today, force user to select
-            // If currently selected event is NOT in the new list, reset it. 
-            // If it IS in the list, we might want to keep it, but the requirement says 
-            // "if one event today then default, else -- Select Event --". 
-            // We'll reset to null if multiple events are found to strictly follow "else -- Select Event --"
-            // unless we want to be nice and preserve selection. 
-            // Given "it will be -- Select Event --", we default to null on load.
             if (!selectedEventId) setSelectedEventId(null);
         }
     } else {
-        // Fallback: Fetch ALL ongoing/scheduled events if none matched "today" logic strictly
+        // Fallback: Fetch ALL ongoing/scheduled events if none matched "today" strictly
         const { data: allEvents } = await supabase.from('events').select('*').order('start_date', { ascending: false }).limit(20);
         if (allEvents && allEvents.length > 0) {
              setEvents(allEvents);
@@ -156,15 +150,14 @@ const AttendanceList: React.FC = () => {
                     const pLogs = logs?.filter(l => l.participant_id === p.participant_id) || [];
                     const todaysLogs = pLogs.filter(l => l.attendance_date === today);
 
-                    todaysLogs.sort((a, b) => new Date(a.scan_time).getTime() - new Date(b.scan_time).getTime());
+                    // Sort: AM Ascending (Earliest), PM Descending (Latest)
+                    const amLogs = todaysLogs.filter(l => l.action_session === 'AM').sort((a,b) => a.scan_time.localeCompare(b.scan_time));
+                    const pmLogs = todaysLogs.filter(l => l.action_session === 'PM').sort((a,b) => b.scan_time.localeCompare(a.scan_time));
 
-                    const am = todaysLogs.find(l => l.action_session === 'AM');
-                    const pm = todaysLogs.find(l => l.action_session === 'PM');
-                    
                     return {
                         participant: p,
-                        amLog: am ? { time: am.scan_time, status: am.scan_status } : undefined,
-                        pmLog: pm ? { time: pm.scan_time, status: pm.scan_status } : undefined,
+                        amLog: amLogs.length > 0 ? { time: amLogs[0].scan_time, status: amLogs[0].scan_status } : undefined,
+                        pmLog: pmLogs.length > 0 ? { time: pmLogs[0].scan_time, status: pmLogs[0].scan_status } : undefined,
                     };
                 });
             setData(rows);

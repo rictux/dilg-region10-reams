@@ -1,5 +1,5 @@
 {
-  "name": "EventPulse",
+  "name": "Event Portal",
   "description": "A comprehensive Event Management and Attendance Web Portal with mobile-first QR scanning.",
   "requestFramePermissions": [
     "camera"

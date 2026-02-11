@@ -88,8 +88,10 @@ const AttendanceSheetPrint: React.FC = () => {
           .map(p => {
               const pLogs = daysLogs.filter(l => l.participant_id === p.participant_id);
               
+              // Sort AM Ascending (Earliest)
               const amLogs = pLogs.filter(l => l.action_session === 'AM').sort((a,b) => a.scan_time.localeCompare(b.scan_time));
-              const pmLogs = pLogs.filter(l => l.action_session === 'PM').sort((a,b) => a.scan_time.localeCompare(b.scan_time));
+              // Sort PM Descending (Latest)
+              const pmLogs = pLogs.filter(l => l.action_session === 'PM').sort((a,b) => b.scan_time.localeCompare(a.scan_time));
 
               return {
                   participant: p,

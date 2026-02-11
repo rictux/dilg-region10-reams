@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -11,7 +11,11 @@ import {
   AlertTriangle, 
   History, 
   User, 
-  MapPin
+  MapPin,
+  Calendar,
+  Wifi,
+  WifiOff,
+  CloudUpload
 } from 'lucide-react';
 import { Event } from '../../types/database';
 import { format } from 'date-fns';
@@ -20,15 +24,35 @@ interface RecentScan {
     id: string;
     name: string;
     position: string;
-    status: 'Valid' | 'Invalid' | 'Duplicate';
+    status: 'Valid' | 'Invalid' | 'Duplicate' | 'Offline-Saved';
     timestamp: Date;
     message: string;
+}
+
+interface OfflineScanItem {
+    id: string; // Unique ID for queue management
+    event_id: number;
+    participant_id: number;
+    participant_code: string;
+    scan_time: string; // ISO string
+    session: 'AM' | 'PM';
+    scanner_device: string;
+    timestamp: number;
+}
+
+interface ParticipantCache {
+    [code: string]: {
+        participant_id: number;
+        full_name: string;
+        position: string;
+        office: string;
+    };
 }
 
 const Scanner: React.FC = () => {
   const { user } = useAuth();
   const [scanning, setScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<'Valid' | 'Invalid' | 'Duplicate' | null>(null);
+  const [scanResult, setScanResult] = useState<'Valid' | 'Invalid' | 'Duplicate' | 'Offline-Saved' | null>(null);
   const [resultMessage, setResultMessage] = useState('');
   const [participantDetails, setParticipantDetails] = useState<{ name: string; position: string; office: string; photo?: string } | null>(null);
   const [session, setSession] = useState<'AM' | 'PM'>('AM');
@@ -37,6 +61,12 @@ const Scanner: React.FC = () => {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [loadingEvents, setLoadingEvents] = useState(true);
   
+  // Offline & Sync State
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [offlineQueue, setOfflineQueue] = useState<OfflineScanItem[]>([]);
+  const [participantCache, setParticipantCache] = useState<ParticipantCache>({});
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Recent History State
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
   
@@ -50,21 +80,55 @@ const Scanner: React.FC = () => {
     eventIdRef.current = selectedEventId;
   }, [selectedEventId]);
 
-  // 1. Load Events
+  // --- 1. Network Status Listeners & Queue Loading ---
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Load existing queue from local storage
+    const storedQueue = localStorage.getItem('eventpulse_offline_queue');
+    if (storedQueue) {
+        try {
+            setOfflineQueue(JSON.parse(storedQueue));
+        } catch (e) {
+            console.error("Error parsing offline queue", e);
+        }
+    }
+
+    return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // --- 2. Load Events ---
   useEffect(() => {
     const loadEvents = async () => {
       try {
+        const today = new Date().toISOString().split('T')[0];
+
         const { data } = await supabase
           .from('events')
           .select('*')
-          .in('status', ['Ongoing', 'Scheduled'])
+          .lte('start_date', today)
+          .gte('end_date', today)
+          .neq('status', 'Cancelled')
           .order('start_date', { ascending: false });
         
         if (data && data.length > 0) {
           setEvents(data);
-          // Default to the first ongoing event, or just the first one
-          const ongoing = data.find(e => e.status === 'Ongoing');
-          setSelectedEventId(ongoing ? ongoing.event_id.toString() : data[0].event_id.toString());
+          
+          if (data.length === 1) {
+            setSelectedEventId(data[0].event_id.toString());
+          } else {
+            setSelectedEventId('');
+          }
+        } else {
+            setEvents([]);
+            setSelectedEventId('');
         }
       } catch (error) {
         console.error("Error loading events", error);
@@ -72,27 +136,153 @@ const Scanner: React.FC = () => {
         setLoadingEvents(false);
       }
     };
-    loadEvents();
-  }, []);
+    
+    if (isOnline) {
+        loadEvents();
+    }
+  }, [isOnline]);
 
-  // 2. Initialize Scanner logic
-   useEffect(() => {
+  // --- 3. Cache Participants when Event is Selected ---
+  useEffect(() => {
+    const cacheParticipants = async () => {
+        if (!selectedEventId || !isOnline) return;
+
+        try {
+            const { data } = await supabase
+                .from('event_participants')
+                .select(`
+                    participant_id,
+                    participants (
+                        participant_id,
+                        participant_code,
+                        full_name,
+                        position,
+                        office
+                    )
+                `)
+                .eq('event_id', selectedEventId)
+                .eq('registration_status', 'Registered');
+
+            if (data) {
+                const cache: ParticipantCache = {};
+                data.forEach((row: any) => {
+                    if (row.participants) {
+                        cache[row.participants.participant_code] = {
+                            participant_id: row.participants.participant_id,
+                            full_name: row.participants.full_name,
+                            position: row.participants.position,
+                            office: row.participants.office
+                        };
+                    }
+                });
+                setParticipantCache(cache);
+                // console.log(`Cached ${Object.keys(cache).length} participants for offline mode.`);
+            }
+        } catch (err) {
+            console.error("Failed to cache participants", err);
+        }
+    };
+
+    cacheParticipants();
+  }, [selectedEventId, isOnline]);
+
+  // --- 4. Sync Logic ---
+  const syncOfflineScans = useCallback(async () => {
+      if (offlineQueue.length === 0 || !isOnline || isSyncing) return;
+
+      setIsSyncing(true);
+      const newQueue = [...offlineQueue];
+      
+      // Process one by one to ensure logic holds
+      // We process from oldest to newest
+      const item = newQueue[0]; 
+
+      try {
+            // Re-use logic: Check DB for existing log
+            const today = item.scan_time.split('T')[0];
+            
+            // Check for duplicate on server
+            const { data: existingLog } = await supabase
+                .from('attendance_logs')
+                .select('attendance_id, scan_time')
+                .eq('event_id', item.event_id)
+                .eq('participant_id', item.participant_id)
+                .eq('attendance_date', today)
+                .eq('action_session', item.session)
+                .eq('scan_status', 'Valid')
+                .single();
+
+            if (existingLog) {
+                if (item.session === 'PM') {
+                    // PM Logic: Update to Latest
+                    // Only update if the queued scan is LATER than the DB scan
+                    if (new Date(item.scan_time) > new Date(existingLog.scan_time)) {
+                        await supabase
+                            .from('attendance_logs')
+                            .update({ 
+                                scan_time: item.scan_time,
+                                scanner_device: item.scanner_device + ' (Synced)',
+                                remarks: 'Updated PM Time (Synced)'
+                            })
+                            .eq('attendance_id', existingLog.attendance_id);
+                    }
+                }
+                // If AM, ignore duplicate (Earliest is kept)
+            } else {
+                // Insert New
+                await supabase.from('attendance_logs').insert({
+                    event_id: item.event_id,
+                    participant_id: item.participant_id,
+                    user_id: user?.user_id,
+                    scan_status: 'Valid',
+                    attendance_date: today,
+                    action_session: item.session,
+                    scan_time: item.scan_time,
+                    remarks: 'Synced from Offline',
+                    scanner_device: item.scanner_device
+                });
+            }
+
+            // Success: Remove from queue
+            newQueue.shift();
+            setOfflineQueue(newQueue);
+            localStorage.setItem('eventpulse_offline_queue', JSON.stringify(newQueue));
+
+      } catch (err) {
+          console.error("Sync error for item", item, err);
+          // Move to end of queue or keep retry logic? 
+          // For now, we leave it to retry on next cycle, but safeguard against infinite loop on bad data might be needed.
+          // Simple safeguard: if fails, remove it to unblock queue? 
+          // Better: Leave it, maybe next time connection is better.
+      } finally {
+          setIsSyncing(false);
+      }
+  }, [offlineQueue, isOnline, isSyncing, user]);
+
+  // Trigger sync when queue changes or online status changes
+  useEffect(() => {
+      if (isOnline && offlineQueue.length > 0) {
+          const timer = setTimeout(() => {
+              syncOfflineScans();
+          }, 1000); // Small delay to batch or allow connection stabilize
+          return () => clearTimeout(timer);
+      }
+  }, [isOnline, offlineQueue, syncOfflineScans]);
+
+
+  // --- 5. Scanner Initialization ---
+  useEffect(() => {
     // Start condition: Have event, no result on screen, not currently scanning
     if (selectedEventId && !scanResult && !scanning) {
        startScanner();
     } 
-    // Stop condition: No event selected (and is scanning), or Result is showing (and is scanning)
-    // Note: handleScan usually stops it before showing result, but this acts as a safety
+    // Stop condition
     else if ((!selectedEventId || scanResult) && scanning) {
         cleanupScanner();
     }
-    
-    // We intentionally DO NOT cleanup on every render to keep camera alive when switching events.
-    // Cleanup is handled by the mount/unmount effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEventId, scanResult, scanning]);
 
-  // Cleanup on unmount
   useEffect(() => {
       return () => {
           cleanupScanner();
@@ -106,16 +296,13 @@ const Scanner: React.FC = () => {
             await scannerRef.current.stop();
         }
         scannerRef.current.clear();
-      } catch(e) {
-        // console.error("Failed to stop scanner", e);
-      }
+      } catch(e) { }
       scannerRef.current = null;
       setScanning(false);
     }
   };
 
   const startScanner = async () => {
-    // Ensure clean state before starting
     if (scannerRef.current) {
         await cleanupScanner();
     }
@@ -132,14 +319,12 @@ const Scanner: React.FC = () => {
             {
                 fps: 10,
                 qrbox: { width: 250, height: 250 },
-                aspectRatio: window.innerWidth < 768 ? 1 : 1.77, // Square on mobile, wide on desktop
+                aspectRatio: window.innerWidth < 768 ? 1 : 1.77, 
             },
             (decodedText) => {
                 handleScan(decodedText);
             },
-            (errorMessage) => {
-                // Ignore frame errors
-            }
+            (errorMessage) => { }
         );
         setScanning(true);
         setCameraError(null);
@@ -153,18 +338,53 @@ const Scanner: React.FC = () => {
   const handleScan = async (qrToken: string) => {
     if (!scannerRef.current) return;
     
+    // Pause scanner immediately
     try {
         await scannerRef.current.stop();
         setScanning(false);
     } catch (e) { console.error(e) }
 
-    try {
-        // Use Ref to get the latest event ID without needing to restart scanner closure
-        const currentEventIdStr = eventIdRef.current;
-        const eventId = parseInt(currentEventIdStr);
-        
-        if (isNaN(eventId)) throw new Error("No event selected");
+    const currentEventIdStr = eventIdRef.current;
+    const eventId = parseInt(currentEventIdStr);
+    if (isNaN(eventId)) return;
 
+    // --- OFFLINE MODE LOGIC ---
+    if (!isOnline) {
+        const cachedP = participantCache[qrToken];
+        
+        if (cachedP) {
+            // Save to Queue
+            const offlineItem: OfflineScanItem = {
+                id: Date.now().toString() + Math.random().toString().slice(2),
+                event_id: eventId,
+                participant_id: cachedP.participant_id,
+                participant_code: qrToken,
+                scan_time: new Date().toISOString(),
+                session: session,
+                scanner_device: navigator.userAgent + " (Offline)",
+                timestamp: Date.now()
+            };
+
+            const newQueue = [...offlineQueue, offlineItem];
+            setOfflineQueue(newQueue);
+            localStorage.setItem('eventpulse_offline_queue', JSON.stringify(newQueue));
+
+            setParticipantDetails({
+                name: cachedP.full_name,
+                position: cachedP.position,
+                office: cachedP.office
+            });
+
+            processScanResult('Offline-Saved', 'Saved locally. Will sync when online.', cachedP.full_name, cachedP.position);
+        } else {
+            // Not in cache
+            processScanResult('Invalid', 'Participant not found in offline cache.', qrToken);
+        }
+        return;
+    }
+
+    // --- ONLINE MODE LOGIC ---
+    try {
         // 1. Find Participant
         const { data: partData, error: partError } = await supabase
             .from('participants')
@@ -198,7 +418,7 @@ const Scanner: React.FC = () => {
             return;
         }
 
-        // 3. Check Duplicate
+        // 3. Check Duplicate or Existing Log
         const today = new Date().toISOString().split('T')[0];
         const { data: existingLog } = await supabase
             .from('attendance_logs')
@@ -211,16 +431,35 @@ const Scanner: React.FC = () => {
             .single();
 
         if (existingLog) {
-            await logScan(eventId, partData.participant_id, 'Duplicate', 'Already Scanned');
-            processScanResult('Duplicate', `Already scanned for ${session}.`, participant.name, participant.position);
-            return;
+            if (session === 'AM') {
+                await logScan(eventId, partData.participant_id, 'Duplicate', 'Already Scanned');
+                processScanResult('Duplicate', `Already scanned for ${session}.`, participant.name, participant.position);
+                return;
+            } else {
+                // PM Session: Update time to latest
+                const newTime = new Date().toISOString();
+                const { error: updateError } = await supabase
+                    .from('attendance_logs')
+                    .update({ 
+                        scan_time: newTime,
+                        scanner_device: navigator.userAgent,
+                        remarks: 'Updated PM Time'
+                    })
+                    .eq('attendance_id', existingLog.attendance_id);
+
+                if (updateError) throw updateError;
+                processScanResult('Valid', 'PM Time Updated', participant.name, participant.position);
+                return;
+            }
         }
 
-        // 4. Success
+        // 4. Success (New Insert)
         await logScan(eventId, partData.participant_id, 'Valid', 'Success');
         processScanResult('Valid', 'Attendance Recorded', participant.name, participant.position);
 
     } catch (err: any) {
+        // Fallback to offline mode logic if request fails unexpectedly?
+        // For now, treat as error.
         processScanResult('Invalid', err.message || 'Scan failed', 'Unknown');
     }
   };
@@ -245,7 +484,7 @@ const Scanner: React.FC = () => {
       });
   };
 
-  const processScanResult = (status: 'Valid' | 'Invalid' | 'Duplicate', message: string, name: string = 'Unknown', position: string = '') => {
+  const processScanResult = (status: 'Valid' | 'Invalid' | 'Duplicate' | 'Offline-Saved', message: string, name: string = 'Unknown', position: string = '') => {
       setScanResult(status);
       setResultMessage(message);
 
@@ -261,7 +500,7 @@ const Scanner: React.FC = () => {
       setRecentScans(prev => [newScan, ...prev].slice(0, 20));
 
       if (navigator.vibrate) {
-        if (status === 'Valid') navigator.vibrate([100]);
+        if (status === 'Valid' || status === 'Offline-Saved') navigator.vibrate([100]);
         else navigator.vibrate([300]);
       }
 
@@ -281,7 +520,26 @@ const Scanner: React.FC = () => {
             {/* Top Bar Overlay */}
             <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/80 to-transparent">
                  <div className="flex flex-col sm:flex-row gap-3 max-w-4xl mx-auto items-center">
-                    <div className="flex-1 w-full sm:w-auto">
+                    
+                    {/* Status Indicators */}
+                    <div className="flex items-center gap-2 absolute top-4 right-4 sm:relative sm:top-0 sm:right-0 sm:order-last">
+                        {isOnline ? (
+                            <div className="bg-green-500/20 text-green-400 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 backdrop-blur-md border border-green-500/30">
+                                <Wifi size={14} /> Online
+                            </div>
+                        ) : (
+                            <div className="bg-red-500/20 text-red-400 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 backdrop-blur-md border border-red-500/30">
+                                <WifiOff size={14} /> Offline Mode
+                            </div>
+                        )}
+                        {offlineQueue.length > 0 && (
+                             <div className="bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 backdrop-blur-md border border-amber-500/30 animate-pulse">
+                                <CloudUpload size={14} /> {offlineQueue.length} Pending
+                             </div>
+                        )}
+                    </div>
+
+                    <div className="flex-1 w-full sm:w-auto mt-8 sm:mt-0">
                         {loadingEvents ? (
                             <div className="h-11 bg-slate-800 rounded-lg animate-pulse"></div>
                         ) : (
@@ -292,9 +550,18 @@ const Scanner: React.FC = () => {
                                     onChange={(e) => setSelectedEventId(e.target.value)}
                                     className="w-full bg-slate-900/80 text-white text-sm font-medium rounded-xl pl-10 pr-8 py-3 border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-xl backdrop-blur-md appearance-none"
                                 >
-                                    {events.length === 0 && <option value="">No Active Events</option>}
-                                    {events.map(e => <option key={e.event_id} value={e.event_id}>{e.event_name}</option>)}
+                                    {events.length === 0 ? (
+                                        <option value="">No Events Today</option>
+                                    ) : (
+                                        <>
+                                            {(events.length > 1 || !selectedEventId) && <option value="">-- Select Event --</option>}
+                                            {events.map(e => <option key={e.event_id} value={e.event_id}>{e.event_name}</option>)}
+                                        </>
+                                    )}
                                 </select>
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -351,6 +618,23 @@ const Scanner: React.FC = () => {
                                 </div>
                             </div>
                         )}
+                        
+                        {!scanResult && !scanning && !loadingEvents && (
+                             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-6 text-center">
+                                {!selectedEventId ? (
+                                    <>
+                                        <Calendar className="w-16 h-16 text-slate-500 mb-4" />
+                                        <h3 className="text-xl font-bold text-slate-300">No Event Selected</h3>
+                                        <p className="text-slate-500 mt-2">Please select an ongoing event to start scanning.</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
+                                        <p>Starting Camera...</p>
+                                    </>
+                                )}
+                             </div>
+                        )}
                     </>
                 )}
             </div>
@@ -370,34 +654,38 @@ const Scanner: React.FC = () => {
                 <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-200 backdrop-blur-md bg-black/40`}>
                     <div className={`
                         w-full max-w-sm rounded-3xl shadow-2xl p-8 flex flex-col items-center
-                        ${scanResult === 'Valid' ? 'bg-white' : 'bg-white'}
+                        bg-white
                         border-t-8
                         ${scanResult === 'Valid' ? 'border-emerald-500' : ''}
+                        ${scanResult === 'Offline-Saved' ? 'border-blue-500' : ''}
                         ${scanResult === 'Invalid' ? 'border-red-500' : ''}
                         ${scanResult === 'Duplicate' ? 'border-amber-500' : ''}
                     `}>
                         <div className={`
                             -mt-16 mb-4 p-4 rounded-full border-4 border-white shadow-lg
                             ${scanResult === 'Valid' ? 'bg-emerald-500' : ''}
+                            ${scanResult === 'Offline-Saved' ? 'bg-blue-500' : ''}
                             ${scanResult === 'Invalid' ? 'bg-red-500' : ''}
                             ${scanResult === 'Duplicate' ? 'bg-amber-500' : ''}
                         `}>
                             {scanResult === 'Valid' && <CheckCircle size={48} className="text-white" />}
+                            {scanResult === 'Offline-Saved' && <WifiOff size={48} className="text-white" />}
                             {scanResult === 'Invalid' && <XCircle size={48} className="text-white" />}
                             {scanResult === 'Duplicate' && <RefreshCw size={48} className="text-white" />}
                         </div>
 
                         <h2 className={`text-3xl font-black uppercase tracking-tight mb-2
                             ${scanResult === 'Valid' ? 'text-emerald-600' : ''}
+                            ${scanResult === 'Offline-Saved' ? 'text-blue-600' : ''}
                             ${scanResult === 'Invalid' ? 'text-red-600' : ''}
                             ${scanResult === 'Duplicate' ? 'text-amber-600' : ''}
                         `}>
-                            {scanResult === 'Valid' ? 'Verified!' : scanResult}
+                            {scanResult === 'Valid' ? 'Verified!' : scanResult === 'Offline-Saved' ? 'Saved (Offline)' : scanResult}
                         </h2>
                         
                         <p className="text-slate-500 font-medium mb-6">{resultMessage}</p>
 
-                        {(scanResult === 'Valid' || scanResult === 'Duplicate') && participantDetails && (
+                        {(scanResult === 'Valid' || scanResult === 'Duplicate' || scanResult === 'Offline-Saved') && participantDetails && (
                             <div className="w-full bg-slate-50 rounded-xl p-4 border border-slate-100">
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Participant</p>
                                 <p className="text-xl font-bold text-slate-900 leading-tight">{participantDetails.name}</p>
@@ -449,10 +737,11 @@ const Scanner: React.FC = () => {
                                     <p className="text-xs text-slate-500 truncate max-w-[150px]">{scan.position || 'Unknown Position'}</p>
                                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase
                                         ${scan.status === 'Valid' ? 'bg-emerald-50 text-emerald-700' : ''}
+                                        ${scan.status === 'Offline-Saved' ? 'bg-blue-50 text-blue-700' : ''}
                                         ${scan.status === 'Invalid' ? 'bg-red-50 text-red-700' : ''}
                                         ${scan.status === 'Duplicate' ? 'bg-amber-50 text-amber-700' : ''}
                                     `}>
-                                        {scan.status}
+                                        {scan.status === 'Offline-Saved' ? 'Offline' : scan.status}
                                     </span>
                                 </div>
                             </div>

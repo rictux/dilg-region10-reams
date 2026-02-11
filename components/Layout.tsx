@@ -16,7 +16,8 @@ import {
   CheckCircle,
   ChevronDown,
   ChevronUp,
-  User
+  User,
+  ShieldCheck
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -39,6 +40,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // If scanner role, strictly show simplified layout or redirect
   const isScanner = user?.role === 'Scanner';
+  const isAdmin = user?.role === 'Admin';
 
   // Click outside listener for dropdown
   useEffect(() => {
@@ -252,8 +254,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <NavItem to="/events" icon={CalendarDays} label="Events" />
             <NavItem to="/attendance" icon={ClipboardList} label="Attendance" />
             <NavItem to="/reports" icon={FileBarChart} label="Reports" />
+            
+            {isAdmin && (
+              <div className="pt-2 mt-2 border-t border-slate-100">
+                <NavItem to="/users" icon={ShieldCheck} label="Users" />
+              </div>
+            )}
+
             {/* Admins can also scan if they want */}
-            <NavItem to="/scan" icon={ScanLine} label="Scan Mode" />
+            <div className="pt-2 mt-2 border-t border-slate-100">
+              <NavItem to="/scan" icon={ScanLine} label="Scan Mode" />
+            </div>
           </nav>
 
           <div className="p-4 border-t border-slate-200 relative" ref={dropdownRef}>

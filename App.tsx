@@ -12,6 +12,7 @@ import Scanner from './features/scanner/Scanner';
 import Reports from './features/reports/Reports';
 import AttendanceSheetPrint from './features/participants/AttendanceSheetPrint';
 import ScanLogsPrint from './features/reports/ScanLogsPrint';
+import UserManagement from './features/users/UserManagement';
 
 const ProtectedRoute = ({ children, allowedRoles }: React.PropsWithChildren<{ allowedRoles?: string[] }>) => {
   const { user, loading } = useAuth();
@@ -60,6 +61,13 @@ const App: React.FC = () => {
           <Route path="/reports" element={
             <ProtectedRoute allowedRoles={['Admin', 'EventManager']}>
               <Layout><Reports /></Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Users - Restricted to Admin only */}
+          <Route path="/users" element={
+            <ProtectedRoute allowedRoles={['Admin']}>
+              <Layout><UserManagement /></Layout>
             </ProtectedRoute>
           } />
 
