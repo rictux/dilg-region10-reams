@@ -148,10 +148,10 @@ const AttendanceSheetPrint: React.FC = () => {
                         <div className="text-xl font-bold font-serif mb-1 uppercase tracking-wide">
                             {event.event_name}
                         </div>
-                        <div className="text-sm font-sans text-slate-700 uppercase">
+                        <div className="text-sm font-sans text-slate-700">
                             {event.venue}
                         </div>
-                        <div className="text-sm font-sans text-slate-900 font-bold mt-1">
+                        <div className="text-sm font-sans text-slate-900 mt-1">
                             {format(date, 'MMMM d, yyyy')}
                         </div>
                     </div>
