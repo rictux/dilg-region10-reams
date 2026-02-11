@@ -102,6 +102,12 @@ const AttendanceSheetPrint: React.FC = () => {
           .sort((a, b) => a.participant.full_name.localeCompare(b.participant.full_name));
   };
 
+  // Helper to format time strings that might be missing timezone info (assume UTC if missing)
+  const formatLogTime = (timeStr: string) => {
+      const d = new Date(timeStr.endsWith('Z') || timeStr.includes('+') ? timeStr : timeStr + 'Z');
+      return format(d, 'h:mm a');
+  };
+
   if (loading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin text-blue-600" /></div>;
   if (!event) return <div>Event not found</div>;
 
@@ -199,11 +205,11 @@ const AttendanceSheetPrint: React.FC = () => {
                                             </td>
 
                                             <td className="px-2 py-1.5 font-mono">
-                                                {row.amLog ? format(new Date(row.amLog.time), 'h:mm a') : ''}
+                                                {row.amLog ? formatLogTime(row.amLog.time) : ''}
                                             </td>
 
                                             <td className="px-2 py-1.5 font-mono">
-                                                {row.pmLog ? format(new Date(row.pmLog.time), 'h:mm a') : ''}
+                                                {row.pmLog ? formatLogTime(row.pmLog.time) : ''}
                                             </td>
                                         </tr>
                                     ))
