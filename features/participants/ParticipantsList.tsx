@@ -218,14 +218,16 @@ const AttendanceList: React.FC = () => {
       
       setSavingManual(true);
       try {
-          const dateTimeStr = `${manualForm.date}T${manualForm.time}:00`;
+          // Construct UTC timestamp from local input
+          const localDate = new Date(`${manualForm.date}T${manualForm.time}:00`);
+          const scanTimeStr = localDate.toISOString();
           
           const { error } = await supabase.from('attendance_logs').insert({
               event_id: selectedEventId,
               participant_id: manualParticipant.participant_id,
               user_id: user.user_id,
               attendance_date: manualForm.date,
-              scan_time: dateTimeStr,
+              scan_time: scanTimeStr, // Save as ISO UTC
               action_session: manualForm.session,
               scan_status: manualForm.status,
               remarks: 'Manual Entry',
@@ -239,6 +241,12 @@ const AttendanceList: React.FC = () => {
       } finally {
           setSavingManual(false);
       }
+  };
+
+  // Helper to format time strings that might be missing timezone info (assume UTC if missing)
+  const formatLogTime = (timeStr: string) => {
+      const d = new Date(timeStr.endsWith('Z') || timeStr.includes('+') ? timeStr : timeStr + 'Z');
+      return format(d, 'h:mm a');
   };
 
   const FilterButton = ({ label }: { label: string }) => (
@@ -419,7 +427,7 @@ const AttendanceList: React.FC = () => {
                                 <td className="px-6 py-4">
                                     {row.amLog ? (
                                         <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold">
-                                            {format(new Date(row.amLog.time), 'h:mm a')}
+                                            {formatLogTime(row.amLog.time)}
                                         </span>
                                     ) : (
                                         <span className="text-slate-300">-</span>
@@ -428,7 +436,7 @@ const AttendanceList: React.FC = () => {
                                 <td className="px-6 py-4">
                                     {row.pmLog ? (
                                         <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold">
-                                            {format(new Date(row.pmLog.time), 'h:mm a')}
+                                            {formatLogTime(row.pmLog.time)}
                                         </span>
                                     ) : (
                                         <span className="text-slate-300">-</span>
