@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Event } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy } from 'lucide-react';
+import { Event, Office } from '../../types/database';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Printer, Building2, Home } from 'lucide-react';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 const EventsList: React.FC = () => {
+  const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
+  const [offices, setOffices] = useState<Office[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
   
   // Modal States
   const [showEventModal, setShowEventModal] = useState(false);
@@ -27,12 +32,15 @@ const EventsList: React.FC = () => {
       venue: '',
       start_date: '',
       end_date: '',
-      status: 'Scheduled' as const
+      status: 'Scheduled' as const,
+      organize_by: null as number | null,
+      has_accommodation: false
   };
   const [formData, setFormData] = useState<Partial<Event>>(initialFormState);
 
   useEffect(() => {
     fetchEvents();
+    fetchOffices();
 
     const subscription = supabase
       .channel('events_list_realtime')
@@ -80,6 +88,11 @@ const EventsList: React.FC = () => {
     setLoading(false);
   };
 
+  const fetchOffices = async () => {
+      const { data } = await supabase.from('offices').select('*').order('name');
+      if (data) setOffices(data);
+  };
+
   const fetchEventParticipants = async (eventId: number) => {
     setLoadingParticipants(true);
     const { data, error } = await supabase
@@ -87,6 +100,9 @@ const EventsList: React.FC = () => {
         .select(`
             registration_status,
             registered_at,
+            role,
+            needs_accommodation,
+            accommodation_pax,
             participants (
                 full_name,
                 participant_code,
@@ -140,7 +156,9 @@ const EventsList: React.FC = () => {
           venue: event.venue,
           start_date: event.start_date,
           end_date: event.end_date,
-          status: event.status
+          status: event.status,
+          organize_by: event.organize_by,
+          has_accommodation: event.has_accommodation
       });
       setShowEventModal(true);
   };
@@ -200,6 +218,7 @@ const EventsList: React.FC = () => {
   };
 
   const getRegistrationLink = (eventId: number) => {
+      // Constructs link based on current origin and HashRouter structure
       return `${window.location.origin}${window.location.pathname}#/register/${eventId}`;
   };
 
@@ -266,9 +285,15 @@ const EventsList: React.FC = () => {
                                       key={event.event_id} 
                                       onClick={() => handleRowClick(event)}
                                       className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                                      title="Click to view participants"
                                   >
                                       <td className="px-6 py-4 font-medium text-slate-800 group-hover:text-indigo-600 transition-colors">
                                           {event.event_name}
+                                          {event.has_accommodation && (
+                                              <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
+                                                  <Home size={10} className="mr-1" /> Stay
+                                              </span>
+                                          )}
                                       </td>
                                       <td className="px-6 py-4 text-slate-600">{event.venue}</td>
                                       <td className="px-6 py-4 text-slate-600 font-medium">
@@ -292,6 +317,16 @@ const EventsList: React.FC = () => {
                                       </td>
                                       <td className="px-6 py-4 flex items-center gap-2">
                                           <button 
+                                              onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  navigate(`/print-participants/${event.event_id}`);
+                                              }} 
+                                              className="p-1.5 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors"
+                                              title="Print Participant List"
+                                          >
+                                              <Printer size={18} />
+                                          </button>
+                                          <button 
                                               onClick={(e) => openShareModal(e, event)}
                                               className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-colors"
                                               title="Share Registration Link"
@@ -305,13 +340,15 @@ const EventsList: React.FC = () => {
                                           >
                                               <Edit size={18} />
                                           </button>
-                                          <button 
-                                              onClick={(e) => handleDelete(e, event.event_id)} 
-                                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                              title="Delete Event"
-                                          >
-                                              <Trash2 size={18} />
-                                          </button>
+                                          {user?.role === 'Admin' && (
+                                              <button 
+                                                  onClick={(e) => handleDelete(e, event.event_id)} 
+                                                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                  title="Delete Event"
+                                              >
+                                                  <Trash2 size={18} />
+                                              </button>
+                                          )}
                                       </td>
                                   </tr>
                               ))}
@@ -402,7 +439,7 @@ const EventsList: React.FC = () => {
                                 <tr>
                                     <th className="px-6 py-4 w-16 text-center">#</th>
                                     <th className="px-6 py-4">Participant Name</th>
-                                    <th className="px-6 py-4">Position</th>
+                                    <th className="px-6 py-4">Role</th>
                                     <th className="px-6 py-4">Office</th>
                                     <th className="px-6 py-4">Status</th>
                                 </tr>
@@ -415,7 +452,14 @@ const EventsList: React.FC = () => {
                                             <div className="font-medium text-slate-800">{record.participants?.full_name}</div>
                                             <div className="text-xs text-slate-500">{record.participants?.email}</div>
                                         </td>
-                                        <td className="px-6 py-3 text-slate-600">{record.participants?.position}</td>
+                                        <td className="px-6 py-3 text-slate-600">
+                                            {record.role || 'Delegate'}
+                                            {record.needs_accommodation && (
+                                                <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded">
+                                                    Stay ({record.accommodation_pax})
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="px-6 py-3 text-slate-600">{record.participants?.office}</td>
                                         <td className="px-6 py-3">
                                             <span className={`px-2 py-0.5 rounded-full text-xs font-semibold
@@ -540,26 +584,61 @@ const EventsList: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Status */}
+                {/* Organize By */}
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Organized By</label>
                     <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Clock className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                      </div>
-                      <select 
-                        className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
-                        value={formData.status}
-                        onChange={e => setFormData({...formData, status: e.target.value as any})}
-                      >
-                        <option value="Scheduled">Scheduled</option>
-                        <option value="Ongoing">Ongoing</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Cancelled">Cancelled</option>
-                      </select>
-                      <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                      </div>
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Building2 className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                        </div>
+                        <select 
+                            className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
+                            value={formData.organize_by || ''}
+                            onChange={e => setFormData({...formData, organize_by: e.target.value ? Number(e.target.value) : null})}
+                        >
+                            <option value="">-- Select Office --</option>
+                            {offices.map(office => (
+                                <option key={office.office_id} value={office.office_id}>{office.name}</option>
+                            ))}
+                        </select>
+                        <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-5">
+                    {/* Status */}
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
+                        <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Clock className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                            </div>
+                            <select 
+                                className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
+                                value={formData.status}
+                                onChange={e => setFormData({...formData, status: e.target.value as any})}
+                            >
+                                <option value="Scheduled">Scheduled</option>
+                                <option value="Ongoing">Ongoing</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Accommodation Checkbox */}
+                    <div className="flex items-center pt-6">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                                type="checkbox"
+                                className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                checked={formData.has_accommodation || false}
+                                onChange={e => setFormData({...formData, has_accommodation: e.target.checked})}
+                            />
+                            <span className="text-sm font-medium text-slate-700">Offers Accommodation</span>
+                        </label>
                     </div>
                 </div>
 
