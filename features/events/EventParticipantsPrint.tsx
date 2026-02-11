@@ -51,14 +51,8 @@ const EventParticipantsPrint: React.FC = () => {
     fetchData();
   }, [eventId]);
 
-  const accommodationStats = React.useMemo(() => {
-      return participants.reduce((acc, curr) => {
-          if (curr.needs_accommodation) {
-              acc.requests += 1;
-              acc.pax += (curr.accommodation_pax || 0);
-          }
-          return acc;
-      }, { requests: 0, pax: 0 });
+  const accommodationCount = React.useMemo(() => {
+      return participants.filter(p => p.needs_accommodation).length;
   }, [participants]);
 
   if (loading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin text-indigo-600" /></div>;
@@ -113,7 +107,7 @@ const EventParticipantsPrint: React.FC = () => {
                  <div className="text-xs text-slate-500 uppercase font-bold font-sans">Total Registered: {participants.length}</div>
                  {event.has_accommodation && (
                      <div className="text-xs text-slate-500 uppercase font-bold font-sans">
-                         Accommodation: {accommodationStats.pax} Pax ({accommodationStats.requests} Requests)
+                         With Accommodation: {accommodationCount}
                      </div>
                  )}
             </div>
@@ -141,8 +135,8 @@ const EventParticipantsPrint: React.FC = () => {
                                  <td className="border border-black px-2 py-1.5">{row.participants?.position}</td>
                                  <td className="border border-black px-2 py-1.5">{row.participants?.office}</td>
                                  {event.has_accommodation && (
-                                     <td className="border border-black px-2 py-1.5 font-bold">
-                                         {row.needs_accommodation ? `${row.accommodation_pax}` : '-'}
+                                     <td className="border border-black px-2 py-1.5 font-bold text-center">
+                                         {row.needs_accommodation ? '✓' : '-'}
                                      </td>
                                  )}
                                  <td className="border border-black px-2 py-1.5 text-center">
