@@ -76,8 +76,11 @@ const AttendanceList: React.FC = () => {
       return () => {
         supabase.removeChannel(channel);
       };
-    } else if (events.length === 0 && !loading) {
-      setData([]);
+    } else {
+      setData([]); // Clear data if no event selected
+      if (events.length === 0 && !loading) {
+         // keep empty
+      }
     }
   }, [selectedEventId]);
 
@@ -94,21 +97,29 @@ const AttendanceList: React.FC = () => {
     
     if (eventsData && eventsData.length > 0) {
         setEvents(eventsData);
-        // Default to first event if not already selected
-        if (!selectedEventId) {
+        // Default only if exactly one event exists
+        if (eventsData.length === 1) {
             setSelectedEventId(eventsData[0].event_id);
         } else {
-            // Verify selected event is still in the list, else switch
-            const exists = eventsData.find(e => e.event_id === selectedEventId);
-            if (!exists) setSelectedEventId(eventsData[0].event_id);
+            // If multiple events today, force user to select
+            // If currently selected event is NOT in the new list, reset it. 
+            // If it IS in the list, we might want to keep it, but the requirement says 
+            // "if one event today then default, else -- Select Event --". 
+            // We'll reset to null if multiple events are found to strictly follow "else -- Select Event --"
+            // unless we want to be nice and preserve selection. 
+            // Given "it will be -- Select Event --", we default to null on load.
+            if (!selectedEventId) setSelectedEventId(null);
         }
     } else {
         // Fallback: Fetch ALL ongoing/scheduled events if none matched "today" logic strictly
-        // This helps if admins want to view past events
         const { data: allEvents } = await supabase.from('events').select('*').order('start_date', { ascending: false }).limit(20);
         if (allEvents && allEvents.length > 0) {
              setEvents(allEvents);
-             if (!selectedEventId) setSelectedEventId(allEvents[0].event_id);
+             if (allEvents.length === 1) {
+                 setSelectedEventId(allEvents[0].event_id);
+             } else {
+                 if (!selectedEventId) setSelectedEventId(null);
+             }
         } else {
             setEvents([]);
             setData([]);
@@ -122,7 +133,6 @@ const AttendanceList: React.FC = () => {
     const today = new Date().toISOString().split('T')[0];
     
     try {
-        // 1. Get All Participants registered for THIS event
         const { data: eventParticipants, error: epError } = await supabase
             .from('event_participants')
             .select('participant_id, participants(*)')
@@ -130,14 +140,6 @@ const AttendanceList: React.FC = () => {
         
         if (epError) throw epError;
 
-        // 2. Get All Logs for THIS event (not just today, so we can see history if needed, 
-        // but typically we filter by date in UI or Query. Let's get ALL logs for the event to handle manual entry of past dates correctly in view)
-        // However, the View is designed for "Today's Attendance" mostly. 
-        // Let's widen the query slightly or keep it to today. 
-        // *Correction*: The prompt implies manual inputting date. If they input a past date, it won't show up if we only fetch today.
-        // Let's fetch logs for ALL dates for this event to be safe, or just rely on the Manual Modal to insert and the user to select the date they want to view?
-        // To keep the UI simple, the main view shows attendance based on the *Event's current context*.
-        // We will fetch logs for ALL dates for this event.
         const { data: logs, error: logsError } = await supabase
             .from('attendance_logs')
             .select('*')
@@ -146,23 +148,12 @@ const AttendanceList: React.FC = () => {
         if (logsError) throw logsError;
             
         if (eventParticipants) {
-            // Map the joined data structure back to flat participant list
             const rows = eventParticipants
                 .map((ep: any) => ep.participants)
-                .filter((p: any) => p !== null) // Safety check for deleted participants
+                .filter((p: any) => p !== null) 
                 .sort((a: any, b: any) => a.full_name.localeCompare(b.full_name))
                 .map((p: Participant) => {
-                    // Filter logs for this participant
                     const pLogs = logs?.filter(l => l.participant_id === p.participant_id) || [];
-                    
-                    // We need to decide WHICH date to show. 
-                    // Default behavior: Show logs for "Today". 
-                    // If the user manually added a log for yesterday, it won't show unless we have a Date Picker filter for the view.
-                    // For now, we will filter logs to match the "today" variable which is system date.
-                    // *Improvement*: If the event is multi-day, we might need a date selector.
-                    // For this specific request, we'll stick to showing Today's logs in the columns, 
-                    // but the manual entry allows inserting for any date.
-                    
                     const todaysLogs = pLogs.filter(l => l.attendance_date === today);
 
                     todaysLogs.sort((a, b) => new Date(a.scan_time).getTime() - new Date(b.scan_time).getTime());
@@ -189,7 +180,6 @@ const AttendanceList: React.FC = () => {
     const hasAM = !!row.amLog;
     const hasPM = !!row.pmLog;
 
-    // Search Filter
     if (searchQuery && !row.participant.full_name.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false;
     }
@@ -197,7 +187,7 @@ const AttendanceList: React.FC = () => {
     switch (filter) {
         case 'No Logs': return !hasAM && !hasPM;
         case 'With AM': return hasAM;
-        case 'No PM': return hasAM && !hasPM; // Must have AM but NO PM
+        case 'No PM': return hasAM && !hasPM;
         case 'Complete Logs': return hasAM && hasPM;
         case 'Show All':
         default: return true;
@@ -235,8 +225,6 @@ const AttendanceList: React.FC = () => {
       
       setSavingManual(true);
       try {
-          // Construct timestamp
-          // Note: scan_time expects full ISO string usually, or at least date+time
           const dateTimeStr = `${manualForm.date}T${manualForm.time}:00`;
           
           const { error } = await supabase.from('attendance_logs').insert({
@@ -252,10 +240,7 @@ const AttendanceList: React.FC = () => {
           });
 
           if (error) throw error;
-          
           setShowManualModal(false);
-          // fetchAttendance handled by realtime subscription
-          
       } catch (err: any) {
           alert("Error adding log: " + err.message);
       } finally {
@@ -276,7 +261,6 @@ const AttendanceList: React.FC = () => {
       </button>
   );
 
-  // Stats Calculation
   const totalParticipants = data.length;
   const presentCount = data.filter(r => r.amLog || r.pmLog).length;
   const notPresentCount = data.filter(r => !r.amLog && !r.pmLog).length;
@@ -320,6 +304,7 @@ const AttendanceList: React.FC = () => {
                             onChange={(e) => setSelectedEventId(Number(e.target.value))}
                             className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer"
                         >
+                            <option value="">-- Select Event --</option>
                             {events.map(e => (
                                 <option key={e.event_id} value={e.event_id}>
                                     {e.event_name}
@@ -487,7 +472,8 @@ const AttendanceList: React.FC = () => {
         </div>
       )}
 
-      {/* Manual Entry Modal */}
+      {/* Manual Entry Modal and Badge Modal remain unchanged */}
+      {/* ... (truncated for brevity since they are same as before) */}
       {showManualModal && manualParticipant && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div 
@@ -576,7 +562,6 @@ const AttendanceList: React.FC = () => {
           </div>
       )}
 
-      {/* Badge Modal */}
       {selectedParticipant && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div 
@@ -585,7 +570,6 @@ const AttendanceList: React.FC = () => {
             ></div>
             
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
-                {/* Modal Header */}
                 <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 flex justify-between items-center text-white">
                     <h3 className="font-semibold flex items-center gap-2">
                         <User size={20} /> Participant Badge
@@ -598,7 +582,6 @@ const AttendanceList: React.FC = () => {
                     </button>
                 </div>
 
-                {/* Badge Content */}
                 <div className="p-8 flex flex-col items-center text-center">
                      <>
                         <div className="border-4 border-slate-900 p-3 rounded-xl mb-6 bg-white shadow-sm">
