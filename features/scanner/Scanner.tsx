@@ -348,6 +348,9 @@ const Scanner: React.FC = () => {
     const eventId = parseInt(currentEventIdStr);
     if (isNaN(eventId)) return;
 
+    // Capture device time strictly at scan moment
+    const deviceScanTime = new Date().toISOString();
+
     // --- OFFLINE MODE LOGIC ---
     if (!isOnline) {
         const cachedP = participantCache[qrToken];
@@ -359,7 +362,7 @@ const Scanner: React.FC = () => {
                 event_id: eventId,
                 participant_id: cachedP.participant_id,
                 participant_code: qrToken,
-                scan_time: new Date().toISOString(),
+                scan_time: deviceScanTime, // Use captured device time
                 session: session,
                 scanner_device: navigator.userAgent + " (Offline)",
                 timestamp: Date.now()
@@ -413,13 +416,13 @@ const Scanner: React.FC = () => {
             .single();
 
         if (!regData || regData.registration_status !== 'Registered') {
-            await logScan(eventId, partData.participant_id, 'Invalid', 'Not Registered');
+            await logScan(eventId, partData.participant_id, 'Invalid', deviceScanTime, 'Not Registered');
             processScanResult('Invalid', 'Not registered for this event.', participant.name, participant.position);
             return;
         }
 
         // 3. Check Duplicate or Existing Log
-        const today = new Date().toISOString().split('T')[0];
+        const today = deviceScanTime.split('T')[0]; // Use device date for consistency
         const { data: existingLog } = await supabase
             .from('attendance_logs')
             .select('attendance_id')
@@ -432,16 +435,15 @@ const Scanner: React.FC = () => {
 
         if (existingLog) {
             if (session === 'AM') {
-                await logScan(eventId, partData.participant_id, 'Duplicate', 'Already Scanned');
+                // AM Session: Prevent duplicates (No DB Insert)
                 processScanResult('Duplicate', `Already scanned for ${session}.`, participant.name, participant.position);
                 return;
             } else {
-                // PM Session: Update time to latest
-                const newTime = new Date().toISOString();
+                // PM Session: Update time to latest (Device Time)
                 const { error: updateError } = await supabase
                     .from('attendance_logs')
                     .update({ 
-                        scan_time: newTime,
+                        scan_time: deviceScanTime,
                         scanner_device: navigator.userAgent,
                         remarks: 'Updated PM Time'
                     })
@@ -454,21 +456,20 @@ const Scanner: React.FC = () => {
         }
 
         // 4. Success (New Insert)
-        await logScan(eventId, partData.participant_id, 'Valid', 'Success');
+        await logScan(eventId, partData.participant_id, 'Valid', deviceScanTime, 'Success');
         processScanResult('Valid', 'Attendance Recorded', participant.name, participant.position);
 
     } catch (err: any) {
-        // Fallback to offline mode logic if request fails unexpectedly?
-        // For now, treat as error.
         processScanResult('Invalid', err.message || 'Scan failed', 'Unknown');
     }
   };
 
-  const logScan = async (eventId: number, participantId: number, status: 'Valid' | 'Invalid' | 'Duplicate', notes?: string) => {
+  const logScan = async (eventId: number, participantId: number, status: 'Valid' | 'Invalid' | 'Duplicate', scanTimeStr: string, notes?: string) => {
       if (!user) return;
-      if (status === 'Duplicate') return; // DB constraint
+      // Do not log 'Duplicate' for AM as per logic in handleScan (it returns early).
+      // If status is passed as Duplicate here, it might be for other future cases, but for now AM duplicates are suppressed.
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = scanTimeStr.split('T')[0];
       const dbEventId = eventId === 0 ? null : eventId;
       const dbParticipantId = participantId === 0 ? null : participantId;
 
@@ -480,6 +481,7 @@ const Scanner: React.FC = () => {
           attendance_date: today,
           action_session: session,
           remarks: notes,
+          scan_time: scanTimeStr, // Use explicit device time
           scanner_device: navigator.userAgent
       });
   };
