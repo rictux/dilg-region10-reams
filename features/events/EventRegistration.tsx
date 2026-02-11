@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Event, Participant } from '../../types/database';
 import QRCode from 'react-qr-code';
-import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Search } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home } from 'lucide-react';
 import { format } from 'date-fns';
 
 const EventRegistration: React.FC = () => {
@@ -27,7 +27,14 @@ const EventRegistration: React.FC = () => {
     email: '',
     gender: 'Male',
     position: '',
-    office: ''
+    office: '',
+    mobile_no: '',
+    age_group: '18-24',
+    pwd: 'No',
+    indigenous_people: 'No',
+    role: 'Delegate',
+    needs_accommodation: false,
+    accommodation_pax: 0
   });
 
   useEffect(() => {
@@ -76,11 +83,16 @@ const EventRegistration: React.FC = () => {
 
   const selectSuggestion = (p: Participant) => {
       setFormData({
+          ...formData,
           full_name: p.full_name,
           email: p.email,
           gender: p.gender || 'Male',
           position: p.position,
-          office: p.office
+          office: p.office,
+          mobile_no: p.mobile_no || '',
+          age_group: p.age_group || '18-24',
+          pwd: p.pwd || 'No',
+          indigenous_people: p.indigenous_people || 'No',
       });
       setSuggestions([]);
       setShowSuggestions(false);
@@ -94,6 +106,12 @@ const EventRegistration: React.FC = () => {
         return;
     }
 
+    // Validate Accommodation
+    if (formData.needs_accommodation && formData.accommodation_pax < 1) {
+        setError("Please specify at least 1 pax for accommodation.");
+        return;
+    }
+
     setSubmitting(true);
     setError(null);
     
@@ -102,10 +120,11 @@ const EventRegistration: React.FC = () => {
         
         const id = parseInt(eventId!);
 
-        // 1. Check if participant exists by email
+        // 1. Check if participant exists by email or mobile
         let participantId: number;
         let finalParticipantCode: string = '';
 
+        // Try finding by email first
         const { data: existingUser } = await supabase
             .from('participants')
             .select('participant_id, participant_code')
@@ -116,24 +135,35 @@ const EventRegistration: React.FC = () => {
             participantId = existingUser.participant_id;
             finalParticipantCode = existingUser.participant_code;
             
-            // Update existing participant details to match current form data
+            // Update existing participant details
             await supabase.from('participants').update({
                 full_name: formData.full_name,
                 gender: formData.gender,
                 position: formData.position,
-                office: formData.office
+                office: formData.office,
+                mobile_no: formData.mobile_no,
+                age_group: formData.age_group,
+                pwd: formData.pwd,
+                indigenous_people: formData.indigenous_people
             }).eq('participant_id', participantId);
         } else {
             // Create new participant
-            // Generate a unique code: Initials + Timestamp + Random
             const initials = formData.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 3);
             const code = `${initials}-${Date.now().toString().slice(-6)}`;
 
             const { data: newUser, error: createError } = await supabase
                 .from('participants')
                 .insert([{
-                    ...formData,
-                    participant_code: code
+                    full_name: formData.full_name,
+                    email: formData.email,
+                    gender: formData.gender,
+                    position: formData.position,
+                    office: formData.office,
+                    participant_code: code,
+                    mobile_no: formData.mobile_no,
+                    age_group: formData.age_group,
+                    pwd: formData.pwd,
+                    indigenous_people: formData.indigenous_people
                 }])
                 .select()
                 .single();
@@ -149,7 +179,10 @@ const EventRegistration: React.FC = () => {
             .insert({
                 event_id: id,
                 participant_id: participantId,
-                registration_status: 'Registered'
+                registration_status: 'Registered',
+                role: formData.role,
+                needs_accommodation: formData.needs_accommodation,
+                accommodation_pax: formData.needs_accommodation ? formData.accommodation_pax : 0
             });
 
         // Ignore unique violation (already registered)
@@ -216,6 +249,11 @@ const EventRegistration: React.FC = () => {
                           <p className="font-bold text-slate-800 text-lg">{formData.full_name}</p>
                           <p className="text-slate-500">{formData.email}</p>
                           <p className="text-slate-500 text-sm mt-1">{formData.position} • {formData.office}</p>
+                          {formData.needs_accommodation && (
+                               <p className="text-indigo-600 text-xs font-semibold mt-2 flex items-center gap-1">
+                                  <Home size={12}/> Accommodation Requested ({formData.accommodation_pax} Pax)
+                               </p>
+                          )}
                           <p className="text-xs text-slate-300 font-mono mt-2">ID: {qrToken}</p>
                       </div>
                       
@@ -233,7 +271,7 @@ const EventRegistration: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 flex justify-center">
-        <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
+        <div className="max-w-xl w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
             {/* Event Header */}
             <div className="bg-indigo-600 p-6 sm:p-8 text-white relative overflow-hidden">
                 <div className="relative z-10">
@@ -263,102 +301,256 @@ const EventRegistration: React.FC = () => {
                 )}
                 
                 <form onSubmit={handleSubmit} className="space-y-5">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Full Name</label>
-                        <div className="relative">
-                            <User className="absolute left-3 top-3 text-slate-400" size={18} />
-                            <input 
-                                required 
-                                type="text"
-                                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                                placeholder="Type your name..."
-                                value={formData.full_name}
-                                onChange={handleNameChange}
-                                onFocus={() => { if(formData.full_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
-                                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                                autoComplete="off"
-                            />
-                            {showSuggestions && suggestions.length > 0 && (
-                                <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
-                                    {suggestions.map((p) => (
-                                        <li 
-                                            key={p.participant_id}
-                                            onClick={() => selectSuggestion(p)}
-                                            className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
-                                        >
-                                            <div className="flex justify-between items-center">
-                                                <div className="font-medium text-slate-800 group-hover:text-indigo-700">{p.full_name}</div>
-                                                <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Select</span>
-                                            </div>
-                                            <div className="text-xs text-slate-500 mt-0.5">{p.email} • {p.office}</div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address</label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-3 text-slate-400" size={18} />
-                            <input 
-                                required 
-                                type="email"
-                                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                                placeholder="john@company.com"
-                                value={formData.email}
-                                onChange={e => setFormData({...formData, email: e.target.value})}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
+                    
+                    {/* SECTION: Personal Info */}
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b pb-2 mb-4">Personal Information</h3>
+                        
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Gender</label>
-                            <select 
-                                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                                value={formData.gender}
-                                onChange={e => setFormData({...formData, gender: e.target.value})}
-                            >
-                                <option value="Male">Male</option>
-                                <option value="Female">Female</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Position / Title</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Full Name</label>
                             <div className="relative">
-                                <Briefcase className="absolute left-3 top-3 text-slate-400" size={18} />
+                                <User className="absolute left-3 top-3 text-slate-400" size={18} />
                                 <input 
                                     required 
                                     type="text"
-                                    className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                    placeholder="Manager"
-                                    value={formData.position}
-                                    onChange={e => setFormData({...formData, position: e.target.value})}
+                                    className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                                    placeholder="Type your name..."
+                                    value={formData.full_name}
+                                    onChange={handleNameChange}
+                                    onFocus={() => { if(formData.full_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
+                                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                    autoComplete="off"
                                 />
+                                {showSuggestions && suggestions.length > 0 && (
+                                    <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                                        {suggestions.map((p) => (
+                                            <li 
+                                                key={p.participant_id}
+                                                onClick={() => selectSuggestion(p)}
+                                                className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
+                                            >
+                                                <div className="flex justify-between items-center">
+                                                    <div className="font-medium text-slate-800 group-hover:text-indigo-700">{p.full_name}</div>
+                                                    <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Select</span>
+                                                </div>
+                                                <div className="text-xs text-slate-500 mt-0.5">{p.email} • {p.office}</div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address</label>
+                                <div className="relative">
+                                    <Mail className="absolute left-3 top-3 text-slate-400" size={18} />
+                                    <input 
+                                        required 
+                                        type="email"
+                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                                        placeholder="john@company.com"
+                                        value={formData.email}
+                                        onChange={e => setFormData({...formData, email: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+                             <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Mobile No.</label>
+                                <div className="relative">
+                                    <Phone className="absolute left-3 top-3 text-slate-400" size={18} />
+                                    <input 
+                                        required 
+                                        type="tel"
+                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                                        placeholder="09123456789"
+                                        value={formData.mobile_no}
+                                        onChange={e => setFormData({...formData, mobile_no: e.target.value.replace(/[^0-9]/g, '')})}
+                                        maxLength={11}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Gender</label>
+                                <select 
+                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                    value={formData.gender}
+                                    onChange={e => setFormData({...formData, gender: e.target.value})}
+                                >
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">What age group do you belong?</label>
+                                <select 
+                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                    value={formData.age_group}
+                                    onChange={e => setFormData({...formData, age_group: e.target.value})}
+                                >
+                                    <option value="18-24">18-24</option>
+                                    <option value="25-34">25-34</option>
+                                    <option value="35-44">35-44</option>
+                                    <option value="45-54">45-54</option>
+                                    <option value="55-65">55-65</option>
+                                </select>
                             </div>
                         </div>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Office / Department</label>
-                        <div className="relative">
-                            <Building className="absolute left-3 top-3 text-slate-400" size={18} />
-                            <input 
-                                required 
-                                type="text"
-                                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                placeholder="IT Department"
-                                value={formData.office}
-                                onChange={e => setFormData({...formData, office: e.target.value})}
-                            />
+                    {/* SECTION: Demographics */}
+                    <div className="space-y-4">
+                         <div className="space-y-4">
+                             <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5 leading-snug">
+                                    Are you a person with disability (PWD), as defined under RA 7277 (Magna Carta for Persons with Disability)?
+                                </label>
+                                <select 
+                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                    value={formData.pwd}
+                                    onChange={e => setFormData({...formData, pwd: e.target.value})}
+                                >
+                                    <option value="No">No</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="Prefer not to say">Prefer not to say</option>
+                                </select>
+                            </div>
+                             <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5 leading-snug">
+                                    Do you identify as a member of an Indigenous Cultural Community / Indigenous People (ICCs/IPs)?
+                                </label>
+                                <select 
+                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                    value={formData.indigenous_people}
+                                    onChange={e => setFormData({...formData, indigenous_people: e.target.value})}
+                                >
+                                    <option value="No">No</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="Prefer not to say">Prefer not to say</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
+                    {/* SECTION: Professional Info */}
+                    <div className="space-y-4">
+                         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b pb-2 mb-4 pt-4">Professional Details</h3>
+                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Position / Title</label>
+                                <div className="relative">
+                                    <Briefcase className="absolute left-3 top-3 text-slate-400" size={18} />
+                                    <input 
+                                        required 
+                                        type="text"
+                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        placeholder="Manager"
+                                        value={formData.position}
+                                        onChange={e => setFormData({...formData, position: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Office / Department</label>
+                                <div className="relative">
+                                    <Building className="absolute left-3 top-3 text-slate-400" size={18} />
+                                    <input 
+                                        required 
+                                        type="text"
+                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        placeholder="IT Department"
+                                        value={formData.office}
+                                        onChange={e => setFormData({...formData, office: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                             <label className="block text-sm font-medium text-slate-700 mb-1.5">Role</label>
+                             <div className="relative">
+                                <Users className="absolute left-3 top-3 text-slate-400" size={18} />
+                                <select
+                                    className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white appearance-none"
+                                    value={formData.role}
+                                    onChange={e => setFormData({...formData, role: e.target.value})}
+                                >
+                                    <option value="Delegate">Delegate</option>
+                                    <option value="Speaker">Speaker</option>
+                                    <option value="Secretariat">Secretariat</option>
+                                    <option value="Guest">Guest</option>
+                                    <option value="VIP">VIP</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* SECTION: Accommodation (Conditional) */}
+                    {event.has_accommodation && (
+                        <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                             <h3 className="text-sm font-bold text-indigo-800 uppercase tracking-wider flex items-center gap-2">
+                                <Home size={16}/> Accommodation Request
+                             </h3>
+                             
+                             <div>
+                                <label className="block text-sm font-medium text-slate-800 mb-3 leading-snug">
+                                    We offer accommodation during the entire duration of the event. Do you wish to avail this offer?
+                                </label>
+                                <div className="flex gap-6">
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${formData.needs_accommodation ? 'border-indigo-600 bg-indigo-600' : 'border-slate-400 bg-white'}`}>
+                                            {formData.needs_accommodation && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                                        </div>
+                                        <input
+                                            type="radio"
+                                            name="accommodation"
+                                            className="hidden"
+                                            checked={formData.needs_accommodation}
+                                            onChange={() => setFormData(prev => ({ ...prev, needs_accommodation: true, accommodation_pax: Math.max(1, prev.accommodation_pax) }))}
+                                        />
+                                        <span className="text-sm font-medium text-slate-700 group-hover:text-indigo-700">Yes</span>
+                                    </label>
+
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                         <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${!formData.needs_accommodation ? 'border-indigo-600 bg-indigo-600' : 'border-slate-400 bg-white'}`}>
+                                            {!formData.needs_accommodation && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                                        </div>
+                                        <input
+                                            type="radio"
+                                            name="accommodation"
+                                            className="hidden"
+                                            checked={!formData.needs_accommodation}
+                                            onChange={() => setFormData(prev => ({ ...prev, needs_accommodation: false, accommodation_pax: 0 }))}
+                                        />
+                                        <span className="text-sm font-medium text-slate-700 group-hover:text-indigo-700">No</span>
+                                    </label>
+                                </div>
+                             </div>
+
+                             {formData.needs_accommodation && (
+                                 <div className="animate-in fade-in slide-in-from-top-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Number of Pax</label>
+                                    <input 
+                                        type="number"
+                                        min="1"
+                                        required={formData.needs_accommodation}
+                                        className="w-full px-4 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        value={formData.accommodation_pax}
+                                        onChange={e => setFormData({...formData, accommodation_pax: parseInt(e.target.value) || 0})}
+                                    />
+                                    <p className="text-xs text-indigo-500 mt-1">Specify number of people needing stay (including yourself).</p>
+                                 </div>
+                             )}
+                        </div>
+                    )}
+
                     {/* Data Privacy Consent */}
-                    <div className="flex items-start gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <div className="flex items-start gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100 mt-4">
                         <div className="flex items-center h-5">
                             <input
                                 id="privacy-consent"
