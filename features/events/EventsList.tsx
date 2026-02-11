@@ -229,6 +229,17 @@ const EventsList: React.FC = () => {
       setTimeout(() => setCopied(false), 2000);
   };
 
+  // Calculate accommodation stats
+  const accommodationStats = React.useMemo(() => {
+      return viewingParticipants.reduce((acc, curr) => {
+          if (curr.needs_accommodation) {
+              acc.requests += 1;
+              acc.pax += (curr.accommodation_pax || 0);
+          }
+          return acc;
+      }, { requests: 0, pax: 0 });
+  }, [viewingParticipants]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -412,9 +423,18 @@ const EventsList: React.FC = () => {
                             {formatEventDate(selectedEvent.start_date, selectedEvent.end_date)} • {selectedEvent.venue}
                         </p>
                     </div>
-                    <button onClick={() => setShowParticipantsModal(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
-                        <X size={24} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={() => window.open(`#/print-list/${selectedEvent.event_id}`, '_blank')}
+                            className="text-slate-500 hover:text-indigo-600 p-2 hover:bg-indigo-50 rounded-full transition-colors flex items-center gap-1 text-sm font-medium"
+                            title="Print List"
+                        >
+                            <span className="hidden sm:inline">Print</span>
+                        </button>
+                        <button onClick={() => setShowParticipantsModal(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
+                            <X size={24} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Table Content */}
@@ -445,8 +465,8 @@ const EventsList: React.FC = () => {
                                         <td className="px-6 py-3 text-slate-600">
                                             {record.role || 'Delegate'}
                                             {record.needs_accommodation && (
-                                                <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded">
-                                                    Stay ({record.accommodation_pax})
+                                                <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded flex items-center w-fit gap-1 mt-0.5">
+                                                    <Home size={8} /> Stay ({record.accommodation_pax})
                                                 </span>
                                             )}
                                         </td>
@@ -473,8 +493,15 @@ const EventsList: React.FC = () => {
                 </div>
                 
                 {/* Footer stats */}
-                <div className="p-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 rounded-b-xl flex justify-between">
-                    <span>Total Participants: <b>{viewingParticipants.length}</b></span>
+                <div className="p-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 rounded-b-xl flex flex-col sm:flex-row justify-between gap-2">
+                    <span className="flex items-center">Total Participants: <b className="ml-1 text-slate-800">{viewingParticipants.length}</b></span>
+                    
+                    {selectedEvent.has_accommodation && (
+                        <div className="flex items-center gap-2 text-purple-700 bg-purple-50 px-3 py-1 rounded-lg border border-purple-100 shadow-sm">
+                            <Home size={14} />
+                            <span>Accommodation: <b>{accommodationStats.pax}</b> Pax <span className="text-xs opacity-75 ml-1">({accommodationStats.requests} Requests)</span></span>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
