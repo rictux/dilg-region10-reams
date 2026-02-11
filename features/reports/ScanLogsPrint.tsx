@@ -98,6 +98,12 @@ const ScanLogsPrint: React.FC = () => {
     }
   };
 
+  // Helper to format time strings that might be missing timezone info (assume UTC if missing)
+  const formatLogTime = (timeStr: string) => {
+      const d = new Date(timeStr.endsWith('Z') || timeStr.includes('+') ? timeStr : timeStr + 'Z');
+      return format(d, 'MMM d, h:mm:ss a');
+  };
+
   if (loading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin text-blue-600" /></div>;
 
   return (
@@ -168,7 +174,7 @@ const ScanLogsPrint: React.FC = () => {
                         ) : (
                             logs.map((log, i) => (
                                 <tr key={i} className="break-inside-avoid hover:bg-slate-50 print:hover:bg-transparent">
-                                    <td className="py-2 px-1 whitespace-nowrap">{format(new Date(log.scan_time), 'MMM d, h:mm:ss a')}</td>
+                                    <td className="py-2 px-1 whitespace-nowrap">{formatLogTime(log.scan_time)}</td>
                                     <td className="py-2 px-1 font-mono text-slate-600">{log.participants?.participant_code}</td>
                                     <td className="py-2 px-1 font-bold text-slate-900">{log.participants?.full_name}</td>
                                     <td className="py-2 px-1">{log.participants?.gender}</td>
