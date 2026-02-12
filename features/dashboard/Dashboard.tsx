@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { 
     Calendar as CalendarIcon, 
@@ -175,6 +175,70 @@ const Dashboard: React.FC = () => {
   const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+  // --- Slot Assignment Logic for Consistent Bar Positions ---
+  const eventPositions = useMemo(() => {
+    if (calendarEvents.length === 0) return {};
+
+    // 1. Filter events overlapping with current view
+    const visibleEvents = calendarEvents.filter(e => {
+        const start = parseISO(e.start_date);
+        const end = parseISO(e.end_date);
+        return start <= endDate && end >= startDate;
+    }).sort((a, b) => {
+        // Sort by start date ASC
+        const startA = parseISO(a.start_date).getTime();
+        const startB = parseISO(b.start_date).getTime();
+        if (startA !== startB) return startA - startB;
+        
+        // Then by duration DESC (Longer events on top usually looks better)
+        const durA = parseISO(a.end_date).getTime() - startA;
+        const durB = parseISO(b.end_date).getTime() - startB;
+        return durB - durA;
+    });
+
+    const positions: Record<number, number> = {};
+    const dayOccupancy: Record<string, boolean[]> = {};
+
+    visibleEvents.forEach(event => {
+        const start = parseISO(event.start_date);
+        const end = parseISO(event.end_date);
+        
+        // Clamp to visible range for calculation
+        const rangeStart = start < startDate ? startDate : start;
+        const rangeEnd = end > endDate ? endDate : end;
+        
+        const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
+        
+        // Find first slot index free for ALL days this event spans
+        let slot = 0;
+        while(true) {
+            let isFree = true;
+            for (const day of days) {
+                const dateKey = format(day, 'yyyy-MM-dd');
+                if (!dayOccupancy[dateKey]) dayOccupancy[dateKey] = [];
+                if (dayOccupancy[dateKey][slot]) {
+                    isFree = false;
+                    break;
+                }
+            }
+            if (isFree) break;
+            slot++;
+        }
+        
+        // Assign slot to event
+        positions[event.event_id] = slot;
+        
+        // Mark slot as occupied for these days
+        for (const day of days) {
+            const dateKey = format(day, 'yyyy-MM-dd');
+            if (!dayOccupancy[dateKey]) dayOccupancy[dateKey] = [];
+            dayOccupancy[dateKey][slot] = true;
+        }
+    });
+
+    return positions;
+  }, [calendarEvents, startDate, endDate]);
+
   // Helper to determine event styling
   const getEventStyle = (event: DashboardEvent, day: Date) => {
       const start = parseISO(event.start_date);
@@ -268,21 +332,51 @@ const Dashboard: React.FC = () => {
                     {calendarDays.map((day, idx) => {
                         const isCurrentMonth = isSameMonth(day, monthStart);
                         const isTodayDate = isToday(day);
-                        const dayStart = startOfDay(day);
-                        const dayEnd = endOfDay(day);
-
+                        
                         // Find events active on this specific day
-                        const dayEvents = calendarEvents.filter(e => {
-                            const eStart = startOfDay(parseISO(e.start_date));
-                            const eEnd = endOfDay(parseISO(e.end_date));
-                            return isWithinInterval(day, { start: eStart, end: eEnd });
-                        }).sort((a, b) => {
-                            // Sort for consistency across days: Longer events first, then by ID
-                            const durA = new Date(a.end_date).getTime() - new Date(a.start_date).getTime();
-                            const durB = new Date(b.end_date).getTime() - new Date(b.start_date).getTime();
-                            if (durA !== durB) return durB - durA;
-                            return a.event_id - b.event_id;
+                        const activeEvents = calendarEvents.filter(e => {
+                            const start = startOfDay(parseISO(e.start_date));
+                            const end = endOfDay(parseISO(e.end_date));
+                            return isWithinInterval(day, { start, end });
                         });
+
+                        // Map active events to their assigned slot positions
+                        const slots: Record<number, DashboardEvent> = {};
+                        let maxSlotIndex = -1;
+
+                        activeEvents.forEach(e => {
+                            const pos = eventPositions[e.event_id];
+                            if (pos !== undefined) {
+                                slots[pos] = e;
+                                if (pos > maxSlotIndex) maxSlotIndex = pos;
+                            }
+                        });
+
+                        const renderSlots = [];
+                        // Render up to max slot used to maintain vertical alignment
+                        for (let i = 0; i <= maxSlotIndex; i++) {
+                            const event = slots[i];
+                            if (event) {
+                                const { className, isStart } = getEventStyle(event, day);
+                                renderSlots.push(
+                                    <div 
+                                        key={`${event.event_id}-${day.toISOString()}`} 
+                                        className={className}
+                                        title={`${event.event_name} (${event.status})`}
+                                    >
+                                        {(isStart || day.getDay() === 0 || day.getDate() === 1) && (
+                                            <span className="truncate font-medium">{event.event_name}</span>
+                                        )}
+                                        {(!isStart && day.getDay() !== 0 && day.getDate() !== 1) && (
+                                            <span className="opacity-0 select-none">.</span>
+                                        )}
+                                    </div>
+                                );
+                            } else {
+                                // Spacer for empty slot
+                                renderSlots.push(<div key={`spacer-${i}`} className="h-5 mb-1"></div>);
+                            }
+                        }
 
                         return (
                             <div 
@@ -300,30 +394,8 @@ const Dashboard: React.FC = () => {
                                     <span>{format(day, 'd')}</span>
                                 </div>
                                 
-                                {/* 
-                                    Scroll container for events within the day cell.
-                                    This prevents the cell from growing infinitely and breaking the grid layout.
-                                */}
                                 <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-1">
-                                    {dayEvents.map((e) => {
-                                        const { className, isStart } = getEventStyle(e, day);
-                                        return (
-                                            <div 
-                                                key={`${e.event_id}-${day.toISOString()}`} 
-                                                className={className}
-                                                title={`${e.event_name} (${e.status})`}
-                                            >
-                                                {/* Only show text on the start day or if it's the first day of the week (Sunday) to re-contextualize */}
-                                                {(isStart || day.getDay() === 0 || day.getDate() === 1) && (
-                                                    <span className="truncate font-medium">{e.event_name}</span>
-                                                )}
-                                                {/* If not start, render empty space so bar color continues but text doesn't repeat awkwardly */}
-                                                {(!isStart && day.getDay() !== 0 && day.getDate() !== 1) && (
-                                                    <span className="opacity-0 select-none">.</span>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
+                                    {renderSlots}
                                 </div>
                             </div>
                         );
