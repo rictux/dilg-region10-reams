@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Participant, Event } from '../../types/database';
-import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search } from 'lucide-react';
+import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Home, ChevronDown, Check } from 'lucide-react';
 import QRCode from 'react-qr-code';
-import { format } from 'date-fns';
+import { format, parseISO, eachDayOfInterval, isSameDay } from 'date-fns';
 
 interface AttendanceRow {
     participant: Participant;
@@ -24,6 +24,14 @@ const AttendanceList: React.FC = () => {
   // Event Selection State
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+
+  // Dropdown & Date Selection State
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [eventSearchTerm, setEventSearchTerm] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [eventDays, setEventDays] = useState<Date[]>([]);
 
   // Manual Entry State
   const [showManualModal, setShowManualModal] = useState(false);
@@ -36,14 +44,35 @@ const AttendanceList: React.FC = () => {
   });
   const [savingManual, setSavingManual] = useState(false);
 
-  // Subscribe to new events creation
+  // Click Outside Listener for Dropdown
   useEffect(() => {
-    fetchEventsToday();
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Fetch Events
+  useEffect(() => {
+    const fetchAllEvents = async () => {
+        const { data } = await supabase.from('events').select('*').order('start_date', { ascending: false });
+        if (data && data.length > 0) {
+            setEvents(data);
+            // Default select the latest event
+            handleEventSelect(data[0]);
+        } else {
+            setLoading(false);
+        }
+    };
+    fetchAllEvents();
 
     const channel = supabase
         .channel('participants_events_realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
-            fetchEventsToday();
+            fetchAllEvents();
         })
         .subscribe();
     
@@ -52,10 +81,10 @@ const AttendanceList: React.FC = () => {
     };
   }, []);
 
-  // Subscribe to data changes for the selected event
+  // Fetch Attendance when Event or Date Changes
   useEffect(() => {
-    if (selectedEventId) {
-      fetchAttendance(selectedEventId);
+    if (selectedEventId && selectedDate) {
+      fetchAttendance(selectedEventId, selectedDate);
 
       const channel = supabase
         .channel(`participants_data_${selectedEventId}`)
@@ -64,67 +93,60 @@ const AttendanceList: React.FC = () => {
             schema: 'public', 
             table: 'attendance_logs',
             filter: `event_id=eq.${selectedEventId}`
-        }, () => fetchAttendance(selectedEventId))
+        }, () => fetchAttendance(selectedEventId, selectedDate))
         .on('postgres_changes', { 
             event: '*', 
             schema: 'public', 
             table: 'event_participants',
             filter: `event_id=eq.${selectedEventId}`
-        }, () => fetchAttendance(selectedEventId))
+        }, () => fetchAttendance(selectedEventId, selectedDate))
         .subscribe();
 
       return () => {
         supabase.removeChannel(channel);
       };
     } else {
-      setData([]); // Clear data if no event selected
       if (events.length === 0 && !loading) {
-         // keep empty
+         setData([]);
       }
     }
-  }, [selectedEventId]);
+  }, [selectedEventId, selectedDate]);
 
-  const fetchEventsToday = async () => {
-    // Note: We don't trigger loading=true here to avoid flickering on realtime updates
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Fetch events that include today's date
-    const { data: eventsData } = await supabase
-        .from('events')
-        .select('*')
-        .lte('start_date', today)
-        .gte('end_date', today);
-    
-    if (eventsData && eventsData.length > 0) {
-        setEvents(eventsData);
-        // Default only if exactly one event exists
-        if (eventsData.length === 1) {
-            setSelectedEventId(eventsData[0].event_id);
-        } else {
-            // If multiple events today, force user to select
-            if (!selectedEventId) setSelectedEventId(null);
-        }
-    } else {
-        // Fallback: Fetch ALL ongoing/scheduled events if none matched "today" strictly
-        const { data: allEvents } = await supabase.from('events').select('*').order('start_date', { ascending: false }).limit(20);
-        if (allEvents && allEvents.length > 0) {
-             setEvents(allEvents);
-             if (allEvents.length === 1) {
-                 setSelectedEventId(allEvents[0].event_id);
-             } else {
-                 if (!selectedEventId) setSelectedEventId(null);
-             }
-        } else {
-            setEvents([]);
-            setData([]);
-            setLoading(false);
-        }
-    }
+  const handleEventSelect = (event: Event) => {
+      setSelectedEventId(event.event_id);
+      setSelectedEvent(event);
+      
+      const start = parseISO(event.start_date);
+      const end = event.end_date ? parseISO(event.end_date) : start;
+      
+      let days: Date[] = [];
+      try {
+          if (start <= end) {
+               days = eachDayOfInterval({ start, end });
+          } else {
+               days = [start];
+          }
+      } catch (e) {
+          days = [start];
+      }
+      setEventDays(days);
+      
+      // Auto-select Today if it's in range, else first day
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      const isTodayInRange = days.some(d => format(d, 'yyyy-MM-dd') === todayStr);
+      
+      const newDate = isTodayInRange ? todayStr : format(days[0], 'yyyy-MM-dd');
+      setSelectedDate(newDate);
+      
+      setIsDropdownOpen(false);
+      setEventSearchTerm('');
+      
+      // Update manual form date default
+      setManualForm(prev => ({ ...prev, date: newDate }));
   };
 
-  const fetchAttendance = async (eventId: number) => {
-    if (data.length === 0) setLoading(true); // Only show loading on empty state
-    const today = new Date().toISOString().split('T')[0];
+  const fetchAttendance = async (eventId: number, dateStr: string) => {
+    if (data.length === 0) setLoading(true); 
     
     try {
         const { data: eventParticipants, error: epError } = await supabase
@@ -148,11 +170,11 @@ const AttendanceList: React.FC = () => {
                 .sort((a: any, b: any) => a.full_name.localeCompare(b.full_name))
                 .map((p: Participant) => {
                     const pLogs = logs?.filter(l => l.participant_id === p.participant_id) || [];
-                    const todaysLogs = pLogs.filter(l => l.attendance_date === today);
+                    const daysLogs = pLogs.filter(l => l.attendance_date === dateStr);
 
                     // Sort: AM Ascending (Earliest), PM Descending (Latest)
-                    const amLogs = todaysLogs.filter(l => l.action_session === 'AM').sort((a,b) => a.scan_time.localeCompare(b.scan_time));
-                    const pmLogs = todaysLogs.filter(l => l.action_session === 'PM').sort((a,b) => b.scan_time.localeCompare(a.scan_time));
+                    const amLogs = daysLogs.filter(l => l.action_session === 'AM').sort((a,b) => a.scan_time.localeCompare(b.scan_time));
+                    const pmLogs = daysLogs.filter(l => l.action_session === 'PM').sort((a,b) => b.scan_time.localeCompare(a.scan_time));
 
                     return {
                         participant: p,
@@ -193,10 +215,8 @@ const AttendanceList: React.FC = () => {
   };
 
   const handleRefresh = () => {
-    if (selectedEventId) {
-        fetchAttendance(selectedEventId);
-    } else {
-        fetchEventsToday();
+    if (selectedEventId && selectedDate) {
+        fetchAttendance(selectedEventId, selectedDate);
     }
   };
 
@@ -204,7 +224,7 @@ const AttendanceList: React.FC = () => {
       e.stopPropagation();
       setManualParticipant(p);
       setManualForm({
-          date: new Date().toISOString().split('T')[0],
+          date: selectedDate || new Date().toISOString().split('T')[0],
           time: format(new Date(), 'HH:mm'),
           session: new Date().getHours() < 12 ? 'AM' : 'PM',
           status: 'Valid'
@@ -262,11 +282,22 @@ const AttendanceList: React.FC = () => {
       </button>
   );
 
+  const filteredEvents = events.filter(e => 
+      e.event_name.toLowerCase().includes(eventSearchTerm.toLowerCase())
+  );
+
   const totalParticipants = data.length;
   const presentCount = data.filter(r => r.amLog || r.pmLog).length;
   const notPresentCount = data.filter(r => !r.amLog && !r.pmLog).length;
   const noPmCount = data.filter(r => r.amLog && !r.pmLog).length;
   const completeLogsCount = data.filter(r => r.amLog && r.pmLog).length;
+
+  // Accommodation count for current event
+  const accommodationCount = data.filter(r => r.participant && (r.participant as any).needs_accommodation).length; // Need to join properly if using data derived from API that includes accommodation info. 
+  // However, `fetchAttendance` fetches `participants` table which doesn't have `needs_accommodation` directly on it, it's on `event_participants`.
+  // `fetchAttendance` maps `eventParticipants` but only returns `participant` object.
+  // To show accommodation stats here correctly, we'd need to include that flag in the mapped data.
+  // For now, we will stick to attendance stats as primary focus.
 
   return (
     <div className="space-y-6">
@@ -275,9 +306,6 @@ const AttendanceList: React.FC = () => {
       <div>
         <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             Attendance 
-            {events.length === 0 && !loading && (
-                <span className="text-sm font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">No Events Today</span>
-            )}
             <button 
                 onClick={handleRefresh} 
                 className="ml-2 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
@@ -287,39 +315,96 @@ const AttendanceList: React.FC = () => {
             </button>
         </h2>
         <p className="text-slate-500 text-sm mt-1">
-            {format(new Date(), 'EEEE, MMMM d, yyyy')}
+            {selectedDate ? format(parseISO(selectedDate), 'EEEE, MMMM d, yyyy') : 'Select an event'}
         </p>
       </div>
 
       {/* Toolbar Section: Event Dropdown (Left) & Filters (Right) */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
         
-        <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
-            {/* Left: Event Selector */}
-            <div className="w-full md:w-72">
-                {events.length > 0 ? (
-                    <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <select
-                            value={selectedEventId || ''}
-                            onChange={(e) => setSelectedEventId(Number(e.target.value))}
-                            className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer"
-                        >
-                            <option value="">-- Select Event --</option>
-                            {events.map(e => (
-                                <option key={e.event_id} value={e.event_id}>
-                                    {e.event_name}
-                                </option>
-                            ))}
-                        </select>
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+        <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto items-start md:items-center">
+            {/* Left: Searchable Event Selector */}
+            <div className="w-full md:w-80 relative" ref={dropdownRef}>
+                <div 
+                    className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors shadow-sm"
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                >
+                    <div className="flex items-center gap-2 overflow-hidden">
+                        <Calendar className="text-slate-400 shrink-0" size={18} />
+                        <span className={`truncate ${!selectedEvent ? 'text-slate-500' : 'text-slate-800 font-medium'}`}>
+                            {selectedEvent ? selectedEvent.event_name : "-- Select Event --"}
+                        </span>
+                    </div>
+                    <ChevronDown className={`text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} size={16} />
+                </div>
+
+                {isDropdownOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                        <div className="p-2 border-b border-slate-100 bg-slate-50 sticky top-0">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    placeholder="Search event..."
+                                    value={eventSearchTerm}
+                                    onChange={(e) => setEventSearchTerm(e.target.value)}
+                                    className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                                />
+                            </div>
+                        </div>
+                        <div className="max-h-60 overflow-y-auto">
+                            {filteredEvents.length > 0 ? (
+                                filteredEvents.map(e => (
+                                    <div 
+                                        key={e.event_id}
+                                        className={`px-4 py-2.5 text-sm cursor-pointer border-b border-slate-50 last:border-0 hover:bg-indigo-50 transition-colors flex items-center justify-between group
+                                            ${selectedEventId === e.event_id ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-700'}
+                                        `}
+                                        onClick={() => handleEventSelect(e)}
+                                    >
+                                        <div className="overflow-hidden">
+                                            <p className="truncate">{e.event_name}</p>
+                                            <p className="text-xs text-slate-400 truncate">{format(parseISO(e.start_date), 'MMM d, yyyy')}</p>
+                                        </div>
+                                        {selectedEventId === e.event_id && <Check size={16} className="text-indigo-600 shrink-0 ml-2" />}
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="px-4 py-8 text-center text-sm text-slate-400">
+                                    No events found.
+                                </div>
+                            )}
                         </div>
                     </div>
-                ) : (
-                    <div className="text-slate-500 text-sm italic py-2">No active events found for today.</div>
                 )}
             </div>
+
+            {/* Day Selection (Visible if multi-day) */}
+            {eventDays.length > 1 && (
+                <div className="flex bg-white rounded-lg border border-slate-200 p-1 overflow-x-auto no-scrollbar max-w-full">
+                    {eventDays.map((day, idx) => {
+                        const dStr = format(day, 'yyyy-MM-dd');
+                        const isSelected = selectedDate === dStr;
+                        return (
+                            <button
+                                key={dStr}
+                                onClick={() => setSelectedDate(dStr)}
+                                className={`px-3 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all flex flex-col items-center min-w-[60px]
+                                    ${isSelected 
+                                        ? 'bg-indigo-600 text-white shadow-sm' 
+                                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                                    }`}
+                            >
+                                <span>Day {idx + 1}</span>
+                                <span className={`text-[9px] font-normal ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>
+                                    {format(day, 'MMM d')}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
 
             {/* Search Bar */}
             <div className="w-full md:w-64 relative">
@@ -473,8 +558,7 @@ const AttendanceList: React.FC = () => {
         </div>
       )}
 
-      {/* Manual Entry Modal and Badge Modal remain unchanged */}
-      {/* ... (truncated for brevity since they are same as before) */}
+      {/* Manual Entry Modal */}
       {showManualModal && manualParticipant && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div 
