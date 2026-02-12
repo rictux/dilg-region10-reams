@@ -324,32 +324,32 @@ const AttendanceList: React.FC = () => {
         
         <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto items-start md:items-center">
             {/* Left: Searchable Event Selector */}
-            <div className="w-full md:w-80 relative" ref={dropdownRef}>
+            <div className="w-full md:w-[480px] relative" ref={dropdownRef}>
                 <div 
                     className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors shadow-sm"
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
                     <div className="flex items-center gap-2 overflow-hidden">
-                        <Calendar className="text-slate-400 shrink-0" size={18} />
-                        <span className={`truncate ${!selectedEvent ? 'text-slate-500' : 'text-slate-800 font-medium'}`}>
+                        <Calendar className="text-slate-400 shrink-0" size={16} />
+                        <span className={`truncate text-xs ${!selectedEvent ? 'text-slate-500' : 'text-slate-800 font-medium'}`}>
                             {selectedEvent ? selectedEvent.event_name : "-- Select Event --"}
                         </span>
                     </div>
-                    <ChevronDown className={`text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} size={16} />
+                    <ChevronDown className={`text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} size={14} />
                 </div>
 
                 {isDropdownOpen && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                         <div className="p-2 border-b border-slate-100 bg-slate-50 sticky top-0">
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
                                 <input
                                     autoFocus
                                     type="text"
                                     placeholder="Search event..."
                                     value={eventSearchTerm}
                                     onChange={(e) => setEventSearchTerm(e.target.value)}
-                                    className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                                    className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                                 />
                             </div>
                         </div>
@@ -358,20 +358,20 @@ const AttendanceList: React.FC = () => {
                                 filteredEvents.map(e => (
                                     <div 
                                         key={e.event_id}
-                                        className={`px-4 py-2.5 text-sm cursor-pointer border-b border-slate-50 last:border-0 hover:bg-indigo-50 transition-colors flex items-center justify-between group
+                                        className={`px-4 py-2 text-xs cursor-pointer border-b border-slate-50 last:border-0 hover:bg-indigo-50 transition-colors flex items-center justify-between group
                                             ${selectedEventId === e.event_id ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-700'}
                                         `}
                                         onClick={() => handleEventSelect(e)}
                                     >
-                                        <div className="overflow-hidden">
-                                            <p className="truncate">{e.event_name}</p>
-                                            <p className="text-xs text-slate-400 truncate">{format(parseISO(e.start_date), 'MMM d, yyyy')}</p>
+                                        <div className="overflow-hidden w-full mr-2">
+                                            <p className="whitespace-normal break-words leading-snug">{e.event_name}</p>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">{format(parseISO(e.start_date), 'MMM d, yyyy')}</p>
                                         </div>
-                                        {selectedEventId === e.event_id && <Check size={16} className="text-indigo-600 shrink-0 ml-2" />}
+                                        {selectedEventId === e.event_id && <Check size={14} className="text-indigo-600 shrink-0" />}
                                     </div>
                                 ))
                             ) : (
-                                <div className="px-4 py-8 text-center text-sm text-slate-400">
+                                <div className="px-4 py-8 text-center text-xs text-slate-400">
                                     No events found.
                                 </div>
                             )}
