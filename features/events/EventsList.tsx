@@ -418,13 +418,7 @@ const EventsList: React.FC = () => {
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button 
-                            onClick={() => window.open(`#/print-list/${selectedEvent.event_id}`, '_blank')}
-                            className="text-slate-500 hover:text-indigo-600 p-2 hover:bg-indigo-50 rounded-full transition-colors flex items-center gap-1 text-sm font-medium"
-                            title="Print List"
-                        >
-                            <span className="hidden sm:inline">Print</span>
-                        </button>
+                        {/* Print Button Removed as per request */}
                         <button onClick={() => setShowParticipantsModal(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
                             <X size={24} />
                         </button>
