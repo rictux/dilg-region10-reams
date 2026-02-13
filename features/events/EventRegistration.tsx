@@ -157,19 +157,37 @@ const EventRegistration: React.FC = () => {
     let finalOfficeName = formData.office;
 
     if (affiliationType === 'LGU') {
-        if (!selectedProvince || !selectedCity) {
-            setError("Please select both Province and City/Municipality for LGU.");
+        if (!selectedProvince) {
+            setError("Please select a Province/HUC for LGU.");
             return;
         }
         
-        const loc = locations.find(l => l.province_huc === selectedProvince && l.city_mun === selectedCity);
-        if (loc) {
-            finalLocationId = loc.location_id;
-            // Construct a standard display name for the Office column for backwards compatibility
-            finalOfficeName = `LGU ${selectedCity}, ${selectedProvince}`;
+        if (selectedCity) {
+            // City Selected
+            const loc = locations.find(l => l.province_huc === selectedProvince && l.city_mun === selectedCity);
+            if (loc) {
+                finalLocationId = loc.location_id;
+                finalOfficeName = `LGU ${selectedCity}, ${selectedProvince}`;
+            } else {
+                setError("Selected location is invalid.");
+                return;
+            }
         } else {
-            setError("Selected location is invalid.");
-            return;
+            // Province/HUC Level Selected (No City)
+            // Try to find location ID for the province itself (where city_mun is null)
+            const loc = locations.find(l => l.province_huc === selectedProvince && !l.city_mun);
+            if (loc) {
+                finalLocationId = loc.location_id;
+            }
+            
+            // Construct Name
+            if (selectedProvince.toLowerCase().includes('city')) {
+                 // Likely an HUC (e.g. Cagayan de Oro City)
+                 finalOfficeName = `LGU ${selectedProvince}`;
+            } else {
+                 // Likely a Province
+                 finalOfficeName = `Provincial Gov't of ${selectedProvince}`;
+            }
         }
     } else {
         if (!formData.office.trim()) {
@@ -271,12 +289,12 @@ const EventRegistration: React.FC = () => {
   };
 
   // Helper to get unique provinces
-  const provinces = Array.from(new Set(locations.map(l => l.province_huc)));
+  const provinces = Array.from(new Set(locations.map(l => l.province_huc))).sort();
   
-  // Helper to get cities based on selected province
+  // Helper to get cities based on selected province (Filter out nulls/empty)
   const cities = locations
-    .filter(l => l.province_huc === selectedProvince)
-    .map(l => l.city_mun)
+    .filter(l => l.province_huc === selectedProvince && l.city_mun)
+    .map(l => l.city_mun as string)
     .sort();
 
   if (loading) {
@@ -353,8 +371,10 @@ const EventRegistration: React.FC = () => {
                           <div className="mt-1 flex items-start gap-1 text-slate-500 text-sm">
                              {affiliationType === 'LGU' ? <Landmark size={14} className="mt-0.5" /> : <Building size={14} className="mt-0.5" />}
                              <span>
-                                 {affiliationType === 'LGU' && selectedCity && selectedProvince 
+                                 {affiliationType === 'LGU' && selectedCity 
                                     ? `LGU ${selectedCity}, ${selectedProvince}`
+                                    : affiliationType === 'LGU' && selectedProvince
+                                    ? (selectedProvince.toLowerCase().includes('city') ? `LGU ${selectedProvince}` : `Provincial Gov't of ${selectedProvince}`)
                                     : formData.office
                                  }
                              </span>
@@ -635,15 +655,14 @@ const EventRegistration: React.FC = () => {
                                         <div className="relative">
                                             <MapPin className="absolute left-3 top-3 text-slate-400" size={18} />
                                             <select 
-                                                required={affiliationType === 'LGU'}
                                                 disabled={!selectedProvince}
                                                 className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white appearance-none disabled:bg-slate-100 disabled:text-slate-400"
                                                 value={selectedCity}
                                                 onChange={e => setSelectedCity(e.target.value)}
                                             >
-                                                <option value="">-- Select City/Mun --</option>
+                                                <option value="">-- Provincial / HUC Level (Optional) --</option>
                                                 {cities.map(city => (
-                                                    <option key={city} value={city || ''}>{city}</option>
+                                                    <option key={city} value={city}>{city}</option>
                                                 ))}
                                             </select>
                                         </div>
