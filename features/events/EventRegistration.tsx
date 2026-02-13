@@ -181,7 +181,7 @@ const EventRegistration: React.FC = () => {
                 event_id: id,
                 participant_id: participantId,
                 registration_status: 'Registered',
-                role: formData.role,
+                role: 'Delegate', // Forced Delegate role for public registration
                 needs_accommodation: formData.needs_accommodation,
                 accommodation_pax: formData.needs_accommodation ? formData.accommodation_pax : 0
             });
@@ -493,23 +493,7 @@ const EventRegistration: React.FC = () => {
                             </div>
                         </div>
                         
-                        <div>
-                             <label className="block text-sm font-medium text-slate-700 mb-1.5">Role</label>
-                             <div className="relative">
-                                <Users className="absolute left-3 top-3 text-slate-400" size={18} />
-                                <select
-                                    className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white appearance-none"
-                                    value={formData.role}
-                                    onChange={e => setFormData({...formData, role: e.target.value})}
-                                >
-                                    <option value="Delegate">Delegate</option>
-                                    <option value="Speaker">Speaker</option>
-                                    <option value="Secretariat">Secretariat</option>
-                                    <option value="Guest">Guest</option>
-                                    <option value="VIP">VIP</option>
-                                </select>
-                            </div>
-                        </div>
+                        {/* Role selection hidden - defaulting to Delegate */}
                     </div>
 
                     {/* SECTION: Accommodation (Conditional) */}
