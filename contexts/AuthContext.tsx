@@ -2,11 +2,12 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { User } from '../types/database';
 import { Permission, ROLE_PERMISSIONS } from '../config/permissions';
+import bcrypt from 'bcryptjs';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (username: string, passwordHash: string, remember?: boolean) => Promise<void>;
+  login: (username: string, passwordPlain: string, remember?: boolean) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   changePassword: (newPw: string) => Promise<void>;
@@ -65,17 +66,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const login = async (username: string, passwordHash: string, remember: boolean = false) => {
+  const login = async (username: string, passwordPlain: string, remember: boolean = false) => {
     setLoading(true);
     try {
-      // Direct query to check credentials
-      // NOTE: In a production environment, password verification should happen 
-      // via a secure backend function (RPC) to avoid exposing hashes or logic.
+      // 1. Fetch user by username
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('username', username)
-        .eq('password_hash', passwordHash)
         .eq('status', 'Active')
         .single();
 
@@ -83,13 +81,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Invalid username or password');
       }
 
-      const loggedInUser = data as User;
-      setUser(loggedInUser);
+      const userRecord = data as User;
+
+      // 2. Verify password with bcrypt
+      const isMatch = await bcrypt.compare(passwordPlain, userRecord.password_hash);
+      
+      if (!isMatch) {
+        throw new Error('Invalid username or password');
+      }
+
+      // 3. Set Session
+      setUser(userRecord);
       
       if (remember) {
-        localStorage.setItem('eventpulse_user', JSON.stringify(loggedInUser));
+        localStorage.setItem('eventpulse_user', JSON.stringify(userRecord));
       } else {
-        sessionStorage.setItem('eventpulse_user', JSON.stringify(loggedInUser));
+        sessionStorage.setItem('eventpulse_user', JSON.stringify(userRecord));
       }
     } catch (error: any) {
       setLoading(false);
@@ -102,10 +109,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const changePassword = async (newPw: string) => {
     if (!user) throw new Error("No user logged in");
     
-    // Direct update without checking old password
+    // Hash new password before saving
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(newPw, salt);
+
     const { error: updateError } = await supabase
       .from('users')
-      .update({ password_hash: newPw })
+      .update({ password_hash: hash })
       .eq('user_id', user.user_id);
 
     if (updateError) throw new Error("Failed to update password. Please try again.");
