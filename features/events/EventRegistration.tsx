@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Event, Participant } from '../../types/database';
 import QRCode from 'react-qr-code';
-import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock } from 'lucide-react';
 import { format } from 'date-fns';
 
 const EventRegistration: React.FC = () => {
@@ -117,6 +117,7 @@ const EventRegistration: React.FC = () => {
     
     try {
         if (!event) throw new Error("Event not loaded");
+        if (!event.registration_open) throw new Error("Registration for this event is closed.");
         
         const id = parseInt(eventId!);
 
@@ -219,6 +220,27 @@ const EventRegistration: React.FC = () => {
               </div>
           </div>
       );
+  }
+
+  // Registration Closed Screen
+  if (!event.registration_open) {
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+              <div className="bg-white p-8 rounded-xl shadow-md text-center max-w-md w-full border border-slate-100">
+                  <div className="bg-red-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Lock size={32} className="text-red-500" />
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-800 mb-2">Registration Closed</h2>
+                  <p className="text-slate-500">
+                      Registration for <strong className="text-slate-700">{event.event_name}</strong> is currently closed.
+                  </p>
+                  <div className="mt-6 pt-6 border-t border-slate-100">
+                    <p className="text-slate-400 text-xs uppercase font-medium mb-1">Contact Organizer</p>
+                    <p className="text-indigo-600 font-medium text-sm">Please contact the event organizer for assistance.</p>
+                  </div>
+              </div>
+          </div>
+    );
   }
 
   if (success && qrToken) {
