@@ -37,7 +37,7 @@ export interface Event {
   created_at?: string;
   organize_by?: number | null;
   has_accommodation?: boolean | null;
-  registraion_open: boolean;
+  registration_open: boolean;
 }
 
 export interface Participant {
