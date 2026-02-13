@@ -153,7 +153,7 @@ const AttendanceSheetPrint: React.FC = () => {
 
                     {/* Centered Event Details */}
                     <div className="flex flex-col items-center justify-center text-center w-full mb-6">
-                        <div className="text-lg font-bold font-serif mb-1 uppercasee tracking-wide">
+                        <div className="text-lg font-bold font-serif mb-1 uppercase tracking-wide">
                             {event.event_name}
                         </div>
                         <div className="text-sm font-sans text-slate-700">
