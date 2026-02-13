@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event, Office } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Building2, Home } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Building2, Home, Lock, Unlock } from 'lucide-react';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import { useNavigate } from 'react-router-dom';
@@ -34,7 +34,8 @@ const EventsList: React.FC = () => {
       end_date: '',
       status: 'Scheduled' as const,
       organize_by: null as number | null,
-      has_accommodation: false
+      has_accommodation: false,
+      registration_open: true
   };
   const [formData, setFormData] = useState<Partial<Event>>(initialFormState);
 
@@ -158,7 +159,8 @@ const EventsList: React.FC = () => {
           end_date: event.end_date,
           status: event.status,
           organize_by: event.organize_by,
-          has_accommodation: event.has_accommodation
+          has_accommodation: event.has_accommodation,
+          registration_open: event.registration_open
       });
       setShowEventModal(true);
   };
@@ -294,11 +296,18 @@ const EventsList: React.FC = () => {
                                   >
                                       <td className="px-6 py-4 font-medium text-slate-800 group-hover:text-indigo-600 transition-colors">
                                           {event.event_name}
-                                          {event.has_accommodation && (
-                                              <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
-                                                  <Home size={10} className="mr-1" /> Stay
-                                              </span>
-                                          )}
+                                          <div className="flex gap-2 mt-1">
+                                            {event.has_accommodation && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
+                                                    <Home size={10} className="mr-1" /> Stay
+                                                </span>
+                                            )}
+                                            {!event.registration_open && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">
+                                                    <Lock size={10} className="mr-1" /> Registration Closed
+                                                </span>
+                                            )}
+                                          </div>
                                       </td>
                                       <td className="px-6 py-4 text-slate-600">{event.venue}</td>
                                       <td className="px-6 py-4 text-slate-600 font-medium">
@@ -374,28 +383,42 @@ const EventsList: React.FC = () => {
                 </div>
                 
                 <div className="space-y-6 flex flex-col items-center">
-                    <div className="p-4 border-2 border-indigo-100 rounded-lg bg-indigo-50/50">
-                        <QRCode value={getRegistrationLink(selectedEvent.event_id)} size={180} />
-                    </div>
-                    
-                    <div className="w-full">
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Registration Link</label>
-                        <div className="flex gap-2">
-                            <input 
-                                readOnly 
-                                value={getRegistrationLink(selectedEvent.event_id)}
-                                className="flex-1 block w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 bg-slate-50 focus:outline-none"
-                            />
-                            <button 
-                                onClick={copyToClipboard}
-                                className={`px-3 py-2 rounded-lg border flex items-center gap-2 transition-all
-                                    ${copied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'}
-                                `}
-                            >
-                                {copied ? <Check size={18} /> : <Copy size={18} />}
-                            </button>
+                    {!selectedEvent.registration_open ? (
+                        <div className="w-full bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                            <div className="flex justify-center mb-2">
+                                <Lock className="text-red-500" size={32} />
+                            </div>
+                            <h4 className="font-bold text-red-700 mb-1">Registration is Closed</h4>
+                            <p className="text-sm text-red-600">
+                                Users cannot register for this event. Enable registration in event settings to share.
+                            </p>
                         </div>
-                    </div>
+                    ) : (
+                        <>
+                            <div className="p-4 border-2 border-indigo-100 rounded-lg bg-indigo-50/50">
+                                <QRCode value={getRegistrationLink(selectedEvent.event_id)} size={180} />
+                            </div>
+                            
+                            <div className="w-full">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Registration Link</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        readOnly 
+                                        value={getRegistrationLink(selectedEvent.event_id)}
+                                        className="flex-1 block w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 bg-slate-50 focus:outline-none"
+                                    />
+                                    <button 
+                                        onClick={copyToClipboard}
+                                        className={`px-3 py-2 rounded-lg border flex items-center gap-2 transition-all
+                                            ${copied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'}
+                                        `}
+                                    >
+                                        {copied ? <Check size={18} /> : <Copy size={18} />}
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
         </div>
@@ -612,7 +635,7 @@ const EventsList: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     {/* Status */}
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
@@ -633,16 +656,33 @@ const EventsList: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Accommodation Checkbox */}
-                    <div className="flex items-center pt-6">
-                        <label className="flex items-center gap-2 cursor-pointer">
+                    <div className="flex flex-col gap-3 pt-2">
+                         {/* Registration Open Toggle */}
+                         <label className="flex items-center gap-2 cursor-pointer group">
+                             <div className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${formData.registration_open ? 'bg-green-500' : 'bg-slate-200'}`}>
+                                <span
+                                    aria-hidden="true"
+                                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${formData.registration_open ? 'translate-x-4' : 'translate-x-0'}`}
+                                />
+                             </div>
+                             <input 
+                                type="checkbox"
+                                className="hidden"
+                                checked={formData.registration_open}
+                                onChange={e => setFormData({...formData, registration_open: e.target.checked})}
+                            />
+                            <span className="text-sm font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">Registration Open</span>
+                        </label>
+
+                        {/* Accommodation Checkbox */}
+                        <label className="flex items-center gap-2 cursor-pointer group">
                             <input 
                                 type="checkbox"
                                 className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
                                 checked={formData.has_accommodation || false}
                                 onChange={e => setFormData({...formData, has_accommodation: e.target.checked})}
                             />
-                            <span className="text-sm font-medium text-slate-700">Offers Accommodation</span>
+                            <span className="text-sm font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">Offers Accommodation</span>
                         </label>
                     </div>
                 </div>
