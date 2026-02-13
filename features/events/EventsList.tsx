@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event, Office, Participant } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Building2, Home, Lock, Unlock, UserPlus, Loader2 } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Building2, Home, Lock, Unlock, UserPlus, Loader2, MoreVertical, ArrowRight } from 'lucide-react';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 const EventsList: React.FC = () => {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [offices, setOffices] = useState<Office[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,7 +164,7 @@ const EventsList: React.FC = () => {
     }
 
     if (isSameMonth(startDate, endDate) && isSameYear(startDate, endDate)) {
-        return `${format(startDate, 'MMM d')}-${format(endDate, 'd, yyyy')}`;
+        return `${format(startDate, 'MMM d')} - ${format(endDate, 'd, yyyy')}`;
     }
 
     if (!isSameMonth(startDate, endDate) && isSameYear(startDate, endDate)) {
@@ -442,6 +442,26 @@ const EventsList: React.FC = () => {
       return viewingParticipants.filter(p => p.needs_accommodation).length;
   }, [viewingParticipants]);
 
+  // Helper for status badges
+  const getStatusBadge = (status: string) => {
+    const styles = {
+      'Ongoing': 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-500/20',
+      'Scheduled': 'bg-blue-50 text-blue-700 border-blue-200 ring-blue-500/20',
+      'Completed': 'bg-slate-50 text-slate-600 border-slate-200 ring-slate-500/20',
+      'Cancelled': 'bg-red-50 text-red-700 border-red-200 ring-red-500/20',
+    };
+    
+    // @ts-ignore
+    const activeStyle = styles[status] || styles['Completed'];
+
+    return (
+      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border inline-flex items-center gap-1.5 ring-1 ring-inset ${activeStyle}`}>
+         <span className={`w-1.5 h-1.5 rounded-full ${status === 'Ongoing' ? 'animate-pulse bg-emerald-500' : 'bg-current opacity-60'}`}></span>
+         {status.toUpperCase()}
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -459,11 +479,11 @@ const EventsList: React.FC = () => {
               <table className="w-full text-sm text-left">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                       <tr>
-                          <th className="px-6 py-4">Event Name</th>
+                          <th className="px-6 py-4">Event Details</th>
                           <th className="px-6 py-4">Venue</th>
                           <th className="px-6 py-4">Date</th>
                           <th className="px-6 py-4">Status</th>
-                          <th className="px-6 py-4">Actions</th>
+                          <th className="px-6 py-4 text-right">Actions</th>
                       </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -497,75 +517,83 @@ const EventsList: React.FC = () => {
                                   <tr 
                                       key={event.event_id} 
                                       onClick={() => handleRowClick(event)}
-                                      className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                                      className="group hover:bg-indigo-50/30 transition-all duration-200 cursor-pointer hover:shadow-sm border-l-2 border-l-transparent hover:border-l-indigo-500"
                                       title="Click to view participants"
                                   >
-                                      <td className="px-6 py-4 font-medium text-slate-800 group-hover:text-indigo-600 transition-colors">
-                                          {event.event_name}
-                                          <div className="flex gap-2 mt-1">
+                                      <td className="px-6 py-4">
+                                          <div className="font-semibold text-base text-slate-800 group-hover:text-indigo-700 transition-colors">
+                                            {event.event_name}
+                                          </div>
+                                          <div className="flex gap-2 mt-1.5">
                                             {event.has_accommodation && (
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
-                                                    <Home size={10} className="mr-1" /> Stay
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
+                                                    <Home size={10} className="mr-1" /> Accommodation
                                                 </span>
                                             )}
                                             {!event.registration_open && (
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">
-                                                    <Lock size={10} className="mr-1" /> Registration Closed
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100">
+                                                    <Lock size={10} className="mr-1" /> Closed
                                                 </span>
                                             )}
                                           </div>
                                       </td>
-                                      <td className="px-6 py-4 text-slate-600">{event.venue}</td>
+                                      <td className="px-6 py-4 text-slate-600">
+                                          <div className="flex items-center gap-1.5">
+                                            <MapPin size={14} className="text-slate-400" />
+                                            {event.venue}
+                                          </div>
+                                      </td>
                                       <td className="px-6 py-4 text-slate-600 font-medium">
-                                          {formatEventDate(event.start_date, event.end_date)}
+                                          <div className="flex items-center gap-1.5">
+                                            <Calendar size={14} className="text-slate-400" />
+                                            {formatEventDate(event.start_date, event.end_date)}
+                                          </div>
                                       </td>
                                       <td className="px-6 py-4">
-                                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1
-                                              ${event.status === 'Ongoing' ? 'bg-green-100 text-green-700' : ''}
-                                              ${event.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' : ''}
-                                              ${event.status === 'Completed' ? 'bg-slate-100 text-slate-700' : ''}
-                                              ${event.status === 'Cancelled' ? 'bg-red-100 text-red-700' : ''}
-                                          `}>
-                                              <span className={`w-1.5 h-1.5 rounded-full 
-                                                  ${event.status === 'Ongoing' ? 'bg-green-500' : ''}
-                                                  ${event.status === 'Scheduled' ? 'bg-blue-500' : ''}
-                                                  ${event.status === 'Completed' ? 'bg-slate-500' : ''}
-                                                  ${event.status === 'Cancelled' ? 'bg-red-500' : ''}
-                                              `}></span>
-                                              {event.status.toUpperCase()}
-                                          </span>
+                                          {getStatusBadge(event.status)}
                                       </td>
-                                      <td className="px-6 py-4 flex items-center gap-2">
-                                          <button 
-                                              onClick={(e) => openShareModal(e, event)}
-                                              className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-colors"
-                                              title="Share Registration Link"
-                                          >
-                                              <Share2 size={18} />
-                                          </button>
-                                          <button 
-                                              onClick={(e) => openEditModal(e, event)}
-                                              className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                                              title="Edit Event"
-                                          >
-                                              <Edit size={18} />
-                                          </button>
-                                          {user?.role === 'Admin' && (
-                                              <button 
-                                                  onClick={(e) => handleDelete(e, event.event_id)} 
-                                                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                                  title="Delete Event"
-                                              >
-                                                  <Trash2 size={18} />
-                                              </button>
-                                          )}
+                                      <td className="px-6 py-4">
+                                          <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                                            <button 
+                                                onClick={(e) => openShareModal(e, event)}
+                                                className="p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                title="Share Registration Link"
+                                            >
+                                                <Share2 size={18} />
+                                            </button>
+                                            <button 
+                                                onClick={(e) => openEditModal(e, event)}
+                                                className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                                                title="Edit Event"
+                                            >
+                                                <Edit size={18} />
+                                            </button>
+                                            {/* GRANULAR PERMISSION CHECK FOR DELETE */}
+                                            {hasPermission('DELETE_EVENTS') && (
+                                                <button 
+                                                    onClick={(e) => handleDelete(e, event.event_id)} 
+                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Delete Event"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
+                                            <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                                            <div className="text-slate-300">
+                                                <ArrowRight size={18} />
+                                            </div>
+                                          </div>
                                       </td>
                                   </tr>
                               ))}
                               {events.length === 0 && (
                                   <tr>
-                                      <td colSpan={5} className="text-center py-8 text-slate-400">
-                                          No events found. Create one to get started.
+                                      <td colSpan={5} className="text-center py-12 text-slate-400 bg-slate-50/50">
+                                          <div className="flex flex-col items-center justify-center">
+                                            <Calendar className="w-12 h-12 text-slate-300 mb-3" />
+                                            <p className="font-medium text-slate-500">No events found</p>
+                                            <p className="text-xs mt-1">Create a new event to get started</p>
+                                          </div>
                                       </td>
                                   </tr>
                               )}
@@ -647,12 +675,14 @@ const EventsList: React.FC = () => {
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                         <button 
-                            onClick={() => setShowAddParticipantModal(true)}
-                            className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors mr-2 shadow-sm"
-                        >
-                            <UserPlus size={16} /> Add Participant
-                        </button>
+                        {hasPermission('MANAGE_PARTICIPANTS') && (
+                             <button 
+                                onClick={() => setShowAddParticipantModal(true)}
+                                className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors mr-2 shadow-sm"
+                            >
+                                <UserPlus size={16} /> Add Participant
+                            </button>
+                        )}
                         <button onClick={() => setShowParticipantsModal(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
                             <X size={24} />
                         </button>

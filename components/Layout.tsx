@@ -25,7 +25,7 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, signOut, changePassword } = useAuth();
+  const { user, signOut, changePassword, hasPermission } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -38,9 +38,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [pwStatus, setPwStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [pwMessage, setPwMessage] = useState('');
 
-  // If scanner role, strictly show simplified layout or redirect
-  const isScanner = user?.role === 'Scanner';
-  const isAdmin = user?.role === 'Admin';
+  // Determine Layout Mode based on permissions
+  const showSidebar = hasPermission('VIEW_DASHBOARD');
 
   // Click outside listener for dropdown
   useEffect(() => {
@@ -178,8 +177,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     </div>
   );
 
-  // Scanner Layout (Minimal)
-  if (isScanner) {
+  // Scanner Mode Layout (Full screen, no sidebar)
+  // Used if user doesn't have permission to view dashboard (e.g. Scanner Role)
+  if (!showSidebar) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
         {/* Top Bar for Scanner */}
@@ -226,7 +226,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     );
   }
 
-  // Admin/Manager Layout
+  // Dashboard Layout with Sidebar
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
       {/* Mobile Header */}
@@ -245,26 +245,35 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       `}>
         <div className="h-full flex flex-col">
           <div className="p-6 hidden md:block">
-            <h1 className="text-2xl font-bold text-indigo-600">R10 Event Portal</h1>
+            <h1 className="text-xl font-bold text-indigo-600">R10 Event Portal</h1>
             <p className="text-sm text-slate-500">Admin Portal</p>
           </div>
 
           <nav className="flex-1 px-4 space-y-2 mt-4 md:mt-0">
-            <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" />
-            <NavItem to="/events" icon={CalendarDays} label="Events" />
-            <NavItem to="/attendance" icon={ClipboardList} label="Attendance" />
-            <NavItem to="/reports" icon={FileBarChart} label="Reports" />
+            {hasPermission('VIEW_DASHBOARD') && (
+                <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" />
+            )}
+            {hasPermission('MANAGE_EVENTS') && (
+                <NavItem to="/events" icon={CalendarDays} label="Events" />
+            )}
+            {hasPermission('VIEW_PARTICIPANTS') && (
+                <NavItem to="/attendance" icon={ClipboardList} label="Attendance" />
+            )}
+            {hasPermission('VIEW_REPORTS') && (
+                <NavItem to="/reports" icon={FileBarChart} label="Reports" />
+            )}
             
-            {isAdmin && (
+            {hasPermission('MANAGE_USERS') && (
               <div className="pt-2 mt-2 border-t border-slate-100">
                 <NavItem to="/users" icon={ShieldCheck} label="Users" />
               </div>
             )}
 
-            {/* Admins can also scan if they want */}
-            <div className="pt-2 mt-2 border-t border-slate-100">
-              <NavItem to="/scan" icon={ScanLine} label="Scan Mode" />
-            </div>
+            {hasPermission('SCAN_QR') && (
+              <div className="pt-2 mt-2 border-t border-slate-100">
+                <NavItem to="/scan" icon={ScanLine} label="Scan Mode" />
+              </div>
+            )}
           </nav>
 
           <div className="p-4 border-t border-slate-200 relative" ref={dropdownRef}>

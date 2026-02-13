@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { User } from '../types/database';
+import { Permission, ROLE_PERMISSIONS } from '../config/permissions';
 
 interface AuthContextType {
   user: User | null;
@@ -9,6 +10,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   changePassword: (newPw: string) => Promise<void>;
+  hasPermission: (permission: Permission) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -121,8 +123,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  // Granular Permission Check
+  const hasPermission = (permission: Permission): boolean => {
+    if (!user) return false;
+    
+    // Retrieve permissions for the user's role
+    const permissions = ROLE_PERMISSIONS[user.role] || [];
+    
+    // Check if the user has the specific permission
+    return permissions.includes(permission);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, signOut, refreshProfile, changePassword }}>
+    <AuthContext.Provider value={{ user, loading, login, signOut, refreshProfile, changePassword, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

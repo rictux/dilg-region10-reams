@@ -8,7 +8,8 @@ import {
     Layers, 
     ChevronLeft, 
     ChevronRight,
-    Users
+    Users,
+    Info
 } from 'lucide-react';
 import { 
     format, 
@@ -316,7 +317,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Calendar Grid */}
-            <div className="flex-1 p-4 flex flex-col">
+            <div className="flex-1 p-4 flex flex-col relative z-0">
                 <div className="grid grid-cols-7 mb-2">
                     {weekDays.map(day => (
                         <div key={day} className="text-center text-xs font-semibold text-slate-400 uppercase tracking-wider py-2">
@@ -324,11 +325,13 @@ const Dashboard: React.FC = () => {
                         </div>
                     ))}
                 </div>
+                
                 {/* 
-                   Using auto-rows with a strict minmax height ensures cells don't collapse.
-                   overflow-hidden on the grid prevents the whole component from blowing up.
+                   We remove overflow-hidden from here to allow tooltips to pop out. 
+                   We apply rounding to the corners manually in the map loop if needed, 
+                   or just on the container.
                 */}
-                <div className="grid grid-cols-7 auto-rows-fr gap-px bg-slate-200 border border-slate-200 rounded-lg overflow-hidden flex-1">
+                <div className="grid grid-cols-7 auto-rows-fr gap-px bg-slate-200 border border-slate-200 rounded-lg flex-1">
                     {calendarDays.map((day, idx) => {
                         const isCurrentMonth = isSameMonth(day, monthStart);
                         const isTodayDate = isToday(day);
@@ -339,6 +342,8 @@ const Dashboard: React.FC = () => {
                             const end = endOfDay(parseISO(e.end_date));
                             return isWithinInterval(day, { start, end });
                         });
+
+                        const hasEvents = activeEvents.length > 0;
 
                         // Map active events to their assigned slot positions
                         const slots: Record<number, DashboardEvent> = {};
@@ -378,25 +383,68 @@ const Dashboard: React.FC = () => {
                             }
                         }
 
+                        // Determine corners for rounding since parent no longer has overflow-hidden
+                        const cornerClass = 
+                            idx === 0 ? 'rounded-tl-lg' :
+                            idx === 6 ? 'rounded-tr-lg' :
+                            idx === calendarDays.length - 7 ? 'rounded-bl-lg' :
+                            idx === calendarDays.length - 1 ? 'rounded-br-lg' : '';
+
                         return (
                             <div 
                                 key={idx} 
                                 className={`
-                                    min-h-[110px] flex flex-col relative
+                                    min-h-[110px] flex flex-col relative group hover:z-20
                                     ${isCurrentMonth ? 'bg-white' : 'bg-slate-50 text-slate-300'}
-                                    ${isTodayDate ? 'bg-indigo-50/30' : ''}
+                                    ${isTodayDate ? '!bg-indigo-50/30' : ''}
+                                    ${cornerClass}
+                                    transition-colors hover:bg-slate-50
                                 `}
                             >
                                 <div className={`
                                     text-xs font-medium p-1.5 flex justify-between items-center
-                                    ${isTodayDate ? 'text-indigo-600 font-bold' : 'text-slate-500'}
                                 `}>
-                                    <span>{format(day, 'd')}</span>
+                                    <span className={`
+                                        w-7 h-7 flex items-center justify-center rounded-full transition-all
+                                        ${isTodayDate 
+                                            ? 'bg-indigo-600 text-white font-bold shadow-md' 
+                                            : hasEvents && isCurrentMonth 
+                                                ? 'bg-indigo-100 text-indigo-700 font-bold ring-1 ring-indigo-200' 
+                                                : 'text-slate-500 group-hover:bg-slate-200'
+                                        }
+                                    `}>
+                                        {format(day, 'd')}
+                                    </span>
                                 </div>
                                 
-                                <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-1">
+                                <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-1 z-0 relative">
                                     {renderSlots}
                                 </div>
+
+                                {/* TOOLTIP */}
+                                {hasEvents && (
+                                    <div className="hidden group-hover:block absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 pointer-events-none animate-in fade-in zoom-in-95 duration-200">
+                                        <div className="bg-slate-800 text-white text-xs rounded-xl shadow-2xl border border-slate-700 p-3">
+                                            <div className="font-bold border-b border-slate-600 pb-2 mb-2 flex justify-between items-center">
+                                                <span>{format(day, 'MMMM d, yyyy')}</span>
+                                                <span className="bg-slate-700 px-1.5 py-0.5 rounded text-[10px]">{activeEvents.length} Events</span>
+                                            </div>
+                                            <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                                                {activeEvents.map(e => (
+                                                    <div key={e.event_id} className="flex flex-col gap-0.5 border-l-2 border-indigo-500 pl-2">
+                                                        <span className="font-semibold text-indigo-200 truncate">{e.event_name}</span>
+                                                        <div className="flex justify-between text-[10px] text-slate-400">
+                                                            <span className="flex items-center gap-1"><MapPin size={10}/> {e.venue}</span>
+                                                            <span className={e.status === 'Ongoing' ? 'text-green-400' : ''}>{e.status}</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {/* Tooltip Arrow */}
+                                        <div className="w-3 h-3 bg-slate-800 rotate-45 absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-r border-b border-slate-700"></div>
+                                    </div>
+                                )}
                             </div>
                         );
                     })}

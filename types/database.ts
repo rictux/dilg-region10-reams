@@ -53,7 +53,6 @@ export interface Participant {
   pwd?: string | null;
   indigenous_people?: string | null;
   mobile_no?: string | null;
-  agency?: string | null;
   location_id?: number | null;
 }
 
