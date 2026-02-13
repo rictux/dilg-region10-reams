@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Event, Participant } from '../../types/database';
+import { Event, Participant, RefLocation } from '../../types/database';
 import QRCode from 'react-qr-code';
-import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock, Landmark } from 'lucide-react';
 import { format } from 'date-fns';
 
 const EventRegistration: React.FC = () => {
@@ -18,6 +18,12 @@ const EventRegistration: React.FC = () => {
   // Auto-suggestion state
   const [suggestions, setSuggestions] = useState<Participant[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Location / Office State
+  const [locations, setLocations] = useState<RefLocation[]>([]);
+  const [affiliationType, setAffiliationType] = useState<'Office' | 'LGU'>('Office');
+  const [selectedProvince, setSelectedProvince] = useState<string>('');
+  const [selectedCity, setSelectedCity] = useState<string>('');
 
   // Consent State
   const [consent, setConsent] = useState(false);
@@ -34,11 +40,13 @@ const EventRegistration: React.FC = () => {
     indigenous_people: 'No',
     role: 'Delegate',
     needs_accommodation: false,
-    accommodation_pax: 0
+    accommodation_pax: 0,
+    location_id: null as number | null
   });
 
   useEffect(() => {
     fetchEventDetails();
+    fetchLocations();
   }, [eventId]);
 
   const fetchEventDetails = async () => {
@@ -55,6 +63,18 @@ const EventRegistration: React.FC = () => {
       setEvent(data);
     }
     setLoading(false);
+  };
+
+  const fetchLocations = async () => {
+    const { data } = await supabase
+        .from('ref_locations')
+        .select('*')
+        .order('province_huc', { ascending: true })
+        .order('city_mun', { ascending: true });
+    
+    if (data) {
+        setLocations(data);
+    }
   };
 
   const handleNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,17 +102,37 @@ const EventRegistration: React.FC = () => {
   };
 
   const selectSuggestion = (p: Participant) => {
+      // Determine affiliation type based on location_id
+      let affType: 'Office' | 'LGU' = 'Office';
+      let prov = '';
+      let city = '';
+      let locId = p.location_id || null;
+
+      if (locId && locations.length > 0) {
+          const loc = locations.find(l => l.location_id === locId);
+          if (loc) {
+              affType = 'LGU';
+              prov = loc.province_huc;
+              city = loc.city_mun || '';
+          }
+      }
+
+      setAffiliationType(affType);
+      setSelectedProvince(prov);
+      setSelectedCity(city);
+
       setFormData({
           ...formData,
           full_name: p.full_name,
-          email: p.email,
+          email: p.email || '',
           gender: p.gender || 'Male',
-          position: p.position,
-          office: p.office,
+          position: p.position || '',
+          office: p.office || '',
           mobile_no: p.mobile_no || '',
           age_group: p.age_group || '18-24',
           pwd: p.pwd || 'No',
           indigenous_people: p.indigenous_people || 'No',
+          location_id: locId
       });
       setSuggestions([]);
       setShowSuggestions(false);
@@ -110,6 +150,32 @@ const EventRegistration: React.FC = () => {
     if (formData.needs_accommodation && formData.accommodation_pax < 1) {
         setError("Please specify at least 1 pax for accommodation.");
         return;
+    }
+
+    // Prepare Office / Location Data
+    let finalLocationId = null;
+    let finalOfficeName = formData.office;
+
+    if (affiliationType === 'LGU') {
+        if (!selectedProvince || !selectedCity) {
+            setError("Please select both Province and City/Municipality for LGU.");
+            return;
+        }
+        
+        const loc = locations.find(l => l.province_huc === selectedProvince && l.city_mun === selectedCity);
+        if (loc) {
+            finalLocationId = loc.location_id;
+            // Construct a standard display name for the Office column for backwards compatibility
+            finalOfficeName = `LGU ${selectedCity}, ${selectedProvince}`;
+        } else {
+            setError("Selected location is invalid.");
+            return;
+        }
+    } else {
+        if (!formData.office.trim()) {
+            setError("Please enter your Office / Agency name.");
+            return;
+        }
     }
 
     setSubmitting(true);
@@ -141,7 +207,8 @@ const EventRegistration: React.FC = () => {
                 full_name: formData.full_name,
                 gender: formData.gender,
                 position: formData.position,
-                office: formData.office,
+                office: finalOfficeName,
+                location_id: finalLocationId,
                 mobile_no: formData.mobile_no,
                 age_group: formData.age_group,
                 pwd: formData.pwd,
@@ -159,7 +226,8 @@ const EventRegistration: React.FC = () => {
                     email: formData.email,
                     gender: formData.gender,
                     position: formData.position,
-                    office: formData.office,
+                    office: finalOfficeName,
+                    location_id: finalLocationId,
                     participant_code: code,
                     mobile_no: formData.mobile_no,
                     age_group: formData.age_group,
@@ -201,6 +269,15 @@ const EventRegistration: React.FC = () => {
         setSubmitting(false);
     }
   };
+
+  // Helper to get unique provinces
+  const provinces = Array.from(new Set(locations.map(l => l.province_huc)));
+  
+  // Helper to get cities based on selected province
+  const cities = locations
+    .filter(l => l.province_huc === selectedProvince)
+    .map(l => l.city_mun)
+    .sort();
 
   if (loading) {
       return (
@@ -270,7 +347,19 @@ const EventRegistration: React.FC = () => {
                           <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-2">Participant Details</p>
                           <p className="font-bold text-slate-800 text-lg">{formData.full_name}</p>
                           <p className="text-slate-500">{formData.email}</p>
-                          <p className="text-slate-500 text-sm mt-1">{formData.position} • {formData.office}</p>
+                          <p className="text-slate-500 text-sm mt-1">{formData.position}</p>
+                          
+                          {/* Display Logic for Office vs LGU */}
+                          <div className="mt-1 flex items-start gap-1 text-slate-500 text-sm">
+                             {affiliationType === 'LGU' ? <Landmark size={14} className="mt-0.5" /> : <Building size={14} className="mt-0.5" />}
+                             <span>
+                                 {affiliationType === 'LGU' && selectedCity && selectedProvince 
+                                    ? `LGU ${selectedCity}, ${selectedProvince}`
+                                    : formData.office
+                                 }
+                             </span>
+                          </div>
+
                           {formData.needs_accommodation && (
                                <p className="text-indigo-600 text-xs font-semibold mt-2 flex items-center gap-1">
                                   <Home size={12}/> Accommodation Requested ({formData.accommodation_pax} Pax)
@@ -462,38 +551,106 @@ const EventRegistration: React.FC = () => {
                     {/* SECTION: Professional Info */}
                     <div className="space-y-4">
                          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b pb-2 mb-4 pt-4">Professional Details</h3>
-                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Position / Title</label>
-                                <div className="relative">
-                                    <Briefcase className="absolute left-3 top-3 text-slate-400" size={18} />
-                                    <input 
-                                        required 
-                                        type="text"
-                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        placeholder="Manager"
-                                        value={formData.position}
-                                        onChange={e => setFormData({...formData, position: e.target.value})}
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Office / Department</label>
-                                <div className="relative">
-                                    <Building className="absolute left-3 top-3 text-slate-400" size={18} />
-                                    <input 
-                                        required 
-                                        type="text"
-                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        placeholder="IT Department"
-                                        value={formData.office}
-                                        onChange={e => setFormData({...formData, office: e.target.value})}
-                                    />
-                                </div>
+                         
+                         <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Position / Title</label>
+                            <div className="relative">
+                                <Briefcase className="absolute left-3 top-3 text-slate-400" size={18} />
+                                <input 
+                                    required 
+                                    type="text"
+                                    className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                    placeholder="Manager"
+                                    value={formData.position}
+                                    onChange={e => setFormData({...formData, position: e.target.value})}
+                                />
                             </div>
                         </div>
-                        
-                        {/* Role selection hidden - defaulting to Delegate */}
+
+                        {/* Office vs LGU Selection */}
+                        <div className="pt-2">
+                             <label className="block text-sm font-medium text-slate-700 mb-2">Affiliation Type</label>
+                             <div className="flex gap-4 mb-4">
+                                <label className={`flex-1 cursor-pointer border rounded-lg p-3 flex items-center gap-3 transition-all ${affiliationType === 'Office' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                    <input 
+                                        type="radio" 
+                                        className="hidden" 
+                                        checked={affiliationType === 'Office'} 
+                                        onChange={() => setAffiliationType('Office')}
+                                    />
+                                    <Building size={20} />
+                                    <span className="font-medium">NGA / Office</span>
+                                </label>
+                                <label className={`flex-1 cursor-pointer border rounded-lg p-3 flex items-center gap-3 transition-all ${affiliationType === 'LGU' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                    <input 
+                                        type="radio" 
+                                        className="hidden" 
+                                        checked={affiliationType === 'LGU'} 
+                                        onChange={() => setAffiliationType('LGU')}
+                                    />
+                                    <Landmark size={20} />
+                                    <span className="font-medium">LGU</span>
+                                </label>
+                             </div>
+
+                             {affiliationType === 'Office' ? (
+                                <div className="animate-in fade-in zoom-in-95 duration-200">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Office / Agency Name</label>
+                                    <div className="relative">
+                                        <Building className="absolute left-3 top-3 text-slate-400" size={18} />
+                                        <input 
+                                            required={affiliationType === 'Office'}
+                                            type="text"
+                                            className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                            placeholder="e.g. DILG Regional Office 10"
+                                            value={formData.office}
+                                            onChange={e => setFormData({...formData, office: e.target.value})}
+                                        />
+                                    </div>
+                                </div>
+                             ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-200">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Province / HUC</label>
+                                        <div className="relative">
+                                            <MapPin className="absolute left-3 top-3 text-slate-400" size={18} />
+                                            <select 
+                                                required={affiliationType === 'LGU'}
+                                                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white appearance-none"
+                                                value={selectedProvince}
+                                                onChange={e => {
+                                                    setSelectedProvince(e.target.value);
+                                                    setSelectedCity('');
+                                                }}
+                                            >
+                                                <option value="">-- Select Province --</option>
+                                                {provinces.map(prov => (
+                                                    <option key={prov} value={prov}>{prov}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1.5">City / Municipality</label>
+                                        <div className="relative">
+                                            <MapPin className="absolute left-3 top-3 text-slate-400" size={18} />
+                                            <select 
+                                                required={affiliationType === 'LGU'}
+                                                disabled={!selectedProvince}
+                                                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white appearance-none disabled:bg-slate-100 disabled:text-slate-400"
+                                                value={selectedCity}
+                                                onChange={e => setSelectedCity(e.target.value)}
+                                            >
+                                                <option value="">-- Select City/Mun --</option>
+                                                {cities.map(city => (
+                                                    <option key={city} value={city || ''}>{city}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                             )}
+                        </div>
                     </div>
 
                     {/* SECTION: Accommodation (Conditional) */}
