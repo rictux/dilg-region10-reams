@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Event, Office } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Building2, Home, Lock, Unlock } from 'lucide-react';
+import { Event, Office, Participant } from '../../types/database';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Building2, Home, Lock, Unlock, UserPlus, Loader2 } from 'lucide-react';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +18,39 @@ const EventsList: React.FC = () => {
   const [showEventModal, setShowEventModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  
+  // Add Participant Modal State
+  const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
+  const [isAddingParticipant, setIsAddingParticipant] = useState(false);
+  const [newParticipant, setNewParticipant] = useState<{
+      full_name: string;
+      email: string;
+      role: string;
+      office: string;
+      mobile_no: string;
+      age_group: string;
+      pwd: string;
+      indigenous_people: string;
+      needs_accommodation: boolean;
+      accommodation_pax: number;
+      participant_id?: number | null; // Track ID if selected from suggestions
+  }>({
+      full_name: '',
+      email: '',
+      role: 'Delegate',
+      office: '',
+      mobile_no: '',
+      age_group: '18-24',
+      pwd: 'No',
+      indigenous_people: 'No',
+      needs_accommodation: false,
+      accommodation_pax: 0,
+      participant_id: null
+  });
+
+  // Auto-suggestion state
+  const [suggestions, setSuggestions] = useState<Participant[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   
   // Selection States
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -219,6 +252,172 @@ const EventsList: React.FC = () => {
       // fetchEventParticipants is called in useEffect when modal opens
   };
 
+  const handleNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Clear participant_id when user types manually (implies new or search again)
+    setNewParticipant(prev => ({ ...prev, full_name: value, participant_id: null }));
+
+    if (value.length >= 2) {
+        const { data } = await supabase
+            .from('participants')
+            .select('*')
+            .ilike('full_name', `%${value}%`)
+            .limit(5);
+        
+        if (data && data.length > 0) {
+            setSuggestions(data);
+            setShowSuggestions(true);
+        } else {
+            setSuggestions([]);
+            setShowSuggestions(false);
+        }
+    } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+    }
+  };
+
+  const selectSuggestion = (p: Participant) => {
+      setNewParticipant(prev => ({
+          ...prev,
+          full_name: p.full_name,
+          email: p.email || '',
+          office: p.office || '',
+          mobile_no: p.mobile_no || '',
+          age_group: p.age_group || '18-24',
+          pwd: p.pwd || 'No',
+          indigenous_people: p.indigenous_people || 'No',
+          participant_id: p.participant_id
+      }));
+      setSuggestions([]);
+      setShowSuggestions(false);
+  };
+  
+  const handleAddParticipant = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedEvent) return;
+      setIsAddingParticipant(true);
+      
+      try {
+          // 1. Check or Create Participant
+          let participantId: number;
+          
+          if (newParticipant.participant_id) {
+             participantId = newParticipant.participant_id;
+             // Optional: Update participant details if changed
+             await supabase.from('participants').update({
+                full_name: newParticipant.full_name,
+                email: newParticipant.email || null,
+                office: newParticipant.office,
+                mobile_no: newParticipant.mobile_no || null,
+                age_group: newParticipant.age_group,
+                pwd: newParticipant.pwd,
+                indigenous_people: newParticipant.indigenous_people
+             }).eq('participant_id', participantId);
+
+          } else if (newParticipant.email) {
+               const { data: existingUser } = await supabase
+                .from('participants')
+                .select('participant_id')
+                .eq('email', newParticipant.email)
+                .single();
+                
+               if (existingUser) {
+                   participantId = existingUser.participant_id;
+                   // Update details
+                   await supabase.from('participants').update({
+                        full_name: newParticipant.full_name,
+                        office: newParticipant.office,
+                        mobile_no: newParticipant.mobile_no || null,
+                        age_group: newParticipant.age_group,
+                        pwd: newParticipant.pwd,
+                        indigenous_people: newParticipant.indigenous_people
+                    }).eq('participant_id', participantId);
+               } else {
+                   // Create
+                    const initials = newParticipant.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 3);
+                    const code = `${initials}-${Date.now().toString().slice(-6)}`;
+                    
+                    const { data: newUser, error: createError } = await supabase
+                    .from('participants')
+                    .insert([{
+                        full_name: newParticipant.full_name,
+                        email: newParticipant.email,
+                        office: newParticipant.office,
+                        participant_code: code,
+                        position: 'N/A', // Default
+                        mobile_no: newParticipant.mobile_no || null,
+                        age_group: newParticipant.age_group,
+                        pwd: newParticipant.pwd,
+                        indigenous_people: newParticipant.indigenous_people
+                    }])
+                    .select()
+                    .single();
+                    if(createError) throw createError;
+                    participantId = newUser.participant_id;
+               }
+          } else {
+               // Create (No Email provided)
+               const initials = newParticipant.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 3);
+               const code = `${initials}-${Date.now().toString().slice(-6)}`;
+               const { data: newUser, error: createError } = await supabase
+                .from('participants')
+                .insert([{
+                    full_name: newParticipant.full_name,
+                    email: null,
+                    office: newParticipant.office,
+                    participant_code: code,
+                    position: 'N/A',
+                    mobile_no: newParticipant.mobile_no || null,
+                    age_group: newParticipant.age_group,
+                    pwd: newParticipant.pwd,
+                    indigenous_people: newParticipant.indigenous_people
+                }])
+                .select()
+                .single();
+                if(createError) throw createError;
+                participantId = newUser.participant_id;
+          }
+
+          // 2. Register
+          const { error: regError } = await supabase
+            .from('event_participants')
+            .insert({
+                event_id: selectedEvent.event_id,
+                participant_id: participantId,
+                registration_status: 'Registered',
+                role: newParticipant.role,
+                needs_accommodation: newParticipant.needs_accommodation,
+                accommodation_pax: newParticipant.needs_accommodation ? Math.max(1, newParticipant.accommodation_pax) : 0
+            });
+
+          if (regError && regError.code !== '23505') throw regError;
+          
+          // Success
+          setShowAddParticipantModal(false);
+          setNewParticipant({
+              full_name: '',
+              email: '',
+              role: 'Delegate',
+              office: '',
+              mobile_no: '',
+              age_group: '18-24',
+              pwd: 'No',
+              indigenous_people: 'No',
+              needs_accommodation: false,
+              accommodation_pax: 0,
+              participant_id: null
+          });
+          setSuggestions([]);
+          fetchEventParticipants(selectedEvent.event_id);
+
+      } catch (err: any) {
+          alert("Error adding participant: " + err.message);
+      } finally {
+          setIsAddingParticipant(false);
+      }
+  };
+
   const getRegistrationLink = (eventId: number) => {
       // Constructs link based on current origin and HashRouter structure
       return `${window.location.origin}${window.location.pathname}#/register/${eventId}`;
@@ -231,7 +430,14 @@ const EventsList: React.FC = () => {
       setTimeout(() => setCopied(false), 2000);
   };
 
-  // Calculate accommodation stats (Count of participants who requested)
+  // Grouping Logic
+  const specialRoles = ['Speaker', 'Secretariat', 'VIP', 'Guest'];
+  const specialParticipants = viewingParticipants.filter(p => specialRoles.includes(p.role));
+  const delegateParticipants = viewingParticipants.filter(p => p.role === 'Delegate');
+
+  // Stats Logic
+  const totalCount = viewingParticipants.length;
+  const delegateCount = delegateParticipants.length;
   const accommodationCount = React.useMemo(() => {
       return viewingParticipants.filter(p => p.needs_accommodation).length;
   }, [viewingParticipants]);
@@ -441,7 +647,12 @@ const EventsList: React.FC = () => {
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        {/* Print Button Removed as per request */}
+                         <button 
+                            onClick={() => setShowAddParticipantModal(true)}
+                            className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors mr-2 shadow-sm"
+                        >
+                            <UserPlus size={16} /> Add Participant
+                        </button>
                         <button onClick={() => setShowParticipantsModal(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
                             <X size={24} />
                         </button>
@@ -456,7 +667,7 @@ const EventsList: React.FC = () => {
                         </div>
                     ) : (
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50 text-slate-500 font-semibold sticky top-0 shadow-sm">
+                            <thead className="bg-slate-50 text-slate-500 font-semibold sticky top-0 shadow-sm z-10">
                                 <tr>
                                     <th className="px-6 py-4 w-16 text-center">#</th>
                                     <th className="px-6 py-4">Participant Name</th>
@@ -466,31 +677,76 @@ const EventsList: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {viewingParticipants.map((record, index) => (
-                                    <tr key={index} className="hover:bg-slate-50">
-                                        <td className="px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
-                                        <td className="px-6 py-3">
-                                            <div className="font-medium text-slate-800">{record.participants?.full_name}</div>
-                                            <div className="text-xs text-slate-500">{record.participants?.email}</div>
-                                        </td>
-                                        <td className="px-6 py-3 text-slate-600">
-                                            {record.role || 'Delegate'}
-                                            {record.needs_accommodation && (
-                                                <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded flex items-center w-fit gap-1 mt-0.5">
-                                                    <Home size={8} /> Stay
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-3 text-slate-600">{record.participants?.office}</td>
-                                        <td className="px-6 py-3">
-                                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold
-                                                ${record.registration_status === 'Registered' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}
-                                            `}>
-                                                {record.registration_status}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {specialParticipants.length > 0 && (
+                                    <>
+                                        <tr className="bg-indigo-50/50">
+                                            <td colSpan={5} className="px-6 py-2 text-xs font-bold text-indigo-800 uppercase tracking-wider">
+                                                Event Officials & Guests ({specialParticipants.length})
+                                            </td>
+                                        </tr>
+                                        {specialParticipants.map((record, index) => (
+                                            <tr key={record.id} className="hover:bg-slate-50">
+                                                <td className="px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
+                                                <td className="px-6 py-3">
+                                                    <div className="font-medium text-slate-800">{record.participants?.full_name}</div>
+                                                    <div className="text-xs text-slate-500">{record.participants?.email}</div>
+                                                </td>
+                                                <td className="px-6 py-3 text-slate-600">
+                                                    <span className="font-medium text-indigo-600">{record.role}</span>
+                                                    {record.needs_accommodation && (
+                                                        <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded flex items-center w-fit gap-1 mt-0.5">
+                                                            <Home size={8} /> Stay
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-3 text-slate-600">{record.participants?.office}</td>
+                                                <td className="px-6 py-3">
+                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold
+                                                        ${record.registration_status === 'Registered' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}
+                                                    `}>
+                                                        {record.registration_status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </>
+                                )}
+
+                                {delegateParticipants.length > 0 && (
+                                    <>
+                                         <tr className="bg-slate-50/80">
+                                            <td colSpan={5} className="px-6 py-2 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                                Delegates ({delegateParticipants.length})
+                                            </td>
+                                        </tr>
+                                        {delegateParticipants.map((record, index) => (
+                                            <tr key={record.id} className="hover:bg-slate-50">
+                                                <td className="px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
+                                                <td className="px-6 py-3">
+                                                    <div className="font-medium text-slate-800">{record.participants?.full_name}</div>
+                                                    <div className="text-xs text-slate-500">{record.participants?.email}</div>
+                                                </td>
+                                                <td className="px-6 py-3 text-slate-600">
+                                                    {record.role}
+                                                    {record.needs_accommodation && (
+                                                        <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded flex items-center w-fit gap-1 mt-0.5">
+                                                            <Home size={8} /> Stay
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-3 text-slate-600">{record.participants?.office}</td>
+                                                <td className="px-6 py-3">
+                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold
+                                                        ${record.registration_status === 'Registered' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}
+                                                    `}>
+                                                        {record.registration_status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </>
+                                )}
+
                                 {viewingParticipants.length === 0 && (
                                     <tr>
                                         <td colSpan={5} className="text-center py-10 text-slate-400">
@@ -504,16 +760,198 @@ const EventsList: React.FC = () => {
                 </div>
                 
                 {/* Footer stats */}
-                <div className="p-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 rounded-b-xl flex flex-col sm:flex-row justify-between gap-2">
-                    <span className="flex items-center">Total Participants: <b className="ml-1 text-slate-800">{viewingParticipants.length}</b></span>
-                    
-                    {selectedEvent.has_accommodation && (
-                        <div className="flex items-center gap-2 text-purple-700 bg-purple-50 px-3 py-1 rounded-lg border border-purple-100 shadow-sm">
-                            <Home size={14} />
-                            <span>With Accommodation: <b>{accommodationCount}</b></span>
+                <div className="p-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 rounded-b-xl grid grid-cols-1 sm:grid-cols-3 gap-4">
+                     <div className="flex flex-col">
+                        <span className="text-xs uppercase text-slate-400 font-bold">Total Participants</span>
+                        <span className="text-lg font-bold text-slate-800">{totalCount}</span>
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-xs uppercase text-slate-400 font-bold">Total Delegates</span>
+                        <span className="text-lg font-bold text-slate-800">{delegateCount}</span>
+                    </div>
+                     <div className="flex flex-col">
+                        <span className="text-xs uppercase text-slate-400 font-bold">Accommodation</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-lg font-bold text-purple-700">{accommodationCount}</span>
+                            <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">Pax Requested</span>
                         </div>
-                    )}
+                    </div>
                 </div>
+            </div>
+        </div>
+      )}
+
+      {/* Add Participant Modal */}
+      {showAddParticipantModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddParticipantModal(false)}></div>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative z-10 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <UserPlus size={20} className="text-indigo-600" />
+                        Add Participant
+                    </h3>
+                    <button onClick={() => setShowAddParticipantModal(false)} className="text-slate-400 hover:text-slate-600">
+                        <X size={24} />
+                    </button>
+                </div>
+                
+                <form onSubmit={handleAddParticipant} className="space-y-4">
+                    <div className="relative">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+                        <input 
+                            required
+                            type="text"
+                            placeholder="Full Name"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            value={newParticipant.full_name}
+                            onChange={handleNameChange}
+                            onFocus={() => { if(newParticipant.full_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
+                            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                            autoComplete="off"
+                        />
+                         {showSuggestions && suggestions.length > 0 && (
+                            <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                                {suggestions.map((p) => (
+                                    <li 
+                                        key={p.participant_id}
+                                        onClick={() => selectSuggestion(p)}
+                                        className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div className="font-medium text-slate-800 group-hover:text-indigo-700">{p.full_name}</div>
+                                            <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Select</span>
+                                        </div>
+                                        <div className="text-xs text-slate-500 mt-0.5">{p.email} • {p.office}</div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Email (Optional)</label>
+                        <input 
+                            type="email"
+                            placeholder="email@example.com"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            value={newParticipant.email}
+                            onChange={e => setNewParticipant({...newParticipant, email: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Mobile No.</label>
+                        <input 
+                            type="tel"
+                            placeholder="09123456789"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            value={newParticipant.mobile_no}
+                            onChange={e => setNewParticipant({...newParticipant, mobile_no: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Office / Agency</label>
+                        <input 
+                            required
+                            type="text"
+                            placeholder="Office Name"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            value={newParticipant.office}
+                            onChange={e => setNewParticipant({...newParticipant, office: e.target.value})}
+                        />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Age Group</label>
+                            <select
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                value={newParticipant.age_group}
+                                onChange={e => setNewParticipant({...newParticipant, age_group: e.target.value})}
+                            >
+                                <option value="18-24">18-24</option>
+                                <option value="25-34">25-34</option>
+                                <option value="35-44">35-44</option>
+                                <option value="45-54">45-54</option>
+                                <option value="55-65">55-65</option>
+                                <option value="65+">65+</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
+                             <select
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                value={newParticipant.role}
+                                onChange={e => setNewParticipant({...newParticipant, role: e.target.value})}
+                            >
+                                <option value="Delegate">Delegate</option>
+                                <option value="Speaker">Speaker</option>
+                                <option value="Secretariat">Secretariat</option>
+                                <option value="Guest">Guest</option>
+                                <option value="VIP">VIP</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">PWD</label>
+                            <select
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                value={newParticipant.pwd}
+                                onChange={e => setNewParticipant({...newParticipant, pwd: e.target.value})}
+                            >
+                                <option value="No">No</option>
+                                <option value="Yes">Yes</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Indigenous People</label>
+                            <select
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                value={newParticipant.indigenous_people}
+                                onChange={e => setNewParticipant({...newParticipant, indigenous_people: e.target.value})}
+                            >
+                                <option value="No">No</option>
+                                <option value="Yes">Yes</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                                type="checkbox"
+                                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                checked={newParticipant.needs_accommodation}
+                                onChange={e => setNewParticipant({...newParticipant, needs_accommodation: e.target.checked})}
+                            />
+                            <span className="text-sm font-medium text-slate-700">Needs Accommodation</span>
+                        </label>
+                        
+                        {newParticipant.needs_accommodation && (
+                            <div className="mt-2 pl-6 animate-in fade-in slide-in-from-top-1">
+                                <label className="block text-xs font-medium text-slate-500 mb-1">Pax Count</label>
+                                <input 
+                                    type="number"
+                                    min="1"
+                                    className="w-24 px-2 py-1 text-sm border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none"
+                                    value={newParticipant.accommodation_pax}
+                                    onChange={e => setNewParticipant({...newParticipant, accommodation_pax: parseInt(e.target.value) || 0})}
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="pt-2">
+                        <button 
+                            type="submit" 
+                            disabled={isAddingParticipant}
+                            className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-all flex justify-center items-center gap-2"
+                        >
+                            {isAddingParticipant ? <Loader2 className="animate-spin" size={18} /> : 'Add to Event'}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
       )}
