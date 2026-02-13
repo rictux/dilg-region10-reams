@@ -184,7 +184,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="min-h-screen bg-slate-50 flex flex-col">
         {/* Top Bar for Scanner */}
         <header className="bg-white shadow-sm p-4 flex justify-between items-center z-10 sticky top-0">
-          <h1 className="text-xl font-bold text-indigo-600">EventPulse Scan</h1>
+          <h1 className="text-xl font-bold text-indigo-600">Event Management Portal</h1>
           <div className="relative" ref={dropdownRef}>
             <button 
                 onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
@@ -231,7 +231,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
       {/* Mobile Header */}
       <header className="md:hidden bg-white shadow-sm p-4 flex justify-between items-center z-20 sticky top-0">
-        <h1 className="text-xl font-bold text-indigo-600">EventPulse</h1>
+        <h1 className="text-xl font-bold text-indigo-600">Event Management Portal</h1>
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2">
           {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
@@ -245,7 +245,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       `}>
         <div className="h-full flex flex-col">
           <div className="p-6 hidden md:block">
-            <h1 className="text-2xl font-bold text-indigo-600">EventPulse</h1>
+            <h1 className="text-2xl font-bold text-indigo-600">Event Management Portal</h1>
             <p className="text-sm text-slate-500">Admin Portal</p>
           </div>
 
