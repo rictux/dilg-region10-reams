@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { User } from '../../types/database';
 import { Trash2, UserPlus, Shield, CheckCircle, XCircle, Search, Mail, Briefcase, Lock, X, Loader2, AlertCircle, Edit } from 'lucide-react';
 import { format } from 'date-fns';
+import bcrypt from 'bcryptjs';
 
 const UserManagement: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -132,7 +133,9 @@ const UserManagement: React.FC = () => {
               // Only update password if provided
               if (formData.password) {
                   if (formData.password.length < 4) throw new Error("Password must be at least 4 characters.");
-                  updates.password_hash = formData.password;
+                  // Hash password
+                  const salt = await bcrypt.genSalt(10);
+                  updates.password_hash = await bcrypt.hash(formData.password, salt);
               }
 
               const { error } = await supabase
@@ -147,12 +150,16 @@ const UserManagement: React.FC = () => {
               if (!formData.password || formData.password.length < 4) {
                   throw new Error("Password must be at least 4 characters.");
               }
+              
+              // Hash password
+              const salt = await bcrypt.genSalt(10);
+              const hash = await bcrypt.hash(formData.password, salt);
 
               const { error } = await supabase.from('users').insert([{
                   full_name: formData.full_name,
                   email: formData.email,
                   username: formData.username,
-                  password_hash: formData.password,
+                  password_hash: hash,
                   role: formData.role,
                   position: formData.position,
                   status: formData.status
