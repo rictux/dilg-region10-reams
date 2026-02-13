@@ -245,7 +245,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       `}>
         <div className="h-full flex flex-col">
           <div className="p-6 hidden md:block">
-            <h1 className="text-2xl font-bold text-indigo-600">Event Management Portal</h1>
+            <h1 className="text-2xl font-bold text-indigo-600">R10 Event Portal</h1>
             <p className="text-sm text-slate-500">Admin Portal</p>
           </div>
 
