@@ -13,6 +13,7 @@ import Reports from './features/reports/Reports';
 import AttendanceSheetPrint from './features/participants/AttendanceSheetPrint';
 import ScanLogsPrint from './features/reports/ScanLogsPrint';
 import UserManagement from './features/users/UserManagement';
+import NameLookup from './features/lookup/NameLookup';
 import { Permission } from './config/permissions';
 
 // Updated to check permissions
@@ -47,8 +48,9 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<Login />} />
           
-          {/* Public Registration Route */}
+          {/* Public Routes */}
           <Route path="/register/:eventId" element={<EventRegistration />} />
+          <Route path="/lookup" element={<NameLookup />} />
           
           {/* Dashboard - Requires VIEW_DASHBOARD */}
           <Route path="/dashboard" element={
