@@ -75,6 +75,7 @@ const Scanner: React.FC = () => {
   
   // Ref to hold selectedEventId to avoid restarting scanner on change
   const eventIdRef = useRef(selectedEventId);
+  const isProcessingRef = useRef(false);
 
   useEffect(() => {
     eventIdRef.current = selectedEventId;
@@ -336,17 +337,25 @@ const Scanner: React.FC = () => {
   };
 
   const handleScan = async (qrToken: string) => {
-    if (!scannerRef.current) return;
+    if (!scannerRef.current || isProcessingRef.current) return;
     
+    // Lock to prevent multiple simultaneous processing of the same frame or subsequent fast frames
+    isProcessingRef.current = true;
+
     // Pause scanner immediately
     try {
-        await scannerRef.current.stop();
+        if (scannerRef.current.isScanning) {
+            await scannerRef.current.stop();
+        }
         setScanning(false);
     } catch (e) { console.error(e) }
 
     const currentEventIdStr = eventIdRef.current;
     const eventId = parseInt(currentEventIdStr);
-    if (isNaN(eventId)) return;
+    if (isNaN(eventId)) {
+        isProcessingRef.current = false;
+        return;
+    }
 
     // Capture device time strictly at scan moment
     const deviceScanTime = new Date().toISOString();
@@ -506,10 +515,12 @@ const Scanner: React.FC = () => {
         else navigator.vibrate([300]);
       }
 
+      // Auto Dismiss and Unlock scanning
       setTimeout(() => {
           setScanResult(null);
           setParticipantDetails(null);
           setResultMessage('');
+          isProcessingRef.current = false;
       }, 2000);
   };
     
