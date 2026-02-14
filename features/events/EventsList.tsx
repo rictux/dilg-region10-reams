@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event, Office, Participant } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Building2, Home, Lock, Unlock, UserPlus, Loader2, MoreVertical, ArrowRight } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Building2, Home, Lock, Unlock, UserPlus, Loader2, MoreVertical, ArrowRight, Search } from 'lucide-react';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
-import { useNavigate } from 'react-router-dom';
+// Use react-router for core library components and hooks
+import { useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
 
 const EventsList: React.FC = () => {
@@ -12,6 +14,7 @@ const EventsList: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [offices, setOffices] = useState<Office[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
   
   // Modal States
@@ -462,16 +465,41 @@ const EventsList: React.FC = () => {
     );
   };
 
+  // Filtered list for search
+  const filteredEvents = useMemo(() => {
+    if (!searchTerm.trim()) return events;
+    const lower = searchTerm.toLowerCase();
+    return events.filter(e => 
+      e.event_name.toLowerCase().includes(lower) || 
+      e.venue.toLowerCase().includes(lower)
+    );
+  }, [events, searchTerm]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-2xl font-bold text-slate-800">Event Management</h2>
-        <button 
-            onClick={openCreateModal}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition-colors"
-        >
-            <CalendarPlus size={20} /> New Event
-        </button>
+        
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <div className="relative w-full sm:w-64">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <Search size={18} />
+            </div>
+            <input 
+              type="text" 
+              placeholder="Search events..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+            />
+          </div>
+          <button 
+              onClick={openCreateModal}
+              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors"
+          >
+              <CalendarPlus size={20} /> New Event
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
@@ -513,7 +541,7 @@ const EventsList: React.FC = () => {
                           ))
                       ) : (
                           <>
-                              {events.map((event) => (
+                              {filteredEvents.map((event) => (
                                   <tr 
                                       key={event.event_id} 
                                       onClick={() => handleRowClick(event)}
@@ -586,13 +614,13 @@ const EventsList: React.FC = () => {
                                       </td>
                                   </tr>
                               ))}
-                              {events.length === 0 && (
+                              {filteredEvents.length === 0 && (
                                   <tr>
                                       <td colSpan={5} className="text-center py-12 text-slate-400 bg-slate-50/50">
                                           <div className="flex flex-col items-center justify-center">
-                                            <Calendar className="w-12 h-12 text-slate-300 mb-3" />
-                                            <p className="font-medium text-slate-500">No events found</p>
-                                            <p className="text-xs mt-1">Create a new event to get started</p>
+                                            {searchTerm ? <Search className="w-12 h-12 text-slate-300 mb-3" /> : <Calendar className="w-12 h-12 text-slate-300 mb-3" />}
+                                            <p className="font-medium text-slate-500">{searchTerm ? `No results for "${searchTerm}"` : 'No events found'}</p>
+                                            <p className="text-xs mt-1">{searchTerm ? 'Try adjusting your search terms' : 'Create a new event to get started'}</p>
                                           </div>
                                       </td>
                                   </tr>
@@ -911,7 +939,7 @@ const EventsList: React.FC = () => {
                              <select
                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
                                 value={newParticipant.role}
-                                onChange={e => setNewParticipant({...newParticipant, role: e.target.value})}
+                                onChange={e => setNewParticipant({...newParticipant, role: e.target.value as any})}
                             >
                                 <option value="Delegate">Delegate</option>
                                 <option value="Speaker">Speaker</option>
