@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { supabase } from '../../lib/supabase';
@@ -177,7 +178,6 @@ const Scanner: React.FC = () => {
                     }
                 });
                 setParticipantCache(cache);
-                // console.log(`Cached ${Object.keys(cache).length} participants for offline mode.`);
             }
         } catch (err) {
             console.error("Failed to cache participants", err);
@@ -193,16 +193,10 @@ const Scanner: React.FC = () => {
 
       setIsSyncing(true);
       const newQueue = [...offlineQueue];
-      
-      // Process one by one to ensure logic holds
-      // We process from oldest to newest
       const item = newQueue[0]; 
 
       try {
-            // Re-use logic: Check DB for existing log
             const today = item.scan_time.split('T')[0];
-            
-            // Check for duplicate on server
             const { data: existingLog } = await supabase
                 .from('attendance_logs')
                 .select('attendance_id, scan_time')
@@ -215,8 +209,6 @@ const Scanner: React.FC = () => {
 
             if (existingLog) {
                 if (item.session === 'PM') {
-                    // PM Logic: Update to Latest
-                    // Only update if the queued scan is LATER than the DB scan
                     if (new Date(item.scan_time) > new Date(existingLog.scan_time)) {
                         await supabase
                             .from('attendance_logs')
@@ -228,9 +220,7 @@ const Scanner: React.FC = () => {
                             .eq('attendance_id', existingLog.attendance_id);
                     }
                 }
-                // If AM, ignore duplicate (Earliest is kept)
             } else {
-                // Insert New
                 await supabase.from('attendance_logs').insert({
                     event_id: item.event_id,
                     participant_id: item.participant_id,
@@ -244,28 +234,22 @@ const Scanner: React.FC = () => {
                 });
             }
 
-            // Success: Remove from queue
             newQueue.shift();
             setOfflineQueue(newQueue);
             localStorage.setItem('eventpulse_offline_queue', JSON.stringify(newQueue));
 
       } catch (err) {
           console.error("Sync error for item", item, err);
-          // Move to end of queue or keep retry logic? 
-          // For now, we leave it to retry on next cycle, but safeguard against infinite loop on bad data might be needed.
-          // Simple safeguard: if fails, remove it to unblock queue? 
-          // Better: Leave it, maybe next time connection is better.
       } finally {
           setIsSyncing(false);
       }
   }, [offlineQueue, isOnline, isSyncing, user]);
 
-  // Trigger sync when queue changes or online status changes
   useEffect(() => {
       if (isOnline && offlineQueue.length > 0) {
           const timer = setTimeout(() => {
               syncOfflineScans();
-          }, 1000); // Small delay to batch or allow connection stabilize
+          }, 1000); 
           return () => clearTimeout(timer);
       }
   }, [isOnline, offlineQueue, syncOfflineScans]);
@@ -273,15 +257,12 @@ const Scanner: React.FC = () => {
 
   // --- 5. Scanner Initialization ---
   useEffect(() => {
-    // Start condition: Have event, no result on screen, not currently scanning
     if (selectedEventId && !scanResult && !scanning) {
        startScanner();
     } 
-    // Stop condition
     else if ((!selectedEventId || scanResult) && scanning) {
         cleanupScanner();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEventId, scanResult, scanning]);
 
   useEffect(() => {
@@ -318,9 +299,24 @@ const Scanner: React.FC = () => {
         await html5QrCode.start(
             { facingMode: "environment" },
             {
-                fps: 10,
-                qrbox: { width: 250, height: 250 },
+                fps: 20, // Increased FPS for smoother scanning and faster focus reaction
+                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                    const qrboxSize = Math.floor(minEdge * 0.65);
+                    return {
+                        width: qrboxSize,
+                        height: qrboxSize
+                    };
+                },
                 aspectRatio: window.innerWidth < 768 ? 1 : 1.77, 
+                // Advanced constraints for better focus
+                videoConstraints: {
+                    facingMode: "environment",
+                    // @ts-ignore - focusMode is supported in many browsers even if not in standard TS types
+                    focusMode: "continuous",
+                    width: { min: 640, ideal: 1280, max: 1920 },
+                    height: { min: 480, ideal: 720, max: 1080 }
+                }
             },
             (decodedText) => {
                 handleScan(decodedText);
@@ -339,10 +335,8 @@ const Scanner: React.FC = () => {
   const handleScan = async (qrToken: string) => {
     if (!scannerRef.current || isProcessingRef.current) return;
     
-    // Lock to prevent multiple simultaneous processing of the same frame or subsequent fast frames
     isProcessingRef.current = true;
 
-    // Pause scanner immediately
     try {
         if (scannerRef.current.isScanning) {
             await scannerRef.current.stop();
@@ -357,21 +351,18 @@ const Scanner: React.FC = () => {
         return;
     }
 
-    // Capture device time strictly at scan moment
     const deviceScanTime = new Date().toISOString();
 
-    // --- OFFLINE MODE LOGIC ---
     if (!isOnline) {
         const cachedP = participantCache[qrToken];
         
         if (cachedP) {
-            // Save to Queue
             const offlineItem: OfflineScanItem = {
                 id: Date.now().toString() + Math.random().toString().slice(2),
                 event_id: eventId,
                 participant_id: cachedP.participant_id,
                 participant_code: qrToken,
-                scan_time: deviceScanTime, // Use captured device time
+                scan_time: deviceScanTime,
                 session: session,
                 scanner_device: navigator.userAgent + " (Offline)",
                 timestamp: Date.now()
@@ -389,15 +380,12 @@ const Scanner: React.FC = () => {
 
             processScanResult('Offline-Saved', 'Saved locally. Will sync when online.', cachedP.full_name, cachedP.position);
         } else {
-            // Not in cache
             processScanResult('Invalid', 'Participant not found in offline cache.', qrToken);
         }
         return;
     }
 
-    // --- ONLINE MODE LOGIC ---
     try {
-        // 1. Find Participant
         const { data: partData, error: partError } = await supabase
             .from('participants')
             .select('participant_id, full_name, position, office')
@@ -416,7 +404,6 @@ const Scanner: React.FC = () => {
         };
         setParticipantDetails(participant);
 
-        // 2. Check Event Registration
         const { data: regData } = await supabase
             .from('event_participants')
             .select('registration_status')
@@ -430,8 +417,7 @@ const Scanner: React.FC = () => {
             return;
         }
 
-        // 3. Check Duplicate or Existing Log
-        const today = deviceScanTime.split('T')[0]; // Use device date for consistency
+        const today = deviceScanTime.split('T')[0];
         const { data: existingLog } = await supabase
             .from('attendance_logs')
             .select('attendance_id')
@@ -444,11 +430,9 @@ const Scanner: React.FC = () => {
 
         if (existingLog) {
             if (session === 'AM') {
-                // AM Session: Prevent duplicates (No DB Insert)
                 processScanResult('Duplicate', `Already scanned for ${session}.`, participant.name, participant.position);
                 return;
             } else {
-                // PM Session: Update time to latest (Device Time)
                 const { error: updateError } = await supabase
                     .from('attendance_logs')
                     .update({ 
@@ -464,7 +448,6 @@ const Scanner: React.FC = () => {
             }
         }
 
-        // 4. Success (New Insert)
         await logScan(eventId, partData.participant_id, 'Valid', deviceScanTime, 'Success');
         processScanResult('Valid', 'Attendance Recorded', participant.name, participant.position);
 
@@ -475,9 +458,6 @@ const Scanner: React.FC = () => {
 
   const logScan = async (eventId: number, participantId: number, status: 'Valid' | 'Invalid' | 'Duplicate', scanTimeStr: string, notes?: string) => {
       if (!user) return;
-      // Do not log 'Duplicate' for AM as per logic in handleScan (it returns early).
-      // If status is passed as Duplicate here, it might be for other future cases, but for now AM duplicates are suppressed.
-
       const today = scanTimeStr.split('T')[0];
       const dbEventId = eventId === 0 ? null : eventId;
       const dbParticipantId = participantId === 0 ? null : participantId;
@@ -490,7 +470,7 @@ const Scanner: React.FC = () => {
           attendance_date: today,
           action_session: session,
           remarks: notes,
-          scan_time: scanTimeStr, // Use explicit device time
+          scan_time: scanTimeStr,
           scanner_device: navigator.userAgent
       });
   };
@@ -499,7 +479,6 @@ const Scanner: React.FC = () => {
       setScanResult(status);
       setResultMessage(message);
 
-      // Add to history
       const newScan: RecentScan = {
           id: Date.now().toString(),
           name,
@@ -515,7 +494,6 @@ const Scanner: React.FC = () => {
         else navigator.vibrate([300]);
       }
 
-      // Auto Dismiss and Unlock scanning
       setTimeout(() => {
           setScanResult(null);
           setParticipantDetails(null);
@@ -616,18 +594,19 @@ const Scanner: React.FC = () => {
                         {/* Static Overlay Guide */}
                         {!scanResult && scanning && (
                             <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
-                                <div className="w-72 h-72 border-2 border-white/40 rounded-3xl relative overflow-hidden">
-                                    <div className="absolute inset-0 border-[40px] border-black/30"></div>
-                                    <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white -mt-1 -ml-1 rounded-tl-lg"></div>
-                                    <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white -mt-1 -mr-1 rounded-tr-lg"></div>
-                                    <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white -mb-1 -ml-1 rounded-bl-lg"></div>
-                                    <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white -mb-1 -mr-1 rounded-br-lg"></div>
+                                <div className="w-64 h-64 sm:w-80 sm:h-80 border-2 border-white/40 rounded-3xl relative overflow-hidden backdrop-brightness-150">
+                                    <div className="absolute inset-0 border-[60px] border-black/40"></div>
+                                    <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-indigo-500 -mt-1 -ml-1 rounded-tl-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
+                                    <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-indigo-500 -mt-1 -mr-1 rounded-tr-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
+                                    <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-indigo-500 -mb-1 -ml-1 rounded-bl-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
+                                    <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-indigo-500 -mb-1 -mr-1 rounded-br-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
                                     
-                                    {/* Scan Line Animation */}
-                                    <div className="absolute top-0 left-0 w-full h-1 bg-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.8)] animate-[scan_2s_ease-in-out_infinite]"></div>
+                                    {/* Scan Line Animation - High Tech look */}
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent shadow-[0_0_20px_rgba(79,70,229,0.9)] animate-[scan_2.5s_ease-in-out_infinite]"></div>
                                 </div>
-                                <div className="mt-8 bg-black/60 backdrop-blur-md px-6 py-2 rounded-full text-white/90 text-sm font-medium border border-white/10">
-                                    Align QR Code within frame
+                                <div className="mt-8 bg-black/70 backdrop-blur-md px-6 py-2.5 rounded-full text-white/90 text-sm font-bold border border-white/20 tracking-wide flex items-center gap-2">
+                                    <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
+                                    Focusing on QR Code...
                                 </div>
                             </div>
                         )}
@@ -643,7 +622,7 @@ const Scanner: React.FC = () => {
                                 ) : (
                                     <>
                                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
-                                        <p>Starting Camera...</p>
+                                        <p className="font-medium">Initializing Advanced Scanner...</p>
                                     </>
                                 )}
                              </div>
@@ -655,10 +634,10 @@ const Scanner: React.FC = () => {
             {/* Styles for scan animation */}
             <style>{`
                 @keyframes scan {
-                    0%, 100% { transform: translateY(0); opacity: 0; }
+                    0% { transform: translateY(0); opacity: 0; }
                     10% { opacity: 1; }
                     90% { opacity: 1; }
-                    50% { transform: translateY(288px); }
+                    100% { transform: translateY(320px); opacity: 0; }
                 }
             `}</style>
 
@@ -707,17 +686,15 @@ const Scanner: React.FC = () => {
                             </div>
                         )}
                         
-                        {/* Progress Bar for Auto Dismiss */}
                         <div className="w-full bg-slate-100 h-1.5 rounded-full mt-6 overflow-hidden">
                              <div className="h-full bg-slate-300 animate-[progress_2s_linear_forwards]"></div>
                         </div>
-                        <style>{`@keyframes progress { from { width: 100%; } to { width: 0%; } }`}</style>
                     </div>
                 </div>
             )}
         </div>
 
-        {/* RIGHT/BOTTOM: Recent Scans History (Sidebar on Desktop, Bottom panel on Mobile) */}
+        {/* RIGHT/BOTTOM: Recent Scans History */}
         <div className="lg:w-96 w-full bg-white border-l border-slate-800 lg:h-full flex flex-col z-10 lg:z-auto max-h-[40vh] lg:max-h-full">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
