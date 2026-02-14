@@ -54,8 +54,8 @@ const ScanLogsPrint: React.FC = () => {
           participants (participant_code, full_name, gender, position, office, email),
           users (full_name, email)
         `)
-        .order('attendance_date', { ascending: false })
-        .order('scan_time', { ascending: false });
+        // Change: Sort strictly by scan_time ascending as requested
+        .order('scan_time', { ascending: true });
 
         if (eventId) {
             query = query.eq('event_id', parseInt(eventId));
@@ -64,7 +64,6 @@ const ScanLogsPrint: React.FC = () => {
         const { data, error } = await query;
         if (error) throw error;
         
-        // Cast data to ScanLog[] type
         setLogs(data as unknown as ScanLog[] || []);
 
         if (eventId && data && data.length > 0) {
@@ -72,7 +71,6 @@ const ScanLogsPrint: React.FC = () => {
             const e = data[0].events;
             if (e) {
                 setEventName(e.event_name);
-                // Determine date range string
                 if (e.start_date === e.end_date || !e.end_date) {
                     setEventDate(format(new Date(e.start_date), 'MMMM d, yyyy'));
                 } else {
@@ -80,7 +78,6 @@ const ScanLogsPrint: React.FC = () => {
                 }
             }
         } else if (eventId) {
-             // Fetch event details even if no logs
              const { data: e } = await supabase.from('events').select('*').eq('event_id', eventId).single();
              if(e) {
                  setEventName(e.event_name);
@@ -98,7 +95,6 @@ const ScanLogsPrint: React.FC = () => {
     }
   };
 
-  // Helper to format time strings that might be missing timezone info (assume UTC if missing)
   const formatLogTime = (timeStr: string) => {
       const d = new Date(timeStr.endsWith('Z') || timeStr.includes('+') ? timeStr : timeStr + 'Z');
       return format(d, 'MMM d, h:mm:ss a');
@@ -118,17 +114,9 @@ const ScanLogsPrint: React.FC = () => {
         </div>
 
         <div className="w-[297mm] mx-auto bg-white shadow-xl print:shadow-none print:w-full min-h-[210mm] p-10 flex flex-col">
-            {/* Header */}
             <div className="flex items-center mb-6">
                 <div className="w-20 h-20 mr-4 flex-shrink-0 flex items-center justify-center">
-                    <img 
-                        src="/assets/dilg_logo.png" 
-                        alt="DILG Logo" 
-                        className="w-full h-full object-contain"
-                        onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/6/6f/DILG_Seal.svg';
-                        }}
-                    />
+                    <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/6/6f/DILG_Seal.svg'; }} />
                 </div>
                  <div>
                     <h1 className="text-lg font-bold uppercase text-slate-800">DILG Region 10</h1>
@@ -149,7 +137,6 @@ const ScanLogsPrint: React.FC = () => {
                  </div>
             </div>
 
-            {/* Table */}
             <div className="flex-1">
                 <table className="w-full text-[10px] text-left border-collapse">
                     <thead>
@@ -199,9 +186,7 @@ const ScanLogsPrint: React.FC = () => {
                 <div>
                     <p className="text-[10px] font-bold uppercase text-slate-500 mb-6">Prepared By:</p>
                     <div className="text-center">
-                        <p className="font-bold uppercase text-slate-900 text-sm border-b border-black min-w-[200px] pb-1">
-                            {user?.full_name}
-                        </p>
+                        <p className="font-bold uppercase text-slate-900 text-sm border-b border-black min-w-[200px] pb-1">{user?.full_name}</p>
                         <p className="text-[10px] text-slate-500 uppercase mt-1">{user?.position || user?.role}</p>
                     </div>
                 </div>
