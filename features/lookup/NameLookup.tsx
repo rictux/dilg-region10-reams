@@ -157,7 +157,7 @@ const NameLookup: React.FC = () => {
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 flex-shrink-0">
             <img 
-              src="https://upload.wikimedia.org/wikipedia/commons/6/6f/DILG_Seal.svg" 
+              src="/assets/dilg_logo.png" 
               alt="DILG Logo" 
               className="w-full h-full object-contain" 
             />
