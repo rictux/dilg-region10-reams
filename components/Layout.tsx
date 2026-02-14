@@ -1,8 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-// Use react-router for hooks as they are natively defined there, bypassing potential re-export issues in react-router-dom
-import { useNavigate, useLocation } from 'react-router';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   CalendarDays, 
@@ -35,16 +34,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
-  // Password Modal State
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [pwForm, setPwForm] = useState({ new: '', confirm: '' });
   const [pwStatus, setPwStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [pwMessage, setPwMessage] = useState('');
 
-  // Determine Layout Mode based on permissions
   const showSidebar = hasPermission('VIEW_DASHBOARD');
 
-  // Click outside listener for dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -180,12 +176,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     </div>
   );
 
-  // Scanner Mode Layout (Full screen, no sidebar)
-  // Used if user doesn't have permission to view dashboard (e.g. Scanner Role)
   if (!showSidebar) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
-        {/* Top Bar for Scanner */}
         <header className="bg-white shadow-sm p-4 flex justify-between items-center z-10 sticky top-0">
           <h1 className="text-xl font-bold text-indigo-600">Event Management Portal</h1>
           <div className="flex items-center gap-3">
@@ -238,10 +231,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     );
   }
 
-  // Dashboard Layout with Sidebar
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
-      {/* Mobile Header */}
       <header className="md:hidden bg-white shadow-sm p-4 flex justify-between items-center z-20 sticky top-0">
         <h1 className="text-xl font-bold text-indigo-600">Event Management Portal</h1>
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2">
@@ -249,7 +240,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </button>
       </header>
 
-      {/* Sidebar Navigation */}
       <aside className={`
         fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out
         md:translate-x-0 md:static md:shadow-none border-r border-slate-200
@@ -272,7 +262,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <NavItem to="/attendance" icon={ClipboardList} label="Attendance" />
             )}
 
-            {/* Use the internal route for internal users */}
             <NavItem to="/admin/lookup" icon={Search} label="Name Lookup" />
 
             {hasPermission('VIEW_REPORTS') && (
@@ -293,8 +282,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </nav>
 
           <div className="p-4 border-t border-slate-200 relative" ref={dropdownRef}>
-            
-            {/* Pop-up Dropdown Menu */}
             {isProfileDropdownOpen && (
                 <div className="absolute bottom-full left-4 right-4 mb-2 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in slide-in-from-bottom-2 duration-200">
                     <button
@@ -316,7 +303,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </div>
             )}
 
-            {/* User Profile Trigger */}
             <button 
                 onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                 className={`flex items-center w-full p-2.5 rounded-lg transition-all ${isProfileDropdownOpen ? 'bg-indigo-50 border-indigo-100' : 'hover:bg-slate-50 border border-transparent'}`}
@@ -336,12 +322,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-4 md:p-8 h-[calc(100vh-64px)] md:h-screen">
         {children}
       </main>
 
-      {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden"
@@ -349,7 +333,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         />
       )}
 
-      {/* Global Password Modal */}
       {isPasswordModalOpen && <PasswordModal />}
     </div>
   );
