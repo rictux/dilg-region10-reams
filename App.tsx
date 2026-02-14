@@ -1,5 +1,8 @@
+
 import React from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+// Import core routing components from react-router and DOM-specific ones from react-router-dom
+import { BrowserRouter as Router } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './features/auth/Login';
 import Layout from './components/Layout';
@@ -32,12 +35,6 @@ const ProtectedRoute = ({ children, requiredPermission }: React.PropsWithChildre
     return <Navigate to="/dashboard" />;
   }
 
-  // General check for logged in users who might be purely scanners
-  if (!requiredPermission && !hasPermission('VIEW_DASHBOARD') && hasPermission('SCAN_QR')) {
-     // If accessing a generic protected route but user is a Scanner, force them to scan page unless specific permission says otherwise
-     // However, this component usually wraps specific routes.
-  }
-
   return <>{children}</>;
 };
 
@@ -52,6 +49,13 @@ const App: React.FC = () => {
           <Route path="/register/:eventId" element={<EventRegistration />} />
           <Route path="/lookup" element={<NameLookup />} />
           
+          {/* Internal Name Lookup - Wrapped in Layout */}
+          <Route path="/admin/lookup" element={
+            <ProtectedRoute>
+              <Layout><NameLookup isInternal={true} /></Layout>
+            </ProtectedRoute>
+          } />
+
           {/* Dashboard - Requires VIEW_DASHBOARD */}
           <Route path="/dashboard" element={
             <ProtectedRoute requiredPermission="VIEW_DASHBOARD">
