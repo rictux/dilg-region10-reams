@@ -947,30 +947,32 @@ const EventsList: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input 
-                                type="checkbox"
-                                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
-                                checked={newParticipant.needs_accommodation}
-                                onChange={e => setNewParticipant({...newParticipant, needs_accommodation: e.target.checked})}
-                            />
-                            <span className="text-sm font-medium text-slate-700">Needs Accommodation</span>
-                        </label>
-                        
-                        {newParticipant.needs_accommodation && (
-                            <div className="mt-2 pl-6 animate-in fade-in slide-in-from-top-1">
-                                <label className="block text-xs font-medium text-slate-500 mb-1">Pax Count</label>
+                    {selectedEvent?.has_accommodation && (
+                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <label className="flex items-center gap-2 cursor-pointer">
                                 <input 
-                                    type="number"
-                                    min="1"
-                                    className="w-24 px-2 py-1 text-sm border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none"
-                                    value={newParticipant.accommodation_pax}
-                                    onChange={e => setNewParticipant({...newParticipant, accommodation_pax: parseInt(e.target.value) || 0})}
+                                    type="checkbox"
+                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                    checked={newParticipant.needs_accommodation}
+                                    onChange={e => setNewParticipant({...newParticipant, needs_accommodation: e.target.checked})}
                                 />
-                            </div>
-                        )}
-                    </div>
+                                <span className="text-sm font-medium text-slate-700">Needs Accommodation</span>
+                            </label>
+                            
+                            {newParticipant.needs_accommodation && (
+                                <div className="mt-2 pl-6 animate-in fade-in slide-in-from-top-1">
+                                    <label className="block text-xs font-medium text-slate-500 mb-1">Pax Count</label>
+                                    <input 
+                                        type="number"
+                                        min="1"
+                                        className="w-24 px-2 py-1 text-sm border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none"
+                                        value={newParticipant.accommodation_pax}
+                                        onChange={e => setNewParticipant({...newParticipant, accommodation_pax: parseInt(e.target.value) || 0})}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <div className="pt-2">
                         <button 
