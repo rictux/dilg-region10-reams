@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Participant, Event } from '../../types/database';
 import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Home, ChevronDown, Check } from 'lucide-react';
 import QRCode from 'react-qr-code';
-import { format, parseISO, eachDayOfInterval, isSameDay } from 'date-fns';
+import { format, parseISO, eachDayOfInterval } from 'date-fns';
 
 interface AttendanceRow {
     participant: Participant;
@@ -131,7 +131,6 @@ const AttendanceList: React.FC = () => {
       }
       setEventDays(days);
       
-      // Auto-select Today if it's in range, else first day
       const todayStr = format(new Date(), 'yyyy-MM-dd');
       const isTodayInRange = days.some(d => format(d, 'yyyy-MM-dd') === todayStr);
       
@@ -141,7 +140,6 @@ const AttendanceList: React.FC = () => {
       setIsDropdownOpen(false);
       setEventSearchTerm('');
       
-      // Update manual form date default
       setManualForm(prev => ({ ...prev, date: newDate }));
   };
 
@@ -167,22 +165,38 @@ const AttendanceList: React.FC = () => {
             const rows = eventParticipants
                 .map((ep: any) => ep.participants)
                 .filter((p: any) => p !== null) 
-                .sort((a: any, b: any) => a.full_name.localeCompare(b.full_name))
                 .map((p: Participant) => {
                     const pLogs = logs?.filter(l => l.participant_id === p.participant_id) || [];
                     const daysLogs = pLogs.filter(l => l.attendance_date === dateStr);
 
-                    // Sort: AM Ascending (Earliest), PM Descending (Latest)
                     const amLogs = daysLogs.filter(l => l.action_session === 'AM').sort((a,b) => a.scan_time.localeCompare(b.scan_time));
                     const pmLogs = daysLogs.filter(l => l.action_session === 'PM').sort((a,b) => b.scan_time.localeCompare(a.scan_time));
 
                     return {
                         participant: p,
                         amLog: amLogs.length > 0 ? { time: amLogs[0].scan_time, status: amLogs[0].scan_status } : undefined,
-                        pmLog: pmLogs.length > 0 ? { time: pmLogs[0].scan_time, status: pmLogs[0].scan_status } : undefined,
+                        pmLog: pmLogs.length > 0 ? { time: pmLogs[pmLogs.length - 1].scan_time, status: pmLogs[pmLogs.length - 1].scan_status } : undefined,
                     };
                 });
-            setData(rows);
+
+            // Sorting logic: AM logs on top, then sorted by AM time ascending, then alphabetically for those without
+            const sortedRows = rows.sort((a, b) => {
+                const hasAM_a = !!a.amLog;
+                const hasAM_b = !!b.amLog;
+
+                if (hasAM_a && !hasAM_b) return -1;
+                if (!hasAM_a && hasAM_b) return 1;
+
+                if (hasAM_a && hasAM_b) {
+                    // Both have AM logs, sort by time ASC
+                    return a.amLog!.time.localeCompare(b.amLog!.time);
+                }
+
+                // Neither have AM logs, sort alphabetically
+                return a.participant.full_name.localeCompare(b.participant.full_name);
+            });
+
+            setData(sortedRows);
         }
     } catch (err) {
         console.error("Error fetching attendance:", err);
@@ -192,13 +206,13 @@ const AttendanceList: React.FC = () => {
   };
 
   const filteredData = data.filter(row => {
-    const hasAM = !!row.amLog;
-    const hasPM = !!row.pmLog;
-
     if (searchQuery && !row.participant.full_name.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false;
     }
     
+    const hasAM = !!row.amLog;
+    const hasPM = !!row.pmLog;
+
     switch (filter) {
         case 'No Logs': return !hasAM && !hasPM;
         case 'With AM': return hasAM;
@@ -238,24 +252,66 @@ const AttendanceList: React.FC = () => {
       
       setSavingManual(true);
       try {
-          // Construct UTC timestamp from local input
           const localDate = new Date(`${manualForm.date}T${manualForm.time}:00`);
           const scanTimeStr = localDate.toISOString();
           
-          const { error } = await supabase.from('attendance_logs').insert({
-              event_id: selectedEventId,
-              participant_id: manualParticipant.participant_id,
-              user_id: user.user_id,
-              attendance_date: manualForm.date,
-              scan_time: scanTimeStr, // Save as ISO UTC
-              action_session: manualForm.session,
-              scan_status: manualForm.status,
-              remarks: 'Manual Entry',
-              scanner_device: 'Manual Input'
-          });
+          if (manualForm.session === 'PM') {
+              // For PM, check if entry exists to have "latest time out"
+              const { data: existingPM } = await supabase
+                .from('attendance_logs')
+                .select('attendance_id')
+                .eq('event_id', selectedEventId)
+                .eq('participant_id', manualParticipant.participant_id)
+                .eq('attendance_date', manualForm.date)
+                .eq('action_session', 'PM')
+                .eq('scan_status', 'Valid')
+                .maybeSingle();
 
-          if (error) throw error;
+              if (existingPM) {
+                  // Update existing PM entry
+                  const { error: updateError } = await supabase
+                    .from('attendance_logs')
+                    .update({
+                        scan_time: scanTimeStr,
+                        scan_status: manualForm.status,
+                        remarks: 'Manual Entry (Updated PM)',
+                        user_id: user.user_id
+                    })
+                    .eq('attendance_id', existingPM.attendance_id);
+                  if (updateError) throw updateError;
+              } else {
+                  // Insert new PM entry
+                  const { error: insertError } = await supabase.from('attendance_logs').insert({
+                    event_id: selectedEventId,
+                    participant_id: manualParticipant.participant_id,
+                    user_id: user.user_id,
+                    attendance_date: manualForm.date,
+                    scan_time: scanTimeStr,
+                    action_session: manualForm.session,
+                    scan_status: manualForm.status,
+                    remarks: 'Manual Entry (PM)',
+                    scanner_device: 'Manual Input'
+                  });
+                  if (insertError) throw insertError;
+              }
+          } else {
+              // AM Session - Insert (Standard manual log)
+              const { error: insertError } = await supabase.from('attendance_logs').insert({
+                  event_id: selectedEventId,
+                  participant_id: manualParticipant.participant_id,
+                  user_id: user.user_id,
+                  attendance_date: manualForm.date,
+                  scan_time: scanTimeStr,
+                  action_session: manualForm.session,
+                  scan_status: manualForm.status,
+                  remarks: 'Manual Entry',
+                  scanner_device: 'Manual Input'
+              });
+              if (insertError) throw insertError;
+          }
+
           setShowManualModal(false);
+          // fetchAttendance will be triggered by supabase real-time channel
       } catch (err: any) {
           alert("Error adding log: " + err.message);
       } finally {
@@ -263,7 +319,6 @@ const AttendanceList: React.FC = () => {
       }
   };
 
-  // Helper to format time strings that might be missing timezone info (assume UTC if missing)
   const formatLogTime = (timeStr: string) => {
       const d = new Date(timeStr.endsWith('Z') || timeStr.includes('+') ? timeStr : timeStr + 'Z');
       return format(d, 'h:mm a');
@@ -292,17 +347,8 @@ const AttendanceList: React.FC = () => {
   const noPmCount = data.filter(r => r.amLog && !r.pmLog).length;
   const completeLogsCount = data.filter(r => r.amLog && r.pmLog).length;
 
-  // Accommodation count for current event
-  const accommodationCount = data.filter(r => r.participant && (r.participant as any).needs_accommodation).length; // Need to join properly if using data derived from API that includes accommodation info. 
-  // However, `fetchAttendance` fetches `participants` table which doesn't have `needs_accommodation` directly on it, it's on `event_participants`.
-  // `fetchAttendance` maps `eventParticipants` but only returns `participant` object.
-  // To show accommodation stats here correctly, we'd need to include that flag in the mapped data.
-  // For now, we will stick to attendance stats as primary focus.
-
   return (
     <div className="space-y-6">
-      
-      {/* Header Section */}
       <div>
         <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             Attendance 
@@ -319,11 +365,8 @@ const AttendanceList: React.FC = () => {
         </p>
       </div>
 
-      {/* Toolbar Section: Event Dropdown (Left) & Filters (Right) */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-        
         <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto items-start md:items-center">
-            {/* Left: Searchable Event Selector */}
             <div className="w-full md:w-[480px] relative" ref={dropdownRef}>
                 <div 
                     className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors shadow-sm"
@@ -380,7 +423,6 @@ const AttendanceList: React.FC = () => {
                 )}
             </div>
 
-            {/* Day Selection (Visible if multi-day) */}
             {eventDays.length > 1 && (
                 <div className="flex bg-white rounded-lg border border-slate-200 p-1 overflow-x-auto no-scrollbar max-w-full">
                     {eventDays.map((day, idx) => {
@@ -406,7 +448,6 @@ const AttendanceList: React.FC = () => {
                 </div>
             )}
 
-            {/* Search Bar */}
             <div className="w-full md:w-64 relative">
                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                      <Search size={18} />
@@ -421,7 +462,6 @@ const AttendanceList: React.FC = () => {
             </div>
         </div>
 
-        {/* Right: Filters */}
         <div className="w-full xl:w-auto overflow-x-auto no-scrollbar">
             <div className="flex gap-2">
                 <FilterButton label="Show All" />
@@ -433,7 +473,6 @@ const AttendanceList: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
               <div className="flex justify-between items-start mb-2">
@@ -476,7 +515,6 @@ const AttendanceList: React.FC = () => {
           </div>
       </div>
 
-      {/* Table Section */}
       {loading && data.length === 0 ? (
         <div className="flex justify-center py-10">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -558,23 +596,15 @@ const AttendanceList: React.FC = () => {
         </div>
       )}
 
-      {/* Manual Entry Modal */}
       {showManualModal && manualParticipant && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div 
-                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
-                onClick={() => setShowManualModal(false)}
-            ></div>
-
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowManualModal(false)}></div>
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
                     <h3 className="font-semibold flex items-center gap-2">
                         <Clock size={20} /> Manual Attendance
                     </h3>
-                    <button 
-                        onClick={() => setShowManualModal(false)} 
-                        className="text-indigo-100 hover:text-white p-1 hover:bg-white/20 rounded-full transition"
-                    >
+                    <button onClick={() => setShowManualModal(false)} className="text-indigo-100 hover:text-white p-1 hover:bg-white/20 rounded-full transition">
                         <X size={20} />
                     </button>
                 </div>
@@ -584,61 +614,34 @@ const AttendanceList: React.FC = () => {
                         <p className="text-xs text-indigo-500 uppercase font-bold tracking-wider mb-1">Participant</p>
                         <p className="font-bold text-slate-800">{manualParticipant.full_name}</p>
                     </div>
-
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
-                            <input 
-                                type="date"
-                                required
-                                value={manualForm.date}
-                                onChange={e => setManualForm({...manualForm, date: e.target.value})}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                            />
+                            <input type="date" required value={manualForm.date} onChange={e => setManualForm({...manualForm, date: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Time</label>
-                            <input 
-                                type="time"
-                                required
-                                value={manualForm.time}
-                                onChange={e => setManualForm({...manualForm, time: e.target.value})}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                            />
+                            <input type="time" required value={manualForm.time} onChange={e => setManualForm({...manualForm, time: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none" />
                         </div>
                     </div>
-
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Session</label>
-                            <select
-                                value={manualForm.session}
-                                onChange={e => setManualForm({...manualForm, session: e.target.value as any})}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                            >
+                            <select value={manualForm.session} onChange={e => setManualForm({...manualForm, session: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
                                 <option value="AM">AM</option>
                                 <option value="PM">PM</option>
                             </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                            <select
-                                value={manualForm.status}
-                                onChange={e => setManualForm({...manualForm, status: e.target.value as any})}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                            >
+                            <select value={manualForm.status} onChange={e => setManualForm({...manualForm, status: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
                                 <option value="Valid">Valid</option>
                                 <option value="Late">Late</option>
                                 <option value="Excuse">Excuse</option>
                             </select>
                         </div>
                     </div>
-
-                    <button 
-                        type="submit"
-                        disabled={savingManual}
-                        className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-all shadow-md flex justify-center items-center gap-2 mt-4"
-                    >
+                    <button type="submit" disabled={savingManual} className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-all shadow-md flex justify-center items-center gap-2 mt-4">
                         {savingManual ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                         Log Attendance
                     </button>
@@ -649,40 +652,27 @@ const AttendanceList: React.FC = () => {
 
       {selectedParticipant && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div 
-                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
-                onClick={() => setSelectedParticipant(null)}
-            ></div>
-            
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setSelectedParticipant(null)}></div>
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 flex justify-between items-center text-white">
                     <h3 className="font-semibold flex items-center gap-2">
                         <User size={20} /> Participant Badge
                     </h3>
-                    <button 
-                        onClick={() => setSelectedParticipant(null)} 
-                        className="text-indigo-100 hover:text-white p-1 hover:bg-white/20 rounded-full transition"
-                    >
+                    <button onClick={() => setSelectedParticipant(null)} className="text-indigo-100 hover:text-white p-1 hover:bg-white/20 rounded-full transition">
                         <X size={20} />
                     </button>
                 </div>
-
                 <div className="p-8 flex flex-col items-center text-center">
                      <>
                         <div className="border-4 border-slate-900 p-3 rounded-xl mb-6 bg-white shadow-sm">
                             {qrToken && <QRCode value={qrToken} size={160} />}
                         </div>
-                        
                         <h2 className="text-xl font-bold text-slate-800">{selectedParticipant.full_name}</h2>
                         <p className="text-indigo-600 font-medium mb-1">{selectedParticipant.position}</p>
                         <p className="text-slate-500 text-sm">{selectedParticipant.office}</p>
-                        
                         <div className="mt-6 pt-6 border-t border-slate-100 w-full">
                             <p className="text-xs text-slate-400 font-mono mb-4">{selectedParticipant.participant_code}</p>
-                            <button 
-                                onClick={() => window.print()}
-                                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
-                            >
+                            <button onClick={() => window.print()} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors">
                                 <Printer size={18} /> Print Badge
                             </button>
                         </div>
