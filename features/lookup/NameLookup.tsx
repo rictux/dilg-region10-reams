@@ -34,7 +34,6 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
   const [searching, setSearching] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Click outside suggestions closer
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -45,7 +44,6 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch suggestions as user types
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (searchTerm.length < 2) {
@@ -55,7 +53,6 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
 
       setSearching(true);
       try {
-        // Query participants who have at least one record in attendance_logs
         const { data, error } = await supabase
           .from('participants')
           .select(`
@@ -91,12 +88,10 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
 
   const handleSelectParticipant = async (participant: ParticipantSuggestion) => {
     setSelectedParticipant(participant);
-    // Keep the search term visible during loading for context, then clear it after
     setShowSuggestions(false);
     setLoading(true);
 
     try {
-      // 1. Get IDs of events the participant actually attended (scanned into)
       const { data: logsData } = await supabase
         .from('attendance_logs')
         .select('event_id')
@@ -106,12 +101,11 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
 
       if (attendedEventIds.length === 0) {
         setAttendedEvents([]);
-        setSearchTerm(''); // Clear if no events
+        setSearchTerm(''); 
         setLoading(false);
         return;
       }
 
-      // 2. Fetch event details and roles from event_participants
       const { data: epData, error: epError } = await supabase
         .from('event_participants')
         .select(`
@@ -140,7 +134,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
           role: item.role
         }));
         setAttendedEvents(mapped);
-        setSearchTerm(''); // Clear the search bar when data is loaded
+        setSearchTerm(''); 
       }
     } catch (err) {
       console.error("Error fetching attended events", err);
@@ -161,13 +155,12 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
 
   return (
     <div className={contentClass}>
-      {/* Brand Header - Only show if public */}
       {!isInternal && (
         <div className="w-full max-w-4xl flex flex-col sm:flex-row items-center justify-between mb-12 gap-6">
             <div className="flex items-center gap-4">
             <div className="w-16 h-16 flex-shrink-0">
                 <img 
-                src="/assets/dilg_logo.png" 
+                src="https://upload.wikimedia.org/wikipedia/commons/6/6f/DILG_Seal.svg" 
                 alt="DILG Logo" 
                 className="w-full h-full object-contain" 
                 />
@@ -185,7 +178,6 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
       )}
 
       <div className={isInternal ? "w-full space-y-8" : "w-full max-w-2xl space-y-8"}>
-        {/* Search Section */}
         <div className="relative" ref={dropdownRef}>
           <div className={isInternal ? "mb-6" : "text-center mb-6"}>
             <h2 className="text-3xl font-black text-slate-800 mb-2">Participant Name Lookup</h2>
@@ -213,7 +205,6 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
             />
           </div>
 
-          {/* Suggestions Dropdown */}
           {showSuggestions && suggestions.length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="p-3 border-b border-slate-50 bg-slate-50/50">
@@ -243,7 +234,6 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
           )}
         </div>
 
-        {/* Results Section */}
         <div className="space-y-6">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 text-slate-400">
@@ -252,7 +242,6 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
             </div>
           ) : selectedParticipant ? (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {/* Profile Card Summary */}
               <div className="bg-indigo-600 rounded-3xl p-6 text-white shadow-xl shadow-indigo-200 mb-8 flex flex-col sm:flex-row items-center gap-6">
                 <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center text-3xl font-black">
                   {selectedParticipant.full_name.charAt(0)}
@@ -322,7 +311,6 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
         </div>
       </div>
 
-      {/* Footer - Only show if public */}
       {!isInternal && (
         <footer className="w-full max-w-4xl mt-auto pt-12 pb-6 text-center">
             <p className="text-xs text-slate-400 font-medium">© {new Date().getFullYear()} Department of the Interior and Local Government Region 10</p>
