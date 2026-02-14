@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Search, Calendar, MapPin, User, Clock, ChevronRight, Loader2, Landmark, History, AlertCircle, Shield } from 'lucide-react';
@@ -19,7 +20,11 @@ interface ParticipantSuggestion {
   position: string;
 }
 
-const NameLookup: React.FC = () => {
+interface NameLookupProps {
+    isInternal?: boolean;
+}
+
+const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState<ParticipantSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -150,35 +155,41 @@ const NameLookup: React.FC = () => {
     return `${format(startDate, 'MMM d')} - ${format(parseISO(end), 'MMM d, yyyy')}`;
   };
 
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center p-4 sm:p-8">
-      {/* Brand Header */}
-      <div className="w-full max-w-4xl flex flex-col sm:flex-row items-center justify-between mb-12 gap-6">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 flex-shrink-0">
-            <img 
-              src="/assets/dilg_logo.png" 
-              alt="DILG Logo" 
-              className="w-full h-full object-contain" 
-            />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 leading-tight">DILG Region 10</h1>
-            <p className="text-sm text-indigo-600 font-semibold tracking-wide uppercase">Attendance History Portal</p>
-          </div>
-        </div>
-        <div className="hidden sm:block text-right">
-           <p className="text-xs text-slate-400 font-medium uppercase tracking-widest">Public Access Service</p>
-           <p className="text-xs text-slate-500 mt-1">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
-        </div>
-      </div>
+  const contentClass = isInternal 
+    ? "w-full max-w-4xl space-y-8" 
+    : "min-h-screen bg-slate-50 flex flex-col items-center p-4 sm:p-8 w-full";
 
-      <div className="w-full max-w-2xl space-y-8">
+  return (
+    <div className={contentClass}>
+      {/* Brand Header - Only show if public */}
+      {!isInternal && (
+        <div className="w-full max-w-4xl flex flex-col sm:flex-row items-center justify-between mb-12 gap-6">
+            <div className="flex items-center gap-4">
+            <div className="w-16 h-16 flex-shrink-0">
+                <img 
+                src="/assets/dilg_logo.png" 
+                alt="DILG Logo" 
+                className="w-full h-full object-contain" 
+                />
+            </div>
+            <div>
+                <h1 className="text-xl font-bold text-slate-900 leading-tight">DILG Region 10</h1>
+                <p className="text-sm text-indigo-600 font-semibold tracking-wide uppercase">Attendance History Portal</p>
+            </div>
+            </div>
+            <div className="hidden sm:block text-right">
+            <p className="text-xs text-slate-400 font-medium uppercase tracking-widest">Public Access Service</p>
+            <p className="text-xs text-slate-500 mt-1">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+            </div>
+        </div>
+      )}
+
+      <div className={isInternal ? "w-full space-y-8" : "w-full max-w-2xl space-y-8"}>
         {/* Search Section */}
         <div className="relative" ref={dropdownRef}>
-          <div className="text-center mb-6">
+          <div className={isInternal ? "mb-6" : "text-center mb-6"}>
             <h2 className="text-3xl font-black text-slate-800 mb-2">Participant Name Lookup</h2>
-            <p className="text-slate-500">Verify your attendance history across all Regional events.</p>
+            <p className="text-slate-500">Verify attendance history across all Regional events.</p>
           </div>
           
           <div className="relative group">
@@ -187,15 +198,12 @@ const NameLookup: React.FC = () => {
             </div>
             <input 
               type="text"
-              placeholder="Enter your full name to search..."
+              placeholder="Enter full name to search..."
               className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-200 rounded-2xl text-lg font-medium shadow-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all placeholder:text-slate-300"
               value={searchTerm}
               onChange={(e) => {
                 const value = e.target.value;
                 setSearchTerm(value);
-                // Only clear the selected view if the user is typing something new 
-                // and it's not the name of the currently selected person.
-                // We ignore the clear action from handleSelectParticipant (value === '')
                 if (selectedParticipant && value !== '' && value !== selectedParticipant.full_name) {
                   setSelectedParticipant(null);
                   setAttendedEvents([]);
@@ -314,11 +322,13 @@ const NameLookup: React.FC = () => {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="w-full max-w-4xl mt-auto pt-12 pb-6 text-center">
-         <p className="text-xs text-slate-400 font-medium">© {new Date().getFullYear()} Department of the Interior and Local Government Region 10</p>
-         <p className="text-[10px] text-slate-400 mt-1">Management Information Systems Unit</p>
-      </footer>
+      {/* Footer - Only show if public */}
+      {!isInternal && (
+        <footer className="w-full max-w-4xl mt-auto pt-12 pb-6 text-center">
+            <p className="text-xs text-slate-400 font-medium">© {new Date().getFullYear()} Department of the Interior and Local Government Region 10</p>
+            <p className="text-[10px] text-slate-400 mt-1">Regional Information and Communication Technology Unit</p>
+        </footer>
+      )}
     </div>
   );
 };
