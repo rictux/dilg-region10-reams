@@ -1,6 +1,8 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate, useLocation } from 'react-router-dom';
+// Use react-router for hooks as they are natively defined there, bypassing potential re-export issues in react-router-dom
+import { useNavigate, useLocation } from 'react-router';
 import { 
   LayoutDashboard, 
   CalendarDays, 
@@ -117,7 +119,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" 
             onClick={() => setIsPasswordModalOpen(false)}
         ></div>
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 flex justify-between items-center text-white">
                 <h3 className="font-semibold flex items-center gap-2">
                     <KeyRound size={20} /> Change Password
@@ -188,7 +190,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <h1 className="text-xl font-bold text-indigo-600">Event Management Portal</h1>
           <div className="flex items-center gap-3">
              <button 
-                onClick={() => navigate('/lookup')}
+                onClick={() => navigate('/admin/lookup')}
                 className="p-2 text-slate-600 hover:text-indigo-600 transition-colors"
                 title="Name Lookup"
             >
@@ -270,8 +272,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <NavItem to="/attendance" icon={ClipboardList} label="Attendance" />
             )}
 
-            {/* Public but accessible internal tool */}
-            <NavItem to="/lookup" icon={Search} label="Name Lookup" />
+            {/* Use the internal route for internal users */}
+            <NavItem to="/admin/lookup" icon={Search} label="Name Lookup" />
 
             {hasPermission('VIEW_REPORTS') && (
                 <NavItem to="/reports" icon={FileBarChart} label="Reports" />
