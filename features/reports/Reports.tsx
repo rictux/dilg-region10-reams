@@ -4,9 +4,11 @@ import { supabase } from '../../lib/supabase';
 import { Printer, Calendar, ScrollText, Search, ChevronDown, Check, X } from 'lucide-react';
 import { Event } from '../../types/database';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Reports: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   
   // Initialize from session storage if available
@@ -22,7 +24,9 @@ const Reports: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchEvents();
+    if (user) {
+        fetchEvents();
+    }
 
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -31,7 +35,7 @@ const Reports: React.FC = () => {
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [user]);
 
   // Persist selection change
   useEffect(() => {
@@ -39,7 +43,14 @@ const Reports: React.FC = () => {
   }, [selectedEventId]);
 
   const fetchEvents = async () => {
-    const { data } = await supabase.from('events').select('*').order('start_date', { ascending: false });
+    let query = supabase.from('events').select('*').order('start_date', { ascending: false });
+
+    // Filter events by office for non-admins
+    if (user?.role !== 'Admin' && user?.office_id) {
+        query = query.eq('organize_by', user.office_id);
+    }
+
+    const { data } = await query;
     if (data) {
         setEvents(data);
     }
