@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -58,28 +59,39 @@ const AttendanceList: React.FC = () => {
   // Fetch Events
   useEffect(() => {
     const fetchAllEvents = async () => {
-        const { data } = await supabase.from('events').select('*').order('start_date', { ascending: false });
+        let query = supabase.from('events').select('*').order('start_date', { ascending: false });
+
+        // Filter events by office for non-admins
+        if (user?.role !== 'Admin' && user?.office_id) {
+            query = query.eq('organize_by', user.office_id);
+        }
+
+        const { data } = await query;
         if (data && data.length > 0) {
             setEvents(data);
             // Default select the latest event
             handleEventSelect(data[0]);
         } else {
+            setEvents([]);
             setLoading(false);
         }
     };
-    fetchAllEvents();
+    
+    if (user) {
+        fetchAllEvents();
+    }
 
     const channel = supabase
         .channel('participants_events_realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
-            fetchAllEvents();
+            if (user) fetchAllEvents();
         })
         .subscribe();
     
     return () => {
         supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user]);
 
   // Fetch Attendance when Event or Date Changes
   useEffect(() => {
