@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Event } from '../../types/database';
@@ -33,6 +34,7 @@ interface ScanLog {
 const ScanLogsPrint: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [logs, setLogs] = useState<ScanLog[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -145,6 +147,9 @@ const ScanLogsPrint: React.FC = () => {
                 tfoot {
                     display: table-footer-group;
                 }
+                .break-inside-avoid {
+                    break-inside: avoid;
+                }
             }
         `}</style>
 
@@ -218,6 +223,17 @@ const ScanLogsPrint: React.FC = () => {
                             )}
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            {/* Prepared By Section */}
+            <div className="mt-8 px-4 print:px-0 break-inside-avoid">
+                <div className="w-64">
+                    <p className="text-[10px] uppercase font-bold text-slate-500 mb-6">Prepared by:</p>
+                    <p className="font-bold text-sm text-slate-900 uppercase border-b border-slate-400 inline-block min-w-[200px] pb-1">
+                        {user?.full_name}
+                    </p>
+                    <p className="text-xs text-slate-600 mt-1">{user?.position || 'System Administrator'}</p>
                 </div>
             </div>
             
