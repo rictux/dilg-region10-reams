@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Printer, Calendar, ScrollText, Search, ChevronDown, Check, X } from 'lucide-react';
@@ -7,7 +8,12 @@ import { useNavigate } from 'react-router-dom';
 const Reports: React.FC = () => {
   const navigate = useNavigate();
   const [events, setEvents] = useState<Event[]>([]);
-  const [selectedEventId, setSelectedEventId] = useState<string>('');
+  
+  // Initialize from session storage if available
+  const [selectedEventId, setSelectedEventId] = useState<string>(() => {
+    return sessionStorage.getItem('reports_selected_event_id') || '';
+  });
+  
   const [loading, setLoading] = useState(true);
 
   // Dropdown State
@@ -27,12 +33,15 @@ const Reports: React.FC = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Persist selection change
+  useEffect(() => {
+    sessionStorage.setItem('reports_selected_event_id', selectedEventId);
+  }, [selectedEventId]);
+
   const fetchEvents = async () => {
     const { data } = await supabase.from('events').select('*').order('start_date', { ascending: false });
     if (data) {
         setEvents(data);
-        // Default to empty for manual selection
-        setSelectedEventId('');
     }
     setLoading(false);
   };
