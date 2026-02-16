@@ -238,7 +238,7 @@ const ScanLogsPrint: React.FC = () => {
             <div className="mt-8 px-4 print:px-0 break-inside-avoid flex justify-end">
                 <div className="w-64">
                     <p className="text-[10px] uppercase font-bold text-slate-500 mb-6">Prepared by:</p>
-                    <p className="text-sm text-slate-900 uppercase border-b border-slate-400 inline-block min-w-[200px] pb-1">
+                    <p className="text-xs text-slate-900 uppercase border-b border-slate-400 inline-block min-w-[200px] pb-1">
                         {user?.full_name}
                     </p>
                     <p className="text-xs text-slate-600 mt-1">{user?.position || 'System Administrator'}</p>
