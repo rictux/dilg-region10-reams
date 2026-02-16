@@ -1,11 +1,10 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Event, Office, Participant } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Building2, Home, Lock, Unlock, UserPlus, Loader2, MoreVertical, ArrowRight, Search } from 'lucide-react';
+import { Event, Participant, Office } from '../../types/database';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Home, Lock, UserPlus, Loader2, ArrowRight, Search, Building2 } from 'lucide-react';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
-// Use react-router for core library components and hooks
 import { useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -36,7 +35,7 @@ const EventsList: React.FC = () => {
       indigenous_people: string;
       needs_accommodation: boolean;
       accommodation_pax: number;
-      participant_id?: number | null; // Track ID if selected from suggestions
+      participant_id?: number | null; 
   }>({
       full_name: '',
       email: '',
@@ -77,7 +76,9 @@ const EventsList: React.FC = () => {
 
   useEffect(() => {
     fetchEvents();
-    fetchOffices();
+    if (user?.role === 'Admin') {
+        fetchOffices();
+    }
 
     const subscription = supabase
       .channel('events_list_realtime')
@@ -89,7 +90,7 @@ const EventsList: React.FC = () => {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, []);
+  }, [user]);
 
   // Realtime updates for the Participants Modal
   useEffect(() => {
@@ -120,7 +121,16 @@ const EventsList: React.FC = () => {
     // Only set loading on initial load to avoid UI flicker
     if (events.length === 0) setLoading(true);
     
-    const { data, error } = await supabase.from('events').select('*').order('start_date', { ascending: false });
+    let query = supabase.from('events').select('*').order('start_date', { ascending: false });
+
+    // Display only the event with same office_id of the login user IF NOT ADMIN
+    // If the user has an office assigned, filter events organized by that office
+    // Admin sees everything regardless of their office_id
+    if (user?.role !== 'Admin' && user?.office_id) {
+        query = query.eq('organize_by', user.office_id);
+    }
+    
+    const { data, error } = await query;
     if (!error && data) setEvents(data);
     setLoading(false);
   };
@@ -181,7 +191,11 @@ const EventsList: React.FC = () => {
 
   const openCreateModal = () => {
       setEditingEventId(null);
-      setFormData(initialFormState);
+      // Pre-select user's office if applicable, unless Admin who can choose
+      setFormData({
+          ...initialFormState,
+          organize_by: user?.role === 'Admin' ? null : (user?.office_id || null)
+      });
       setShowEventModal(true);
   };
 
@@ -204,19 +218,25 @@ const EventsList: React.FC = () => {
   const handleSaveEvent = async (e: React.FormEvent) => {
       e.preventDefault();
       
+      // If not admin, force assignment to their office (security fallback)
+      let payload = { ...formData };
+      if (user?.role !== 'Admin' && user?.office_id) {
+          payload.organize_by = user.office_id;
+      }
+
       let error;
       if (editingEventId) {
           // Update
           const { error: updateError } = await supabase
             .from('events')
-            .update(formData)
+            .update(payload)
             .eq('event_id', editingEventId);
           error = updateError;
       } else {
           // Create
           const { error: insertError } = await supabase
             .from('events')
-            .insert([formData]);
+            .insert([payload]);
           error = insertError;
       }
 
@@ -224,7 +244,6 @@ const EventsList: React.FC = () => {
           setShowEventModal(false);
           setEditingEventId(null);
           setFormData(initialFormState);
-          // fetchEvents is handled by subscription, but calling it here ensures immediate UI feedback if desired
           fetchEvents(); 
       } else {
         alert("Error saving event: " + error.message);
@@ -1082,6 +1101,33 @@ const EventsList: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Organized By - Admin Only */}
+                {user?.role === 'Admin' && (
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Organized By</label>
+                        <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Building2 className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                            </div>
+                            <select 
+                                className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
+                                value={formData.organize_by || ''}
+                                onChange={e => setFormData({...formData, organize_by: e.target.value ? Number(e.target.value) : null})}
+                            >
+                                <option value="">-- Select Office --</option>
+                                {offices.map(office => (
+                                    <option key={office.office_id} value={office.office_id}>
+                                        {office.name} ({office.code})
+                                    </option>
+                                ))}
+                            </select>
+                            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Dates Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
@@ -1108,29 +1154,6 @@ const EventsList: React.FC = () => {
                       />
                     </div>
                   </div>
-                </div>
-
-                {/* Organize By */}
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Organized By</label>
-                    <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Building2 className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                        </div>
-                        <select 
-                            className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
-                            value={formData.organize_by || ''}
-                            onChange={e => setFormData({...formData, organize_by: e.target.value ? Number(e.target.value) : null})}
-                        >
-                            <option value="">-- Select Office --</option>
-                            {offices.map(office => (
-                                <option key={office.office_id} value={office.office_id}>{office.name}</option>
-                            ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </div>
-                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
