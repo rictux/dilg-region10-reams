@@ -441,8 +441,9 @@ const EventsList: React.FC = () => {
   };
 
   const getRegistrationLink = (eventId: number) => {
-      // Constructs link based on current origin and HashRouter structure
-      return `${window.location.origin}${window.location.pathname}#/register/${eventId}`;
+      // Determine base URL, assuming the events page is at /events
+      const baseUrl = window.location.href.split('/events')[0];
+      return `${baseUrl}/register/${eventId}`;
   };
 
   const copyToClipboard = () => {
