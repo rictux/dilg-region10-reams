@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -54,7 +55,6 @@ const ScanLogsPrint: React.FC = () => {
           participants (participant_code, full_name, gender, position, office, email),
           users (full_name, email)
         `)
-        // Change: Sort strictly by scan_time ascending as requested
         .order('scan_time', { ascending: true });
 
         if (eventId) {
@@ -97,7 +97,7 @@ const ScanLogsPrint: React.FC = () => {
 
   const formatLogTime = (timeStr: string) => {
       const d = new Date(timeStr.endsWith('Z') || timeStr.includes('+') ? timeStr : timeStr + 'Z');
-      return format(d, 'MMM d, h:mm:ss a');
+      return format(d, 'MM/dd/yyyy hh:mm:ss a');
   };
 
   if (loading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin text-blue-600" /></div>;
