@@ -536,7 +536,7 @@ const EventsList: React.FC = () => {
     const activeStyle = styles[status] || styles['Completed'];
 
     return (
-      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border inline-flex items-center gap-1.5 ring-1 ring-inset ${activeStyle}`}>
+      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium border inline-flex items-center gap-1.5 ring-1 ring-inset ${activeStyle}`}>
          <span className={`w-1.5 h-1.5 rounded-full ${status === 'Ongoing' ? 'animate-pulse bg-emerald-500' : 'bg-current opacity-60'}`}></span>
          {status.toUpperCase()}
       </span>
@@ -585,11 +585,11 @@ const EventsList: React.FC = () => {
               <table className="w-full text-sm text-left">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                       <tr>
-                          <th className="px-6 py-4">Event Details</th>
-                          <th className="px-6 py-4">Venue</th>
-                          <th className="px-6 py-4">Date</th>
-                          <th className="px-6 py-4">Status</th>
-                          <th className="px-6 py-4 text-right">Actions</th>
+                          <th className="px-6 py-4 text-center">Event Details</th>
+                          <th className="px-6 py-4 text-center">Venue</th>
+                          <th className="px-6 py-4 text-center">Date</th>
+                          <th className="px-6 py-4 text-center">Status</th>
+                          <th className="px-6 py-4 text-center">Actions</th>
                       </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -598,19 +598,19 @@ const EventsList: React.FC = () => {
                           [...Array(5)].map((_, i) => (
                               <tr key={i} className="animate-pulse">
                                   <td className="px-6 py-4">
-                                      <div className="h-5 bg-slate-200 rounded w-48 mb-2"></div>
-                                      <div className="h-3 bg-slate-100 rounded w-24"></div>
+                                      <div className="h-5 bg-slate-200 rounded w-48 mb-2 mx-auto"></div>
+                                      <div className="h-3 bg-slate-100 rounded w-24 mx-auto"></div>
                                   </td>
                                   <td className="px-6 py-4">
-                                      <div className="h-4 bg-slate-200 rounded w-32"></div>
+                                      <div className="h-4 bg-slate-200 rounded w-32 mx-auto"></div>
                                   </td>
                                   <td className="px-6 py-4">
-                                      <div className="h-4 bg-slate-200 rounded w-24"></div>
+                                      <div className="h-4 bg-slate-200 rounded w-24 mx-auto"></div>
                                   </td>
                                   <td className="px-6 py-4">
-                                      <div className="h-6 bg-slate-200 rounded-full w-20"></div>
+                                      <div className="h-6 bg-slate-200 rounded-full w-20 mx-auto"></div>
                                   </td>
-                                  <td className="px-6 py-4 flex gap-2">
+                                  <td className="px-6 py-4 flex gap-2 justify-center">
                                       <div className="h-8 w-8 bg-slate-200 rounded"></div>
                                       <div className="h-8 w-8 bg-slate-200 rounded"></div>
                                       <div className="h-8 w-8 bg-slate-200 rounded"></div>
@@ -626,11 +626,11 @@ const EventsList: React.FC = () => {
                                       className="group hover:bg-indigo-50/30 transition-all duration-200 cursor-pointer hover:shadow-sm border-l-2 border-l-transparent hover:border-l-indigo-500"
                                       title="Click to view participants"
                                   >
-                                      <td className="px-6 py-4">
-                                          <div className="font-semibold text-base text-slate-800 group-hover:text-indigo-700 transition-colors">
+                                      <td className="px-6 py-4 text-center">
+                                          <div className="font-semibold text-sm text-slate-800 group-hover:text-indigo-700 transition-colors">
                                             {event.event_name}
                                           </div>
-                                          <div className="flex gap-2 mt-1.5">
+                                          <div className="flex gap-2 mt-1.5 justify-center">
                                             {event.has_accommodation && (
                                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
                                                     <Home size={10} className="mr-1" /> Accommodation
@@ -643,23 +643,23 @@ const EventsList: React.FC = () => {
                                             )}
                                           </div>
                                       </td>
-                                      <td className="px-6 py-4 text-slate-600">
-                                          <div className="flex items-center gap-1.5">
-                                            <MapPin size={14} className="text-slate-400" />
+                                      <td className="px-6 py-4 text-slate-600 text-center">
+                                          <div className="flex items-center justify-center gap-1.5 text-xs">
+                                            <MapPin size={12} className="text-slate-400" />
                                             {event.venue}
                                           </div>
                                       </td>
-                                      <td className="px-6 py-4 text-slate-600 font-medium">
-                                          <div className="flex items-center gap-1.5">
-                                            <Calendar size={14} className="text-slate-400" />
+                                      <td className="px-6 py-4 text-slate-600 font-medium text-center">
+                                          <div className="flex items-center justify-center gap-1.5 text-xs">
+                                            <Calendar size={12} className="text-slate-400" />
                                             {formatEventDate(event.start_date, event.end_date)}
                                           </div>
                                       </td>
-                                      <td className="px-6 py-4">
+                                      <td className="px-6 py-4 text-center">
                                           {getStatusBadge(event.status)}
                                       </td>
                                       <td className="px-6 py-4">
-                                          <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                                          <div className="flex items-center justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                                             <button 
                                                 onClick={(e) => openShareModal(e, event)}
                                                 className="p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors"
