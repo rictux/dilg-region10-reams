@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Participant, Event } from '../../types/database';
 import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Home, ChevronDown, Check, Filter } from 'lucide-react';
 import QRCode from 'react-qr-code';
-import { format, parseISO, eachDayOfInterval } from 'date-fns';
+import { format, parseISO, eachDayOfInterval, isSameMonth, isSameYear } from 'date-fns';
 import { toPng } from 'html-to-image';
 
 interface AttendanceRow {
@@ -337,6 +337,26 @@ const AttendanceList: React.FC = () => {
       return format(d, 'h:mm a');
   };
 
+  const formatEventDate = (start: string, end: string) => {
+    if (!start) return '';
+    const startDate = parseISO(start);
+    const endDate = end ? parseISO(end) : startDate;
+
+    if (start === end || !end) {
+        return format(startDate, 'MMM. d, yyyy');
+    }
+
+    if (isSameMonth(startDate, endDate) && isSameYear(startDate, endDate)) {
+        return `${format(startDate, 'MMM. d')}-${format(endDate, 'd, yyyy')}`;
+    }
+
+    if (!isSameMonth(startDate, endDate) && isSameYear(startDate, endDate)) {
+        return `${format(startDate, 'MMM. d')} - ${format(endDate, 'MMM. d, yyyy')}`;
+    }
+
+    return `${format(startDate, 'MMM. d, yyyy')} - ${format(endDate, 'MMM. d, yyyy')}`;
+  };
+
   const filteredEvents = events.filter(e => 
       e.event_name.toLowerCase().includes(eventSearchTerm.toLowerCase())
   );
@@ -408,7 +428,7 @@ const AttendanceList: React.FC = () => {
                                     >
                                         <div className="overflow-hidden w-full mr-2">
                                             <p className="whitespace-normal break-words leading-snug">{e.event_name}</p>
-                                            <p className="text-[10px] text-slate-400 mt-0.5">{format(parseISO(e.start_date), 'MMM d, yyyy')}</p>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">{formatEventDate(e.start_date, e.end_date)}</p>
                                         </div>
                                         {selectedEventId === e.event_id && <Check size={14} className="text-indigo-600 shrink-0" />}
                                     </div>
