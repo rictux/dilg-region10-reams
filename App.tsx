@@ -3,6 +3,7 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './features/auth/Login';
+import Signup from './features/auth/Signup';
 import Layout from './components/Layout';
 import Dashboard from './features/dashboard/Dashboard';
 import EventsList from './features/events/EventsList';
@@ -39,6 +40,7 @@ const App: React.FC = () => {
       <Router>
         <Routes>
           <Route path="/" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
           
           {/* Public Routes */}
           <Route path="/register/:eventId" element={<EventRegistration />} />
