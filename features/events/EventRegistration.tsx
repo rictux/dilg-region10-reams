@@ -519,8 +519,7 @@ const EventRegistration: React.FC = () => {
                                 <div className="relative">
                                     <Mail className="absolute left-3 top-3 text-slate-400" size={18} />
                                     <input 
-                                        required 
-                                        type="email"
+                                         type="email"
                                         className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                                         placeholder="john@company.com"
                                         value={formData.email}
@@ -533,7 +532,6 @@ const EventRegistration: React.FC = () => {
                                 <div className="relative">
                                     <Phone className="absolute left-3 top-3 text-slate-400" size={18} />
                                     <input 
-                                        required 
                                         type="tel"
                                         className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                                         placeholder="09123456789"
