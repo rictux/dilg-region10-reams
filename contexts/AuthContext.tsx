@@ -9,7 +9,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (username: string, passwordPlain: string, remember?: boolean) => Promise<void>;
-  signup: (userData: { username: string; passwordPlain: string; full_name: string; email: string; position: string }) => Promise<void>;
+  signup: (userData: { username: string; passwordPlain: string; full_name: string; email: string; position: string; office_id?: number | null }) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   changePassword: (newPw: string) => Promise<void>;
@@ -108,7 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signup = async (userData: { username: string; passwordPlain: string; full_name: string; email: string; position: string }) => {
+  const signup = async (userData: { username: string; passwordPlain: string; full_name: string; email: string; position: string; office_id?: number | null }) => {
     setLoading(true);
     try {
       // 1. Check if username exists
@@ -134,6 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         full_name: userData.full_name,
         email: userData.email,
         position: userData.position,
+        office_id: userData.office_id,
         role: 'EventManager',
         status: 'Active'
       }]);
