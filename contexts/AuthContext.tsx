@@ -136,7 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         position: userData.position,
         office_id: userData.office_id,
         role: 'EventManager',
-        status: 'Active'
+        status: 'Inactive'
       }]);
 
       if (error) throw error;
