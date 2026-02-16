@@ -1,8 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Lock, User, Eye, EyeOff, Mail, Briefcase, UserPlus } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { Office } from '../../types/database';
+import { Lock, User, Eye, EyeOff, Mail, Briefcase, UserPlus, Building2 } from 'lucide-react';
 
 const Signup: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -11,9 +13,11 @@ const Signup: React.FC = () => {
     position: '',
     username: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    office_id: ''
   });
   
+  const [offices, setOffices] = useState<Office[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,6 +26,14 @@ const Signup: React.FC = () => {
   
   const navigate = useNavigate();
   const { signup } = useAuth();
+
+  useEffect(() => {
+    const fetchOffices = async () => {
+      const { data } = await supabase.from('offices').select('*').order('name');
+      if (data) setOffices(data);
+    };
+    fetchOffices();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +57,8 @@ const Signup: React.FC = () => {
         email: formData.email,
         position: formData.position,
         username: formData.username.toLowerCase(),
-        passwordPlain: formData.password
+        passwordPlain: formData.password,
+        office_id: formData.office_id ? parseInt(formData.office_id) : null
       });
       
       setSuccess(true);
@@ -120,6 +133,29 @@ const Signup: React.FC = () => {
                 className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                 placeholder="john@example.com"
               />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Office / Agency</label>
+            <div className="relative">
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <select
+                value={formData.office_id}
+                onChange={(e) => setFormData({...formData, office_id: e.target.value})}
+                required
+                className="w-full pl-10 pr-8 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all bg-white appearance-none text-slate-600"
+              >
+                <option value="">Select Office</option>
+                {offices.map((office) => (
+                  <option key={office.office_id} value={office.office_id}>
+                    {office.name} ({office.code})
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+              </div>
             </div>
           </div>
 
