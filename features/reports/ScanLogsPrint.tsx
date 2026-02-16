@@ -120,12 +120,14 @@ const ScanLogsPrint: React.FC = () => {
                     display: none !important;
                 }
                 table {
-                    font-size: 9px;
+                    font-size: 8px; /* Slightly smaller to fit more columns */
                     width: 100%;
                 }
                 th, td {
-                    padding: 4px;
+                    padding: 3px;
                     border: 1px solid #000;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
                 thead {
                     display: table-header-group; 
@@ -137,12 +139,12 @@ const ScanLogsPrint: React.FC = () => {
         `}</style>
 
         {/* Report Content */}
-        <div className="pt-24 pb-10 px-8 print:p-0 print:m-0 bg-white min-h-screen max-w-[350mm] mx-auto">
+        <div className="pt-24 pb-10 px-4 print:p-0 print:m-0 bg-white min-h-screen w-full">
             
             {/* Header Section */}
             <div className="flex items-center justify-between mb-8 border-b-2 border-black pb-4">
                 <div className="flex items-center gap-4">
-                    <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center">
+                    <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center">
                         <img 
                             src="/assets/dilg_logo.png" 
                             alt="DILG Logo" 
@@ -152,12 +154,12 @@ const ScanLogsPrint: React.FC = () => {
                     </div>
                     <div>
                         <p className="text-[10px] font-serif font-bold text-slate-600 uppercase tracking-widest">Republic of the Philippines</p>
-                        <h1 className="text-xl font-serif font-bold text-slate-900 uppercase leading-none my-0.5">Department of the Interior and Local Government</h1>
-                        <p className="text-sm font-serif font-bold text-slate-700 uppercase tracking-wide">Region 10 - Northern Mindanao</p>
+                        <h1 className="text-lg font-serif font-bold text-slate-900 uppercase leading-none my-0.5">Department of the Interior and Local Government</h1>
+                        <p className="text-xs font-serif font-bold text-slate-700 uppercase tracking-wide">Region 10 - Northern Mindanao</p>
                     </div>
                 </div>
                 <div className="text-right">
-                    <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tight font-sans">SCAN LOGS</h2>
+                    <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight font-sans">SCAN LOGS</h2>
                     <p className="text-[10px] font-mono text-slate-500 mt-1">Generated: {format(new Date(), 'yyyy-MM-dd HH:mm:ss')}</p>
                 </div>
             </div>
@@ -189,59 +191,67 @@ const ScanLogsPrint: React.FC = () => {
                 </div>
             )}
 
-            <table className="w-full border-collapse border border-black text-[10px] leading-tight text-left">
-                <thead className="bg-slate-100 print:bg-slate-200 text-slate-900">
-                    <tr>
-                        <th className="border border-black px-2 py-1 w-8 text-center">#</th>
-                        <th className="border border-black px-2 py-1 whitespace-nowrap">Scan Time</th>
-                        <th className="border border-black px-2 py-1 w-12 text-center">Session</th>
-                        <th className="border border-black px-2 py-1">Event Name</th>
-                        <th className="border border-black px-2 py-1">Participant Name</th>
-                        <th className="border border-black px-2 py-1 w-24">Code</th>
-                        <th className="border border-black px-2 py-1">Email / Mobile</th>
-                        <th className="border border-black px-2 py-1">Scanned By</th>
-                        <th className="border border-black px-2 py-1">Remarks</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {logs.map((log, index) => (
-                        <tr key={log.attendance_id} className="hover:bg-slate-50 print:hover:bg-transparent">
-                            <td className="border border-black px-2 py-1 text-center">{index + 1}</td>
-                            <td className="border border-black px-2 py-1 whitespace-nowrap font-mono">{formatDateTime(log.scan_time)}</td>
-                            <td className="border border-black px-2 py-1 text-center font-bold">
-                                {log.action_session}
-                            </td>
-                            <td className="border border-black px-2 py-1">
-                                {log.events?.event_name || '-'}
-                            </td>
-                            <td className="border border-black px-2 py-1 font-bold">
-                                {log.participants?.full_name || '-'}
-                            </td>
-                            <td className="border border-black px-2 py-1 font-mono">
-                                {log.participants?.participant_code || '-'}
-                            </td>
-                            <td className="border border-black px-2 py-1">
-                                <div>{log.participants?.email || ''}</div>
-                                {log.participants?.mobile_no && <div className="text-[9px] text-slate-500">{log.participants.mobile_no}</div>}
-                            </td>
-                            <td className="border border-black px-2 py-1">
-                                {log.users?.full_name || 'System'}
-                                {log.users?.email && <span className="text-[8px] block text-slate-500">{log.users.email}</span>}
-                            </td>
-                            <td className="border border-black px-2 py-1 italic text-slate-600">
-                                {log.remarks || ''}
-                            </td>
-                        </tr>
-                    ))}
-                    {logs.length === 0 && (
+            <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-black text-[9px] leading-tight text-left table-fixed">
+                    <thead className="bg-slate-100 print:bg-slate-200 text-slate-900">
                         <tr>
-                            <td colSpan={9} className="border border-black px-4 py-8 text-center text-slate-400 italic">
-                                No scan records found.
-                            </td>
+                            <th className="border border-black px-2 py-1 w-8 text-center">#</th>
+                            <th className="border border-black px-2 py-1 w-28 whitespace-nowrap">Scan Time</th>
+                            <th className="border border-black px-2 py-1 w-12 text-center">Session</th>
+                            <th className="border border-black px-2 py-1 w-32">Event Name</th>
+                            <th className="border border-black px-2 py-1 w-32">Participant Name</th>
+                            <th className="border border-black px-2 py-1 w-20">Code</th>
+                            <th className="border border-black px-2 py-1 w-32">Participant Email</th>
+                            <th className="border border-black px-2 py-1 w-24">Mobile No.</th>
+                            <th className="border border-black px-2 py-1 w-28">Scanner Name</th>
+                            <th className="border border-black px-2 py-1 w-32">Scanner Email</th>
+                            <th className="border border-black px-2 py-1">Remarks</th>
                         </tr>
-                    )}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {logs.map((log, index) => (
+                            <tr key={log.attendance_id} className="hover:bg-slate-50 print:hover:bg-transparent break-inside-avoid">
+                                <td className="border border-black px-2 py-1 text-center">{index + 1}</td>
+                                <td className="border border-black px-2 py-1 whitespace-nowrap font-mono">{formatDateTime(log.scan_time)}</td>
+                                <td className="border border-black px-2 py-1 text-center font-bold">
+                                    {log.action_session}
+                                </td>
+                                <td className="border border-black px-2 py-1">
+                                    {log.events?.event_name || '-'}
+                                </td>
+                                <td className="border border-black px-2 py-1 font-bold">
+                                    {log.participants?.full_name || '-'}
+                                </td>
+                                <td className="border border-black px-2 py-1 font-mono text-center">
+                                    {log.participants?.participant_code || '-'}
+                                </td>
+                                <td className="border border-black px-2 py-1 truncate">
+                                    {log.participants?.email || ''}
+                                </td>
+                                <td className="border border-black px-2 py-1">
+                                    {log.participants?.mobile_no || ''}
+                                </td>
+                                <td className="border border-black px-2 py-1">
+                                    {log.users?.full_name || 'System'}
+                                </td>
+                                <td className="border border-black px-2 py-1 truncate">
+                                    {log.users?.email || ''}
+                                </td>
+                                <td className="border border-black px-2 py-1 italic text-slate-600">
+                                    {log.remarks || ''}
+                                </td>
+                            </tr>
+                        ))}
+                        {logs.length === 0 && (
+                            <tr>
+                                <td colSpan={11} className="border border-black px-4 py-8 text-center text-slate-400 italic">
+                                    No scan records found.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
             
             {/* Minimal Footer for Context */}
             <div className="mt-4 text-[8px] text-slate-400 flex justify-between print:flex border-t border-slate-200 pt-2">
