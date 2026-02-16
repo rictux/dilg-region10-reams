@@ -174,7 +174,7 @@ const ScanLogsPrint: React.FC = () => {
                                 <tr key={log.attendance_id} className="hover:bg-slate-50 transition-colors print:hover:bg-transparent text-slate-600 print:text-black">
                                     <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 text-center font-mono text-slate-400 print:text-black whitespace-nowrap">{index + 1}</td>
                                     <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 font-mono whitespace-nowrap">{formatDateTime(log.scan_time)}</td>
-                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 text-center font-bold whitespace-nowrap">
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 text-center whitespace-nowrap">
                                         {log.action_session}
                                     </td>
                                     <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap">
@@ -183,7 +183,7 @@ const ScanLogsPrint: React.FC = () => {
                                     <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 font-mono text-center whitespace-nowrap">
                                         {log.participants?.participant_code || '-'}
                                     </td>
-                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 font-bold whitespace-nowrap">
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap">
                                         {log.participants?.full_name || '-'}
                                     </td>
                                     <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 text-center whitespace-nowrap">
@@ -199,7 +199,10 @@ const ScanLogsPrint: React.FC = () => {
                                         {log.participants?.office || '-'}
                                     </td>
                                     <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap">
-                                        {log.users?.full_name || 'System'}
+                                        <div className="flex flex-col">
+                                            <span>{log.users?.full_name || 'System'}</span>
+                                            {log.users?.email && <span className="text-[10px] print:text-[6px] text-slate-400 print:text-black">{log.users.email}</span>}
+                                        </div>
                                     </td>
                                     <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 italic text-slate-500 print:text-black whitespace-nowrap">
                                         {log.remarks || ''}
