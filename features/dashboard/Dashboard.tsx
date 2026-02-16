@@ -1,5 +1,7 @@
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { 
     Calendar as CalendarIcon, 
     CheckCircle, 
@@ -43,6 +45,7 @@ interface DashboardEvent {
 }
 
 const Dashboard: React.FC = () => {
+  const { user } = useAuth();
   const [stats, setStats] = useState({
     totalEvents: 0,
     activeEvents: 0,
@@ -55,35 +58,45 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchDashboardData();
+    if (user) {
+        fetchDashboardData();
+    }
 
     // Realtime subscriptions
     const channel = supabase
       .channel('dashboard_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
-        fetchDashboardData();
+        if (user) fetchDashboardData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'event_participants' }, () => {
-        fetchDashboardData();
+        if (user) fetchDashboardData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_logs' }, () => {
-        fetchDashboardData();
+        if (user) fetchDashboardData();
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user]);
 
   const fetchDashboardData = async () => {
     const today = new Date().toISOString().split('T')[0];
 
     try {
         // 1. Stats
-        const { count: total } = await supabase.from('events').select('*', { count: 'exact', head: true });
-        const { count: active } = await supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'Ongoing');
-        const { count: completed } = await supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'Completed');
+        let totalQ = supabase.from('events').select('*', { count: 'exact', head: true });
+        if (user?.role !== 'Admin' && user?.office_id) totalQ = totalQ.eq('organize_by', user.office_id);
+        const { count: total } = await totalQ;
+
+        let activeQ = supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'Ongoing');
+        if (user?.role !== 'Admin' && user?.office_id) activeQ = activeQ.eq('organize_by', user.office_id);
+        const { count: active } = await activeQ;
+
+        let completedQ = supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'Completed');
+        if (user?.role !== 'Admin' && user?.office_id) completedQ = completedQ.eq('organize_by', user.office_id);
+        const { count: completed } = await completedQ;
 
         setStats({
             totalEvents: total || 0,
@@ -92,11 +105,14 @@ const Dashboard: React.FC = () => {
         });
 
         // 2. Today's Events
-        const { data: todayData } = await supabase
+        let todayQuery = supabase
             .from('events')
             .select('*')
             .lte('start_date', today)
             .gte('end_date', today);
+        
+        if (user?.role !== 'Admin' && user?.office_id) todayQuery = todayQuery.eq('organize_by', user.office_id);
+        const { data: todayData } = await todayQuery;
         
         const todaysEventsWithCounts = await Promise.all((todayData || []).map(async (e) => {
             const { count: regCount } = await supabase
@@ -122,12 +138,15 @@ const Dashboard: React.FC = () => {
         setTodaysEvents(todaysEventsWithCounts);
 
         // 3. Upcoming Events
-        const { data: upcomingData } = await supabase
+        let upcomingQuery = supabase
             .from('events')
             .select('*')
             .gt('start_date', today)
             .order('start_date', { ascending: true })
             .limit(5);
+        
+        if (user?.role !== 'Admin' && user?.office_id) upcomingQuery = upcomingQuery.eq('organize_by', user.office_id);
+        const { data: upcomingData } = await upcomingQuery;
 
         const upcomingEventsWithCounts = await Promise.all((upcomingData || []).map(async (e) => {
              const { count: regCount } = await supabase
@@ -144,11 +163,13 @@ const Dashboard: React.FC = () => {
         setUpcomingEvents(upcomingEventsWithCounts);
 
         // 4. All Events (For Calendar) - Fetch basic info
-        // We fetch events for a broad range or all to populate calendar
-        const { data: allEventsData } = await supabase
+        let calendarQuery = supabase
             .from('events')
             .select('*')
             .neq('status', 'Cancelled');
+        
+        if (user?.role !== 'Admin' && user?.office_id) calendarQuery = calendarQuery.eq('organize_by', user.office_id);
+        const { data: allEventsData } = await calendarQuery;
             
         // Map to match interface (counts aren't strictly needed for calendar dots but useful if we want to show them)
         const mappedCalendarEvents = (allEventsData || []).map(e => ({
