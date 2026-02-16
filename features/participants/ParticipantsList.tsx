@@ -3,9 +3,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Participant, Event } from '../../types/database';
-import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Home, ChevronDown, Check } from 'lucide-react';
+import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Home, ChevronDown, Check, Filter } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { format, parseISO, eachDayOfInterval } from 'date-fns';
+import { toPng } from 'html-to-image';
 
 interface AttendanceRow {
     participant: Participant;
@@ -227,7 +228,7 @@ const AttendanceList: React.FC = () => {
 
     switch (filter) {
         case 'No Logs': return !hasAM && !hasPM;
-        case 'With AM': return hasAM;
+        case 'Present': return hasAM || hasPM;
         case 'No PM': return hasAM && !hasPM;
         case 'Complete Logs': return hasAM && hasPM;
         case 'Show All':
@@ -336,19 +337,6 @@ const AttendanceList: React.FC = () => {
       return format(d, 'h:mm a');
   };
 
-  const FilterButton = ({ label }: { label: string }) => (
-      <button
-        onClick={() => setFilter(label)}
-        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all border whitespace-nowrap ${
-            filter === label 
-            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' 
-            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-        }`}
-      >
-        {label}
-      </button>
-  );
-
   const filteredEvents = events.filter(e => 
       e.event_name.toLowerCase().includes(eventSearchTerm.toLowerCase())
   );
@@ -378,7 +366,7 @@ const AttendanceList: React.FC = () => {
       </div>
 
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-        <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto items-start md:items-center">
+        <div className="flex flex-col md:flex-row gap-4 w-full items-start md:items-center">
             <div className="w-full md:w-[480px] relative" ref={dropdownRef}>
                 <div 
                     className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors shadow-sm"
@@ -460,7 +448,7 @@ const AttendanceList: React.FC = () => {
                 </div>
             )}
 
-            <div className="w-full md:w-64 relative">
+            <div className="w-full md:w-64 relative ml-auto">
                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                      <Search size={18} />
                  </div>
@@ -473,58 +461,89 @@ const AttendanceList: React.FC = () => {
                  />
             </div>
         </div>
-
-        <div className="w-full xl:w-auto overflow-x-auto no-scrollbar">
-            <div className="flex gap-2">
-                <FilterButton label="Show All" />
-                <FilterButton label="No Logs" />
-                <FilterButton label="With AM" />
-                <FilterButton label="No PM" />
-                <FilterButton label="Complete Logs" />
-            </div>
-        </div>
       </div>
 
+      {/* Stats Cards as Filters */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
-              <div className="flex justify-between items-start mb-2">
+          <button 
+            onClick={() => setFilter('Show All')}
+            className={`p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+                ${filter === 'Show All' ? 'ring-2 ring-slate-400 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-slate-300'}
+                bg-white
+            `}
+          >
+              <div className="flex justify-between items-start mb-2 w-full">
                   <p className="text-xs font-semibold text-slate-500 uppercase">Total</p>
-                  <div className="p-1.5 bg-slate-100 rounded-lg text-slate-600"><Users size={16} /></div>
+                  <div className={`p-1.5 rounded-lg ${filter === 'Show All' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-600'}`}>
+                    <Users size={16} />
+                  </div>
               </div>
               <p className="text-2xl font-bold text-slate-800">{totalParticipants}</p>
-          </div>
+          </button>
 
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
-              <div className="flex justify-between items-start mb-2">
+          <button 
+            onClick={() => setFilter('Present')}
+            className={`p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+                ${filter === 'Present' ? 'ring-2 ring-green-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-green-200'}
+                bg-white
+            `}
+          >
+              <div className="flex justify-between items-start mb-2 w-full">
                   <p className="text-xs font-semibold text-slate-500 uppercase">Present</p>
-                  <div className="p-1.5 bg-green-100 rounded-lg text-green-600"><UserCheck size={16} /></div>
+                  <div className={`p-1.5 rounded-lg ${filter === 'Present' ? 'bg-green-200 text-green-700' : 'bg-green-100 text-green-600'}`}>
+                    <UserCheck size={16} />
+                  </div>
               </div>
               <p className="text-2xl font-bold text-green-600">{presentCount}</p>
-          </div>
+          </button>
 
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
-              <div className="flex justify-between items-start mb-2">
+          <button 
+            onClick={() => setFilter('No Logs')}
+            className={`p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+                ${filter === 'No Logs' ? 'ring-2 ring-red-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-red-200'}
+                bg-white
+            `}
+          >
+              <div className="flex justify-between items-start mb-2 w-full">
                   <p className="text-xs font-semibold text-slate-500 uppercase">Not Present</p>
-                  <div className="p-1.5 bg-red-100 rounded-lg text-red-600"><UserX size={16} /></div>
+                  <div className={`p-1.5 rounded-lg ${filter === 'No Logs' ? 'bg-red-200 text-red-700' : 'bg-red-100 text-red-600'}`}>
+                    <UserX size={16} />
+                  </div>
               </div>
               <p className="text-2xl font-bold text-red-600">{notPresentCount}</p>
-          </div>
+          </button>
 
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
-              <div className="flex justify-between items-start mb-2">
+          <button 
+            onClick={() => setFilter('No PM')}
+            className={`p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+                ${filter === 'No PM' ? 'ring-2 ring-amber-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-amber-200'}
+                bg-white
+            `}
+          >
+              <div className="flex justify-between items-start mb-2 w-full">
                   <p className="text-xs font-semibold text-slate-500 uppercase">No PM</p>
-                  <div className="p-1.5 bg-amber-100 rounded-lg text-amber-600"><AlertCircle size={16} /></div>
+                  <div className={`p-1.5 rounded-lg ${filter === 'No PM' ? 'bg-amber-200 text-amber-700' : 'bg-amber-100 text-amber-600'}`}>
+                    <AlertCircle size={16} />
+                  </div>
               </div>
               <p className="text-2xl font-bold text-amber-600">{noPmCount}</p>
-          </div>
+          </button>
 
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between col-span-2 sm:col-span-1">
-              <div className="flex justify-between items-start mb-2">
+          <button 
+            onClick={() => setFilter('Complete Logs')}
+            className={`p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200 col-span-2 sm:col-span-1
+                ${filter === 'Complete Logs' ? 'ring-2 ring-indigo-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-indigo-200'}
+                bg-white
+            `}
+          >
+              <div className="flex justify-between items-start mb-2 w-full">
                   <p className="text-xs font-semibold text-slate-500 uppercase">Complete</p>
-                  <div className="p-1.5 bg-indigo-100 rounded-lg text-indigo-600"><CheckCircle size={16} /></div>
+                  <div className={`p-1.5 rounded-lg ${filter === 'Complete Logs' ? 'bg-indigo-200 text-indigo-700' : 'bg-indigo-100 text-indigo-600'}`}>
+                    <CheckCircle size={16} />
+                  </div>
               </div>
               <p className="text-2xl font-bold text-indigo-600">{completeLogsCount}</p>
-          </div>
+          </button>
       </div>
 
       {loading && data.length === 0 ? (
@@ -533,6 +552,20 @@ const AttendanceList: React.FC = () => {
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            {/* Active Filter Indicator in Table Header */}
+            {filter !== 'Show All' && (
+                <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2 text-sm text-slate-600">
+                    <Filter size={14} />
+                    <span>Filtering by: <span className="font-bold text-slate-800">{filter}</span></span>
+                    <button 
+                        onClick={() => setFilter('Show All')}
+                        className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                    >
+                        Clear Filter
+                    </button>
+                </div>
+            )}
+            
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                     <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
