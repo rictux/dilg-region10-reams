@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event, Participant, Office } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Home, Lock, UserPlus, Loader2, ArrowRight, Search, Building2 } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Home, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle } from 'lucide-react';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import { useNavigate } from 'react-router';
@@ -60,6 +60,9 @@ const EventsList: React.FC = () => {
   const [viewingParticipants, setViewingParticipants] = useState<any[]>([]);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [copied, setCopied] = useState(false);
+  
+  // Role Editing State
+  const [editingRole, setEditingRole] = useState<{ participantId: number; role: string } | null>(null);
   
   // Form State
   const initialFormState = {
@@ -298,6 +301,25 @@ const EventsList: React.FC = () => {
           fetchEventParticipants(selectedEvent.event_id);
       } catch (err: any) {
           alert("Error removing participant: " + err.message);
+      }
+  };
+
+  const handleUpdateRole = async () => {
+      if (!editingRole || !selectedEvent) return;
+      
+      try {
+          const { error } = await supabase
+              .from('event_participants')
+              .update({ role: editingRole.role })
+              .eq('event_id', selectedEvent.event_id)
+              .eq('participant_id', editingRole.participantId);
+
+          if (error) throw error;
+          
+          setEditingRole(null);
+          fetchEventParticipants(selectedEvent.event_id);
+      } catch (err: any) {
+          alert("Error updating role: " + err.message);
       }
   };
 
@@ -790,7 +812,9 @@ const EventsList: React.FC = () => {
                                                 Event Officials & Guests ({specialParticipants.length})
                                             </td>
                                         </tr>
-                                        {specialParticipants.map((record, index) => (
+                                        {specialParticipants.map((record, index) => {
+                                            const isEditing = editingRole?.participantId === record.participants.participant_id;
+                                            return (
                                             <tr key={record.id} className="hover:bg-slate-50">
                                                 <td className="px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
                                                 <td className="px-6 py-3">
@@ -798,7 +822,49 @@ const EventsList: React.FC = () => {
                                                     <div className="text-xs text-slate-500">{record.participants?.email}</div>
                                                 </td>
                                                 <td className="px-6 py-3 text-slate-600">
-                                                    <span className="font-medium text-indigo-600">{record.role}</span>
+                                                    {isEditing ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <select
+                                                                className="text-xs border border-slate-300 rounded p-1 bg-white focus:outline-none focus:border-indigo-500"
+                                                                value={editingRole.role}
+                                                                onChange={(e) => setEditingRole({ ...editingRole, role: e.target.value })}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <option value="Delegate">Delegate</option>
+                                                                <option value="Speaker">Speaker</option>
+                                                                <option value="Secretariat">Secretariat</option>
+                                                                <option value="Guest">Guest</option>
+                                                                <option value="VIP">VIP</option>
+                                                            </select>
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); handleUpdateRole(); }} 
+                                                                className="text-green-600 hover:text-green-800 p-1 hover:bg-green-50 rounded"
+                                                                title="Save Role"
+                                                            >
+                                                                <Save size={16}/>
+                                                            </button>
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); setEditingRole(null); }} 
+                                                                className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
+                                                                title="Cancel Edit"
+                                                            >
+                                                                <XCircle size={16}/>
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2 group/role">
+                                                            <span className="font-medium text-indigo-600">{record.role}</span>
+                                                            {hasPermission('MANAGE_PARTICIPANTS') && (
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participants.participant_id, role: record.role }); }}
+                                                                    className="opacity-0 group-hover/role:opacity-100 text-slate-400 hover:text-indigo-600 transition-opacity p-1"
+                                                                    title="Edit Role"
+                                                                >
+                                                                    <Edit size={12} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     {record.needs_accommodation && (
                                                         <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded flex items-center w-fit gap-1 mt-0.5">
                                                             <Home size={8} /> Stay
@@ -825,7 +891,8 @@ const EventsList: React.FC = () => {
                                                     </td>
                                                 )}
                                             </tr>
-                                        ))}
+                                        );
+                                        })}
                                     </>
                                 )}
 
@@ -836,7 +903,9 @@ const EventsList: React.FC = () => {
                                                 Delegates ({delegateParticipants.length})
                                             </td>
                                         </tr>
-                                        {delegateParticipants.map((record, index) => (
+                                        {delegateParticipants.map((record, index) => {
+                                            const isEditing = editingRole?.participantId === record.participants.participant_id;
+                                            return (
                                             <tr key={record.id} className="hover:bg-slate-50">
                                                 <td className="px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
                                                 <td className="px-6 py-3">
@@ -844,7 +913,49 @@ const EventsList: React.FC = () => {
                                                     <div className="text-xs text-slate-500">{record.participants?.email}</div>
                                                 </td>
                                                 <td className="px-6 py-3 text-slate-600">
-                                                    {record.role}
+                                                    {isEditing ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <select
+                                                                className="text-xs border border-slate-300 rounded p-1 bg-white focus:outline-none focus:border-indigo-500"
+                                                                value={editingRole.role}
+                                                                onChange={(e) => setEditingRole({ ...editingRole, role: e.target.value })}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <option value="Delegate">Delegate</option>
+                                                                <option value="Speaker">Speaker</option>
+                                                                <option value="Secretariat">Secretariat</option>
+                                                                <option value="Guest">Guest</option>
+                                                                <option value="VIP">VIP</option>
+                                                            </select>
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); handleUpdateRole(); }} 
+                                                                className="text-green-600 hover:text-green-800 p-1 hover:bg-green-50 rounded"
+                                                                title="Save Role"
+                                                            >
+                                                                <Save size={16}/>
+                                                            </button>
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); setEditingRole(null); }} 
+                                                                className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
+                                                                title="Cancel Edit"
+                                                            >
+                                                                <XCircle size={16}/>
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2 group/role">
+                                                            {record.role}
+                                                            {hasPermission('MANAGE_PARTICIPANTS') && (
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participants.participant_id, role: record.role }); }}
+                                                                    className="opacity-0 group-hover/role:opacity-100 text-slate-400 hover:text-indigo-600 transition-opacity p-1"
+                                                                    title="Edit Role"
+                                                                >
+                                                                    <Edit size={12} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     {record.needs_accommodation && (
                                                         <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded flex items-center w-fit gap-1 mt-0.5">
                                                             <Home size={8} /> Stay
@@ -871,7 +982,8 @@ const EventsList: React.FC = () => {
                                                     </td>
                                                 )}
                                             </tr>
-                                        ))}
+                                            );
+                                        })}
                                     </>
                                 )}
 
