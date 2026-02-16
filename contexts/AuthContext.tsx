@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { User } from '../types/database';
@@ -8,6 +9,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (username: string, passwordPlain: string, remember?: boolean) => Promise<void>;
+  signup: (userData: { username: string; passwordPlain: string; full_name: string; email: string; position: string }) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   changePassword: (newPw: string) => Promise<void>;
@@ -106,6 +108,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const signup = async (userData: { username: string; passwordPlain: string; full_name: string; email: string; position: string }) => {
+    setLoading(true);
+    try {
+      // 1. Check if username exists
+      const { data: existing } = await supabase
+        .from('users')
+        .select('user_id')
+        .eq('username', userData.username)
+        .single();
+
+      if (existing) {
+        throw new Error('Username already taken');
+      }
+
+      // 2. Hash password
+      const salt = await bcrypt.genSalt(10);
+      const hash = await bcrypt.hash(userData.passwordPlain, salt);
+
+      // 3. Insert user
+      // Default role is EventManager as per requirement
+      const { error } = await supabase.from('users').insert([{
+        username: userData.username,
+        password_hash: hash,
+        full_name: userData.full_name,
+        email: userData.email,
+        position: userData.position,
+        role: 'EventManager',
+        status: 'Active'
+      }]);
+
+      if (error) throw error;
+
+    } catch (error: any) {
+      setLoading(false);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const changePassword = async (newPw: string) => {
     if (!user) throw new Error("No user logged in");
     
@@ -145,7 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signOut, refreshProfile, changePassword, hasPermission }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, signOut, refreshProfile, changePassword, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );
