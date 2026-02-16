@@ -2,9 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
+import { ArrowLeft, Printer, Loader2, Download } from 'lucide-react';
 import { format } from 'date-fns';
-import { Event } from '../../types/database';
 
 interface ScanLog {
     attendance_id: number;
@@ -32,7 +31,6 @@ const ScanLogsPrint: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const [logs, setLogs] = useState<ScanLog[]>([]);
-  const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,15 +39,6 @@ const ScanLogsPrint: React.FC = () => {
 
   const fetchLogs = async () => {
     try {
-        if (eventId) {
-            const { data: eventData } = await supabase
-                .from('events')
-                .select('*')
-                .eq('event_id', parseInt(eventId))
-                .single();
-            setEvent(eventData);
-        }
-
         // Constructing Supabase query to match the requested SQL structure
         let query = supabase
         .from('attendance_logs')
@@ -88,7 +77,7 @@ const ScanLogsPrint: React.FC = () => {
   if (loading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin text-blue-600" /></div>;
 
   return (
-    <div className="min-h-screen bg-white font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50 font-sans">
         {/* Navigation / Controls (Hidden on Print) */}
         <div className="fixed top-0 left-0 right-0 bg-white border-b border-slate-200 p-4 shadow-sm z-50 flex justify-between items-center no-print">
             <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium">
@@ -137,58 +126,7 @@ const ScanLogsPrint: React.FC = () => {
         `}</style>
 
         {/* Report Content */}
-        <div className="pt-24 pb-10 px-8 print:p-0 print:m-0 bg-white min-h-screen max-w-[350mm] mx-auto">
-            
-            {/* Header Section */}
-            <div className="flex items-center justify-between mb-8 border-b-2 border-black pb-4">
-                <div className="flex items-center gap-4">
-                    <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center">
-                        <img 
-                            src="/assets/dilg_logo.png" 
-                            alt="DILG Logo" 
-                            className="w-full h-full object-contain" 
-                            onError={(e) => { (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/6/6f/DILG_Seal.svg'; }} 
-                        />
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-serif font-bold text-slate-600 uppercase tracking-widest">Republic of the Philippines</p>
-                        <h1 className="text-xl font-serif font-bold text-slate-900 uppercase leading-none my-0.5">Department of the Interior and Local Government</h1>
-                        <p className="text-sm font-serif font-bold text-slate-700 uppercase tracking-wide">Region 10 - Northern Mindanao</p>
-                    </div>
-                </div>
-                <div className="text-right">
-                    <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tight font-sans">SCAN LOGS</h2>
-                    <p className="text-[10px] font-mono text-slate-500 mt-1">Generated: {format(new Date(), 'yyyy-MM-dd HH:mm:ss')}</p>
-                </div>
-            </div>
-
-            {/* Event Metadata (If Filtered) */}
-            {event && (
-                <div className="mb-6 border border-slate-300 bg-slate-50 p-4 rounded-lg print:border-black print:bg-transparent">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                        <div>
-                            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Event Name</p>
-                            <p className="text-sm font-bold text-slate-900 leading-tight">{event.event_name}</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Venue</p>
-                            <p className="text-sm font-medium text-slate-900 leading-tight">{event.venue}</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Date</p>
-                            <p className="text-sm font-medium text-slate-900">
-                                {format(new Date(event.start_date), 'MMM d, yyyy')}
-                                {event.end_date && event.end_date !== event.start_date ? ` - ${format(new Date(event.end_date), 'MMM d, yyyy')}` : ''}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Total Records</p>
-                            <p className="text-sm font-bold text-slate-900">{logs.length}</p>
-                        </div>
-                    </div>
-                </div>
-            )}
-
+        <div className="pt-20 pb-10 px-4 print:p-0 print:m-0 bg-white min-h-screen">
             <table className="w-full border-collapse border border-black text-[10px] leading-tight text-left">
                 <thead className="bg-slate-100 print:bg-slate-200 text-slate-900">
                     <tr>
@@ -244,9 +182,9 @@ const ScanLogsPrint: React.FC = () => {
             </table>
             
             {/* Minimal Footer for Context */}
-            <div className="mt-4 text-[8px] text-slate-400 flex justify-between print:flex border-t border-slate-200 pt-2">
-                <span>System Generated Report • Event Management Portal</span>
-                <span>Page 1 of 1</span>
+            <div className="mt-2 text-[8px] text-slate-400 flex justify-between print:flex">
+                <span>Generated via Event Management Portal</span>
+                <span>{format(new Date(), 'MMMM d, yyyy h:mm a')}</span>
             </div>
         </div>
     </div>
