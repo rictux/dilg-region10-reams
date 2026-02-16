@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event, Participant, Office } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Home, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Home, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle } from 'lucide-react';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import { useNavigate } from 'react-router';
@@ -63,6 +63,10 @@ const EventsList: React.FC = () => {
   
   // Role Editing State
   const [editingRole, setEditingRole] = useState<{ participantId: number; role: string } | null>(null);
+
+  // Delete Confirmation State
+  const [participantToDelete, setParticipantToDelete] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Form State
   const initialFormState = {
@@ -278,29 +282,34 @@ const EventsList: React.FC = () => {
       // fetchEventParticipants is called in useEffect when modal opens
   };
 
-  const handleRemoveParticipant = async (participantId: number) => {
-      if (!selectedEvent) return;
-      
-      if (!confirm("Are you sure you want to remove this participant from the event? This will also remove their attendance records for this event if any exist.")) return;
+  const initiateRemoveParticipant = (participantId: number) => {
+      setParticipantToDelete(participantId);
+  };
 
+  const confirmRemoveParticipant = async () => {
+      if (!selectedEvent || !participantToDelete) return;
+      
+      setIsDeleting(true);
       try {
           // Attempt to delete. DB constraints might prevent this if attendance logs exist and cascade isn't set.
           // Ideally, we would delete attendance logs first or handle the error.
-          // Let's try deleting logs first just in case to be safe, though this is a destructive action.
-          await supabase.from('attendance_logs').delete().eq('event_id', selectedEvent.event_id).eq('participant_id', participantId);
+          await supabase.from('attendance_logs').delete().eq('event_id', selectedEvent.event_id).eq('participant_id', participantToDelete);
 
           const { error } = await supabase
             .from('event_participants')
             .delete()
             .eq('event_id', selectedEvent.event_id)
-            .eq('participant_id', participantId);
+            .eq('participant_id', participantToDelete);
 
           if (error) throw error;
           
           // Refresh happens via realtime subscription or we can force it
           fetchEventParticipants(selectedEvent.event_id);
+          setParticipantToDelete(null); // Close modal
       } catch (err: any) {
           alert("Error removing participant: " + err.message);
+      } finally {
+          setIsDeleting(false);
       }
   };
 
@@ -317,7 +326,7 @@ const EventsList: React.FC = () => {
           if (error) throw error;
           
           setEditingRole(null);
-          fetchEventParticipants(selectedEvent.event_id);
+          // fetchEventParticipants triggered by subscription
       } catch (err: any) {
           alert("Error updating role: " + err.message);
       }
@@ -882,7 +891,7 @@ const EventsList: React.FC = () => {
                                                 {hasPermission('MANAGE_PARTICIPANTS') && (
                                                     <td className="px-6 py-3 text-right">
                                                         <button 
-                                                            onClick={() => handleRemoveParticipant(record.participants.participant_id)}
+                                                            onClick={() => initiateRemoveParticipant(record.participants.participant_id)}
                                                             className="text-slate-400 hover:text-red-600 transition-colors p-1"
                                                             title="Remove Participant"
                                                         >
@@ -973,7 +982,7 @@ const EventsList: React.FC = () => {
                                                 {hasPermission('MANAGE_PARTICIPANTS') && (
                                                     <td className="px-6 py-3 text-right">
                                                         <button 
-                                                            onClick={() => handleRemoveParticipant(record.participants.participant_id)}
+                                                            onClick={() => initiateRemoveParticipant(record.participants.participant_id)}
                                                             className="text-slate-400 hover:text-red-600 transition-colors p-1"
                                                             title="Remove Participant"
                                                         >
@@ -1015,6 +1024,39 @@ const EventsList: React.FC = () => {
                             <span className="text-lg font-bold text-purple-700">{accommodationCount}</span>
                             <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">Pax Requested</span>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {participantToDelete && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setParticipantToDelete(null)}></div>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 relative z-20 animate-in zoom-in-95 duration-200">
+                <div className="flex flex-col items-center text-center">
+                    <div className="bg-red-100 p-3 rounded-full mb-4">
+                        <AlertTriangle className="text-red-600" size={32} />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-800 mb-2">Remove Participant?</h3>
+                    <p className="text-sm text-slate-500 mb-6">
+                        Are you sure you want to remove this participant from the event? This action cannot be undone and will delete all attendance records associated with this event.
+                    </p>
+                    <div className="flex gap-3 w-full">
+                        <button 
+                            onClick={() => setParticipantToDelete(null)}
+                            className="flex-1 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={confirmRemoveParticipant}
+                            disabled={isDeleting}
+                            className="flex-1 px-4 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                            {isDeleting ? <Loader2 className="animate-spin" size={18} /> : 'Delete'}
+                        </button>
                     </div>
                 </div>
             </div>
