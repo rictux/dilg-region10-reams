@@ -6,12 +6,7 @@ import { Event, Participant, RefLocation } from '../../types/database';
 import QRCode from 'react-qr-code';
 import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock, Landmark, Download, Info } from 'lucide-react';
 import { format } from 'date-fns';
-
-declare global {
-  interface Window {
-    html2canvas: any;
-  }
-}
+import { toPng } from 'html-to-image';
 
 const EventRegistration: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -306,73 +301,19 @@ const EventRegistration: React.FC = () => {
   };
 
   const handleDownload = async () => {
-    if (!ticketRef.current || !window.html2canvas) {
-        if (!window.html2canvas) alert("Image generator not ready. Please check internet connection.");
-        return;
-    }
+    if (!ticketRef.current) return;
     setIsDownloading(true);
-
-    // FIX: Convert SVG to Image before capturing because html2canvas sometimes fails with inline SVGs
-    const svg = ticketRef.current.querySelector('svg');
-    const parent = svg?.parentElement;
-    let tempImg: HTMLImageElement | null = null;
-    let originalDisplay = '';
-
-    if (svg && parent) {
-        try {
-            const svgData = new XMLSerializer().serializeToString(svg);
-            const img = new Image();
-            
-            // Promise to ensure image is loaded
-            await new Promise<void>((resolve, reject) => {
-                img.onload = () => resolve();
-                img.onerror = () => reject();
-                // Safe encoding for UTF-8 characters in SVG
-                img.src = 'data:image/svg+xml;base64,' + window.btoa(unescape(encodeURIComponent(svgData)));
-            });
-
-            tempImg = img;
-            
-            // Copy relevant styles and ensure dimensions
-            img.style.width = '180px'; 
-            img.style.height = '180px';
-            img.style.display = 'block'; 
-
-            // Hide original SVG and insert Image
-            originalDisplay = svg.style.display;
-            svg.style.display = 'none';
-            parent.appendChild(img);
-        } catch (e) {
-            console.warn("SVG conversion failed, attempting fallback capture", e);
-            // If conversion fails, we proceed with the original SVG and hope html2canvas handles it
-        }
-    }
-
     try {
-        // Small delay to ensure render cycle is complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        const canvas = await window.html2canvas(ticketRef.current, {
-            backgroundColor: '#ffffff',
-            scale: 2, // Higher resolution
-            useCORS: true,
-            logging: false
-        });
-        const dataUrl = canvas.toDataURL('image/png');
+        const dataUrl = await toPng(ticketRef.current, { cacheBust: true, backgroundColor: '#ffffff' });
         
         const link = document.createElement('a');
-        link.href = dataUrl;
         link.download = `${event?.event_name.substring(0, 20).replace(/\s+/g, '_')}_${formData.full_name.replace(/\s+/g, '_')}_Pass.png`;
+        link.href = dataUrl;
         link.click();
     } catch (err) {
         console.error("Failed to save image", err);
         alert("Failed to save image. Please screenshot instead.");
     } finally {
-        // Restore DOM state
-        if (svg && parent && tempImg) {
-            parent.removeChild(tempImg);
-            svg.style.display = originalDisplay;
-        }
         setIsDownloading(false);
     }
   };
