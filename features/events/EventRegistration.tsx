@@ -163,6 +163,7 @@ const EventRegistration: React.FC = () => {
     let finalLocationId = null;
     let finalOfficeName = formData.office;
 
+    // ... (Your existing Location/Office Logic remains exactly the same here) ...
     if (affiliationType === 'LGU') {
         if (!selectedProvince) {
             setError("Please select a Province/HUC for LGU.");
@@ -170,7 +171,6 @@ const EventRegistration: React.FC = () => {
         }
         
         if (selectedCity) {
-            // City Selected
             const loc = locations.find(l => l.province_huc === selectedProvince && l.city_mun === selectedCity);
             if (loc) {
                 finalLocationId = loc.location_id;
@@ -180,19 +180,13 @@ const EventRegistration: React.FC = () => {
                 return;
             }
         } else {
-            // Province/HUC Level Selected (No City)
-            // Try to find location ID for the province itself (where city_mun is null)
             const loc = locations.find(l => l.province_huc === selectedProvince && !l.city_mun);
             if (loc) {
                 finalLocationId = loc.location_id;
             }
-            
-            // Construct Name
             if (selectedProvince.toLowerCase().includes('city')) {
-                 // Likely an HUC (e.g. Cagayan de Oro City)
                  finalOfficeName = `LGU ${selectedProvince}`;
             } else {
-                 // Likely a Province
                  finalOfficeName = `Provincial Gov't of ${selectedProvince}`;
             }
         }
@@ -202,6 +196,13 @@ const EventRegistration: React.FC = () => {
             return;
         }
     }
+
+    // ---------------------------------------------------------
+    //  STEP 1: SANITIZE DATA (Empty String -> NULL)
+    // ---------------------------------------------------------
+    // If the trimmed string is empty, set it to null. Otherwise, use the trimmed value.
+    const finalEmail = formData.email.trim() === '' ? null : formData.email.trim();
+    const finalMobile = formData.mobile_no.trim() === '' ? null : formData.mobile_no.trim();
 
     setSubmitting(true);
     setError(null);
@@ -217,25 +218,34 @@ const EventRegistration: React.FC = () => {
         let participantId: number;
         let finalParticipantCode: string = '';
 
-        // Try finding by email first
-        const { data: existingUser } = await supabase
-            .from('participants')
-            .select('participant_id, participant_code')
-            .eq('email', formData.email)
-            .single();
+        // NOTE: If searching by email, ensure we don't search for NULL or empty string
+        // If email is provided, search by it.
+        let existingUser = null;
+        
+        if (finalEmail) {
+             const { data } = await supabase
+                .from('participants')
+                .select('participant_id, participant_code')
+                .eq('email', finalEmail)
+                .single();
+             existingUser = data;
+        }
 
         if (existingUser) {
             participantId = existingUser.participant_id;
             finalParticipantCode = existingUser.participant_code;
             
             // Update existing participant details
+            // ---------------------------------------------------------
+            // STEP 2: USE SANITIZED VARIABLES IN UPDATE
+            // ---------------------------------------------------------
             await supabase.from('participants').update({
                 full_name: formData.full_name,
                 gender: formData.gender,
                 position: formData.position,
                 office: finalOfficeName,
                 location_id: finalLocationId,
-                mobile_no: formData.mobile_no,
+                mobile_no: finalMobile, // <--- Used here
                 age_group: formData.age_group,
                 pwd: formData.pwd,
                 indigenous_people: formData.indigenous_people
@@ -245,17 +255,20 @@ const EventRegistration: React.FC = () => {
             const initials = formData.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 3);
             const code = `${initials}-${Date.now().toString().slice(-6)}`;
 
+            // ---------------------------------------------------------
+            // STEP 3: USE SANITIZED VARIABLES IN INSERT
+            // ---------------------------------------------------------
             const { data: newUser, error: createError } = await supabase
                 .from('participants')
                 .insert([{
                     full_name: formData.full_name,
-                    email: formData.email,
+                    email: finalEmail,       // <--- Used here
+                    mobile_no: finalMobile,  // <--- Used here
                     gender: formData.gender,
                     position: formData.position,
                     office: finalOfficeName,
                     location_id: finalLocationId,
                     participant_code: code,
-                    mobile_no: formData.mobile_no,
                     age_group: formData.age_group,
                     pwd: formData.pwd,
                     indigenous_people: formData.indigenous_people
@@ -275,21 +288,19 @@ const EventRegistration: React.FC = () => {
                 event_id: id,
                 participant_id: participantId,
                 registration_status: 'Registered',
-                role: 'Delegate', // Forced Delegate role for public registration
+                role: 'Delegate',
                 needs_accommodation: formData.needs_accommodation,
                 accommodation_pax: formData.needs_accommodation ? formData.accommodation_pax : 0
             });
 
         if (regError) {
             if (regError.code === '23505') {
-                // Unique violation: Already Registered
                 setAlreadyRegistered(true);
             } else {
                 throw regError;
             }
         }
 
-        // 3. Set QR Token (Use Participant Code) and Show Success
         setQrToken(finalParticipantCode);
         setSuccess(true);
 
