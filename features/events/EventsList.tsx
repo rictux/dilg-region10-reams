@@ -944,7 +944,7 @@ const EventsList: React.FC = () => {
                                                         </div>
                                                     ) : (
                                                         <div className="flex items-center gap-2 group/role">
-                                                            {record.role}
+                                                            <span className="font-medium text-indigo-600">{record.role}</span>
                                                             {hasPermission('MANAGE_PARTICIPANTS') && (
                                                                 <button 
                                                                     onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participants.participant_id, role: record.role }); }}
