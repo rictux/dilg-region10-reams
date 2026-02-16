@@ -34,7 +34,6 @@ const ScanLogsPrint: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const [logs, setLogs] = useState<ScanLog[]>([]);
-  const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,15 +42,6 @@ const ScanLogsPrint: React.FC = () => {
 
   const fetchLogs = async () => {
     try {
-        if (eventId) {
-            const { data: eventData } = await supabase
-                .from('events')
-                .select('*')
-                .eq('event_id', parseInt(eventId))
-                .single();
-            setEvent(eventData);
-        }
-
         // Constructing Supabase query to match the requested SQL structure
         let query = supabase
         .from('attendance_logs')
@@ -90,7 +80,7 @@ const ScanLogsPrint: React.FC = () => {
   if (loading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin text-blue-600" /></div>;
 
   return (
-    <div className="min-h-screen bg-white font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 print:bg-white">
         {/* Navigation / Controls (Hidden on Print) */}
         <div className="fixed top-0 left-0 right-0 bg-white border-b border-slate-200 p-4 shadow-sm z-50 flex justify-between items-center no-print">
             <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium">
@@ -121,22 +111,33 @@ const ScanLogsPrint: React.FC = () => {
                 .no-print {
                     display: none !important;
                 }
+                .print-container {
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    width: 100% !important;
+                    max-width: none !important;
+                }
                 table {
-                    font-size: 8px;
+                    font-size: 7px; /* Decrease text to fit in paper */
                     width: 100%;
                     border-collapse: collapse;
                 }
                 th {
-                    padding: 3px;
+                    padding: 2px 4px;
                     border: 1px solid #000;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
+                    white-space: nowrap; /* Don't wrap */
+                    background-color: #f1f5f9 !important;
+                    font-weight: bold;
+                    text-transform: uppercase;
                 }
                 td {
-                    padding: 3px;
-                    border: none;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
+                    padding: 2px 4px;
+                    border: none; /* Keep previous style preference */
+                    white-space: nowrap; /* Don't wrap */
+                }
+                /* Add faint row lines for readability in dense print */
+                tr {
+                    border-bottom: 0.5px solid #e5e5e5;
                 }
                 thead {
                     display: table-header-group; 
@@ -148,125 +149,79 @@ const ScanLogsPrint: React.FC = () => {
         `}</style>
 
         {/* Report Content */}
-        <div className="pt-24 pb-10 px-4 print:p-0 print:m-0 bg-white min-h-screen w-full">
+        <div className="pt-24 pb-10 px-4 md:px-8 print:p-0 print:m-0 min-h-screen w-full print-container">
             
-            {/* Header Section */}
-            <div className="flex items-center justify-between mb-8 border-b-2 border-black pb-4">
-                <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center">
-                        <img 
-                            src="/assets/dilg_logo.png" 
-                            alt="DILG Logo" 
-                            className="w-full h-full object-contain" 
-                            onError={(e) => { (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/6/6f/DILG_Seal.svg'; }} 
-                        />
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-serif font-bold text-slate-600 uppercase tracking-widest">Republic of the Philippines</p>
-                        <h1 className="text-lg font-serif font-bold text-slate-900 uppercase leading-none my-0.5">Department of the Interior and Local Government</h1>
-                        <p className="text-xs font-serif font-bold text-slate-700 uppercase tracking-wide">Region 10 - Northern Mindanao</p>
-                    </div>
-                </div>
-                <div className="text-right">
-                    <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight font-sans">SCAN LOGS</h2>
-                    <p className="text-[10px] font-mono text-slate-500 mt-1">Generated: {format(new Date(), 'yyyy-MM-dd HH:mm:ss')}</p>
-                </div>
-            </div>
-
-            {/* Event Metadata (If Filtered) */}
-            {event && (
-                <div className="mb-6 border border-slate-300 bg-slate-50 p-4 rounded-lg print:border-black print:bg-transparent">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                        <div>
-                            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Event Name</p>
-                            <p className="text-sm font-bold text-slate-900 leading-tight">{event.event_name}</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Venue</p>
-                            <p className="text-sm font-medium text-slate-900 leading-tight">{event.venue}</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Date</p>
-                            <p className="text-sm font-medium text-slate-900">
-                                {format(new Date(event.start_date), 'MMM d, yyyy')}
-                                {event.end_date && event.end_date !== event.start_date ? ` - ${format(new Date(event.end_date), 'MMM d, yyyy')}` : ''}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Total Records</p>
-                            <p className="text-sm font-bold text-slate-900">{logs.length}</p>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-[9px] leading-tight text-left table-fixed">
-                    <thead className="bg-slate-100 print:bg-slate-200 text-slate-900">
-                        <tr>
-                            <th className="border border-black px-2 py-1 w-8 text-center">#</th>
-                            <th className="border border-black px-2 py-1 w-24 whitespace-nowrap">Scan Time</th>
-                            <th className="border border-black px-2 py-1 w-10 text-center">Session</th>
-                            <th className="border border-black px-2 py-1 w-32">Event Name</th>
-                            <th className="border border-black px-2 py-1 w-20">Code</th>
-                            <th className="border border-black px-2 py-1 w-32">Participant Name</th>
-                            <th className="border border-black px-2 py-1 w-12 text-center">Gender</th>
-                            <th className="border border-black px-2 py-1 w-32">Email / Mobile</th>
-                            <th className="border border-black px-2 py-1 w-32">Office</th>
-                            <th className="border border-black px-2 py-1 w-24">Scanned By</th>
-                            <th className="border border-black px-2 py-1">Remarks</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {logs.map((log, index) => (
-                            <tr key={log.attendance_id} className="hover:bg-slate-50 print:hover:bg-transparent break-inside-avoid">
-                                <td className="px-2 py-1 text-center border-none">{index + 1}</td>
-                                <td className="px-2 py-1 whitespace-nowrap font-mono border-none">{formatDateTime(log.scan_time)}</td>
-                                <td className="px-2 py-1 text-center font-bold border-none">
-                                    {log.action_session}
-                                </td>
-                                <td className="px-2 py-1 border-none">
-                                    {log.events?.event_name || '-'}
-                                </td>
-                                <td className="px-2 py-1 font-mono text-center border-none">
-                                    {log.participants?.participant_code || '-'}
-                                </td>
-                                <td className="px-2 py-1 font-bold border-none">
-                                    {log.participants?.full_name || '-'}
-                                </td>
-                                <td className="px-2 py-1 text-center border-none">
-                                    {log.participants?.gender ? log.participants.gender.charAt(0).toUpperCase() + log.participants.gender.slice(1) : '-'}
-                                </td>
-                                <td className="px-2 py-1 border-none">
-                                    <div className="truncate">{log.participants?.email || ''}</div>
-                                    {log.participants?.mobile_no && <div className="text-[8px] text-slate-500 font-mono">{log.participants.mobile_no}</div>}
-                                </td>
-                                <td className="px-2 py-1 border-none">
-                                    {log.participants?.office || '-'}
-                                </td>
-                                <td className="px-2 py-1 border-none">
-                                    {log.users?.full_name || 'System'}
-                                </td>
-                                <td className="px-2 py-1 italic text-slate-600 border-none">
-                                    {log.remarks || ''}
-                                </td>
-                            </tr>
-                        ))}
-                        {logs.length === 0 && (
+            <div className="bg-white shadow-lg rounded-xl overflow-hidden border border-slate-200 print:shadow-none print:border-none print:rounded-none">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-black text-slate-700">
                             <tr>
-                                <td colSpan={11} className="px-4 py-8 text-center text-slate-400 italic border-none">
-                                    No scan records found.
-                                </td>
+                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">#</th>
+                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Scan Time</th>
+                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1 text-center">Session</th>
+                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Event Name</th>
+                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Code</th>
+                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Participant Name</th>
+                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1 text-center">Gender</th>
+                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Email / Mobile</th>
+                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Office</th>
+                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Scanned By</th>
+                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Remarks</th>
                             </tr>
-                        )}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-slate-100 print:divide-y-0">
+                            {logs.map((log, index) => (
+                                <tr key={log.attendance_id} className="hover:bg-slate-50 transition-colors print:hover:bg-transparent text-slate-600 print:text-black">
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 text-center font-mono text-slate-400 print:text-black whitespace-nowrap">{index + 1}</td>
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 font-mono whitespace-nowrap">{formatDateTime(log.scan_time)}</td>
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 text-center font-bold whitespace-nowrap">
+                                        {log.action_session}
+                                    </td>
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap">
+                                        {log.events?.event_name || '-'}
+                                    </td>
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 font-mono text-center whitespace-nowrap">
+                                        {log.participants?.participant_code || '-'}
+                                    </td>
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 font-bold whitespace-nowrap">
+                                        {log.participants?.full_name || '-'}
+                                    </td>
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 text-center whitespace-nowrap">
+                                        {log.participants?.gender ? log.participants.gender.charAt(0).toUpperCase() + log.participants.gender.slice(1) : '-'}
+                                    </td>
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap">
+                                        <div className="flex flex-col">
+                                            <span>{log.participants?.email || ''}</span>
+                                            {log.participants?.mobile_no && <span className="text-[10px] print:text-[6px] text-slate-400 print:text-black">{log.participants.mobile_no}</span>}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap">
+                                        {log.participants?.office || '-'}
+                                    </td>
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap">
+                                        {log.users?.full_name || 'System'}
+                                    </td>
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 italic text-slate-500 print:text-black whitespace-nowrap">
+                                        {log.remarks || ''}
+                                    </td>
+                                </tr>
+                            ))}
+                            {logs.length === 0 && (
+                                <tr>
+                                    <td colSpan={11} className="px-4 py-8 text-center text-slate-400 italic">
+                                        No scan records found.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
             
             {/* Minimal Footer for Context */}
-            <div className="mt-4 text-[8px] text-slate-400 flex justify-between print:flex border-t border-slate-200 pt-2">
-                <span>System Generated Report • Event Management Portal</span>
-                <span>Page 1 of 1</span>
+            <div className="mt-4 text-[10px] text-slate-400 flex justify-between print:flex print:mt-1 border-t border-slate-200 pt-2 print:border-none">
+                <span>Scan Log Report • {format(new Date(), 'yyyy-MM-dd HH:mm:ss')}</span>
+                <span>Page 1</span>
             </div>
         </div>
     </div>
