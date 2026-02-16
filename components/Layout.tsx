@@ -19,7 +19,9 @@ import {
   ChevronUp,
   User,
   ShieldCheck,
-  Search
+  Search,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -38,6 +40,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [pwForm, setPwForm] = useState({ new: '', confirm: '' });
   const [pwStatus, setPwStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [pwMessage, setPwMessage] = useState('');
+  
+  // Password Visibility State
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
 
   const showSidebar = hasPermission('VIEW_DASHBOARD');
 
@@ -82,6 +88,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             setIsPasswordModalOpen(false);
             setPwStatus('idle');
             setPwMessage('');
+            setShowNewPw(false);
+            setShowConfirmPw(false);
         }, 1500);
     } catch (err: any) {
         setPwStatus('error');
@@ -115,7 +123,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" 
             onClick={() => setIsPasswordModalOpen(false)}
         ></div>
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+        {/* Adjusted width from max-sm to max-w-md */}
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 flex justify-between items-center text-white">
                 <h3 className="font-semibold flex items-center gap-2">
                     <KeyRound size={20} /> Change Password
@@ -143,23 +152,41 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         )}
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">New Password</label>
-                            <input 
-                                type="password" 
-                                required
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                value={pwForm.new}
-                                onChange={e => setPwForm({...pwForm, new: e.target.value})}
-                            />
+                            <div className="relative">
+                                <input 
+                                    type={showNewPw ? "text" : "password"}
+                                    required
+                                    className="w-full px-3 py-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                    value={pwForm.new}
+                                    onChange={e => setPwForm({...pwForm, new: e.target.value})}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowNewPw(!showNewPw)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                                >
+                                    {showNewPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Confirm New Password</label>
-                            <input 
-                                type="password" 
-                                required
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                value={pwForm.confirm}
-                                onChange={e => setPwForm({...pwForm, confirm: e.target.value})}
-                            />
+                            <div className="relative">
+                                <input 
+                                    type={showConfirmPw ? "text" : "password"}
+                                    required
+                                    className="w-full px-3 py-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                    value={pwForm.confirm}
+                                    onChange={e => setPwForm({...pwForm, confirm: e.target.value})}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPw(!showConfirmPw)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                                >
+                                    {showConfirmPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
                         </div>
                         <button 
                             type="submit" 
@@ -207,6 +234,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             onClick={() => {
                                 setIsPasswordModalOpen(true);
                                 setIsProfileDropdownOpen(false);
+                                setShowNewPw(false);
+                                setShowConfirmPw(false);
                             }}
                             className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
                         >
@@ -288,6 +317,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         onClick={() => {
                             setIsPasswordModalOpen(true);
                             setIsProfileDropdownOpen(false);
+                            setShowNewPw(false);
+                            setShowConfirmPw(false);
                         }}
                         className="flex items-center gap-3 w-full px-4 py-3 text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
                     >
