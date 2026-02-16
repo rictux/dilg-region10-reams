@@ -1,14 +1,24 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { User } from '../../types/database';
-import { Trash2, UserPlus, Shield, CheckCircle, XCircle, Search, Mail, Briefcase, Lock, X, Loader2, AlertCircle, Edit } from 'lucide-react';
+import { User, Office } from '../../types/database';
+import { Trash2, UserPlus, Shield, CheckCircle, XCircle, Search, Mail, Briefcase, Lock, X, Loader2, AlertCircle, Edit, Building2, Eye, EyeOff } from 'lucide-react';
 import { format } from 'date-fns';
 import bcrypt from 'bcryptjs';
 
+// Extend User type locally to include joined office data
+interface UserWithOffice extends User {
+    offices?: {
+        code: string;
+        name: string;
+    } | null;
+}
+
 const UserManagement: React.FC = () => {
   const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserWithOffice[]>([]);
+  const [offices, setOffices] = useState<Office[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -17,6 +27,9 @@ const UserManagement: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
+  
+  // Password Visibility
+  const [showPassword, setShowPassword] = useState(false);
 
   // Form Data
   const initialFormState = {
@@ -26,12 +39,14 @@ const UserManagement: React.FC = () => {
     password: '',
     role: 'Scanner' as 'Admin' | 'Scanner' | 'EventManager',
     position: '',
-    status: 'Active' as 'Active' | 'Inactive'
+    status: 'Active' as 'Active' | 'Inactive',
+    office_id: null as number | null
   };
   const [formData, setFormData] = useState(initialFormState);
 
   useEffect(() => {
     fetchUsers();
+    fetchOffices();
   }, []);
 
   const fetchUsers = async () => {
@@ -39,11 +54,11 @@ const UserManagement: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select('*, offices(code, name)')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      setUsers(data as User[] || []);
+      setUsers(data as UserWithOffice[] || []);
     } catch (err) {
       console.error('Error fetching users:', err);
     } finally {
@@ -51,16 +66,19 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const handleDelete = async (targetUser: User) => {
+  const fetchOffices = async () => {
+      const { data } = await supabase.from('offices').select('*').order('name');
+      if (data) setOffices(data);
+  };
+
+  const handleDelete = async (targetUser: UserWithOffice) => {
     if (!currentUser) return;
 
-    // Safety Checks
     if (targetUser.user_id === currentUser.user_id) {
         alert("You cannot delete your own account.");
         return;
     }
-    // Only allow deleting admins if you are an admin? (implicit by route protection, but good to check)
-    // Actually requirement said "The admin account cannot delete another admin account".
+    
     if (targetUser.role === 'Admin') {
         alert("You cannot delete another Administrator.");
         return;
@@ -74,7 +92,6 @@ const UserManagement: React.FC = () => {
         const { error } = await supabase.from('users').delete().eq('user_id', targetUser.user_id);
         if (error) throw error;
         
-        // Optimistic update
         setUsers(users.filter(u => u.user_id !== targetUser.user_id));
     } catch (err: any) {
         alert("Error deleting user: " + err.message);
@@ -85,21 +102,24 @@ const UserManagement: React.FC = () => {
       setEditingId(null);
       setFormData(initialFormState);
       setFormError('');
+      setShowPassword(false);
       setShowModal(true);
   };
 
-  const openEditModal = (user: User) => {
+  const openEditModal = (user: UserWithOffice) => {
       setEditingId(user.user_id);
       setFormData({
           full_name: user.full_name,
           email: user.email,
           username: user.username,
-          password: '', // Leave blank to keep existing
+          password: '',
           role: user.role,
           position: user.position || '',
-          status: user.status
+          status: user.status,
+          office_id: user.office_id || null
       });
       setFormError('');
+      setShowPassword(false);
       setShowModal(true);
   };
 
@@ -109,7 +129,6 @@ const UserManagement: React.FC = () => {
       setFormError('');
 
       try {
-          // Check username availability (exclude current user if editing)
           const { data: existing } = await supabase
             .from('users')
             .select('user_id')
@@ -120,20 +139,18 @@ const UserManagement: React.FC = () => {
           if (existing) throw new Error("Username already taken.");
 
           if (editingId) {
-              // Update Mode
               const updates: any = {
                   full_name: formData.full_name,
                   email: formData.email,
                   username: formData.username,
                   role: formData.role,
                   position: formData.position,
-                  status: formData.status
+                  status: formData.status,
+                  office_id: formData.office_id
               };
 
-              // Only update password if provided
               if (formData.password) {
                   if (formData.password.length < 4) throw new Error("Password must be at least 4 characters.");
-                  // Hash password
                   const salt = await bcrypt.genSalt(10);
                   updates.password_hash = await bcrypt.hash(formData.password, salt);
               }
@@ -146,12 +163,10 @@ const UserManagement: React.FC = () => {
               if (error) throw error;
 
           } else {
-              // Create Mode
               if (!formData.password || formData.password.length < 4) {
                   throw new Error("Password must be at least 4 characters.");
               }
               
-              // Hash password
               const salt = await bcrypt.genSalt(10);
               const hash = await bcrypt.hash(formData.password, salt);
 
@@ -162,7 +177,8 @@ const UserManagement: React.FC = () => {
                   password_hash: hash,
                   role: formData.role,
                   position: formData.position,
-                  status: formData.status
+                  status: formData.status,
+                  office_id: formData.office_id
               }]);
 
               if (error) throw error;
@@ -180,7 +196,8 @@ const UserManagement: React.FC = () => {
   const filteredUsers = users.filter(u => 
       u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
       u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.role.toLowerCase().includes(searchTerm.toLowerCase())
+      u.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.offices?.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -218,6 +235,7 @@ const UserManagement: React.FC = () => {
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                       <tr>
                           <th className="px-6 py-4">User Details</th>
+                          <th className="px-6 py-4">Office Code</th>
                           <th className="px-6 py-4">Role & Position</th>
                           <th className="px-6 py-4">Status</th>
                           <th className="px-6 py-4">Created</th>
@@ -226,9 +244,9 @@ const UserManagement: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                       {loading ? (
-                          <tr><td colSpan={5} className="text-center py-8">Loading users...</td></tr>
+                          <tr><td colSpan={6} className="text-center py-8">Loading users...</td></tr>
                       ) : filteredUsers.length === 0 ? (
-                          <tr><td colSpan={5} className="text-center py-8 text-slate-400">No users found.</td></tr>
+                          <tr><td colSpan={6} className="text-center py-8 text-slate-400">No users found.</td></tr>
                       ) : (
                           filteredUsers.map((user) => (
                               <tr key={user.user_id} className="hover:bg-slate-50 transition-colors">
@@ -242,6 +260,15 @@ const UserManagement: React.FC = () => {
                                               <div className="text-xs text-slate-500">@{user.username}</div>
                                           </div>
                                       </div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                      {user.offices ? (
+                                        <span className="font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold">
+                                            {user.offices.code}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400 text-xs italic">Unassigned</span>
+                                      )}
                                   </td>
                                   <td className="px-6 py-4">
                                       <div className="flex flex-col">
@@ -357,14 +384,23 @@ const UserManagement: React.FC = () => {
                             <label className="block text-sm font-medium text-slate-700 mb-1">
                                 {editingId ? 'Password (Optional)' : 'Password'}
                             </label>
-                            <input 
-                                required={!editingId}
-                                type="password"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                placeholder={editingId ? "Leave blank to keep" : "••••••"}
-                                value={formData.password}
-                                onChange={e => setFormData({...formData, password: e.target.value})}
-                            />
+                            <div className="relative">
+                                <input 
+                                    required={!editingId}
+                                    type={showPassword ? "text" : "password"}
+                                    className="w-full px-3 py-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                    placeholder={editingId ? "Leave blank to keep" : "••••••"}
+                                    value={formData.password}
+                                    onChange={e => setFormData({...formData, password: e.target.value})}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
                         </div>
 
                         <div>
@@ -389,6 +425,23 @@ const UserManagement: React.FC = () => {
                                 value={formData.position}
                                 onChange={e => setFormData({...formData, position: e.target.value})}
                             />
+                        </div>
+                        
+                        <div className="sm:col-span-2">
+                             <label className="block text-sm font-medium text-slate-700 mb-1">Office Assignment</label>
+                             <div className="relative">
+                                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <select 
+                                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white appearance-none"
+                                    value={formData.office_id || ''}
+                                    onChange={e => setFormData({...formData, office_id: e.target.value ? Number(e.target.value) : null})}
+                                >
+                                    <option value="">-- No Office Assigned --</option>
+                                    {offices.map(office => (
+                                        <option key={office.office_id} value={office.office_id}>{office.name} ({office.code})</option>
+                                    ))}
+                                </select>
+                             </div>
                         </div>
 
                         <div>
