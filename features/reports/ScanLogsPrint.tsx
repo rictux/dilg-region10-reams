@@ -130,7 +130,7 @@ const ScanLogsPrint: React.FC = () => {
                     white-space: nowrap; /* Don't wrap */
                     background-color: #f1f5f9 !important;
                     font-weight: bold;
-                    text-transform: uppercase;
+                    /* text-transform: uppercase; Removed */
                 }
                 td {
                     padding: 2px 4px;
@@ -150,6 +150,14 @@ const ScanLogsPrint: React.FC = () => {
                 .break-inside-avoid {
                     break-inside: avoid;
                 }
+                .print-footer {
+                    position: fixed;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    width: 100%;
+                    background-color: white;
+                }
             }
         `}</style>
 
@@ -161,17 +169,17 @@ const ScanLogsPrint: React.FC = () => {
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-black text-slate-700">
                             <tr>
-                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">#</th>
-                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Scan Time</th>
-                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1 text-center">Session</th>
-                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Event Name</th>
-                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Code</th>
-                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Participant Name</th>
-                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1 text-center">Gender</th>
-                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Email / Mobile</th>
-                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Office</th>
-                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Scanned By</th>
-                                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap print:px-1 print:py-1">Remarks</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">#</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Scan Time</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 text-center">Session</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Event Name</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Code</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Participant Name</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 text-center">Gender</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Email / Mobile</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Office</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Scanned By</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Remarks</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-slate-100 print:divide-y-0">
@@ -227,10 +235,10 @@ const ScanLogsPrint: React.FC = () => {
             </div>
 
             {/* Prepared By Section */}
-            <div className="mt-8 px-4 print:px-0 break-inside-avoid">
+            <div className="mt-8 px-4 print:px-0 break-inside-avoid flex justify-end">
                 <div className="w-64">
                     <p className="text-[10px] uppercase font-bold text-slate-500 mb-6">Prepared by:</p>
-                    <p className="font-bold text-sm text-slate-900 uppercase border-b border-slate-400 inline-block min-w-[200px] pb-1">
+                    <p className="text-sm text-slate-900 uppercase border-b border-slate-400 inline-block min-w-[200px] pb-1">
                         {user?.full_name}
                     </p>
                     <p className="text-xs text-slate-600 mt-1">{user?.position || 'System Administrator'}</p>
@@ -238,7 +246,7 @@ const ScanLogsPrint: React.FC = () => {
             </div>
             
             {/* Minimal Footer for Context */}
-            <div className="mt-4 text-[10px] text-slate-400 flex justify-between print:flex print:mt-1 border-t border-slate-200 pt-2 print:border-none">
+            <div className="print-footer mt-4 text-[10px] text-slate-400 flex justify-between print:flex print:mt-1 border-t border-slate-200 pt-2 print:border-none">
                 <span>Scan Log Report • {format(new Date(), 'yyyy-MM-dd HH:mm:ss')}</span>
                 <span>Page 1</span>
             </div>
