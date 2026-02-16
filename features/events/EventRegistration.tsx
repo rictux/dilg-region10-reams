@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Event, Participant, RefLocation } from '../../types/database';
 import QRCode from 'react-qr-code';
-import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock, Landmark } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock, Landmark, Download, Info } from 'lucide-react';
 import { format } from 'date-fns';
+// @ts-ignore
+import html2canvas from 'html2canvas';
 
 const EventRegistration: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -12,8 +15,13 @@ const EventRegistration: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Ref for saving image
+  const ticketRef = useRef<HTMLDivElement>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Auto-suggestion state
   const [suggestions, setSuggestions] = useState<Participant[]>([]);
@@ -198,6 +206,7 @@ const EventRegistration: React.FC = () => {
 
     setSubmitting(true);
     setError(null);
+    setAlreadyRegistered(false);
     
     try {
         if (!event) throw new Error("Event not loaded");
@@ -272,12 +281,16 @@ const EventRegistration: React.FC = () => {
                 accommodation_pax: formData.needs_accommodation ? formData.accommodation_pax : 0
             });
 
-        // Ignore unique violation (already registered)
-        if (regError && regError.code !== '23505') {
-            throw regError;
+        if (regError) {
+            if (regError.code === '23505') {
+                // Unique violation: Already Registered
+                setAlreadyRegistered(true);
+            } else {
+                throw regError;
+            }
         }
 
-        // 3. Set QR Token (Use Participant Code)
+        // 3. Set QR Token (Use Participant Code) and Show Success
         setQrToken(finalParticipantCode);
         setSuccess(true);
 
@@ -285,6 +298,28 @@ const EventRegistration: React.FC = () => {
         setError(err.message || "Registration failed. Please try again.");
     } finally {
         setSubmitting(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!ticketRef.current) return;
+    setIsDownloading(true);
+    try {
+        const canvas = await html2canvas(ticketRef.current, {
+            backgroundColor: '#ffffff',
+            scale: 2 // Higher resolution
+        });
+        const dataUrl = canvas.toDataURL('image/png');
+        
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = `${event?.event_name.substring(0, 20).replace(/\s+/g, '_')}_${formData.full_name.replace(/\s+/g, '_')}_Pass.png`;
+        link.click();
+    } catch (err) {
+        console.error("Failed to save image", err);
+        alert("Failed to save image. Please screenshot instead.");
+    } finally {
+        setIsDownloading(false);
     }
   };
 
@@ -342,14 +377,26 @@ const EventRegistration: React.FC = () => {
       return (
           <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 flex justify-center">
               <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
-                  <div className="bg-green-600 px-6 py-8 text-center text-white">
+                  <div className={`${alreadyRegistered ? 'bg-amber-500' : 'bg-green-600'} px-6 py-8 text-center text-white transition-colors`}>
                       <div className="flex justify-center mb-4">
                           <div className="bg-white/20 p-3 rounded-full">
-                              <CheckCircle size={48} className="text-white" />
+                              {alreadyRegistered ? (
+                                <Info size={48} className="text-white" />
+                              ) : (
+                                <CheckCircle size={48} className="text-white" />
+                              )}
                           </div>
                       </div>
-                      <h2 className="text-3xl font-bold mb-2">Registration Confirmed!</h2>
-                      <p className="text-green-100">See you at {event.event_name}</p>
+                      <h2 className="text-3xl font-bold mb-2">
+                          {alreadyRegistered ? 'Already Registered' : 'Registration Confirmed!'}
+                      </h2>
+                      <p className={`${alreadyRegistered ? 'text-amber-100' : 'text-green-100'}`}>
+                          {alreadyRegistered 
+                            ? 'You are already on the list for:' 
+                            : 'See you at'
+                          } <br/>
+                          <span className="font-semibold">{event.event_name}</span>
+                      </p>
                   </div>
                   
                   <div className="p-8 flex flex-col items-center text-center">
@@ -357,42 +404,41 @@ const EventRegistration: React.FC = () => {
                           Please save this QR code. Present it at the venue entrance for attendance scanning.
                       </p>
                       
-                      <div className="border-4 border-slate-900 p-4 rounded-xl mb-6 bg-white shadow-sm">
-                          <QRCode value={qrToken} size={200} />
-                      </div>
-
-                      <div className="w-full bg-slate-50 rounded-lg p-4 text-left border border-slate-100">
-                          <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-2">Participant Details</p>
-                          <p className="font-bold text-slate-800 text-lg">{formData.full_name}</p>
-                          <p className="text-slate-500">{formData.email}</p>
-                          <p className="text-slate-500 text-sm mt-1">{formData.position}</p>
-                          
-                          {/* Display Logic for Office vs LGU */}
-                          <div className="mt-1 flex items-start gap-1 text-slate-500 text-sm">
-                             {affiliationType === 'LGU' ? <Landmark size={14} className="mt-0.5" /> : <Building size={14} className="mt-0.5" />}
-                             <span>
-                                 {affiliationType === 'LGU' && selectedCity 
-                                    ? `LGU ${selectedCity}, ${selectedProvince}`
-                                    : affiliationType === 'LGU' && selectedProvince
-                                    ? (selectedProvince.toLowerCase().includes('city') ? `LGU ${selectedProvince}` : `Provincial Gov't of ${selectedProvince}`)
-                                    : formData.office
-                                 }
-                             </span>
+                      {/* Ticket / Pass Container for Image Generation */}
+                      <div 
+                        ref={ticketRef}
+                        className="bg-white p-6 rounded-xl w-full border-2 border-slate-100"
+                      >
+                          <div className="border-4 border-slate-900 p-4 rounded-xl mb-4 bg-white inline-block">
+                              <QRCode value={qrToken} size={180} />
                           </div>
 
-                          {formData.needs_accommodation && (
-                               <p className="text-indigo-600 text-xs font-semibold mt-2 flex items-center gap-1">
-                                  <Home size={12}/> Accommodation Requested ({formData.accommodation_pax} Pax)
-                               </p>
-                          )}
-                          <p className="text-xs text-slate-300 font-mono mt-2">ID: {qrToken}</p>
+                          <div className="w-full text-center">
+                              <p className="font-bold text-slate-900 text-xl">{formData.full_name}</p>
+                              <p className="text-indigo-600 font-semibold">{formData.position}</p>
+                              
+                              <div className="mt-1 flex items-center justify-center gap-1.5 text-slate-500 text-sm">
+                                 {affiliationType === 'LGU' ? <Landmark size={14} /> : <Building size={14} />}
+                                 <span>
+                                     {affiliationType === 'LGU' && selectedCity 
+                                        ? `LGU ${selectedCity}, ${selectedProvince}`
+                                        : affiliationType === 'LGU' && selectedProvince
+                                        ? (selectedProvince.toLowerCase().includes('city') ? `LGU ${selectedProvince}` : `Provincial Gov't of ${selectedProvince}`)
+                                        : formData.office
+                                     }
+                                 </span>
+                              </div>
+                              <p className="text-[10px] text-slate-300 font-mono mt-3 uppercase tracking-widest">{qrToken}</p>
+                          </div>
                       </div>
                       
                       <button 
-                        onClick={() => window.print()} 
-                        className="mt-8 w-full bg-slate-900 text-white py-3 rounded-lg font-semibold hover:bg-slate-800 transition-colors"
+                        onClick={handleDownload} 
+                        disabled={isDownloading}
+                        className="mt-8 w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-lg active:scale-[0.98]"
                       >
-                          Print / Save Details
+                          {isDownloading ? <Loader2 className="animate-spin" /> : <Download size={20} />}
+                          {isDownloading ? 'Saving...' : 'Save QR Code'}
                       </button>
                   </div>
               </div>
@@ -478,7 +524,6 @@ const EventRegistration: React.FC = () => {
                                 <div className="relative">
                                     <Mail className="absolute left-3 top-3 text-slate-400" size={18} />
                                     <input 
-                                        required 
                                         type="email"
                                         className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                                         placeholder="john@company.com"
@@ -492,7 +537,6 @@ const EventRegistration: React.FC = () => {
                                 <div className="relative">
                                     <Phone className="absolute left-3 top-3 text-slate-400" size={18} />
                                     <input 
-                                        required 
                                         type="tel"
                                         className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                                         placeholder="09123456789"
@@ -514,7 +558,6 @@ const EventRegistration: React.FC = () => {
                                 >
                                     <option value="Male">Male</option>
                                     <option value="Female">Female</option>
-                                    <option value="Other">Other</option>
                                 </select>
                             </div>
                             <div>
@@ -744,8 +787,8 @@ const EventRegistration: React.FC = () => {
                             />
                         </div>
                         <label htmlFor="privacy-consent" className="text-xs text-slate-600 leading-relaxed cursor-pointer text-justify">
-                            I hereby authorize the event organizers to collect, store, and process my personal information for purposes related to event registration, attendance tracking, communication, documentation, and post-event reporting. I understand that my data will be protected in compliance with the Data Privacy Act and will not be disclosed without my consent except as required by law.
-                        </label>
+In compliance to the Data Privacy Act of 2012 (Republic Act No. 10173), we are reminded of the importance of adhering to the policies and guidelines outlined within it to safeguard sensitive and personal information.
+As part of our ongoing commitment to protect personal data and ensure compliance with legal obligations, all personal data shared therein will be treated with the utmost care and confidentiality. Access to such data is only limited to the management who require it for legitimate work purposes only.                        </label>
                     </div>
 
                     <div className="pt-2">
