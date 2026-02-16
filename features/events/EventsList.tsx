@@ -151,6 +151,7 @@ const EventsList: React.FC = () => {
             needs_accommodation,
             accommodation_pax,
             participants (
+                participant_id,
                 full_name,
                 participant_code,
                 email,
@@ -272,6 +273,32 @@ const EventsList: React.FC = () => {
       setSelectedEvent(event);
       setShowParticipantsModal(true);
       // fetchEventParticipants is called in useEffect when modal opens
+  };
+
+  const handleRemoveParticipant = async (participantId: number) => {
+      if (!selectedEvent) return;
+      
+      if (!confirm("Are you sure you want to remove this participant from the event? This will also remove their attendance records for this event if any exist.")) return;
+
+      try {
+          // Attempt to delete. DB constraints might prevent this if attendance logs exist and cascade isn't set.
+          // Ideally, we would delete attendance logs first or handle the error.
+          // Let's try deleting logs first just in case to be safe, though this is a destructive action.
+          await supabase.from('attendance_logs').delete().eq('event_id', selectedEvent.event_id).eq('participant_id', participantId);
+
+          const { error } = await supabase
+            .from('event_participants')
+            .delete()
+            .eq('event_id', selectedEvent.event_id)
+            .eq('participant_id', participantId);
+
+          if (error) throw error;
+          
+          // Refresh happens via realtime subscription or we can force it
+          fetchEventParticipants(selectedEvent.event_id);
+      } catch (err: any) {
+          alert("Error removing participant: " + err.message);
+      }
   };
 
   const handleNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -752,13 +779,14 @@ const EventsList: React.FC = () => {
                                     <th className="px-6 py-4">Role</th>
                                     <th className="px-6 py-4">Office</th>
                                     <th className="px-6 py-4">Status</th>
+                                    {hasPermission('MANAGE_PARTICIPANTS') && <th className="px-6 py-4 text-right">Action</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {specialParticipants.length > 0 && (
                                     <>
                                         <tr className="bg-indigo-50/50">
-                                            <td colSpan={5} className="px-6 py-2 text-xs font-bold text-indigo-800 uppercase tracking-wider">
+                                            <td colSpan={hasPermission('MANAGE_PARTICIPANTS') ? 6 : 5} className="px-6 py-2 text-xs font-bold text-indigo-800 uppercase tracking-wider">
                                                 Event Officials & Guests ({specialParticipants.length})
                                             </td>
                                         </tr>
@@ -785,6 +813,17 @@ const EventsList: React.FC = () => {
                                                         {record.registration_status}
                                                     </span>
                                                 </td>
+                                                {hasPermission('MANAGE_PARTICIPANTS') && (
+                                                    <td className="px-6 py-3 text-right">
+                                                        <button 
+                                                            onClick={() => handleRemoveParticipant(record.participants.participant_id)}
+                                                            className="text-slate-400 hover:text-red-600 transition-colors p-1"
+                                                            title="Remove Participant"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </td>
+                                                )}
                                             </tr>
                                         ))}
                                     </>
@@ -793,7 +832,7 @@ const EventsList: React.FC = () => {
                                 {delegateParticipants.length > 0 && (
                                     <>
                                          <tr className="bg-slate-50/80">
-                                            <td colSpan={5} className="px-6 py-2 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                            <td colSpan={hasPermission('MANAGE_PARTICIPANTS') ? 6 : 5} className="px-6 py-2 text-xs font-bold text-slate-600 uppercase tracking-wider">
                                                 Delegates ({delegateParticipants.length})
                                             </td>
                                         </tr>
@@ -820,6 +859,17 @@ const EventsList: React.FC = () => {
                                                         {record.registration_status}
                                                     </span>
                                                 </td>
+                                                {hasPermission('MANAGE_PARTICIPANTS') && (
+                                                    <td className="px-6 py-3 text-right">
+                                                        <button 
+                                                            onClick={() => handleRemoveParticipant(record.participants.participant_id)}
+                                                            className="text-slate-400 hover:text-red-600 transition-colors p-1"
+                                                            title="Remove Participant"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </td>
+                                                )}
                                             </tr>
                                         ))}
                                     </>
@@ -827,7 +877,7 @@ const EventsList: React.FC = () => {
 
                                 {viewingParticipants.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="text-center py-10 text-slate-400">
+                                        <td colSpan={hasPermission('MANAGE_PARTICIPANTS') ? 6 : 5} className="text-center py-10 text-slate-400">
                                             No participants registered yet.
                                         </td>
                                     </tr>
