@@ -112,13 +112,20 @@ const Scanner: React.FC = () => {
       try {
         const today = new Date().toISOString().split('T')[0];
 
-        const { data } = await supabase
+        let query = supabase
           .from('events')
           .select('*')
           .lte('start_date', today)
           .gte('end_date', today)
           .neq('status', 'Cancelled')
           .order('start_date', { ascending: false });
+
+        // Filter events by office for non-admins
+        if (user?.role !== 'Admin' && user?.office_id) {
+            query = query.eq('organize_by', user.office_id);
+        }
+
+        const { data } = await query;
         
         if (data && data.length > 0) {
           setEvents(data);
@@ -139,10 +146,10 @@ const Scanner: React.FC = () => {
       }
     };
     
-    if (isOnline) {
+    if (isOnline && user) {
         loadEvents();
     }
-  }, [isOnline]);
+  }, [isOnline, user]);
 
   // --- 3. Cache Participants when Event is Selected ---
   useEffect(() => {
