@@ -64,7 +64,7 @@ const Signup: React.FC = () => {
       setSuccess(true);
       setTimeout(() => {
         navigate('/');
-      }, 2000);
+      }, 4000);
     } catch (err: any) {
       setError(err.message || 'Failed to create account.');
       setIsLoading(false);
@@ -79,12 +79,15 @@ const Signup: React.FC = () => {
             <UserPlus size={32} />
           </div>
           <h2 className="text-2xl font-bold text-slate-800 mb-2">Account Created!</h2>
-          <p className="text-slate-600 mb-6">Your account has been successfully created. Redirecting to login...</p>
+          <p className="text-slate-600 mb-6">
+            Your account has been successfully created and is currently <strong>Inactive</strong>. 
+            Please contact the administrator to activate your account before logging in.
+          </p>
           <button 
             onClick={() => navigate('/')}
             className="text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
           >
-            Click here if not redirected
+            Back to Login
           </button>
         </div>
       </div>
