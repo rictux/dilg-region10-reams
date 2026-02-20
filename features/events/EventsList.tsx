@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Event, Participant, Office } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Home, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle } from 'lucide-react';
+import { Event, Participant, Office, RefLocation } from '../../types/database';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Home, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, Building, Landmark } from 'lucide-react';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import { useNavigate } from 'react-router';
@@ -24,6 +24,10 @@ const EventsList: React.FC = () => {
   // Add Participant Modal State
   const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
   const [isAddingParticipant, setIsAddingParticipant] = useState(false);
+  const [locations, setLocations] = useState<RefLocation[]>([]);
+  const [addAffiliationType, setAddAffiliationType] = useState<'Office' | 'LGU'>('Office');
+  const [addProvince, setAddProvince] = useState('');
+  const [addCity, setAddCity] = useState('');
   const [newParticipant, setNewParticipant] = useState<{
       full_name: string;
       email: string;
@@ -83,6 +87,7 @@ const EventsList: React.FC = () => {
 
   useEffect(() => {
     fetchEvents();
+    fetchLocations();
     if (user?.role === 'Admin') {
         fetchOffices();
     }
@@ -145,6 +150,15 @@ const EventsList: React.FC = () => {
   const fetchOffices = async () => {
       const { data } = await supabase.from('offices').select('*').order('name');
       if (data) setOffices(data);
+  };
+
+  const fetchLocations = async () => {
+      const { data } = await supabase
+          .from('ref_locations')
+          .select('*')
+          .order('province_huc', { ascending: true })
+          .order('city_mun', { ascending: true });
+      if (data) setLocations(data);
   };
 
   const fetchEventParticipants = async (eventId: number) => {
@@ -379,6 +393,35 @@ const EventsList: React.FC = () => {
       setIsAddingParticipant(true);
       
       try {
+          // Determine Office Name
+          let finalOfficeName = newParticipant.office;
+          let finalLocationId = null;
+
+          if (addAffiliationType === 'LGU') {
+              if (!addProvince) throw new Error("Please select a Province/HUC for LGU.");
+              
+              if (addCity) {
+                  const loc = locations.find(l => l.province_huc === addProvince && l.city_mun === addCity);
+                  if (loc) {
+                      finalLocationId = loc.location_id;
+                      finalOfficeName = `LGU ${addCity}, ${addProvince}`;
+                  } else {
+                      throw new Error("Selected location is invalid.");
+                  }
+              } else {
+                  const loc = locations.find(l => l.province_huc === addProvince && !l.city_mun);
+                  if (loc) finalLocationId = loc.location_id;
+                  
+                  if (addProvince.toLowerCase().includes('city')) {
+                       finalOfficeName = `LGU ${addProvince}`;
+                  } else {
+                       finalOfficeName = `Provincial Gov't of ${addProvince}`;
+                  }
+              }
+          } else {
+              if (!newParticipant.office.trim()) throw new Error("Please enter Office / Agency name.");
+          }
+
           // 1. Check or Create Participant
           let participantId: number;
           
@@ -388,7 +431,8 @@ const EventsList: React.FC = () => {
              await supabase.from('participants').update({
                 full_name: newParticipant.full_name,
                 email: newParticipant.email || null,
-                office: newParticipant.office,
+                office: finalOfficeName,
+                location_id: finalLocationId,
                 mobile_no: newParticipant.mobile_no || null,
                 age_group: newParticipant.age_group,
                 pwd: newParticipant.pwd,
@@ -407,7 +451,8 @@ const EventsList: React.FC = () => {
                    // Update details
                    await supabase.from('participants').update({
                         full_name: newParticipant.full_name,
-                        office: newParticipant.office,
+                        office: finalOfficeName,
+                        location_id: finalLocationId,
                         mobile_no: newParticipant.mobile_no || null,
                         age_group: newParticipant.age_group,
                         pwd: newParticipant.pwd,
@@ -423,7 +468,8 @@ const EventsList: React.FC = () => {
                     .insert([{
                         full_name: newParticipant.full_name,
                         email: newParticipant.email,
-                        office: newParticipant.office,
+                        office: finalOfficeName,
+                        location_id: finalLocationId,
                         participant_code: code,
                         position: 'N/A', // Default
                         mobile_no: newParticipant.mobile_no || null,
@@ -445,7 +491,8 @@ const EventsList: React.FC = () => {
                 .insert([{
                     full_name: newParticipant.full_name,
                     email: null,
-                    office: newParticipant.office,
+                    office: finalOfficeName,
+                    location_id: finalLocationId,
                     participant_code: code,
                     position: 'N/A',
                     mobile_no: newParticipant.mobile_no || null,
@@ -488,6 +535,9 @@ const EventsList: React.FC = () => {
               accommodation_pax: 0,
               participant_id: null
           });
+          setAddAffiliationType('Office');
+          setAddProvince('');
+          setAddCity('');
           setSuggestions([]);
           fetchEventParticipants(selectedEvent.event_id);
 
@@ -552,6 +602,9 @@ const EventsList: React.FC = () => {
       e.venue.toLowerCase().includes(lower)
     );
   }, [events, searchTerm]);
+
+  const provinces = Array.from(new Set(locations.map(l => l.province_huc))).sort();
+  const cities = locations.filter(l => l.province_huc === addProvince && l.city_mun).map(l => l.city_mun as string).sort();
 
   return (
     <div className="space-y-6">
@@ -784,7 +837,11 @@ const EventsList: React.FC = () => {
                         {hasPermission('MANAGE_PARTICIPANTS') && (
                              <button 
                                 onClick={() => setShowAddParticipantModal(true)}
-                                className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors mr-2 shadow-sm"
+                                disabled={!selectedEvent.registration_open}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors mr-2 shadow-sm
+                                    ${selectedEvent.registration_open ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}
+                                `}
+                                title={!selectedEvent.registration_open ? "Registration is closed for this event" : "Add Participant"}
                             >
                                 <UserPlus size={16} /> Add Participant
                             </button>
@@ -824,7 +881,7 @@ const EventsList: React.FC = () => {
                                         {specialParticipants.map((record, index) => {
                                             const isEditing = editingRole?.participantId === record.participants.participant_id;
                                             return (
-                                            <tr key={record.id} className="hover:bg-slate-50">
+                                            <tr key={record.id || `special-${index}`} className="hover:bg-slate-50">
                                                 <td className="px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
                                                 <td className="px-6 py-3">
                                                     <div className="font-medium text-slate-800">{record.participants?.full_name}</div>
@@ -915,7 +972,7 @@ const EventsList: React.FC = () => {
                                         {delegateParticipants.map((record, index) => {
                                             const isEditing = editingRole?.participantId === record.participants.participant_id;
                                             return (
-                                            <tr key={record.id} className="hover:bg-slate-50">
+                                            <tr key={record.id || `delegate-${index}`} className="hover:bg-slate-50">
                                                 <td className="px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
                                                 <td className="px-6 py-3">
                                                     <div className="font-medium text-slate-800">{record.participants?.full_name}</div>
@@ -1130,16 +1187,78 @@ const EventsList: React.FC = () => {
                             onChange={e => setNewParticipant({...newParticipant, mobile_no: e.target.value})}
                         />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Office / Agency</label>
-                        <input 
-                            required
-                            type="text"
-                            placeholder="Office Name"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                            value={newParticipant.office}
-                            onChange={e => setNewParticipant({...newParticipant, office: e.target.value})}
-                        />
+                    <div className="pt-2">
+                         <label className="block text-sm font-medium text-slate-700 mb-2">Affiliation Type</label>
+                         <div className="flex gap-4 mb-4">
+                            <label className={`flex-1 cursor-pointer border rounded-lg p-3 flex items-center gap-3 transition-all ${addAffiliationType === 'Office' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                <input 
+                                    type="radio" 
+                                    className="hidden" 
+                                    checked={addAffiliationType === 'Office'} 
+                                    onChange={() => setAddAffiliationType('Office')}
+                                />
+                                <Building size={20} />
+                                <span className="font-medium">NGA / Office</span>
+                            </label>
+                            <label className={`flex-1 cursor-pointer border rounded-lg p-3 flex items-center gap-3 transition-all ${addAffiliationType === 'LGU' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                <input 
+                                    type="radio" 
+                                    className="hidden" 
+                                    checked={addAffiliationType === 'LGU'} 
+                                    onChange={() => setAddAffiliationType('LGU')}
+                                />
+                                <Landmark size={20} />
+                                <span className="font-medium">LGU</span>
+                            </label>
+                         </div>
+
+                         {addAffiliationType === 'Office' ? (
+                            <div className="animate-in fade-in zoom-in-95 duration-200">
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Office / Agency Name</label>
+                                <input 
+                                    required={addAffiliationType === 'Office'}
+                                    type="text"
+                                    placeholder="e.g. DILG Regional Office 10"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                    value={newParticipant.office}
+                                    onChange={e => setNewParticipant({...newParticipant, office: e.target.value})}
+                                />
+                            </div>
+                         ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-200">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Province / HUC</label>
+                                    <select 
+                                        required={addAffiliationType === 'LGU'}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white appearance-none"
+                                        value={addProvince}
+                                        onChange={e => {
+                                            setAddProvince(e.target.value);
+                                            setAddCity('');
+                                        }}
+                                    >
+                                        <option value="">-- Select Province --</option>
+                                        {provinces.map(prov => (
+                                            <option key={prov} value={prov}>{prov}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">City / Municipality</label>
+                                    <select 
+                                        disabled={!addProvince}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white appearance-none disabled:bg-slate-100 disabled:text-slate-400"
+                                        value={addCity}
+                                        onChange={e => setAddCity(e.target.value)}
+                                    >
+                                        <option value="">-- Provincial / HUC Level (Optional) --</option>
+                                        {cities.map(city => (
+                                            <option key={city} value={city}>{city}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                         )}
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
