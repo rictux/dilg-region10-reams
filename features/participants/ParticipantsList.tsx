@@ -367,6 +367,9 @@ const AttendanceList: React.FC = () => {
   const noPmCount = data.filter(r => r.amLog && !r.pmLog).length;
   const completeLogsCount = data.filter(r => r.amLog && r.pmLog).length;
 
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const isFutureEvent = selectedDate > todayStr;
+
   return (
     <div className="space-y-6">
       <div>
@@ -387,18 +390,18 @@ const AttendanceList: React.FC = () => {
 
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
         <div className="flex flex-col md:flex-row gap-4 w-full items-start md:items-center">
-            <div className="w-full md:w-[750px] relative" ref={dropdownRef}>
+            <div className="w-full max-w-[60ch] relative" ref={dropdownRef}>
                 <div 
-                    className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors shadow-sm"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors shadow-sm min-h-[42px]"
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
-                    <div className="flex items-center gap-2 overflow-hidden">
+                    <div className="flex items-center gap-2 w-full">
                         <Calendar className="text-slate-400 shrink-0" size={16} />
-                        <span className={`truncate text-xs ${!selectedEvent ? 'text-slate-500' : 'text-slate-800 font-medium'}`}>
+                        <span className={`text-xs ${!selectedEvent ? 'text-slate-500' : 'text-slate-800 font-medium'} whitespace-normal text-left break-words`}>
                             {selectedEvent ? selectedEvent.event_name : "-- Select Event --"}
                         </span>
                     </div>
-                    <ChevronDown className={`text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} size={14} />
+                    <ChevronDown className={`text-slate-400 transition-transform shrink-0 ml-2 ${isDropdownOpen ? 'rotate-180' : ''}`} size={14} />
                 </div>
 
                 {isDropdownOpen && (
@@ -632,9 +635,10 @@ const AttendanceList: React.FC = () => {
                                 </td>
                                 <td className="px-6 py-4 text-center">
                                     <button
-                                        onClick={(e) => openManualModal(e, row.participant)}
-                                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                        title="Manual Log Entry"
+                                        onClick={(e) => !isFutureEvent && openManualModal(e, row.participant)}
+                                        disabled={isFutureEvent}
+                                        className={`p-2 rounded-lg transition-colors ${isFutureEvent ? 'text-slate-300 cursor-not-allowed' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                        title={isFutureEvent ? "Cannot add logs for future dates" : "Manual Log Entry"}
                                     >
                                         <PlusCircle size={18} />
                                     </button>
@@ -737,9 +741,6 @@ const AttendanceList: React.FC = () => {
                         <p className="text-slate-500 text-sm">{selectedParticipant.office}</p>
                         <div className="mt-6 pt-6 border-t border-slate-100 w-full">
                             <p className="text-xs text-slate-400 font-mono mb-4">{selectedParticipant.participant_code}</p>
-                            <button onClick={() => window.print()} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors">
-                                <Printer size={18} /> Print Badge
-                            </button>
                         </div>
                      </>
                 </div>
