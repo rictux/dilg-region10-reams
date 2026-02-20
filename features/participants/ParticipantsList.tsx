@@ -14,6 +14,19 @@ interface AttendanceRow {
     pmLog?: { time: string, status: string };
 }
 
+interface AddParticipantForm {
+  full_name: string;
+  email: string;
+  mobile_no: string;
+  position: string;
+  office: string;
+  gender: string;
+  age_group: string;
+  pwd: string;
+  indigenous_people: string;
+  participant_id: number | null;
+}
+
 const AttendanceList: React.FC = () => {
   const { user } = useAuth();
   const [data, setData] = useState<AttendanceRow[]>([]);
@@ -49,7 +62,7 @@ const AttendanceList: React.FC = () => {
   // Add Participant State
   const [showAddModal, setShowAddModal] = useState(false);
   const [locations, setLocations] = useState<RefLocation[]>([]);
-  const [addForm, setAddForm] = useState({
+  const [addForm, setAddForm] = useState<AddParticipantForm>({
       full_name: '',
       email: '',
       mobile_no: '',
@@ -58,12 +71,56 @@ const AttendanceList: React.FC = () => {
       gender: 'Male',
       age_group: '18-24',
       pwd: 'No',
-      indigenous_people: 'No'
+      indigenous_people: 'No',
+      participant_id: null
   });
   const [addAffiliationType, setAddAffiliationType] = useState<'Office' | 'LGU'>('Office');
   const [addProvince, setAddProvince] = useState('');
   const [addCity, setAddCity] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [addSuggestions, setAddSuggestions] = useState<Participant[]>([]);
+  const [showAddSuggestions, setShowAddSuggestions] = useState(false);
+
+  const closeAddModal = () => {
+      setShowAddModal(false);
+      setAddSuggestions([]);
+      setShowAddSuggestions(false);
+  };
+
+  const normalizeLocations = (rows: any[]): RefLocation[] => {
+    return rows
+      .map((row) => {
+        const provinceRaw =
+          row?.province_huc ??
+          row?.provinceHuc ??
+          row?.province ??
+          row?.province_name ??
+          '';
+        const cityRaw =
+          row?.city_mun ??
+          row?.cityMun ??
+          row?.city_municipality ??
+          row?.city ??
+          row?.municipality ??
+          null;
+        const locationIdRaw = row?.location_id ?? row?.locationId ?? row?.id;
+
+        const province = typeof provinceRaw === 'string' ? provinceRaw.trim() : '';
+        const city = typeof cityRaw === 'string' ? cityRaw.trim() : null;
+        const locationId = Number(locationIdRaw);
+
+        if (!province || Number.isNaN(locationId)) {
+          return null;
+        }
+
+        return {
+          location_id: locationId,
+          province_huc: province,
+          city_mun: city || null
+        } as RefLocation;
+      })
+      .filter((loc): loc is RefLocation => loc !== null);
+  };
 
   // Click Outside Listener for Dropdown
   useEffect(() => {
@@ -79,12 +136,20 @@ const AttendanceList: React.FC = () => {
   // Fetch Events
   useEffect(() => {
     const fetchLocations = async () => {
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('ref_locations')
             .select('*')
             .order('province_huc', { ascending: true })
             .order('city_mun', { ascending: true });
-        if (data) setLocations(data);
+        if (error) {
+            console.error('Failed to fetch ref_locations:', error.message);
+            setLocations([]);
+            return;
+        }
+
+        if (data) {
+            setLocations(normalizeLocations(data));
+        }
     };
     fetchLocations();
 
@@ -402,15 +467,11 @@ const AttendanceList: React.FC = () => {
           let participantId: number;
           let existingUser = null;
           
-          if (finalEmail) {
-               const { data } = await supabase.from('participants').select('participant_id').eq('email', finalEmail).single();
-               existingUser = data;
-          }
-
-          if (existingUser) {
-              participantId = existingUser.participant_id;
+          if (addForm.participant_id) {
+              participantId = addForm.participant_id;
               await supabase.from('participants').update({
                   full_name: addForm.full_name,
+                  email: finalEmail,
                   gender: addForm.gender,
                   position: addForm.position,
                   office: finalOfficeName,
@@ -420,13 +481,51 @@ const AttendanceList: React.FC = () => {
                   pwd: addForm.pwd,
                   indigenous_people: addForm.indigenous_people
               }).eq('participant_id', participantId);
+          } else if (finalEmail) {
+               const { data } = await supabase.from('participants').select('participant_id').eq('email', finalEmail).single();
+               existingUser = data;
+              
+              if (existingUser) {
+                  participantId = existingUser.participant_id;
+                  await supabase.from('participants').update({
+                      full_name: addForm.full_name,
+                      gender: addForm.gender,
+                      position: addForm.position,
+                      office: finalOfficeName,
+                      location_id: finalLocationId,
+                      mobile_no: finalMobile,
+                      age_group: addForm.age_group,
+                      pwd: addForm.pwd,
+                      indigenous_people: addForm.indigenous_people
+                  }).eq('participant_id', participantId);
+              } else {
+                  const initials = addForm.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 3);
+                  const code = `${initials}-${Date.now().toString().slice(-6)}`;
+                  
+                  const { data: newUser, error: createError } = await supabase.from('participants').insert([{
+                      full_name: addForm.full_name,
+                      email: finalEmail,
+                      mobile_no: finalMobile,
+                      gender: addForm.gender,
+                      position: addForm.position,
+                      office: finalOfficeName,
+                      location_id: finalLocationId,
+                      participant_code: code,
+                      age_group: addForm.age_group,
+                      pwd: addForm.pwd,
+                      indigenous_people: addForm.indigenous_people
+                  }]).select().single();
+                  
+                  if (createError) throw createError;
+                  participantId = newUser.participant_id;
+              }
           } else {
               const initials = addForm.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 3);
               const code = `${initials}-${Date.now().toString().slice(-6)}`;
               
               const { data: newUser, error: createError } = await supabase.from('participants').insert([{
                   full_name: addForm.full_name,
-                  email: finalEmail,
+                  email: null,
                   mobile_no: finalMobile,
                   gender: addForm.gender,
                   position: addForm.position,
@@ -453,10 +552,10 @@ const AttendanceList: React.FC = () => {
 
           if (regError && regError.code !== '23505') throw regError;
 
-          setShowAddModal(false);
+          closeAddModal();
           setAddForm({
               full_name: '', email: '', mobile_no: '', position: '', office: '',
-              gender: 'Male', age_group: '18-24', pwd: 'No', indigenous_people: 'No'
+              gender: 'Male', age_group: '18-24', pwd: 'No', indigenous_people: 'No', participant_id: null
           });
           setAddAffiliationType('Office');
           setAddProvince('');
@@ -470,6 +569,67 @@ const AttendanceList: React.FC = () => {
       } finally {
           setIsAdding(false);
       }
+  };
+
+  const handleAddNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setAddForm((prev) => ({ ...prev, full_name: value, participant_id: null }));
+
+      if (value.trim().length < 2) {
+          setAddSuggestions([]);
+          setShowAddSuggestions(false);
+          return;
+      }
+
+      const { data } = await supabase
+          .from('participants')
+          .select('*')
+          .ilike('full_name', `%${value}%`)
+          .limit(5);
+
+      if (data && data.length > 0) {
+          setAddSuggestions(data);
+          setShowAddSuggestions(true);
+      } else {
+          setAddSuggestions([]);
+          setShowAddSuggestions(false);
+      }
+  };
+
+  const selectAddSuggestion = (p: Participant) => {
+      let affiliationType: 'Office' | 'LGU' = 'Office';
+      let province = '';
+      let city = '';
+
+      if (p.location_id && locations.length > 0) {
+          const location = locations.find((l) => l.location_id === p.location_id);
+          if (location) {
+              affiliationType = 'LGU';
+              province = location.province_huc;
+              city = location.city_mun || '';
+          }
+      }
+
+      setAddAffiliationType(affiliationType);
+      setAddProvince(province);
+      setAddCity(city);
+
+      setAddForm((prev) => ({
+          ...prev,
+          full_name: p.full_name || '',
+          email: p.email || '',
+          mobile_no: p.mobile_no || '',
+          position: p.position || '',
+          office: p.office || '',
+          gender: p.gender || 'Male',
+          age_group: p.age_group || '18-24',
+          pwd: p.pwd || 'No',
+          indigenous_people: p.indigenous_people || 'No',
+          participant_id: p.participant_id
+      }));
+
+      setAddSuggestions([]);
+      setShowAddSuggestions(false);
   };
 
   const formatLogTime = (timeStr: string) => {
@@ -510,8 +670,18 @@ const AttendanceList: React.FC = () => {
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const isFutureEvent = selectedDate > todayStr;
   
-  const provinces = Array.from(new Set(locations.map(l => l.province_huc))).sort();
-  const cities = locations.filter(l => l.province_huc === addProvince && l.city_mun).map(l => l.city_mun as string).sort();
+  const provinces = Array.from(
+    new Set(locations.map((l) => l.province_huc).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+
+  const cities = Array.from(
+    new Set(
+      locations
+        .filter((l) => l.province_huc === addProvince && l.city_mun)
+        .map((l) => (l.city_mun as string).trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
 
   return (
     <div className="space-y-6">
@@ -905,13 +1075,13 @@ const AttendanceList: React.FC = () => {
 
       {showAddModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowAddModal(false)}></div>
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={closeAddModal}></div>
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
                 <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white shrink-0">
                     <h3 className="font-semibold flex items-center gap-2">
                         <PlusCircle size={20} /> Add Participant
                     </h3>
-                    <button onClick={() => setShowAddModal(false)} className="text-indigo-100 hover:text-white p-1 hover:bg-white/20 rounded-full transition">
+                    <button onClick={closeAddModal} className="text-indigo-100 hover:text-white p-1 hover:bg-white/20 rounded-full transition">
                         <X size={20} />
                     </button>
                 </div>
@@ -929,8 +1099,30 @@ const AttendanceList: React.FC = () => {
                                         className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                         placeholder="Type name..."
                                         value={addForm.full_name}
-                                        onChange={e => setAddForm({...addForm, full_name: e.target.value})}
+                                        onChange={handleAddNameChange}
+                                        onFocus={() => {
+                                            if (addForm.full_name.trim().length >= 2 && addSuggestions.length > 0) {
+                                                setShowAddSuggestions(true);
+                                            }
+                                        }}
+                                        onBlur={() => setTimeout(() => setShowAddSuggestions(false), 200)}
                                     />
+                                    {showAddSuggestions && addSuggestions.length > 0 && (
+                                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                                            {addSuggestions.map((p) => (
+                                                <div
+                                                    key={p.participant_id}
+                                                    className="px-3 py-2 cursor-pointer hover:bg-indigo-50 border-b border-slate-100 last:border-b-0"
+                                                    onClick={() => selectAddSuggestion(p)}
+                                                >
+                                                    <div className="font-medium text-slate-800">{p.full_name}</div>
+                                                    <div className="text-xs text-slate-500 truncate">
+                                                        {[p.email, p.office].filter(Boolean).join(' • ') || 'No email/office info'}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div>
@@ -1094,7 +1286,7 @@ const AttendanceList: React.FC = () => {
                         <div className="flex justify-end pt-4">
                             <button 
                                 type="button"
-                                onClick={() => setShowAddModal(false)}
+                                onClick={closeAddModal}
                                 className="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium mr-2"
                             >
                                 Cancel

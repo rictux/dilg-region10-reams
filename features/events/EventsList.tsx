@@ -71,6 +71,41 @@ const EventsList: React.FC = () => {
   // Delete Confirmation State
   const [participantToDelete, setParticipantToDelete] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const normalizeLocations = (rows: any[]): RefLocation[] => {
+      return rows
+          .map((row) => {
+              const provinceRaw =
+                  row?.province_huc ??
+                  row?.provinceHuc ??
+                  row?.province ??
+                  row?.province_name ??
+                  '';
+              const cityRaw =
+                  row?.city_mun ??
+                  row?.cityMun ??
+                  row?.city_municipality ??
+                  row?.city ??
+                  row?.municipality ??
+                  null;
+              const locationIdRaw = row?.location_id ?? row?.locationId ?? row?.id;
+
+              const province = typeof provinceRaw === 'string' ? provinceRaw.trim() : '';
+              const city = typeof cityRaw === 'string' ? cityRaw.trim() : null;
+              const locationId = Number(locationIdRaw);
+
+              if (!province || Number.isNaN(locationId)) {
+                  return null;
+              }
+
+              return {
+                  location_id: locationId,
+                  province_huc: province,
+                  city_mun: city || null
+              } as RefLocation;
+          })
+          .filter((loc): loc is RefLocation => loc !== null);
+  };
   
   // Form State
   const initialFormState = {
@@ -153,12 +188,21 @@ const EventsList: React.FC = () => {
   };
 
   const fetchLocations = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
           .from('ref_locations')
           .select('*')
           .order('province_huc', { ascending: true })
           .order('city_mun', { ascending: true });
-      if (data) setLocations(data);
+
+      if (error) {
+          console.error('Failed to fetch ref_locations:', error.message);
+          setLocations([]);
+          return;
+      }
+
+      if (data) {
+          setLocations(normalizeLocations(data));
+      }
   };
 
   const fetchEventParticipants = async (eventId: number) => {
@@ -372,6 +416,23 @@ const EventsList: React.FC = () => {
   };
 
   const selectSuggestion = (p: Participant) => {
+      let affiliationType: 'Office' | 'LGU' = 'Office';
+      let province = '';
+      let city = '';
+
+      if (p.location_id && locations.length > 0) {
+          const location = locations.find((l) => l.location_id === p.location_id);
+          if (location) {
+              affiliationType = 'LGU';
+              province = location.province_huc;
+              city = location.city_mun || '';
+          }
+      }
+
+      setAddAffiliationType(affiliationType);
+      setAddProvince(province);
+      setAddCity(city);
+
       setNewParticipant(prev => ({
           ...prev,
           full_name: p.full_name,
@@ -603,8 +664,18 @@ const EventsList: React.FC = () => {
     );
   }, [events, searchTerm]);
 
-  const provinces = Array.from(new Set(locations.map(l => l.province_huc))).sort();
-  const cities = locations.filter(l => l.province_huc === addProvince && l.city_mun).map(l => l.city_mun as string).sort();
+  const provinces = Array.from(
+      new Set(locations.map((l) => l.province_huc).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+
+  const cities = Array.from(
+      new Set(
+          locations
+              .filter((l) => l.province_huc === addProvince && l.city_mun)
+              .map((l) => (l.city_mun as string).trim())
+              .filter(Boolean)
+      )
+  ).sort((a, b) => a.localeCompare(b));
 
   return (
     <div className="space-y-6">
