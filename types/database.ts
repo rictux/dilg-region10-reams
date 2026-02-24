@@ -25,6 +25,7 @@ export interface User {
   created_at?: string;
   position: string;
   office_id?: number | null;
+  img_link?: string | null;
 }
 
 export interface Event {
