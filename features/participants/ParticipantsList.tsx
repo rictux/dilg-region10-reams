@@ -249,6 +249,18 @@ const AttendanceList: React.FC = () => {
 
   const openManualModal = (e: React.MouseEvent, p: Participant) => {
       e.stopPropagation();
+      
+      // Prevent manual entry for future dates
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const eventDate = new Date(selectedDate);
+      eventDate.setHours(0, 0, 0, 0);
+      
+      if (eventDate > today) {
+          alert("Cannot log attendance for future dates.");
+          return;
+      }
+
       setManualParticipant(p);
       setManualForm({
           date: selectedDate || new Date().toISOString().split('T')[0],
