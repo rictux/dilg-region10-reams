@@ -6,12 +6,10 @@ import {
     Calendar as CalendarIcon, 
     CheckCircle, 
     Clock, 
-    MapPin, 
-    Layers, 
     ChevronLeft, 
     ChevronRight,
     Users,
-    Info
+    Briefcase
 } from 'lucide-react';
 import { 
     format, 
@@ -51,7 +49,7 @@ const Dashboard: React.FC = () => {
     activeEvents: 0,
     completedEvents: 0
   });
-  const [todaysEvents, setTodaysEvents] = useState<DashboardEvent[]>([]);
+  const [ongoingEvents, setOngoingEvents] = useState<DashboardEvent[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<DashboardEvent[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<DashboardEvent[]>([]); // Events for the calendar
   const [currentDate, setCurrentDate] = useState(new Date()); // For Calendar Navigation
@@ -104,17 +102,17 @@ const Dashboard: React.FC = () => {
             completedEvents: completed || 0
         });
 
-        // 2. Today's Events
-        let todayQuery = supabase
+        // 2. On-going Events
+        let ongoingQuery = supabase
             .from('events')
             .select('*')
             .lte('start_date', today)
             .gte('end_date', today);
         
-        if (user?.role !== 'Admin' && user?.office_id) todayQuery = todayQuery.eq('organize_by', user.office_id);
-        const { data: todayData } = await todayQuery;
+        if (user?.role !== 'Admin' && user?.office_id) ongoingQuery = ongoingQuery.eq('organize_by', user.office_id);
+        const { data: ongoingData } = await ongoingQuery;
         
-        const todaysEventsWithCounts = await Promise.all((todayData || []).map(async (e) => {
+        const ongoingEventsWithCounts = await Promise.all((ongoingData || []).map(async (e) => {
             const { count: regCount } = await supabase
                 .from('event_participants')
                 .select('*', { count: 'exact', head: true })
@@ -135,7 +133,7 @@ const Dashboard: React.FC = () => {
                 present_count: amCount || 0
             };
         }));
-        setTodaysEvents(todaysEventsWithCounts);
+        setOngoingEvents(ongoingEventsWithCounts);
 
         // 3. Upcoming Events
         let upcomingQuery = supabase
@@ -291,73 +289,62 @@ const Dashboard: React.FC = () => {
   };
 
   const StatCard = ({ icon: Icon, label, value, color }: any) => (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center space-x-4">
-      <div className={`p-3 rounded-full ${color} bg-opacity-10 text-${color.split('-')[1]}-600`}>
-        <Icon size={24} className={color.replace('bg-', 'text-')} />
+    <div className={`${color} p-6 rounded-2xl shadow-sm flex items-center justify-between text-white`}>
+      <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
+        <Icon size={28} className="text-white" />
       </div>
-      <div>
-        <p className="text-slate-500 text-sm font-medium">{label}</p>
-        <p className="text-2xl font-bold text-slate-800">{loading ? '...' : value}</p>
+      <div className="text-right">
+        <p className="text-white/80 text-sm font-medium mb-1">{label}</p>
+        <p className="text-4xl font-bold">{loading ? '...' : value}</p>
       </div>
     </div>
   );
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-slate-800">Dashboard Overview</h2>
-
-      {/* Stats Row */}
+    <div className="space-y-8">
+      {/* Top Stats Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard icon={Layers} label="Total Events" value={stats.totalEvents} color="bg-indigo-500" />
-        <StatCard icon={CheckCircle} label="Active Events" value={stats.activeEvents} color="bg-emerald-500" />
-        <StatCard icon={CalendarIcon} label="Completed Events" value={stats.completedEvents} color="bg-slate-500" />
+        <StatCard icon={CalendarIcon} label="Total Events" value={stats.totalEvents} color="bg-[#5C3CCE]" />
+        <StatCard icon={Briefcase} label="On-Going Events" value={stats.activeEvents} color="bg-[#4099FF]" />
+        <StatCard icon={Users} label="Completed Events" value={stats.completedEvents} color="bg-[#2ED47A]" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-        
-        {/* LEFT COLUMN: Calendar (2/3 width) */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col h-full min-h-[600px]">
-            {/* Calendar Header */}
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <CalendarIcon className="text-indigo-600" size={20} /> Event Calendar
-                </h3>
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Main Column - Calendar */}
+        <div className="w-full lg:w-2/3 flex flex-col gap-8">
+          {/* Calendar */}
+          <div className="bg-white rounded-[32px] p-8 shadow-sm border border-slate-100 flex flex-col min-h-[500px]">
+            <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-slate-800">Event Calendar</h3>
                 <div className="flex items-center gap-4">
                     <span className="text-slate-600 font-semibold w-32 text-center">
                         {format(currentDate, 'MMMM yyyy')}
                     </span>
-                    <div className="flex gap-1">
-                        <button onClick={prevMonth} className="p-1 hover:bg-slate-100 rounded-full text-slate-500">
+                    <div className="flex gap-2">
+                        <button onClick={prevMonth} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
                             <ChevronLeft size={20} />
                         </button>
-                        <button onClick={nextMonth} className="p-1 hover:bg-slate-100 rounded-full text-slate-500">
+                        <button onClick={nextMonth} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
                             <ChevronRight size={20} />
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* Calendar Grid */}
-            <div className="flex-1 p-4 flex flex-col relative z-0">
+            <div className="flex-1 flex flex-col relative z-0">
                 <div className="grid grid-cols-7 mb-2">
                     {weekDays.map(day => (
-                        <div key={day} className="text-center text-xs font-semibold text-slate-400 uppercase tracking-wider py-2">
+                        <div key={day} className="text-center text-xs font-bold text-slate-400 uppercase tracking-wider py-2">
                             {day}
                         </div>
                     ))}
                 </div>
                 
-                {/* 
-                   We remove overflow-hidden from here to allow tooltips to pop out. 
-                   We apply rounding to the corners manually in the map loop if needed, 
-                   or just on the container.
-                */}
-                <div className="grid grid-cols-7 auto-rows-fr gap-px bg-slate-200 border border-slate-200 rounded-lg flex-1">
+                <div className="grid grid-cols-7 auto-rows-fr gap-px bg-slate-100 border border-slate-100 rounded-2xl overflow-hidden flex-1">
                     {calendarDays.map((day, idx) => {
                         const isCurrentMonth = isSameMonth(day, monthStart);
                         const isTodayDate = isToday(day);
                         
-                        // Find events active on this specific day
                         const activeEvents = calendarEvents.filter(e => {
                             const start = startOfDay(parseISO(e.start_date));
                             const end = endOfDay(parseISO(e.end_date));
@@ -365,8 +352,6 @@ const Dashboard: React.FC = () => {
                         });
 
                         const hasEvents = activeEvents.length > 0;
-
-                        // Map active events to their assigned slot positions
                         const slots: Record<number, DashboardEvent> = {};
                         let maxSlotIndex = -1;
 
@@ -379,7 +364,6 @@ const Dashboard: React.FC = () => {
                         });
 
                         const renderSlots = [];
-                        // Render up to max slot used to maintain vertical alignment
                         for (let i = 0; i <= maxSlotIndex; i++) {
                             const event = slots[i];
                             if (event) {
@@ -399,38 +383,27 @@ const Dashboard: React.FC = () => {
                                     </div>
                                 );
                             } else {
-                                // Spacer for empty slot
                                 renderSlots.push(<div key={`spacer-${i}`} className="h-5 mb-1"></div>);
                             }
                         }
-
-                        // Determine corners for rounding since parent no longer has overflow-hidden
-                        const cornerClass = 
-                            idx === 0 ? 'rounded-tl-lg' :
-                            idx === 6 ? 'rounded-tr-lg' :
-                            idx === calendarDays.length - 7 ? 'rounded-bl-lg' :
-                            idx === calendarDays.length - 1 ? 'rounded-br-lg' : '';
 
                         return (
                             <div 
                                 key={idx} 
                                 className={`
-                                    min-h-[110px] flex flex-col relative group hover:z-20
-                                    ${isCurrentMonth ? 'bg-white' : 'bg-slate-50 text-slate-300'}
+                                    min-h-[100px] flex flex-col relative group hover:z-20
+                                    ${isCurrentMonth ? 'bg-white' : 'bg-slate-50/50 text-slate-300'}
                                     ${isTodayDate ? '!bg-indigo-50/30' : ''}
-                                    ${cornerClass}
                                     transition-colors hover:bg-slate-50
                                 `}
                             >
-                                <div className={`
-                                    text-xs font-medium p-1.5 flex justify-between items-center
-                                `}>
+                                <div className="text-xs font-medium p-2 flex justify-between items-center">
                                     <span className={`
                                         w-7 h-7 flex items-center justify-center rounded-full transition-all
                                         ${isTodayDate 
-                                            ? 'bg-indigo-600 text-white font-bold shadow-md' 
+                                            ? 'bg-[#4322A7] text-white font-bold shadow-md' 
                                             : hasEvents && isCurrentMonth 
-                                                ? 'bg-indigo-100 text-indigo-700 font-bold ring-1 ring-indigo-200' 
+                                                ? 'bg-indigo-100 text-[#4322A7] font-bold' 
                                                 : 'text-slate-500 group-hover:bg-slate-200'
                                         }
                                     `}>
@@ -441,113 +414,97 @@ const Dashboard: React.FC = () => {
                                 <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-1 z-0 relative">
                                     {renderSlots}
                                 </div>
-
-                                {/* TOOLTIP */}
-                                {hasEvents && (
-                                    <div className="hidden group-hover:block absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 pointer-events-none animate-in fade-in zoom-in-95 duration-200">
-                                        <div className="bg-slate-800 text-white text-xs rounded-xl shadow-2xl border border-slate-700 p-3">
-                                            <div className="font-bold border-b border-slate-600 pb-2 mb-2 flex justify-between items-center">
-                                                <span>{format(day, 'MMMM d, yyyy')}</span>
-                                                <span className="bg-slate-700 px-1.5 py-0.5 rounded text-[10px]">{activeEvents.length} Events</span>
-                                            </div>
-                                            <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-                                                {activeEvents.map(e => (
-                                                    <div key={e.event_id} className="flex flex-col gap-0.5 border-l-2 border-indigo-500 pl-2">
-                                                        <span className="font-semibold text-indigo-200 truncate">{e.event_name}</span>
-                                                        <div className="flex justify-between text-[10px] text-slate-400">
-                                                            <span className="flex items-center gap-1"><MapPin size={10}/> {e.venue}</span>
-                                                            <span className={e.status === 'Ongoing' ? 'text-green-400' : ''}>{e.status}</span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        {/* Tooltip Arrow */}
-                                        <div className="w-3 h-3 bg-slate-800 rotate-45 absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-r border-b border-slate-700"></div>
-                                    </div>
-                                )}
                             </div>
                         );
                     })}
                 </div>
             </div>
+          </div>
         </div>
 
-        {/* RIGHT COLUMN: Stacked Today's Events & Upcoming Events (1/3 width) */}
-        <div className="flex flex-col gap-6">
-            
-            {/* Today's Events (Card View) */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col max-h-[500px] overflow-y-auto">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-slate-800 sticky top-0 bg-white z-10 pb-2">
-                    <Clock className="text-green-600" size={20} /> Today's Events
-                </h3>
-                
+        {/* Right Column - Event Lists */}
+        <div className="w-full lg:w-1/3 flex flex-col gap-6">
+          <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100 flex flex-col gap-8">
+            {/* Ongoing Events */}
+            <div>
+              <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <Clock className="text-[#4322A7]" size={20} />
+                On-going Events
+              </h3>
+              {ongoingEvents.length > 0 ? (
                 <div className="space-y-4">
-                    {todaysEvents.map((event) => (
-                        <div key={event.event_id} className="p-4 rounded-xl border border-green-100 bg-green-50/30 hover:shadow-md transition-all group">
-                            <div className="flex justify-between items-start">
-                                <h4 className="font-bold text-slate-800 mb-1 group-hover:text-green-700 transition-colors line-clamp-2">{event.event_name}</h4>
-                                <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
-                                    Today
-                                </span>
-                            </div>
-                            
-                            <div className="flex items-center gap-2 text-xs text-slate-500 mb-3">
-                                <MapPin size={12} /> {event.venue}
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-green-100">
-                                <div className="text-center bg-white rounded p-1.5 border border-slate-100">
-                                    <p className="text-[10px] text-slate-400 uppercase font-bold">Registered</p>
-                                    <p className="text-sm font-bold text-blue-600">{event.registered_count}</p>
-                                </div>
-                                <div className="text-center bg-white rounded p-1.5 border border-slate-100">
-                                    <p className="text-[10px] text-slate-400 uppercase font-bold">Present</p>
-                                    <p className="text-sm font-bold text-green-600">{event.present_count}</p>
-                                </div>
-                            </div>
+                  {ongoingEvents.map((event, index) => (
+                    <div key={event.event_id} className={index !== ongoingEvents.length - 1 ? "border-b border-slate-100 pb-4" : ""}>
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="pr-3">
+                          <h4 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight mb-1">{event.event_name}</h4>
+                          <p className="text-xs font-semibold text-[#4322A7] mb-1">{event.venue}</p>
+                          <p className="text-[10px] text-slate-500">
+                            {format(new Date(event.start_date), 'MMM d, yyyy')} - {format(new Date(event.end_date), 'MMM d, yyyy')}
+                          </p>
                         </div>
-                    ))}
-                    {todaysEvents.length === 0 && (
-                        <div className="text-center py-8 text-slate-400 text-sm bg-slate-50/50 rounded-lg border-2 border-dashed border-slate-100">
-                            <Clock className="w-8 h-8 mb-2 mx-auto opacity-20" />
-                            No events happening today.
+                      </div>
+                      <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
+                        <div className="text-center flex-1 border-r border-slate-200">
+                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-0.5">Registered</p>
+                          <p className="font-bold text-sm text-slate-800">{event.registered_count}</p>
                         </div>
-                    )}
+                        <div className="text-center flex-1">
+                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-0.5">Present</p>
+                          <p className="font-bold text-sm text-[#4322A7]">{event.present_count}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
+              ) : (
+                <div className="text-center py-6 text-slate-400 text-sm bg-slate-50 rounded-2xl border border-slate-100">
+                  <Clock className="w-8 h-8 mb-2 mx-auto opacity-20" />
+                  No on-going events.
+                </div>
+              )}
             </div>
 
-            {/* Upcoming Events (Card View) */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-slate-800 sticky top-0 bg-white z-10 pb-2">
-                    <CalendarIcon className="text-orange-500" size={20} /> Upcoming Events
-                </h3>
+            {/* Upcoming Events */}
+            <div>
+              <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <CalendarIcon className="text-[#4099FF]" size={20} />
+                Upcoming Events
+              </h3>
+              {upcomingEvents.length > 0 ? (
                 <div className="space-y-4">
-                    {upcomingEvents.map((event) => (
-                        <div key={event.event_id} className="p-4 rounded-xl border border-slate-100 hover:border-indigo-200 hover:shadow-md hover:shadow-indigo-500/5 transition-all group bg-slate-50/50 hover:bg-white">
-                            <h4 className="font-bold text-slate-800 mb-1 group-hover:text-indigo-600 transition-colors line-clamp-2">{event.event_name}</h4>
-                            <div className="flex items-center gap-2 text-xs text-slate-500 mb-3">
-                                <MapPin size={12} /> {event.venue}
-                            </div>
-                            <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-100">
-                                <span className="text-slate-600 flex items-center gap-1.5 font-medium text-xs">
-                                    <Clock size={14} className="text-slate-400" />
-                                    {format(new Date(event.start_date), 'MMM d, yyyy')}
-                                </span>
-                                 <span className="bg-white border border-slate-200 text-slate-600 px-2 py-0.5 rounded text-[10px] font-medium flex items-center gap-1">
-                                    <Users size={10} /> {event.registered_count} Reg.
-                                </span>
-                            </div>
+                  {upcomingEvents.map((event, index) => (
+                    <div key={event.event_id} className={index !== upcomingEvents.length - 1 ? "border-b border-slate-100 pb-4" : ""}>
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="pr-3">
+                          <h4 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight mb-1">{event.event_name}</h4>
+                          <p className="text-xs font-semibold text-[#4099FF] mb-1">{event.venue}</p>
+                          <p className="text-[10px] text-slate-500">
+                            {format(new Date(event.start_date), 'MMM d, yyyy')} - {format(new Date(event.end_date), 'MMM d, yyyy')}
+                          </p>
                         </div>
-                    ))}
-                     {upcomingEvents.length === 0 && (
-                        <div className="text-center py-8 text-slate-400 text-sm bg-slate-50/50 rounded-lg border-2 border-dashed border-slate-100">
-                            No upcoming events found.
+                      </div>
+                      <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
+                        <div className="text-center flex-1 border-r border-slate-200">
+                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-0.5">Registered</p>
+                          <p className="font-bold text-sm text-slate-800">{event.registered_count}</p>
                         </div>
-                    )}
+                        <div className="text-center flex-1">
+                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-0.5">Present</p>
+                          <p className="font-bold text-sm text-[#4099FF]">-</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
+              ) : (
+                <div className="text-center py-6 text-slate-400 text-sm bg-slate-50 rounded-2xl border border-slate-100">
+                  <CalendarIcon className="w-8 h-8 mb-2 mx-auto opacity-20" />
+                  No upcoming events.
+                </div>
+              )}
             </div>
-
+          </div>
         </div>
       </div>
     </div>
