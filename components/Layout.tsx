@@ -19,6 +19,7 @@ import {
   CheckCircle,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   User,
   Eye,
   EyeOff
@@ -146,29 +147,45 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const NavItem = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => {
     const isActive = location.pathname === to;
     return (
-      <div className="px-3 mb-1">
+      <div className="relative pl-6 pr-0 my-1">
+        {isActive && (
+          <>
+            {/* Top curve */}
+            <div className="absolute right-0 -top-6 w-6 h-6 bg-[#f4f5f9] z-0 pointer-events-none">
+              <div className="w-full h-full bg-[#4322A7] rounded-br-3xl"></div>
+            </div>
+            {/* Bottom curve */}
+            <div className="absolute right-0 -bottom-6 w-6 h-6 bg-[#f4f5f9] z-0 pointer-events-none">
+              <div className="w-full h-full bg-[#4322A7] rounded-tr-3xl"></div>
+            </div>
+            {/* Active background */}
+            <div className="absolute inset-0 bg-[#f4f5f9] rounded-l-3xl z-0"></div>
+          </>
+        )}
         <button
           onClick={() => {
             navigate(to);
             setIsMobileMenuOpen(false);
           }}
-          className={`group flex items-center w-full gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ease-in-out ${
+          className={`relative z-10 flex items-center justify-between w-full px-4 py-3.5 transition-colors ${
             isActive 
-              ? 'bg-white/10 text-white font-medium shadow-sm' 
-              : 'text-indigo-200 hover:bg-white/5 hover:text-white'
+              ? 'text-slate-800 font-semibold' 
+              : 'text-indigo-100 hover:text-white'
           }`}
           title={isSidebarCollapsed ? label : undefined}
           aria-current={isActive ? 'page' : undefined}
         >
-          <Icon 
-            size={18} 
-            strokeWidth={2} 
-            className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-indigo-300 group-hover:text-white'}`} 
-            aria-hidden="true" 
-          />
-          {!isSidebarCollapsed && (
-            <span className="text-[14px] tracking-wide truncate">{label}</span>
-          )}
+          <div className="flex items-center gap-4">
+            <Icon 
+              size={22} 
+              strokeWidth={isActive ? 2.5 : 2} 
+              className={`shrink-0 transition-colors ${isActive ? 'text-[#4322A7]' : 'text-indigo-200 group-hover:text-white'}`} 
+              aria-hidden="true" 
+            />
+            {!isSidebarCollapsed && (
+              <span className="text-[15px] tracking-wide truncate">{label}</span>
+            )}
+          </div>
         </button>
       </div>
     );
@@ -504,7 +521,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           )}
         </div>
 
-        <nav className="flex-1 space-y-1 mt-4 overflow-y-auto no-scrollbar">
+        <nav className="flex-1 space-y-1 pt-6 pb-6 overflow-y-auto overflow-x-hidden no-scrollbar">
           {hasPermission('VIEW_DASHBOARD') && (
               <NavItem to="/dashboard" icon={LayoutGrid} label="Dashboard" />
           )}
