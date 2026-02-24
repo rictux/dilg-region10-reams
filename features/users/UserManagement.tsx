@@ -202,11 +202,7 @@ const UserManagement: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-            <h2 className="text-2xl font-bold text-slate-800">User Management</h2>
-            <p className="text-slate-500 mt-1">Manage system access and roles.</p>
-        </div>
+      <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-4">
         <button 
             onClick={openCreateModal}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-sm transition-colors font-medium"
