@@ -9,7 +9,8 @@ import {
     ChevronLeft, 
     ChevronRight,
     Users,
-    Briefcase
+    Briefcase,
+    MapPin
 } from 'lucide-react';
 import { 
     format, 
@@ -276,7 +277,7 @@ const Dashboard: React.FC = () => {
       return {
           className: `
             ${baseColor}
-            text-[10px] h-5 mb-1 px-1 flex items-center
+            text-xs h-5 mb-1 px-1 flex items-center
             ${isStart ? 'rounded-l-md ml-1 border-l' : 'border-l-0 -ml-[1px]'}
             ${isEnd ? 'rounded-r-md mr-1 border-r' : 'border-r-0 -mr-[1px]'}
             ${!isStart && !isEnd ? 'rounded-none' : ''}
@@ -313,7 +314,7 @@ const Dashboard: React.FC = () => {
         {/* Main Column - Calendar */}
         <div className="w-full lg:w-2/3 flex flex-col gap-8">
           {/* Calendar */}
-          <div className="bg-white rounded-[32px] p-8 shadow-sm border border-slate-100 flex flex-col min-h-[500px]">
+          <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200/60 flex flex-col min-h-[500px]">
             <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-slate-800">Event Calendar</h3>
                 <div className="flex items-center gap-4">
@@ -424,7 +425,7 @@ const Dashboard: React.FC = () => {
 
         {/* Right Column - Event Lists */}
         <div className="w-full lg:w-1/3 flex flex-col gap-6">
-          <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100 flex flex-col gap-8">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 flex flex-col gap-8">
             {/* Ongoing Events */}
             <div>
               <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -434,23 +435,25 @@ const Dashboard: React.FC = () => {
               {ongoingEvents.length > 0 ? (
                 <div className="space-y-4">
                   {ongoingEvents.map((event, index) => (
-                    <div key={event.event_id} className={index !== ongoingEvents.length - 1 ? "border-b border-slate-100 pb-4" : ""}>
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="pr-3">
-                          <h4 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight mb-1">{event.event_name}</h4>
-                          <p className="text-xs font-semibold text-[#4322A7] mb-1">{event.venue}</p>
-                          <p className="text-[10px] text-slate-500">
-                            {format(new Date(event.start_date), 'MMM d, yyyy')} - {format(new Date(event.end_date), 'MMM d, yyyy')}
-                          </p>
+                    <div key={event.event_id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="mb-3">
+                        <h4 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight mb-2">{event.event_name}</h4>
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-[#4322A7] mb-1.5">
+                          <MapPin size={14} className="shrink-0" />
+                          <span className="truncate">{event.venue}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                          <CalendarIcon size={14} className="shrink-0" />
+                          <span>{format(new Date(event.start_date), 'MMM d, yyyy')} - {format(new Date(event.end_date), 'MMM d, yyyy')}</span>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                         <div className="text-center flex-1 border-r border-slate-200">
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-0.5">Registered</p>
+                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">Registered</p>
                           <p className="font-bold text-sm text-slate-800">{event.registered_count}</p>
                         </div>
                         <div className="text-center flex-1">
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-0.5">Present</p>
+                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">Present</p>
                           <p className="font-bold text-sm text-[#4322A7]">{event.present_count}</p>
                         </div>
                       </div>
@@ -474,23 +477,25 @@ const Dashboard: React.FC = () => {
               {upcomingEvents.length > 0 ? (
                 <div className="space-y-4">
                   {upcomingEvents.map((event, index) => (
-                    <div key={event.event_id} className={index !== upcomingEvents.length - 1 ? "border-b border-slate-100 pb-4" : ""}>
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="pr-3">
-                          <h4 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight mb-1">{event.event_name}</h4>
-                          <p className="text-xs font-semibold text-[#4099FF] mb-1">{event.venue}</p>
-                          <p className="text-[10px] text-slate-500">
-                            {format(new Date(event.start_date), 'MMM d, yyyy')} - {format(new Date(event.end_date), 'MMM d, yyyy')}
-                          </p>
+                    <div key={event.event_id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="mb-3">
+                        <h4 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight mb-2">{event.event_name}</h4>
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-[#4099FF] mb-1.5">
+                          <MapPin size={14} className="shrink-0" />
+                          <span className="truncate">{event.venue}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                          <CalendarIcon size={14} className="shrink-0" />
+                          <span>{format(new Date(event.start_date), 'MMM d, yyyy')} - {format(new Date(event.end_date), 'MMM d, yyyy')}</span>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                         <div className="text-center flex-1 border-r border-slate-200">
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-0.5">Registered</p>
+                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">Registered</p>
                           <p className="font-bold text-sm text-slate-800">{event.registered_count}</p>
                         </div>
                         <div className="text-center flex-1">
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-0.5">Present</p>
+                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">Present</p>
                           <p className="font-bold text-sm text-[#4099FF]">-</p>
                         </div>
                       </div>
