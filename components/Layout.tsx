@@ -146,19 +146,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const NavItem = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => {
     const isActive = location.pathname === to;
     return (
-      <div className="relative pl-6 my-2">
+      <div className="relative pl-6 pr-4 md:pr-0 my-2">
         {isActive && (
-          <>
-            <div className="absolute inset-y-0 -right-10 left-4 bg-[#f4f5f9] rounded-l-full"></div>
-            {/* Top curve */}
-            <div className="absolute -right-10 bottom-full w-16 h-6 bg-[#f4f5f9]">
-              <div className="absolute left-0 top-0 w-6 h-6 bg-[#4322A7] rounded-br-full"></div>
-            </div>
-            {/* Bottom curve */}
-            <div className="absolute -right-10 top-full w-16 h-6 bg-[#f4f5f9]">
-              <div className="absolute left-0 top-0 w-6 h-6 bg-[#4322A7] rounded-tr-full"></div>
-            </div>
-          </>
+          <div className="absolute inset-0 bg-[#f4f5f9] rounded-l-full rounded-r-full md:rounded-r-none">
+          </div>
         )}
         <button
           onClick={() => {
