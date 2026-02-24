@@ -5,22 +5,21 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutGrid, 
-  Ticket, 
-  UsersRound, 
-  Scan, 
+  Calendar, 
+  UserCheck, 
+  Search, 
+  BarChart2, 
+  Users, 
+  ScanLine, 
   LogOut, 
   Menu, 
   X,
-  LineChart,
-  ClipboardList,
   KeyRound,
   Loader2,
   CheckCircle,
   ChevronDown,
   ChevronUp,
   User,
-  Shield,
-  BookUser,
   Eye,
   EyeOff
 } from 'lucide-react';
@@ -146,26 +145,28 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const NavItem = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => {
     const isActive = location.pathname === to;
     return (
-      <div className="relative pl-6 pr-4 md:pr-0 my-2">
-        {isActive && (
-          <div className="absolute inset-0 bg-[#f4f5f9] rounded-l-full rounded-r-full md:rounded-r-none">
-          </div>
-        )}
+      <div className="px-3 mb-1">
         <button
           onClick={() => {
             navigate(to);
             setIsMobileMenuOpen(false);
           }}
-          className={`relative z-10 flex items-center space-x-4 w-full px-6 py-3.5 transition-colors ${
+          className={`group flex items-center w-full gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ease-in-out ${
             isActive 
-              ? 'text-[#4322A7]' 
-              : 'text-indigo-200 hover:text-white'
+              ? 'bg-white/10 text-white font-medium shadow-sm' 
+              : 'text-indigo-200 hover:bg-white/5 hover:text-white'
           }`}
           title={isSidebarCollapsed ? label : undefined}
+          aria-current={isActive ? 'page' : undefined}
         >
-          <Icon size={22} strokeWidth={isActive ? 2.5 : 2} className="shrink-0" />
+          <Icon 
+            size={18} 
+            strokeWidth={2} 
+            className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-indigo-300 group-hover:text-white'}`} 
+            aria-hidden="true" 
+          />
           {!isSidebarCollapsed && (
-            <span className={`font-medium text-[15px] whitespace-nowrap ${isActive ? 'font-semibold' : ''}`}>{label}</span>
+            <span className="text-[14px] tracking-wide truncate">{label}</span>
           )}
         </button>
       </div>
@@ -450,7 +451,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         md:translate-x-0 md:static md:shadow-none
         ${isMobileMenuOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full w-[280px]'}
         ${isSidebarCollapsed ? 'md:w-[90px]' : 'md:w-[280px]'}
-        rounded-tr-[40px] rounded-br-[40px] md:rounded-r-[40px]
+        rounded-tr-3xl rounded-br-3xl md:rounded-r-3xl
         flex flex-col overflow-hidden
       `}>
         <div className={`p-8 flex items-center gap-3 ${isSidebarCollapsed ? 'justify-center px-4' : ''}`}>
@@ -458,7 +459,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" />
           </div>
           {!isSidebarCollapsed && (
-            <h1 className="text-2xl font-bold text-white tracking-wide whitespace-nowrap">R10 Event</h1>
+            <h1 className="text-2xl font-bold text-white tracking-wide whitespace-nowrap">Admin Portal</h1>
           )}
         </div>
 
@@ -467,31 +468,31 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <NavItem to="/dashboard" icon={LayoutGrid} label="Dashboard" />
           )}
           {hasPermission('MANAGE_EVENTS') && (
-              <NavItem to="/events" icon={Ticket} label="Events" />
+              <NavItem to="/events" icon={Calendar} label="Events" />
           )}
           {hasPermission('VIEW_PARTICIPANTS') && (
-              <NavItem to="/attendance" icon={UsersRound} label="Attendance" />
+              <NavItem to="/attendance" icon={UserCheck} label="Attendance" />
           )}
 
-          <NavItem to="/admin/lookup" icon={BookUser} label="Name Lookup" />
+          <NavItem to="/admin/lookup" icon={Search} label="Name Lookup" />
 
           {hasPermission('VIEW_REPORTS') && (
-              <NavItem to="/reports" icon={LineChart} label="Reports" />
+              <NavItem to="/reports" icon={BarChart2} label="Reports" />
           )}
           
           {hasPermission('MANAGE_USERS') && (
-              <NavItem to="/users" icon={Shield} label="Users" />
+              <NavItem to="/users" icon={Users} label="Users" />
           )}
 
           {hasPermission('SCAN_QR') && (
-              <NavItem to="/scan" icon={Scan} label="Scan Mode" />
+              <NavItem to="/scan" icon={ScanLine} label="Scan Mode" />
           )}
         </nav>
 
         <div className={`p-8 mt-auto text-xs text-indigo-300 space-y-2 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-          <p className="font-medium text-indigo-200">Event Portal Admin Dashboard</p>
-          <p>© 2024 All Rights Reserved</p>
-          <p>Made with ❤️ by R10</p>
+          <p className="font-medium text-indigo-200">DILG R10 Event Management Portal</p>
+          <p>© 2026 All Rights Reserved</p>
+          <p>Created by: RICTU X</p>
         </div>
       </aside>
 
