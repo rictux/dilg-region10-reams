@@ -383,7 +383,7 @@ const AttendanceList: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
         <div className="flex flex-col md:flex-row gap-4 w-full items-start md:items-center">
-            <div className="w-full md:w-[750px] relative" ref={dropdownRef}>
+            <div className="w-full md:w-[576px] relative" ref={dropdownRef}>
                 <div 
                     className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors shadow-sm"
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
