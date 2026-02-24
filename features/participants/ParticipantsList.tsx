@@ -2,8 +2,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Participant, Event, RefLocation } from '../../types/database';
-import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Home, ChevronDown, Check, Filter, Building, Landmark, MapPin, Briefcase, Mail, Phone } from 'lucide-react';
+import { Participant, Event } from '../../types/database';
+import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Home, ChevronDown, Check, Filter } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { format, parseISO, eachDayOfInterval, isSameMonth, isSameYear } from 'date-fns';
 import { toPng } from 'html-to-image';
@@ -12,19 +12,6 @@ interface AttendanceRow {
     participant: Participant;
     amLog?: { time: string, status: string };
     pmLog?: { time: string, status: string };
-}
-
-interface AddParticipantForm {
-  full_name: string;
-  email: string;
-  mobile_no: string;
-  position: string;
-  office: string;
-  gender: string;
-  age_group: string;
-  pwd: string;
-  indigenous_people: string;
-  participant_id: number | null;
 }
 
 const AttendanceList: React.FC = () => {
@@ -59,69 +46,6 @@ const AttendanceList: React.FC = () => {
   });
   const [savingManual, setSavingManual] = useState(false);
 
-  // Add Participant State
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [locations, setLocations] = useState<RefLocation[]>([]);
-  const [addForm, setAddForm] = useState<AddParticipantForm>({
-      full_name: '',
-      email: '',
-      mobile_no: '',
-      position: '',
-      office: '',
-      gender: 'Male',
-      age_group: '18-24',
-      pwd: 'No',
-      indigenous_people: 'No',
-      participant_id: null
-  });
-  const [addAffiliationType, setAddAffiliationType] = useState<'Office' | 'LGU'>('Office');
-  const [addProvince, setAddProvince] = useState('');
-  const [addCity, setAddCity] = useState('');
-  const [isAdding, setIsAdding] = useState(false);
-  const [addSuggestions, setAddSuggestions] = useState<Participant[]>([]);
-  const [showAddSuggestions, setShowAddSuggestions] = useState(false);
-
-  const closeAddModal = () => {
-      setShowAddModal(false);
-      setAddSuggestions([]);
-      setShowAddSuggestions(false);
-  };
-
-  const normalizeLocations = (rows: any[]): RefLocation[] => {
-    return rows
-      .map((row) => {
-        const provinceRaw =
-          row?.province_huc ??
-          row?.provinceHuc ??
-          row?.province ??
-          row?.province_name ??
-          '';
-        const cityRaw =
-          row?.city_mun ??
-          row?.cityMun ??
-          row?.city_municipality ??
-          row?.city ??
-          row?.municipality ??
-          null;
-        const locationIdRaw = row?.location_id ?? row?.locationId ?? row?.id;
-
-        const province = typeof provinceRaw === 'string' ? provinceRaw.trim() : '';
-        const city = typeof cityRaw === 'string' ? cityRaw.trim() : null;
-        const locationId = Number(locationIdRaw);
-
-        if (!province || Number.isNaN(locationId)) {
-          return null;
-        }
-
-        return {
-          location_id: locationId,
-          province_huc: province,
-          city_mun: city || null
-        } as RefLocation;
-      })
-      .filter((loc): loc is RefLocation => loc !== null);
-  };
-
   // Click Outside Listener for Dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -135,24 +59,6 @@ const AttendanceList: React.FC = () => {
 
   // Fetch Events
   useEffect(() => {
-    const fetchLocations = async () => {
-        const { data, error } = await supabase
-            .from('ref_locations')
-            .select('*')
-            .order('province_huc', { ascending: true })
-            .order('city_mun', { ascending: true });
-        if (error) {
-            console.error('Failed to fetch ref_locations:', error.message);
-            setLocations([]);
-            return;
-        }
-
-        if (data) {
-            setLocations(normalizeLocations(data));
-        }
-    };
-    fetchLocations();
-
     const fetchAllEvents = async () => {
         let query = supabase.from('events').select('*').order('start_date', { ascending: false });
 
@@ -426,212 +332,6 @@ const AttendanceList: React.FC = () => {
       }
   };
 
-  const handleAddParticipantSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!selectedEventId || !user) return;
-      
-      setIsAdding(true);
-      try {
-          let finalLocationId = null;
-          let finalOfficeName = addForm.office;
-
-          if (addAffiliationType === 'LGU') {
-              if (!addProvince) throw new Error("Please select a Province/HUC for LGU.");
-              
-              if (addCity) {
-                  const loc = locations.find(l => l.province_huc === addProvince && l.city_mun === addCity);
-                  if (loc) {
-                      finalLocationId = loc.location_id;
-                      finalOfficeName = `LGU ${addCity}, ${addProvince}`;
-                  } else {
-                      throw new Error("Selected location is invalid.");
-                  }
-              } else {
-                  const loc = locations.find(l => l.province_huc === addProvince && !l.city_mun);
-                  if (loc) finalLocationId = loc.location_id;
-                  
-                  if (addProvince.toLowerCase().includes('city')) {
-                       finalOfficeName = `LGU ${addProvince}`;
-                  } else {
-                       finalOfficeName = `Provincial Gov't of ${addProvince}`;
-                  }
-              }
-          } else {
-              if (!addForm.office.trim()) throw new Error("Please enter Office / Agency name.");
-          }
-
-          const finalEmail = addForm.email.trim() === '' ? null : addForm.email.trim();
-          const finalMobile = addForm.mobile_no.trim() === '' ? null : addForm.mobile_no.trim();
-
-          // Check existing
-          let participantId: number;
-          let existingUser = null;
-          
-          if (addForm.participant_id) {
-              participantId = addForm.participant_id;
-              await supabase.from('participants').update({
-                  full_name: addForm.full_name,
-                  email: finalEmail,
-                  gender: addForm.gender,
-                  position: addForm.position,
-                  office: finalOfficeName,
-                  location_id: finalLocationId,
-                  mobile_no: finalMobile,
-                  age_group: addForm.age_group,
-                  pwd: addForm.pwd,
-                  indigenous_people: addForm.indigenous_people
-              }).eq('participant_id', participantId);
-          } else if (finalEmail) {
-               const { data } = await supabase.from('participants').select('participant_id').eq('email', finalEmail).single();
-               existingUser = data;
-              
-              if (existingUser) {
-                  participantId = existingUser.participant_id;
-                  await supabase.from('participants').update({
-                      full_name: addForm.full_name,
-                      gender: addForm.gender,
-                      position: addForm.position,
-                      office: finalOfficeName,
-                      location_id: finalLocationId,
-                      mobile_no: finalMobile,
-                      age_group: addForm.age_group,
-                      pwd: addForm.pwd,
-                      indigenous_people: addForm.indigenous_people
-                  }).eq('participant_id', participantId);
-              } else {
-                  const initials = addForm.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 3);
-                  const code = `${initials}-${Date.now().toString().slice(-6)}`;
-                  
-                  const { data: newUser, error: createError } = await supabase.from('participants').insert([{
-                      full_name: addForm.full_name,
-                      email: finalEmail,
-                      mobile_no: finalMobile,
-                      gender: addForm.gender,
-                      position: addForm.position,
-                      office: finalOfficeName,
-                      location_id: finalLocationId,
-                      participant_code: code,
-                      age_group: addForm.age_group,
-                      pwd: addForm.pwd,
-                      indigenous_people: addForm.indigenous_people
-                  }]).select().single();
-                  
-                  if (createError) throw createError;
-                  participantId = newUser.participant_id;
-              }
-          } else {
-              const initials = addForm.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 3);
-              const code = `${initials}-${Date.now().toString().slice(-6)}`;
-              
-              const { data: newUser, error: createError } = await supabase.from('participants').insert([{
-                  full_name: addForm.full_name,
-                  email: null,
-                  mobile_no: finalMobile,
-                  gender: addForm.gender,
-                  position: addForm.position,
-                  office: finalOfficeName,
-                  location_id: finalLocationId,
-                  participant_code: code,
-                  age_group: addForm.age_group,
-                  pwd: addForm.pwd,
-                  indigenous_people: addForm.indigenous_people
-              }]).select().single();
-              
-              if (createError) throw createError;
-              participantId = newUser.participant_id;
-          }
-
-          const { error: regError } = await supabase.from('event_participants').insert({
-              event_id: selectedEventId,
-              participant_id: participantId,
-              registration_status: 'Registered',
-              role: 'Delegate',
-              needs_accommodation: false,
-              accommodation_pax: 0
-          });
-
-          if (regError && regError.code !== '23505') throw regError;
-
-          closeAddModal();
-          setAddForm({
-              full_name: '', email: '', mobile_no: '', position: '', office: '',
-              gender: 'Male', age_group: '18-24', pwd: 'No', indigenous_people: 'No', participant_id: null
-          });
-          setAddAffiliationType('Office');
-          setAddProvince('');
-          setAddCity('');
-          
-          fetchAttendance(selectedEventId, selectedDate);
-          alert("Participant added successfully!");
-
-      } catch (err: any) {
-          alert("Error adding participant: " + err.message);
-      } finally {
-          setIsAdding(false);
-      }
-  };
-
-  const handleAddNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      setAddForm((prev) => ({ ...prev, full_name: value, participant_id: null }));
-
-      if (value.trim().length < 2) {
-          setAddSuggestions([]);
-          setShowAddSuggestions(false);
-          return;
-      }
-
-      const { data } = await supabase
-          .from('participants')
-          .select('*')
-          .ilike('full_name', `%${value}%`)
-          .limit(5);
-
-      if (data && data.length > 0) {
-          setAddSuggestions(data);
-          setShowAddSuggestions(true);
-      } else {
-          setAddSuggestions([]);
-          setShowAddSuggestions(false);
-      }
-  };
-
-  const selectAddSuggestion = (p: Participant) => {
-      let affiliationType: 'Office' | 'LGU' = 'Office';
-      let province = '';
-      let city = '';
-
-      if (p.location_id && locations.length > 0) {
-          const location = locations.find((l) => l.location_id === p.location_id);
-          if (location) {
-              affiliationType = 'LGU';
-              province = location.province_huc;
-              city = location.city_mun || '';
-          }
-      }
-
-      setAddAffiliationType(affiliationType);
-      setAddProvince(province);
-      setAddCity(city);
-
-      setAddForm((prev) => ({
-          ...prev,
-          full_name: p.full_name || '',
-          email: p.email || '',
-          mobile_no: p.mobile_no || '',
-          position: p.position || '',
-          office: p.office || '',
-          gender: p.gender || 'Male',
-          age_group: p.age_group || '18-24',
-          pwd: p.pwd || 'No',
-          indigenous_people: p.indigenous_people || 'No',
-          participant_id: p.participant_id
-      }));
-
-      setAddSuggestions([]);
-      setShowAddSuggestions(false);
-  };
-
   const formatLogTime = (timeStr: string) => {
       const d = new Date(timeStr.endsWith('Z') || timeStr.includes('+') ? timeStr : timeStr + 'Z');
       return format(d, 'h:mm a');
@@ -667,66 +367,22 @@ const AttendanceList: React.FC = () => {
   const noPmCount = data.filter(r => r.amLog && !r.pmLog).length;
   const completeLogsCount = data.filter(r => r.amLog && r.pmLog).length;
 
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const isFutureEvent = selectedDate > todayStr;
-  
-  const provinces = Array.from(
-    new Set(locations.map((l) => l.province_huc).filter(Boolean))
-  ).sort((a, b) => a.localeCompare(b));
-
-  const cities = Array.from(
-    new Set(
-      locations
-        .filter((l) => l.province_huc === addProvince && l.city_mun)
-        .map((l) => (l.city_mun as string).trim())
-        .filter(Boolean)
-    )
-  ).sort((a, b) => a.localeCompare(b));
-
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                Attendance 
-                <button 
-                    onClick={handleRefresh} 
-                    className="ml-2 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
-                    title="Refresh Data"
-                >
-                    <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
-                </button>
-            </h2>
-            <p className="text-slate-500 text-sm mt-1">
-                {selectedDate ? format(parseISO(selectedDate), 'EEEE, MMMM d, yyyy') : 'Select an event'}
-            </p>
-        </div>
-        <button
-            onClick={() => setShowAddModal(true)}
-            disabled={!selectedEventId}
-            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors shadow-sm
-                ${selectedEventId ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}
-            `}
-        >
-            <PlusCircle size={18} />
-            Add Participant
-        </button>
-      </div>
-
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
         <div className="flex flex-col md:flex-row gap-4 w-full items-start md:items-center">
-            <div className="w-full max-w-[60ch] relative" ref={dropdownRef}>
+            <div className="w-full md:w-[750px] relative" ref={dropdownRef}>
                 <div 
-                    className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors shadow-sm min-h-[42px]"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors shadow-sm"
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
-                    <div className="flex items-center gap-2 w-full">
+                    <div className="flex items-center gap-2 overflow-hidden">
                         <Calendar className="text-slate-400 shrink-0" size={16} />
-                        <span className={`text-xs ${!selectedEvent ? 'text-slate-500' : 'text-slate-800 font-medium'} whitespace-normal text-left break-words`}>
+                        <span className={`truncate text-xs ${!selectedEvent ? 'text-slate-500' : 'text-slate-800 font-medium'}`}>
                             {selectedEvent ? selectedEvent.event_name : "-- Select Event --"}
                         </span>
                     </div>
-                    <ChevronDown className={`text-slate-400 transition-transform shrink-0 ml-2 ${isDropdownOpen ? 'rotate-180' : ''}`} size={14} />
+                    <ChevronDown className={`text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} size={14} />
                 </div>
 
                 {isDropdownOpen && (
@@ -960,10 +616,9 @@ const AttendanceList: React.FC = () => {
                                 </td>
                                 <td className="px-6 py-4 text-center">
                                     <button
-                                        onClick={(e) => !isFutureEvent && openManualModal(e, row.participant)}
-                                        disabled={isFutureEvent}
-                                        className={`p-2 rounded-lg transition-colors ${isFutureEvent ? 'text-slate-300 cursor-not-allowed' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
-                                        title={isFutureEvent ? "Cannot add logs for future dates" : "Manual Log Entry"}
+                                        onClick={(e) => openManualModal(e, row.participant)}
+                                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                        title="Manual Log Entry"
                                     >
                                         <PlusCircle size={18} />
                                     </button>
@@ -1066,244 +721,14 @@ const AttendanceList: React.FC = () => {
                         <p className="text-slate-500 text-sm">{selectedParticipant.office}</p>
                         <div className="mt-6 pt-6 border-t border-slate-100 w-full">
                             <p className="text-xs text-slate-400 font-mono mb-4">{selectedParticipant.participant_code}</p>
+                            <button onClick={() => window.print()} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors">
+                                <Printer size={18} /> Print Badge
+                            </button>
                         </div>
                      </>
                 </div>
             </div>
         </div>
-      )}
-
-      {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={closeAddModal}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white shrink-0">
-                    <h3 className="font-semibold flex items-center gap-2">
-                        <PlusCircle size={20} /> Add Participant
-                    </h3>
-                    <button onClick={closeAddModal} className="text-indigo-100 hover:text-white p-1 hover:bg-white/20 rounded-full transition">
-                        <X size={20} />
-                    </button>
-                </div>
-                
-                <div className="overflow-y-auto p-6">
-                    <form onSubmit={handleAddParticipantSubmit} className="space-y-5">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Full Name</label>
-                                <div className="relative">
-                                    <User className="absolute left-3 top-3 text-slate-400" size={18} />
-                                    <input 
-                                        required 
-                                        type="text"
-                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        placeholder="Type name..."
-                                        value={addForm.full_name}
-                                        onChange={handleAddNameChange}
-                                        onFocus={() => {
-                                            if (addForm.full_name.trim().length >= 2 && addSuggestions.length > 0) {
-                                                setShowAddSuggestions(true);
-                                            }
-                                        }}
-                                        onBlur={() => setTimeout(() => setShowAddSuggestions(false), 200)}
-                                    />
-                                    {showAddSuggestions && addSuggestions.length > 0 && (
-                                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-                                            {addSuggestions.map((p) => (
-                                                <div
-                                                    key={p.participant_id}
-                                                    className="px-3 py-2 cursor-pointer hover:bg-indigo-50 border-b border-slate-100 last:border-b-0"
-                                                    onClick={() => selectAddSuggestion(p)}
-                                                >
-                                                    <div className="font-medium text-slate-800">{p.full_name}</div>
-                                                    <div className="text-xs text-slate-500 truncate">
-                                                        {[p.email, p.office].filter(Boolean).join(' • ') || 'No email/office info'}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address</label>
-                                <div className="relative">
-                                    <Mail className="absolute left-3 top-3 text-slate-400" size={18} />
-                                    <input 
-                                        type="email"
-                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        placeholder="john@company.com"
-                                        value={addForm.email}
-                                        onChange={e => setAddForm({...addForm, email: e.target.value})}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Mobile No.</label>
-                                <div className="relative">
-                                    <Phone className="absolute left-3 top-3 text-slate-400" size={18} />
-                                    <input 
-                                        type="tel"
-                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        placeholder="09123456789"
-                                        value={addForm.mobile_no}
-                                        onChange={e => setAddForm({...addForm, mobile_no: e.target.value.replace(/[^0-9]/g, '')})}
-                                        maxLength={11}
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Position / Title</label>
-                                <div className="relative">
-                                    <Briefcase className="absolute left-3 top-3 text-slate-400" size={18} />
-                                    <input 
-                                        required 
-                                        type="text"
-                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        placeholder="Manager"
-                                        value={addForm.position}
-                                        onChange={e => setAddForm({...addForm, position: e.target.value})}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="pt-2">
-                             <label className="block text-sm font-medium text-slate-700 mb-2">Affiliation Type</label>
-                             <div className="flex gap-4 mb-4">
-                                <label className={`flex-1 cursor-pointer border rounded-lg p-3 flex items-center gap-3 transition-all ${addAffiliationType === 'Office' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
-                                    <input 
-                                        type="radio" 
-                                        className="hidden" 
-                                        checked={addAffiliationType === 'Office'} 
-                                        onChange={() => setAddAffiliationType('Office')}
-                                    />
-                                    <Building size={20} />
-                                    <span className="font-medium">NGA / Office</span>
-                                </label>
-                                <label className={`flex-1 cursor-pointer border rounded-lg p-3 flex items-center gap-3 transition-all ${addAffiliationType === 'LGU' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
-                                    <input 
-                                        type="radio" 
-                                        className="hidden" 
-                                        checked={addAffiliationType === 'LGU'} 
-                                        onChange={() => setAddAffiliationType('LGU')}
-                                    />
-                                    <Landmark size={20} />
-                                    <span className="font-medium">LGU</span>
-                                </label>
-                             </div>
-
-                             {addAffiliationType === 'Office' ? (
-                                <div className="animate-in fade-in zoom-in-95 duration-200">
-                                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Office / Agency Name</label>
-                                    <div className="relative">
-                                        <Building className="absolute left-3 top-3 text-slate-400" size={18} />
-                                        <input 
-                                            required={addAffiliationType === 'Office'}
-                                            type="text"
-                                            className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                            placeholder="e.g. DILG Regional Office 10"
-                                            value={addForm.office}
-                                            onChange={e => setAddForm({...addForm, office: e.target.value})}
-                                        />
-                                    </div>
-                                </div>
-                             ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-200">
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Province / HUC</label>
-                                        <div className="relative">
-                                            <MapPin className="absolute left-3 top-3 text-slate-400" size={18} />
-                                            <select 
-                                                required={addAffiliationType === 'LGU'}
-                                                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white appearance-none"
-                                                value={addProvince}
-                                                onChange={e => {
-                                                    setAddProvince(e.target.value);
-                                                    setAddCity('');
-                                                }}
-                                            >
-                                                <option value="">-- Select Province --</option>
-                                                {provinces.map(prov => (
-                                                    <option key={prov} value={prov}>{prov}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1.5">City / Municipality</label>
-                                        <div className="relative">
-                                            <MapPin className="absolute left-3 top-3 text-slate-400" size={18} />
-                                            <select 
-                                                disabled={!addProvince}
-                                                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white appearance-none disabled:bg-slate-100 disabled:text-slate-400"
-                                                value={addCity}
-                                                onChange={e => setAddCity(e.target.value)}
-                                            >
-                                                <option value="">-- Provincial / HUC Level (Optional) --</option>
-                                                {cities.map(city => (
-                                                    <option key={city} value={city}>{city}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                             )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Gender</label>
-                                <select 
-                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                                    value={addForm.gender}
-                                    onChange={e => setAddForm({...addForm, gender: e.target.value})}
-                                >
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Age Group</label>
-                                <select 
-                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                                    value={addForm.age_group}
-                                    onChange={e => setAddForm({...addForm, age_group: e.target.value})}
-                                >
-                                    <option value="18-24">18-24</option>
-                                    <option value="25-34">25-34</option>
-                                    <option value="35-44">35-44</option>
-                                    <option value="45-54">45-54</option>
-                                    <option value="55-65">55-65</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end pt-4">
-                            <button 
-                                type="button"
-                                onClick={closeAddModal}
-                                className="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium mr-2"
-                            >
-                                Cancel
-                            </button>
-                            <button 
-                                type="submit" 
-                                disabled={isAdding}
-                                className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-md flex items-center gap-2"
-                            >
-                                {isAdding ? <Loader2 className="animate-spin" size={18} /> : <PlusCircle size={18} />}
-                                Add Participant
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-          </div>
       )}
     </div>
   );
