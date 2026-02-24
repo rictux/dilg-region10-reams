@@ -180,7 +180,6 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
       <div className={isInternal ? "w-full space-y-8" : "w-full max-w-2xl space-y-8"}>
         <div className="relative" ref={dropdownRef}>
           <div className={isInternal ? "mb-6" : "text-center mb-6"}>
-            <h2 className="text-3xl font-black text-slate-800 mb-2">Participant Name Lookup</h2>
             <p className="text-slate-500">Verify attendance history across all Regional events.</p>
           </div>
           
