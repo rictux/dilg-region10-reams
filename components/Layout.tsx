@@ -39,6 +39,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [pwForm, setPwForm] = useState({ new: '', confirm: '' });
   const [profileForm, setProfileForm] = useState({
       full_name: '',
@@ -262,15 +263,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div 
             className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" 
-            onClick={() => setIsProfileModalOpen(false)}
+            onClick={() => {
+                setIsProfileModalOpen(false);
+                setIsEditingProfile(false);
+            }}
         ></div>
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="bg-gradient-to-r from-[#4322A7] to-indigo-700 px-6 py-4 flex justify-between items-center text-white">
                 <h3 className="font-semibold flex items-center gap-2">
-                    <User size={20} /> Edit Profile
+                    <User size={20} /> {isEditingProfile ? 'Edit Profile' : 'User Profile'}
                 </h3>
                 <button 
-                    onClick={() => setIsProfileModalOpen(false)} 
+                    onClick={() => {
+                        setIsProfileModalOpen(false);
+                        setIsEditingProfile(false);
+                    }} 
                     className="text-indigo-100 hover:text-white p-1 hover:bg-white/20 rounded-full transition"
                 >
                     <X size={20} />
@@ -282,6 +289,40 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <div className="flex flex-col items-center justify-center py-6 text-center text-green-600">
                         <CheckCircle size={48} className="mb-3" />
                         <p className="font-bold text-lg">Profile Updated!</p>
+                    </div>
+                ) : !isEditingProfile ? (
+                    <div className="flex flex-col items-center">
+                        <div className="w-24 h-24 rounded-full bg-indigo-100 flex items-center justify-center text-[#4322A7] font-bold text-3xl overflow-hidden shadow-md mb-4">
+                            {user?.img_link ? (
+                                <img src={user.img_link} alt="User Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                                user?.full_name?.charAt(0) || <User size={40} />
+                            )}
+                        </div>
+                        <h2 className="text-xl font-bold text-slate-800">{user?.full_name}</h2>
+                        <p className="text-sm text-slate-500 mb-6">{user?.position || 'No Position Set'}</p>
+                        
+                        <div className="w-full space-y-3 mb-6">
+                            <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                <span className="text-sm text-slate-500">Email</span>
+                                <span className="text-sm font-medium text-slate-800">{user?.email}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                <span className="text-sm text-slate-500">Username</span>
+                                <span className="text-sm font-medium text-slate-800">{user?.username}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                <span className="text-sm text-slate-500">Role</span>
+                                <span className="text-sm font-medium text-slate-800 capitalize">{user?.role}</span>
+                            </div>
+                        </div>
+
+                        <button 
+                            onClick={() => setIsEditingProfile(true)}
+                            className="w-full bg-slate-100 text-slate-700 font-medium py-2.5 rounded-lg hover:bg-slate-200 transition-all flex justify-center items-center gap-2"
+                        >
+                            Edit Profile Information
+                        </button>
                     </div>
                 ) : (
                     <form onSubmit={handleProfileSubmit} className="space-y-4">
@@ -330,23 +371,23 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 onChange={e => setProfileForm({...profileForm, position: e.target.value})}
                             />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Image Link</label>
-                            <input 
-                                type="text"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#4322A7]/20 focus:border-[#4322A7] outline-none"
-                                value={profileForm.img_link}
-                                onChange={e => setProfileForm({...profileForm, img_link: e.target.value})}
-                            />
+                        <div className="flex gap-3 mt-6">
+                            <button 
+                                type="button"
+                                onClick={() => setIsEditingProfile(false)}
+                                className="flex-1 bg-white border border-slate-300 text-slate-700 font-medium py-2.5 rounded-lg hover:bg-slate-50 transition-all flex justify-center items-center"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                type="submit" 
+                                disabled={profileStatus === 'loading'}
+                                className="flex-1 bg-[#4322A7] text-white font-bold py-2.5 rounded-lg hover:bg-indigo-800 transition-all flex justify-center items-center gap-2"
+                            >
+                                {profileStatus === 'loading' && <Loader2 className="animate-spin" size={18} />}
+                                Save Changes
+                            </button>
                         </div>
-                        <button 
-                            type="submit" 
-                            disabled={profileStatus === 'loading'}
-                            className="w-full bg-[#4322A7] text-white font-bold py-2.5 rounded-lg hover:bg-indigo-800 transition-all flex justify-center items-center gap-2 mt-2"
-                        >
-                            {profileStatus === 'loading' && <Loader2 className="animate-spin" size={18} />}
-                            Save Changes
-                        </button>
                     </form>
                 )}
             </div>
