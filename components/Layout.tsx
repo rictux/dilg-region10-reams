@@ -19,10 +19,10 @@ import {
   CheckCircle,
   ChevronDown,
   ChevronUp,
-  ChevronRight,
   User,
   Eye,
-  EyeOff
+  EyeOff,
+  Camera
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -41,6 +41,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [uploadingImg, setUploadingImg] = useState(false);
   const [pwForm, setPwForm] = useState({ new: '', confirm: '' });
   const [profileForm, setProfileForm] = useState({
       full_name: '',
@@ -110,6 +111,40 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      try {
+          setUploadingImg(true);
+          setProfileStatus('idle');
+          setProfileMessage('');
+
+          if (!e.target.files || e.target.files.length === 0) {
+              return;
+          }
+
+          const file = e.target.files[0];
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${user?.user_id}-${Math.random()}.${fileExt}`;
+          const filePath = `profiles/${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+              .from('img')
+              .upload(filePath, file);
+
+          if (uploadError) {
+              throw uploadError;
+          }
+
+          const { data } = supabase.storage.from('img').getPublicUrl(filePath);
+          
+          setProfileForm({ ...profileForm, img_link: data.publicUrl });
+      } catch (error: any) {
+          setProfileStatus('error');
+          setProfileMessage(error.message || 'Error uploading image');
+      } finally {
+          setUploadingImg(false);
+      }
+  };
+
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileStatus('loading');
@@ -147,19 +182,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const NavItem = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => {
     const isActive = location.pathname === to;
     return (
-      <div className="relative pl-6 pr-0 my-1">
+      <div className="relative pl-6 pr-4 md:pr-0 my-1">
         {isActive && (
           <>
             {/* Top curve */}
-            <div className="absolute right-0 -top-6 w-6 h-6 bg-[#f4f5f9] z-0 pointer-events-none">
+            <div className="hidden md:block absolute right-0 -top-6 w-6 h-6 bg-[#f4f5f9] z-0 pointer-events-none">
               <div className="w-full h-full bg-[#4322A7] rounded-br-3xl"></div>
             </div>
             {/* Bottom curve */}
-            <div className="absolute right-0 -bottom-6 w-6 h-6 bg-[#f4f5f9] z-0 pointer-events-none">
+            <div className="hidden md:block absolute right-0 -bottom-6 w-6 h-6 bg-[#f4f5f9] z-0 pointer-events-none">
               <div className="w-full h-full bg-[#4322A7] rounded-tr-3xl"></div>
             </div>
             {/* Active background */}
-            <div className="absolute inset-0 bg-[#f4f5f9] rounded-l-3xl z-0"></div>
+            <div className="absolute inset-0 bg-[#f4f5f9] rounded-3xl md:rounded-l-3xl md:rounded-r-none z-0"></div>
           </>
         )}
         <button
@@ -348,6 +383,26 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 {profileMessage}
                             </div>
                         )}
+                        <div className="flex flex-col items-center mb-4">
+                            <div className="relative w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center text-[#4322A7] font-bold text-2xl overflow-hidden shadow-sm group">
+                                {profileForm.img_link || user?.img_link ? (
+                                    <img src={profileForm.img_link || user?.img_link} alt="User Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                ) : (
+                                    user?.full_name?.charAt(0) || <User size={32} />
+                                )}
+                                <label className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                                    {uploadingImg ? <Loader2 className="animate-spin" size={20} /> : <Camera size={20} />}
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        className="hidden" 
+                                        onChange={handleImageUpload}
+                                        disabled={uploadingImg}
+                                    />
+                                </label>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-2">Click image to change</p>
+                        </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
                             <input 
