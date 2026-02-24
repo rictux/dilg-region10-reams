@@ -1,16 +1,17 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
-  CalendarDays, 
-  Users, 
-  ScanLine, 
+  LayoutGrid, 
+  Ticket, 
+  UsersRound, 
+  Scan, 
   LogOut, 
   Menu, 
   X,
-  FileBarChart,
+  LineChart,
   ClipboardList,
   KeyRound,
   Loader2,
@@ -18,8 +19,8 @@ import {
   ChevronDown,
   ChevronUp,
   User,
-  ShieldCheck,
-  Search,
+  Shield,
+  BookUser,
   Eye,
   EyeOff
 } from 'lucide-react';
@@ -33,13 +34,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [pwForm, setPwForm] = useState({ new: '', confirm: '' });
+  const [profileForm, setProfileForm] = useState({
+      full_name: '',
+      email: '',
+      username: '',
+      position: '',
+      img_link: ''
+  });
   const [pwStatus, setPwStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [pwMessage, setPwMessage] = useState('');
+  const [profileStatus, setProfileStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [profileMessage, setProfileMessage] = useState('');
   
   // Password Visibility State
   const [showNewPw, setShowNewPw] = useState(false);
@@ -97,23 +109,75 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   };
 
+  const handleProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileStatus('loading');
+    setProfileMessage('');
+
+    try {
+        const { error } = await supabase
+            .from('users')
+            .update({
+                full_name: profileForm.full_name,
+                email: profileForm.email,
+                username: profileForm.username,
+                position: profileForm.position,
+                img_link: profileForm.img_link
+            })
+            .eq('user_id', user?.user_id);
+
+        if (error) throw error;
+
+        await refreshProfile();
+        setProfileStatus('success');
+        setProfileMessage("Profile updated successfully.");
+        
+        setTimeout(() => {
+            setIsProfileModalOpen(false);
+            setProfileStatus('idle');
+            setProfileMessage('');
+        }, 1500);
+    } catch (err: any) {
+        setProfileStatus('error');
+        setProfileMessage(err.message || "Failed to update profile.");
+    }
+  };
+
   const NavItem = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => {
     const isActive = location.pathname === to;
     return (
-      <button
-        onClick={() => {
-          navigate(to);
-          setIsMobileMenuOpen(false);
-        }}
-        className={`flex items-center space-x-3 w-full px-4 py-3 rounded-lg transition-colors ${
-          isActive 
-            ? 'bg-indigo-600 text-white shadow-md' 
-            : 'text-slate-600 hover:bg-slate-100'
-        }`}
-      >
-        <Icon size={20} />
-        <span className="font-medium">{label}</span>
-      </button>
+      <div className="relative pl-6 my-2">
+        {isActive && (
+          <>
+            <div className="absolute inset-y-0 -right-10 left-4 bg-[#f4f5f9] rounded-l-full"></div>
+            {/* Top curve */}
+            <div className="absolute -right-10 bottom-full w-16 h-6 bg-[#f4f5f9]">
+              <div className="absolute left-0 top-0 w-6 h-6 bg-[#4322A7] rounded-br-full"></div>
+            </div>
+            {/* Bottom curve */}
+            <div className="absolute -right-10 top-full w-16 h-6 bg-[#f4f5f9]">
+              <div className="absolute left-0 top-0 w-6 h-6 bg-[#4322A7] rounded-tr-full"></div>
+            </div>
+          </>
+        )}
+        <button
+          onClick={() => {
+            navigate(to);
+            setIsMobileMenuOpen(false);
+          }}
+          className={`relative z-10 flex items-center space-x-4 w-full px-6 py-3.5 transition-colors ${
+            isActive 
+              ? 'text-[#4322A7]' 
+              : 'text-indigo-200 hover:text-white'
+          }`}
+          title={isSidebarCollapsed ? label : undefined}
+        >
+          <Icon size={22} strokeWidth={isActive ? 2.5 : 2} className="shrink-0" />
+          {!isSidebarCollapsed && (
+            <span className={`font-medium text-[15px] whitespace-nowrap ${isActive ? 'font-semibold' : ''}`}>{label}</span>
+          )}
+        </button>
+      </div>
     );
   };
 
@@ -123,9 +187,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" 
             onClick={() => setIsPasswordModalOpen(false)}
         ></div>
-        {/* Adjusted width from max-sm to max-w-md */}
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 flex justify-between items-center text-white">
+            <div className="bg-gradient-to-r from-[#4322A7] to-indigo-700 px-6 py-4 flex justify-between items-center text-white">
                 <h3 className="font-semibold flex items-center gap-2">
                     <KeyRound size={20} /> Change Password
                 </h3>
@@ -156,7 +219,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 <input 
                                     type={showNewPw ? "text" : "password"}
                                     required
-                                    className="w-full px-3 py-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                    className="w-full px-3 py-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#4322A7]/20 focus:border-[#4322A7] outline-none"
                                     value={pwForm.new}
                                     onChange={e => setPwForm({...pwForm, new: e.target.value})}
                                 />
@@ -175,7 +238,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 <input 
                                     type={showConfirmPw ? "text" : "password"}
                                     required
-                                    className="w-full px-3 py-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                    className="w-full px-3 py-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#4322A7]/20 focus:border-[#4322A7] outline-none"
                                     value={pwForm.confirm}
                                     onChange={e => setPwForm({...pwForm, confirm: e.target.value})}
                                 />
@@ -191,7 +254,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         <button 
                             type="submit" 
                             disabled={pwStatus === 'loading'}
-                            className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-all flex justify-center items-center gap-2 mt-2"
+                            className="w-full bg-[#4322A7] text-white font-bold py-2.5 rounded-lg hover:bg-indigo-800 transition-all flex justify-center items-center gap-2 mt-2"
                         >
                             {pwStatus === 'loading' && <Loader2 className="animate-spin" size={18} />}
                             Update Password
@@ -203,15 +266,111 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     </div>
   );
 
+  const UserProfileModal = () => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" 
+            onClick={() => setIsProfileModalOpen(false)}
+        ></div>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-gradient-to-r from-[#4322A7] to-indigo-700 px-6 py-4 flex justify-between items-center text-white">
+                <h3 className="font-semibold flex items-center gap-2">
+                    <User size={20} /> Edit Profile
+                </h3>
+                <button 
+                    onClick={() => setIsProfileModalOpen(false)} 
+                    className="text-indigo-100 hover:text-white p-1 hover:bg-white/20 rounded-full transition"
+                >
+                    <X size={20} />
+                </button>
+            </div>
+            
+            <div className="p-6">
+                {profileStatus === 'success' ? (
+                    <div className="flex flex-col items-center justify-center py-6 text-center text-green-600">
+                        <CheckCircle size={48} className="mb-3" />
+                        <p className="font-bold text-lg">Profile Updated!</p>
+                    </div>
+                ) : (
+                    <form onSubmit={handleProfileSubmit} className="space-y-4">
+                        {profileStatus === 'error' && (
+                            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-100">
+                                {profileMessage}
+                            </div>
+                        )}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+                            <input 
+                                type="text"
+                                required
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#4322A7]/20 focus:border-[#4322A7] outline-none"
+                                value={profileForm.full_name}
+                                onChange={e => setProfileForm({...profileForm, full_name: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                            <input 
+                                type="email"
+                                required
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#4322A7]/20 focus:border-[#4322A7] outline-none"
+                                value={profileForm.email}
+                                onChange={e => setProfileForm({...profileForm, email: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
+                            <input 
+                                type="text"
+                                required
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#4322A7]/20 focus:border-[#4322A7] outline-none"
+                                value={profileForm.username}
+                                onChange={e => setProfileForm({...profileForm, username: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Position</label>
+                            <input 
+                                type="text"
+                                required
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#4322A7]/20 focus:border-[#4322A7] outline-none"
+                                value={profileForm.position}
+                                onChange={e => setProfileForm({...profileForm, position: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Image Link</label>
+                            <input 
+                                type="text"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#4322A7]/20 focus:border-[#4322A7] outline-none"
+                                value={profileForm.img_link}
+                                onChange={e => setProfileForm({...profileForm, img_link: e.target.value})}
+                            />
+                        </div>
+                        <button 
+                            type="submit" 
+                            disabled={profileStatus === 'loading'}
+                            className="w-full bg-[#4322A7] text-white font-bold py-2.5 rounded-lg hover:bg-indigo-800 transition-all flex justify-center items-center gap-2 mt-2"
+                        >
+                            {profileStatus === 'loading' && <Loader2 className="animate-spin" size={18} />}
+                            Save Changes
+                        </button>
+                    </form>
+                )}
+            </div>
+        </div>
+    </div>
+  );
+
   if (!showSidebar) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen bg-[#f4f5f9] flex flex-col">
         <header className="bg-white shadow-sm p-4 flex justify-between items-center z-10 sticky top-0">
-          <h1 className="text-xl font-bold text-indigo-600">Event Management Portal</h1>
+          <h1 className="text-xl font-bold text-[#4322A7]">Event Management Portal</h1>
           <div className="flex items-center gap-3">
              <button 
                 onClick={() => navigate('/admin/lookup')}
-                className="p-2 text-slate-600 hover:text-indigo-600 transition-colors"
+                className="p-2 text-slate-600 hover:text-[#4322A7] transition-colors"
                 title="Name Lookup"
             >
                 <Search size={20} />
@@ -221,10 +380,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                     className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 py-1.5 px-3 rounded-full transition-colors text-slate-700"
                 >
-                    <div className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center">
-                        <User size={14} />
+                    <div className="w-6 h-6 bg-indigo-100 text-[#4322A7] rounded-full flex items-center justify-center overflow-hidden">
+                        {user?.img_link ? (
+                          <img src={user.img_link} alt="User Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <User size={14} />
+                        )}
                     </div>
-                    <span className="text-sm font-medium hidden sm:block">{user?.username}</span>
                     <ChevronDown size={14} />
                 </button>
 
@@ -232,12 +394,28 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
                         <button
                             onClick={() => {
+                                setProfileForm({
+                                    full_name: user?.full_name || '',
+                                    email: user?.email || '',
+                                    username: user?.username || '',
+                                    position: user?.position || '',
+                                    img_link: user?.img_link || ''
+                                });
+                                setIsProfileModalOpen(true);
+                                setIsProfileDropdownOpen(false);
+                            }}
+                            className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-indigo-50 hover:text-[#4322A7] transition-colors"
+                        >
+                            <User size={16} /> User Profile
+                        </button>
+                        <button
+                            onClick={() => {
                                 setIsPasswordModalOpen(true);
                                 setIsProfileDropdownOpen(false);
                                 setShowNewPw(false);
                                 setShowConfirmPw(false);
                             }}
-                            className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                            className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-indigo-50 hover:text-[#4322A7] transition-colors"
                         >
                             <KeyRound size={16} /> Change Password
                         </button>
@@ -256,63 +434,123 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             {children}
         </main>
         {isPasswordModalOpen && <PasswordModal />}
+        {isProfileModalOpen && <UserProfileModal />}
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
-      <header className="md:hidden bg-white shadow-sm p-4 flex justify-between items-center z-20 sticky top-0">
-        <h1 className="text-xl font-bold text-indigo-600">Event Management Portal</h1>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2">
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      </header>
+  const getPageTitle = () => {
+    switch (location.pathname) {
+      case '/dashboard': return 'Dashboard';
+      case '/events': return 'Events';
+      case '/attendance': return 'Attendance';
+      case '/admin/lookup': return 'Name Lookup';
+      case '/reports': return 'Reports';
+      case '/users': return 'Users';
+      case '/scan': return 'Scan Mode';
+      default: return 'Dashboard';
+    }
+  };
 
+  return (
+    <div className="min-h-screen bg-[#f4f5f9] flex flex-col md:flex-row font-sans">
       <aside className={`
-        fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out
-        md:translate-x-0 md:static md:shadow-none border-r border-slate-200
-        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+        fixed inset-y-0 left-0 z-30 bg-[#4322A7] transform transition-all duration-300 ease-in-out
+        md:translate-x-0 md:static md:shadow-none
+        ${isMobileMenuOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full w-[280px]'}
+        ${isSidebarCollapsed ? 'md:w-[90px]' : 'md:w-[280px]'}
+        rounded-tr-[40px] rounded-br-[40px] md:rounded-r-[40px]
+        flex flex-col overflow-hidden
       `}>
-        <div className="h-full flex flex-col">
-          <div className="p-6 hidden md:block">
-            <h1 className="text-xl font-bold text-indigo-600">R10 Event Portal</h1>
-            <p className="text-sm text-slate-500">Admin Portal</p>
+        <div className={`p-8 flex items-center gap-3 ${isSidebarCollapsed ? 'justify-center px-4' : ''}`}>
+          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0 overflow-hidden p-1">
+            <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" />
+          </div>
+          {!isSidebarCollapsed && (
+            <h1 className="text-2xl font-bold text-white tracking-wide whitespace-nowrap">R10 Event</h1>
+          )}
+        </div>
+
+        <nav className="flex-1 space-y-1 mt-4 overflow-y-auto no-scrollbar">
+          {hasPermission('VIEW_DASHBOARD') && (
+              <NavItem to="/dashboard" icon={LayoutGrid} label="Dashboard" />
+          )}
+          {hasPermission('MANAGE_EVENTS') && (
+              <NavItem to="/events" icon={Ticket} label="Events" />
+          )}
+          {hasPermission('VIEW_PARTICIPANTS') && (
+              <NavItem to="/attendance" icon={UsersRound} label="Attendance" />
+          )}
+
+          <NavItem to="/admin/lookup" icon={BookUser} label="Name Lookup" />
+
+          {hasPermission('VIEW_REPORTS') && (
+              <NavItem to="/reports" icon={LineChart} label="Reports" />
+          )}
+          
+          {hasPermission('MANAGE_USERS') && (
+              <NavItem to="/users" icon={Shield} label="Users" />
+          )}
+
+          {hasPermission('SCAN_QR') && (
+              <NavItem to="/scan" icon={Scan} label="Scan Mode" />
+          )}
+        </nav>
+
+        <div className={`p-8 mt-auto text-xs text-indigo-300 space-y-2 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
+          <p className="font-medium text-indigo-200">Event Portal Admin Dashboard</p>
+          <p>© 2024 All Rights Reserved</p>
+          <p>Made with ❤️ by R10</p>
+        </div>
+      </aside>
+
+      <main className="flex-1 overflow-y-auto p-4 md:p-8 h-screen flex flex-col min-w-0">
+        <header className="flex items-center justify-between mb-8 shrink-0">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-600 hover:text-[#4322A7] md:hidden">
+              <Menu size={28} />
+            </button>
+            <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="p-2 text-slate-600 hover:text-[#4322A7] hidden md:block">
+              <Menu size={28} />
+            </button>
+            <h2 className="text-2xl font-bold text-slate-800 hidden sm:block">
+              {getPageTitle()}
+            </h2>
           </div>
 
-          <nav className="flex-1 px-4 space-y-2 mt-4 md:mt-0">
-            {hasPermission('VIEW_DASHBOARD') && (
-                <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" />
-            )}
-            {hasPermission('MANAGE_EVENTS') && (
-                <NavItem to="/events" icon={CalendarDays} label="Events" />
-            )}
-            {hasPermission('VIEW_PARTICIPANTS') && (
-                <NavItem to="/attendance" icon={ClipboardList} label="Attendance" />
-            )}
-
-            <NavItem to="/admin/lookup" icon={Search} label="Name Lookup" />
-
-            {hasPermission('VIEW_REPORTS') && (
-                <NavItem to="/reports" icon={FileBarChart} label="Reports" />
-            )}
-            
-            {hasPermission('MANAGE_USERS') && (
-              <div className="pt-2 mt-2 border-t border-slate-100">
-                <NavItem to="/users" icon={ShieldCheck} label="Users" />
+          <div className="flex items-center gap-6 relative ml-auto" ref={dropdownRef}>
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}>
+              <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-[#4322A7] font-bold text-xl overflow-hidden shadow-sm">
+                {user?.img_link ? (
+                  <img src={user.img_link} alt="User Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  user?.full_name.charAt(0)
+                )}
               </div>
-            )}
+            </div>
 
-            {hasPermission('SCAN_QR') && (
-              <div className="pt-2 mt-2 border-t border-slate-100">
-                <NavItem to="/scan" icon={ScanLine} label="Scan Mode" />
-              </div>
-            )}
-          </nav>
-
-          <div className="p-4 border-t border-slate-200 relative" ref={dropdownRef}>
             {isProfileDropdownOpen && (
-                <div className="absolute bottom-full left-4 right-4 mb-2 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in slide-in-from-bottom-2 duration-200">
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                    <div className="px-4 py-3 border-b border-slate-100 md:hidden">
+                        <p className="text-sm font-bold text-slate-800">{user?.full_name}</p>
+                        <p className="text-xs text-slate-500 capitalize">{user?.role}</p>
+                    </div>
+                    <button
+                        onClick={() => {
+                            setProfileForm({
+                                full_name: user?.full_name || '',
+                                email: user?.email || '',
+                                username: user?.username || '',
+                                position: user?.position || '',
+                                img_link: user?.img_link || ''
+                            });
+                            setIsProfileModalOpen(true);
+                            setIsProfileDropdownOpen(false);
+                        }}
+                        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-indigo-50 hover:text-[#4322A7] transition-colors"
+                    >
+                        <User size={16} /> User Profile
+                    </button>
                     <button
                         onClick={() => {
                             setIsPasswordModalOpen(true);
@@ -320,41 +558,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             setShowNewPw(false);
                             setShowConfirmPw(false);
                         }}
-                        className="flex items-center gap-3 w-full px-4 py-3 text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-indigo-50 hover:text-[#4322A7] transition-colors"
                     >
-                        <KeyRound size={18} /> Change Password
+                        <KeyRound size={16} /> Change Password
                     </button>
-                    <div className="h-px bg-slate-100 mx-2 my-1"></div>
                     <button
                         onClick={handleSignOut}
-                        className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                     >
-                        <LogOut size={18} /> Sign Out
+                        <LogOut size={16} /> Sign Out
                     </button>
                 </div>
             )}
-
-            <button 
-                onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                className={`flex items-center w-full p-2.5 rounded-lg transition-all ${isProfileDropdownOpen ? 'bg-indigo-50 border-indigo-100' : 'hover:bg-slate-50 border border-transparent'}`}
-            >
-                <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg mr-3">
-                    {user?.full_name.charAt(0)}
-                </div>
-                <div className="flex-1 text-left overflow-hidden">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{user?.full_name}</p>
-                    <p className="text-xs text-slate-500 capitalize truncate">{user?.role}</p>
-                </div>
-                <div className="text-slate-400">
-                    {isProfileDropdownOpen ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-                </div>
-            </button>
           </div>
-        </div>
-      </aside>
+        </header>
 
-      <main className="flex-1 overflow-y-auto p-4 md:p-8 h-[calc(100vh-64px)] md:h-screen">
-        {children}
+        <div className="flex-1">
+          {children}
+        </div>
       </main>
 
       {isMobileMenuOpen && (
@@ -365,6 +586,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       )}
 
       {isPasswordModalOpen && <PasswordModal />}
+      {isProfileModalOpen && <UserProfileModal />}
     </div>
   );
 };
