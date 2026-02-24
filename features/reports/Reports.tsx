@@ -76,14 +76,8 @@ const Reports: React.FC = () => {
 
   return (
     <div className="space-y-8">
-        <div>
-            <h2 className="text-2xl font-bold text-slate-800">Reports Center</h2>
-            <p className="text-slate-500 mt-1">Generate and export attendance documentation.</p>
-        </div>
-
         {/* Filters */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Report Settings</h3>
             <div className="flex flex-col md:flex-row gap-4 items-end">
                 <div className="w-full max-w-4xl">
                     <label className="block text-sm font-medium text-slate-700 mb-2">Select Event</label>
