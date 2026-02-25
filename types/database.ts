@@ -66,6 +66,8 @@ export interface EventParticipant {
   accommodation_pax?: number | null;
   role: 'Delegate' | 'Speaker' | 'Secretariat' | 'Guest' | 'VIP';
   needs_accommodation?: boolean | null;
+  accept_photo_video?: boolean | null;
+  store_to_db?: boolean | null;
 }
 
 export interface AttendanceLog {
