@@ -46,8 +46,15 @@ const AttendanceSheetPrint: React.FC = () => {
         const { data: logs } = await supabase.from('attendance_logs').select('*').eq('event_id', id);
         setAllLogs(logs || []);
         
-        const { data: eventParticipants } = await supabase.from('event_participants').select('participants(*)').eq('event_id', id);
-        const fetchedParticipants = eventParticipants?.map((ep: any) => ep.participants).filter((p: any) => p !== null) || [];
+        const { data: eventParticipants } = await supabase.from('event_participants').select('accept_photo_video, store_to_db, participants(*)').eq('event_id', id);
+        const fetchedParticipants = eventParticipants?.map((ep: any) => {
+            if (!ep.participants) return null;
+            return {
+                ...ep.participants,
+                accept_photo_video: ep.accept_photo_video,
+                store_to_db: ep.store_to_db
+            };
+        }).filter((p: any) => p !== null) || [];
         setParticipants(fetchedParticipants);
 
     } catch (e) {
@@ -141,18 +148,21 @@ const AttendanceSheetPrint: React.FC = () => {
                                     <th rowSpan={2} className="border border-black px-4 py-2">POSITION</th>
                                     <th rowSpan={2} className="border border-black px-4 py-2">OFFICE</th>
                                     <th colSpan={2} className="border border-black px-2 py-1 w-20">GENDER</th>
+                                    <th colSpan={2} className="border border-black px-2 py-1 w-20">CONSENT</th>
                                     <th rowSpan={2} className="border border-black px-4 py-2 w-28">AM</th>
                                     <th rowSpan={2} className="border border-black px-4 py-2 w-28">PM</th>
                                 </tr>
                                 <tr className="bg-gray-200 text-center font-bold uppercase font-sans print:bg-gray-200 print:print-color-adjust-exact">
                                     <th className="border border-black px-1 py-1 w-10">M</th>
                                     <th className="border border-black px-1 py-1 w-10">F</th>
+                                    <th className="border border-black px-1 py-1 w-10" title="I consent to the capture of my photo, video, and audio for use in DILG publications.">A</th>
+                                    <th className="border border-black px-1 py-1 w-10" title="I consent to the storage of my data in the organizer’s database for future document processing.">B</th>
                                 </tr>
                             </thead>
                             <tbody className="font-sans text-xs">
                                 {rows.length === 0 ? (
                                     <tr>
-                                        <td colSpan={9} className="text-center py-12 text-slate-500 italic">No attendance recorded for this date.</td>
+                                        <td colSpan={11} className="text-center py-12 text-slate-500 italic">No attendance recorded for this date.</td>
                                     </tr>
                                 ) : (
                                     rows.map((row, index) => (
@@ -163,6 +173,8 @@ const AttendanceSheetPrint: React.FC = () => {
                                             <td className="px-2 py-1.5 border border-black">{row.participant.office}</td>
                                             <td className="px-1 py-1.5 font-bold border border-black">{(row.participant.gender === 'Male' || row.participant.gender === 'M') && '✓'}</td>
                                             <td className="px-1 py-1.5 font-bold border border-black">{(row.participant.gender === 'Female' || row.participant.gender === 'F') && '✓'}</td>
+                                            <td className="px-1 py-1.5 font-bold border border-black">{(row.participant as any).accept_photo_video ? '✓' : ''}</td>
+                                            <td className="px-1 py-1.5 font-bold border border-black">{(row.participant as any).store_to_db ? '✓' : ''}</td>
                                             <td className="px-2 py-1.5 font-mono border border-black">{row.amLog ? formatLogTime(row.amLog.time) : ''}</td>
                                             <td className="px-2 py-1.5 font-mono border border-black">{row.pmLog ? formatLogTime(row.pmLog.time) : ''}</td>
                                         </tr>
@@ -171,8 +183,11 @@ const AttendanceSheetPrint: React.FC = () => {
                             </tbody>
                         </table>
                     </div>
-                    <div className="w-full px-10 pb-6 pt-2 flex justify-between text-[10px] text-slate-400 font-sans">
-                        <div>System Generated Report</div>
+                    <div className="w-full px-10 pb-6 pt-2 flex flex-col text-[10px] text-slate-600 font-sans">
+                        <div className="font-bold mb-0.5">Consent Legend:</div>
+                        <div><span className="font-bold">A</span> - I consent to the capture of my photo, video, and audio for use in DILG publications.</div>
+                        <div><span className="font-bold">B</span> - I consent to the storage of my data in the organizer’s database for future document processing.</div>
+                        <div className="mt-2 text-slate-400">System Generated Report</div>
                     </div>
                 </div>
             );
