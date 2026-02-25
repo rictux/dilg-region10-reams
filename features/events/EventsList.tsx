@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event, Participant, Office } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Home, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Home, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark } from 'lucide-react';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import { useNavigate } from 'react-router';
@@ -38,6 +38,8 @@ const EventsList: React.FC = () => {
       needs_accommodation: boolean;
       accommodation_pax: number;
       participant_id?: number | null; 
+      accept_photo_video: boolean;
+      store_to_db: boolean;
   }>({
       full_name: '',
       email: '',
@@ -49,8 +51,22 @@ const EventsList: React.FC = () => {
       indigenous_people: 'No',
       needs_accommodation: false,
       accommodation_pax: 0,
-      participant_id: null
+      participant_id: null,
+      accept_photo_video: false,
+      store_to_db: false
   });
+
+  // Affiliation State
+  const [affiliationType, setAffiliationType] = useState<'Office' | 'LGU'>('Office');
+  const [selectedProvince, setSelectedProvince] = useState<string>('');
+  const [selectedCity, setSelectedCity] = useState<string>('');
+  const [locations, setLocations] = useState<any[]>([]);
+
+  const provinces = Array.from(new Set(locations.map(l => l.province_huc))).sort();
+  const cities = locations
+      .filter(l => l.province_huc === selectedProvince && l.city_mun)
+      .map(l => l.city_mun)
+      .sort();
 
   // Auto-suggestion state
   const [suggestions, setSuggestions] = useState<Participant[]>([]);
@@ -86,6 +102,7 @@ const EventsList: React.FC = () => {
 
   useEffect(() => {
     fetchEvents();
+    fetchLocations();
     if (user?.role === 'Admin') {
         fetchOffices();
     }
@@ -127,6 +144,18 @@ const EventsList: React.FC = () => {
     }
   }, [showParticipantsModal, selectedEvent]);
 
+  const fetchLocations = async () => {
+    const { data } = await supabase
+        .from('ref_locations')
+        .select('*')
+        .order('province_huc', { ascending: true })
+        .order('city_mun', { ascending: true });
+    
+    if (data) {
+        setLocations(data);
+    }
+  };
+
   const fetchEvents = async () => {
     // Only set loading on initial load to avoid UI flicker
     if (events.length === 0) setLoading(true);
@@ -155,6 +184,7 @@ const EventsList: React.FC = () => {
     const { data, error } = await supabase
         .from('event_participants')
         .select(`
+            id,
             registration_status,
             registered_at,
             role,
@@ -361,6 +391,24 @@ const EventsList: React.FC = () => {
   };
 
   const selectSuggestion = (p: Participant) => {
+      let affType: 'Office' | 'LGU' = 'Office';
+      let prov = '';
+      let city = '';
+      let locId = p.location_id || null;
+
+      if (locId && locations.length > 0) {
+          const loc = locations.find(l => l.location_id === locId);
+          if (loc) {
+              affType = 'LGU';
+              prov = loc.province_huc;
+              city = loc.city_mun || '';
+          }
+      }
+
+      setAffiliationType(affType);
+      setSelectedProvince(prov);
+      setSelectedCity(city);
+
       setNewParticipant(prev => ({
           ...prev,
           full_name: p.full_name,
@@ -379,6 +427,53 @@ const EventsList: React.FC = () => {
   const handleAddParticipant = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!selectedEvent) return;
+      
+      let finalLocationId = null;
+      let finalOfficeName = newParticipant.office;
+
+      if (affiliationType === 'LGU') {
+          if (!selectedProvince) {
+              alert("Please select a Province/HUC for LGU.");
+              return;
+          }
+          
+          if (selectedCity) {
+              const loc = locations.find(l => l.province_huc === selectedProvince && l.city_mun === selectedCity);
+              if (loc) {
+                  finalLocationId = loc.location_id;
+                  finalOfficeName = `LGU ${selectedCity}, ${selectedProvince}`;
+              } else {
+                  alert("Selected location is invalid.");
+                  return;
+              }
+          } else {
+              const loc = locations.find(l => l.province_huc === selectedProvince && !l.city_mun);
+              if (loc) {
+                  finalLocationId = loc.location_id;
+              }
+              if (selectedProvince.toLowerCase().includes('city')) {
+                   finalOfficeName = `LGU ${selectedProvince}`;
+              } else {
+                   finalOfficeName = `Provincial Gov't of ${selectedProvince}`;
+              }
+          }
+      } else {
+          if (!newParticipant.office.trim()) {
+              alert("Please enter your Office / Agency name.");
+              return;
+          }
+      }
+
+      if (newParticipant.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newParticipant.email)) {
+          alert("Please enter a valid email address.");
+          return;
+      }
+
+      if (newParticipant.mobile_no && !/^[0-9]{10,11}$/.test(newParticipant.mobile_no)) {
+          alert("Please enter a valid mobile number (10 or 11 digits).");
+          return;
+      }
+
       setIsAddingParticipant(true);
       
       try {
@@ -391,7 +486,8 @@ const EventsList: React.FC = () => {
              await supabase.from('participants').update({
                 full_name: newParticipant.full_name,
                 email: newParticipant.email || null,
-                office: newParticipant.office,
+                office: finalOfficeName,
+                location_id: finalLocationId,
                 mobile_no: newParticipant.mobile_no || null,
                 age_group: newParticipant.age_group,
                 pwd: newParticipant.pwd,
@@ -410,7 +506,8 @@ const EventsList: React.FC = () => {
                    // Update details
                    await supabase.from('participants').update({
                         full_name: newParticipant.full_name,
-                        office: newParticipant.office,
+                        office: finalOfficeName,
+                        location_id: finalLocationId,
                         mobile_no: newParticipant.mobile_no || null,
                         age_group: newParticipant.age_group,
                         pwd: newParticipant.pwd,
@@ -426,7 +523,8 @@ const EventsList: React.FC = () => {
                     .insert([{
                         full_name: newParticipant.full_name,
                         email: newParticipant.email,
-                        office: newParticipant.office,
+                        office: finalOfficeName,
+                        location_id: finalLocationId,
                         participant_code: code,
                         position: 'N/A', // Default
                         mobile_no: newParticipant.mobile_no || null,
@@ -448,7 +546,8 @@ const EventsList: React.FC = () => {
                 .insert([{
                     full_name: newParticipant.full_name,
                     email: null,
-                    office: newParticipant.office,
+                    office: finalOfficeName,
+                    location_id: finalLocationId,
                     participant_code: code,
                     position: 'N/A',
                     mobile_no: newParticipant.mobile_no || null,
@@ -471,7 +570,9 @@ const EventsList: React.FC = () => {
                 registration_status: 'Registered',
                 role: newParticipant.role,
                 needs_accommodation: newParticipant.needs_accommodation,
-                accommodation_pax: newParticipant.needs_accommodation ? Math.max(1, newParticipant.accommodation_pax) : 0
+                accommodation_pax: newParticipant.needs_accommodation ? Math.max(1, newParticipant.accommodation_pax) : 0,
+                accept_photo_video: newParticipant.accept_photo_video,
+                store_to_db: newParticipant.store_to_db
             });
 
           if (regError && regError.code !== '23505') throw regError;
@@ -1102,7 +1203,7 @@ const EventsList: React.FC = () => {
       {showAddParticipantModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddParticipantModal(false)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative z-10 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 relative z-10 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <UserPlus size={20} className="text-indigo-600" />
@@ -1153,6 +1254,8 @@ const EventsList: React.FC = () => {
                             className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                             value={newParticipant.email}
                             onChange={e => setNewParticipant({...newParticipant, email: e.target.value})}
+                            pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
+                            title="Please enter a valid email address"
                         />
                     </div>
                     <div>
@@ -1162,19 +1265,89 @@ const EventsList: React.FC = () => {
                             placeholder="09123456789"
                             className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                             value={newParticipant.mobile_no}
-                            onChange={e => setNewParticipant({...newParticipant, mobile_no: e.target.value})}
+                            onChange={e => {
+                                const val = e.target.value.replace(/\D/g, '');
+                                if (val.length <= 11) {
+                                    setNewParticipant({...newParticipant, mobile_no: val});
+                                }
+                            }}
+                            pattern="[0-9]{10,11}"
+                            title="Mobile number must be 10 or 11 digits"
                         />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Office / Agency</label>
-                        <input 
-                            required
-                            type="text"
-                            placeholder="Office Name"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                            value={newParticipant.office}
-                            onChange={e => setNewParticipant({...newParticipant, office: e.target.value})}
-                        />
+                    
+                    <div className="pt-2">
+                         <label className="block text-sm font-medium text-slate-700 mb-2">Affiliation Type</label>
+                         <div className="flex gap-4 mb-4">
+                            <label className={`flex-1 cursor-pointer border rounded-lg p-2.5 flex items-center gap-2 transition-all ${affiliationType === 'Office' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                <input 
+                                    type="radio" 
+                                    className="hidden" 
+                                    checked={affiliationType === 'Office'} 
+                                    onChange={() => setAffiliationType('Office')}
+                                />
+                                <Building size={18} />
+                                <span className="font-medium text-sm">NGA / Office</span>
+                            </label>
+                            <label className={`flex-1 cursor-pointer border rounded-lg p-2.5 flex items-center gap-2 transition-all ${affiliationType === 'LGU' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                <input 
+                                    type="radio" 
+                                    className="hidden" 
+                                    checked={affiliationType === 'LGU'} 
+                                    onChange={() => setAffiliationType('LGU')}
+                                />
+                                <Landmark size={18} />
+                                <span className="font-medium text-sm">LGU</span>
+                            </label>
+                         </div>
+
+                         {affiliationType === 'Office' ? (
+                            <div className="animate-in fade-in zoom-in-95 duration-200">
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Office / Agency Name</label>
+                                <input 
+                                    required={affiliationType === 'Office'}
+                                    type="text"
+                                    placeholder="e.g. DILG Regional Office 10"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                    value={newParticipant.office}
+                                    onChange={e => setNewParticipant({...newParticipant, office: e.target.value})}
+                                />
+                            </div>
+                         ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-200">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Province / HUC</label>
+                                    <select 
+                                        required={affiliationType === 'LGU'}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        value={selectedProvince}
+                                        onChange={e => {
+                                            setSelectedProvince(e.target.value);
+                                            setSelectedCity('');
+                                        }}
+                                    >
+                                        <option value="">-- Select Province --</option>
+                                        {provinces.map(prov => (
+                                            <option key={prov} value={prov}>{prov}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">City / Municipality</label>
+                                    <select 
+                                        disabled={!selectedProvince}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                                        value={selectedCity}
+                                        onChange={e => setSelectedCity(e.target.value)}
+                                    >
+                                        <option value="">-- Optional --</option>
+                                        {cities.map(city => (
+                                            <option key={city} value={city}>{city}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                         )}
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
@@ -1260,6 +1433,47 @@ const EventsList: React.FC = () => {
                             )}
                         </div>
                     )}
+
+                    {/* Data Privacy Consent */}
+                    <div className="flex flex-col gap-3 bg-slate-50 p-4 rounded-lg border border-slate-100 mt-4">
+                        <div className="text-xs text-slate-600 leading-relaxed text-justify">
+                            <strong>Privacy Notice</strong><br/>
+                            DILG 10 Regional Office collects your data for event documentation, monitoring, and evaluation. Records are stored for one year. Photos and recordings may be captured for documentation or used in official publications.<br/>
+                            To withdraw consent or report concerns, contact records.dilg10@gmail.com or the DILG Data Protection Officer at dpo.dilg@gmail.com.
+                        </div>
+                        
+                        <div className="text-xs font-bold text-slate-700 mt-2">Consent:</div>
+                        
+                        <div className="flex items-start gap-3">
+                            <div className="flex items-center h-5">
+                                <input
+                                    id="modal-accept-photo-video"
+                                    type="checkbox"
+                                    checked={newParticipant.accept_photo_video}
+                                    onChange={(e) => setNewParticipant({...newParticipant, accept_photo_video: e.target.checked})}
+                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                />
+                            </div>
+                            <label htmlFor="modal-accept-photo-video" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
+                                I consent to the capture of my photo, video, and audio for use in DILG publications.
+                            </label>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                            <div className="flex items-center h-5">
+                                <input
+                                    id="modal-store-to-db"
+                                    type="checkbox"
+                                    checked={newParticipant.store_to_db}
+                                    onChange={(e) => setNewParticipant({...newParticipant, store_to_db: e.target.checked})}
+                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                />
+                            </div>
+                            <label htmlFor="modal-store-to-db" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
+                                I consent to the storage of my data in the organizer’s database for future document processing.
+                            </label>
+                        </div>
+                    </div>
 
                     <div className="pt-2">
                         <button 
