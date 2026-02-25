@@ -48,7 +48,9 @@ const EventRegistration: React.FC = () => {
     role: 'Delegate',
     needs_accommodation: false,
     accommodation_pax: 0,
-    location_id: null as number | null
+    location_id: null as number | null,
+    accept_photo_video: false,
+    store_to_db: false
   });
 
   useEffect(() => {
@@ -290,7 +292,9 @@ const EventRegistration: React.FC = () => {
                 registration_status: 'Registered',
                 role: 'Delegate',
                 needs_accommodation: formData.needs_accommodation,
-                accommodation_pax: formData.needs_accommodation ? formData.accommodation_pax : 0
+                accommodation_pax: formData.needs_accommodation ? formData.accommodation_pax : 0,
+                accept_photo_video: formData.accept_photo_video,
+                store_to_db: formData.store_to_db
             });
 
         if (regError) {
@@ -782,20 +786,44 @@ const EventRegistration: React.FC = () => {
                     )}
 
                     {/* Data Privacy Consent */}
-                    <div className="flex items-start gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100 mt-4">
-                        <div className="flex items-center h-5">
-                            <input
-                                id="privacy-consent"
-                                type="checkbox"
-                                required
-                                checked={consent}
-                                onChange={(e) => setConsent(e.target.checked)}
-                                className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
-                            />
+                    <div className="flex flex-col gap-3 bg-slate-50 p-4 rounded-lg border border-slate-100 mt-4">
+                        <div className="text-xs text-slate-600 leading-relaxed text-justify">
+                            <strong>Privacy Notice</strong><br/>
+                            DILG 10 Regional Office collects your data for event documentation, monitoring, and evaluation. Records are stored for one year. Photos and recordings may be captured for documentation or used in official publications.<br/>
+                            To withdraw consent or report concerns, contact records.dilg10@gmail.com or the DILG Data Protection Officer at dpo.dilg@gmail.com.
                         </div>
-                        <label htmlFor="privacy-consent" className="text-xs text-slate-600 leading-relaxed cursor-pointer text-justify">
-In compliance to the Data Privacy Act of 2012 (Republic Act No. 10173), we are reminded of the importance of adhering to the policies and guidelines outlined within it to safeguard sensitive and personal information.
-As part of our ongoing commitment to protect personal data and ensure compliance with legal obligations, all personal data shared therein will be treated with the utmost care and confidentiality. Access to such data is only limited to the management who require it for legitimate work purposes only.                        </label>
+                        
+                        <div className="text-xs font-bold text-slate-700 mt-2">Consent:</div>
+                        
+                        <div className="flex items-start gap-3">
+                            <div className="flex items-center h-5">
+                                <input
+                                    id="accept-photo-video"
+                                    type="checkbox"
+                                    checked={formData.accept_photo_video}
+                                    onChange={(e) => setFormData({...formData, accept_photo_video: e.target.checked})}
+                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                />
+                            </div>
+                            <label htmlFor="accept-photo-video" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
+                                I consent to the capture of my photo, video, and audio for use in DILG publications.
+                            </label>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                            <div className="flex items-center h-5">
+                                <input
+                                    id="store-to-db"
+                                    type="checkbox"
+                                    checked={formData.store_to_db}
+                                    onChange={(e) => setFormData({...formData, store_to_db: e.target.checked})}
+                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                />
+                            </div>
+                            <label htmlFor="store-to-db" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
+                                I consent to the storage of my data in the organizer’s database for future document processing.
+                            </label>
+                        </div>
                     </div>
 
                     <div className="pt-2">
