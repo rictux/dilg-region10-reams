@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Participant, Event } from '../../types/database';
-import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Home, ChevronDown, Check, Filter } from 'lucide-react';
+import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Home, ChevronDown, Check, Filter, UserPlus, Building, Landmark } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { format, parseISO, eachDayOfInterval, isSameMonth, isSameYear } from 'date-fns';
 import { toPng } from 'html-to-image';
@@ -46,6 +46,39 @@ const AttendanceList: React.FC = () => {
   });
   const [savingManual, setSavingManual] = useState(false);
 
+  // Add Participant State
+  const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
+  const [isAddingParticipant, setIsAddingParticipant] = useState(false);
+  const [newParticipant, setNewParticipant] = useState({
+      full_name: '',
+      email: '',
+      role: 'Delegate',
+      office: '',
+      mobile_no: '',
+      age_group: '18-24',
+      pwd: 'No',
+      indigenous_people: 'No',
+      needs_accommodation: false,
+      accommodation_pax: 0,
+      participant_id: null as number | null,
+      accept_photo_video: false,
+      store_to_db: false
+  });
+  const [suggestions, setSuggestions] = useState<Participant[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Affiliation State
+  const [affiliationType, setAffiliationType] = useState<'Office' | 'LGU'>('Office');
+  const [selectedProvince, setSelectedProvince] = useState<string>('');
+  const [selectedCity, setSelectedCity] = useState<string>('');
+  const [locations, setLocations] = useState<any[]>([]);
+
+  const provinces = Array.from(new Set(locations.map(l => l.province_huc))).sort();
+  const cities = locations
+      .filter(l => l.province_huc === selectedProvince && l.city_mun)
+      .map(l => l.city_mun)
+      .sort();
+
   // Click Outside Listener for Dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -78,8 +111,21 @@ const AttendanceList: React.FC = () => {
         }
     };
     
+    const fetchLocations = async () => {
+        const { data } = await supabase
+            .from('ref_locations')
+            .select('*')
+            .order('province_huc', { ascending: true })
+            .order('city_mun', { ascending: true });
+        
+        if (data) {
+            setLocations(data);
+        }
+    };
+
     if (user) {
         fetchAllEvents();
+        fetchLocations();
     }
 
     const channel = supabase
@@ -349,6 +395,242 @@ const AttendanceList: React.FC = () => {
       return format(d, 'h:mm a');
   };
 
+  const handleNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setNewParticipant({ ...newParticipant, full_name: val });
+    
+    if (val.length >= 2) {
+        const { data } = await supabase
+            .from('participants')
+            .select('*')
+            .ilike('full_name', `%${val}%`)
+            .limit(5);
+            
+        if (data && data.length > 0) {
+            setSuggestions(data);
+            setShowSuggestions(true);
+        } else {
+            setSuggestions([]);
+            setShowSuggestions(false);
+        }
+    } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+    }
+  };
+
+  const selectSuggestion = (p: Participant) => {
+      let affType: 'Office' | 'LGU' = 'Office';
+      let prov = '';
+      let city = '';
+      let locId = p.location_id || null;
+
+      if (locId && locations.length > 0) {
+          const loc = locations.find(l => l.location_id === locId);
+          if (loc) {
+              affType = 'LGU';
+              prov = loc.province_huc;
+              city = loc.city_mun || '';
+          }
+      }
+
+      setAffiliationType(affType);
+      setSelectedProvince(prov);
+      setSelectedCity(city);
+
+      setNewParticipant(prev => ({
+          ...prev,
+          full_name: p.full_name,
+          email: p.email || '',
+          office: p.office || '',
+          mobile_no: p.mobile_no || '',
+          age_group: p.age_group || '18-24',
+          pwd: p.pwd || 'No',
+          indigenous_people: p.indigenous_people || 'No',
+          participant_id: p.participant_id
+      }));
+      setSuggestions([]);
+      setShowSuggestions(false);
+  };
+  
+  const handleAddParticipant = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedEvent) return;
+      
+      let finalLocationId = null;
+      let finalOfficeName = newParticipant.office;
+
+      if (affiliationType === 'LGU') {
+          if (!selectedProvince) {
+              alert("Please select a Province/HUC for LGU.");
+              return;
+          }
+          
+          if (selectedCity) {
+              const loc = locations.find(l => l.province_huc === selectedProvince && l.city_mun === selectedCity);
+              if (loc) {
+                  finalLocationId = loc.location_id;
+                  finalOfficeName = `LGU ${selectedCity}, ${selectedProvince}`;
+              } else {
+                  alert("Selected location is invalid.");
+                  return;
+              }
+          } else {
+              const loc = locations.find(l => l.province_huc === selectedProvince && !l.city_mun);
+              if (loc) {
+                  finalLocationId = loc.location_id;
+              }
+              if (selectedProvince.toLowerCase().includes('city')) {
+                   finalOfficeName = `LGU ${selectedProvince}`;
+              } else {
+                   finalOfficeName = `Provincial Gov't of ${selectedProvince}`;
+              }
+          }
+      } else {
+          if (!newParticipant.office.trim()) {
+              alert("Please enter your Office / Agency name.");
+              return;
+          }
+      }
+
+      if (newParticipant.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newParticipant.email)) {
+          alert("Please enter a valid email address.");
+          return;
+      }
+
+      if (newParticipant.mobile_no && !/^[0-9]{10,11}$/.test(newParticipant.mobile_no)) {
+          alert("Please enter a valid mobile number (10 or 11 digits).");
+          return;
+      }
+
+      setIsAddingParticipant(true);
+      
+      try {
+          // 1. Check or Create Participant
+          let participantId: number;
+          
+          if (newParticipant.participant_id) {
+             participantId = newParticipant.participant_id;
+             // Optional: Update participant details if changed
+             await supabase.from('participants').update({
+                full_name: newParticipant.full_name,
+                email: newParticipant.email || null,
+                office: finalOfficeName,
+                location_id: finalLocationId,
+                mobile_no: newParticipant.mobile_no || null,
+                age_group: newParticipant.age_group,
+                pwd: newParticipant.pwd,
+                indigenous_people: newParticipant.indigenous_people
+             }).eq('participant_id', participantId);
+
+          } else if (newParticipant.email) {
+               const { data: existingUser } = await supabase
+                .from('participants')
+                .select('participant_id')
+                .eq('email', newParticipant.email)
+                .single();
+                
+               if (existingUser) {
+                   participantId = existingUser.participant_id;
+                   // Update details
+                   await supabase.from('participants').update({
+                        full_name: newParticipant.full_name,
+                        office: finalOfficeName,
+                        location_id: finalLocationId,
+                        mobile_no: newParticipant.mobile_no || null,
+                        age_group: newParticipant.age_group,
+                        pwd: newParticipant.pwd,
+                        indigenous_people: newParticipant.indigenous_people
+                    }).eq('participant_id', participantId);
+               } else {
+                   // Create
+                    const initials = newParticipant.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 3);
+                    const code = `${initials}-${Date.now().toString().slice(-6)}`;
+                    
+                    const { data: newUser, error: createError } = await supabase
+                    .from('participants')
+                    .insert([{
+                        full_name: newParticipant.full_name,
+                        email: newParticipant.email,
+                        office: finalOfficeName,
+                        location_id: finalLocationId,
+                        participant_code: code,
+                        position: 'N/A', // Default
+                        mobile_no: newParticipant.mobile_no || null,
+                        age_group: newParticipant.age_group,
+                        pwd: newParticipant.pwd,
+                        indigenous_people: newParticipant.indigenous_people
+                    }])
+                    .select()
+                    .single();
+                    if(createError) throw createError;
+                    participantId = newUser.participant_id;
+               }
+          } else {
+               // Create (No Email provided)
+               const initials = newParticipant.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 3);
+               const code = `${initials}-${Date.now().toString().slice(-6)}`;
+               const { data: newUser, error: createError } = await supabase
+                .from('participants')
+                .insert([{
+                    full_name: newParticipant.full_name,
+                    email: null,
+                    office: finalOfficeName,
+                    location_id: finalLocationId,
+                    participant_code: code,
+                    position: 'N/A',
+                    mobile_no: newParticipant.mobile_no || null,
+                    age_group: newParticipant.age_group,
+                    pwd: newParticipant.pwd,
+                    indigenous_people: newParticipant.indigenous_people
+                }])
+                .select()
+                .single();
+                if(createError) throw createError;
+                participantId = newUser.participant_id;
+          }
+
+          // 2. Register
+          const { error: regError } = await supabase
+            .from('event_participants')
+            .insert({
+                event_id: selectedEvent.event_id,
+                participant_id: participantId,
+                registration_status: 'Registered',
+                role: newParticipant.role,
+                needs_accommodation: newParticipant.needs_accommodation,
+                accommodation_pax: newParticipant.needs_accommodation ? Math.max(1, newParticipant.accommodation_pax) : 0,
+                accept_photo_video: newParticipant.accept_photo_video,
+                store_to_db: newParticipant.store_to_db
+            });
+
+          if (regError && regError.code !== '23505') throw regError;
+          
+          // Success
+          setShowAddParticipantModal(false);
+          setNewParticipant({
+              full_name: '',
+              email: '',
+              role: 'Delegate',
+              office: '',
+              mobile_no: '',
+              age_group: '18-24',
+              pwd: 'No',
+              indigenous_people: 'No',
+              needs_accommodation: false,
+              accommodation_pax: 0,
+              participant_id: null
+          });
+          setSuggestions([]);
+          // fetchAttendance will be triggered by supabase real-time channel
+
+      } catch (err: any) {
+          alert("Error adding participant: " + err.message);
+      } finally {
+          setIsAddingParticipant(false);
+      }
+  };
+
   const formatEventDate = (start: string, end: string) => {
     if (!start) return '';
     const startDate = parseISO(start);
@@ -388,13 +670,13 @@ const AttendanceList: React.FC = () => {
                     className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors shadow-sm"
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
-                    <div className="flex items-center gap-2 overflow-hidden">
-                        <Calendar className="text-slate-400 shrink-0" size={16} />
-                        <span className={`truncate text-xs ${!selectedEvent ? 'text-slate-500' : 'text-slate-800 font-medium'}`}>
+                    <div className="flex items-start gap-2 flex-1">
+                        <Calendar className="text-slate-400 shrink-0 mt-0.5" size={16} />
+                        <span className={`whitespace-normal break-words text-xs leading-snug ${!selectedEvent ? 'text-slate-500' : 'text-slate-800 font-medium'}`}>
                             {selectedEvent ? selectedEvent.event_name : "-- Select Event --"}
                         </span>
                     </div>
-                    <ChevronDown className={`text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} size={14} />
+                    <ChevronDown className={`text-slate-400 transition-transform shrink-0 ml-2 ${isDropdownOpen ? 'rotate-180' : ''}`} size={14} />
                 </div>
 
                 {isDropdownOpen && (
@@ -464,17 +746,26 @@ const AttendanceList: React.FC = () => {
                 </div>
             )}
 
-            <div className="w-full md:w-64 relative ml-auto">
-                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                     <Search size={18} />
+            <div className="flex items-center gap-3 w-full md:w-auto ml-auto">
+                 <div className="relative w-full md:w-64">
+                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                         <Search size={18} />
+                     </div>
+                     <input 
+                        type="text" 
+                        placeholder="Search participants..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                     />
                  </div>
-                 <input 
-                    type="text" 
-                    placeholder="Search participants..." 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                 />
+                 <button 
+                     onClick={() => setShowAddParticipantModal(true)}
+                     disabled={!selectedEvent}
+                     className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium shrink-0"
+                 >
+                     <UserPlus size={20} /> <span className="hidden sm:inline">Add Participant</span>
+                 </button>
             </div>
         </div>
       </div>
@@ -653,6 +944,296 @@ const AttendanceList: React.FC = () => {
                         )}
                     </tbody>
                 </table>
+            </div>
+        </div>
+      )}
+
+      {/* Add Participant Modal */}
+      {showAddParticipantModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddParticipantModal(false)}></div>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 relative z-10 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <UserPlus size={20} className="text-indigo-600" />
+                        Add Participant
+                    </h3>
+                    <button onClick={() => setShowAddParticipantModal(false)} className="text-slate-400 hover:text-slate-600">
+                        <X size={24} />
+                    </button>
+                </div>
+                
+                <form onSubmit={handleAddParticipant} className="space-y-4">
+                    <div className="relative">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+                        <input 
+                            required
+                            type="text"
+                            placeholder="Full Name"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            value={newParticipant.full_name}
+                            onChange={handleNameChange}
+                            onFocus={() => { if(newParticipant.full_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
+                            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                            autoComplete="off"
+                        />
+                         {showSuggestions && suggestions.length > 0 && (
+                            <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                                {suggestions.map((p) => (
+                                    <li 
+                                        key={p.participant_id}
+                                        onClick={() => selectSuggestion(p)}
+                                        className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div className="font-medium text-slate-800 group-hover:text-indigo-700">{p.full_name}</div>
+                                            <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Select</span>
+                                        </div>
+                                        <div className="text-xs text-slate-500 mt-0.5">{p.email} • {p.office}</div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Email (Optional)</label>
+                        <input 
+                            type="email"
+                            placeholder="email@example.com"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            value={newParticipant.email}
+                            onChange={e => setNewParticipant({...newParticipant, email: e.target.value})}
+                            pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
+                            title="Please enter a valid email address"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Mobile No.</label>
+                        <input 
+                            type="tel"
+                            placeholder="09123456789"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            value={newParticipant.mobile_no}
+                            onChange={e => {
+                                const val = e.target.value.replace(/\D/g, '');
+                                if (val.length <= 11) {
+                                    setNewParticipant({...newParticipant, mobile_no: val});
+                                }
+                            }}
+                            pattern="[0-9]{10,11}"
+                            title="Mobile number must be 10 or 11 digits"
+                        />
+                    </div>
+                    
+                    <div className="pt-2">
+                         <label className="block text-sm font-medium text-slate-700 mb-2">Affiliation Type</label>
+                         <div className="flex gap-4 mb-4">
+                            <label className={`flex-1 cursor-pointer border rounded-lg p-2.5 flex items-center gap-2 transition-all ${affiliationType === 'Office' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                <input 
+                                    type="radio" 
+                                    className="hidden" 
+                                    checked={affiliationType === 'Office'} 
+                                    onChange={() => setAffiliationType('Office')}
+                                />
+                                <Building size={18} />
+                                <span className="font-medium text-sm">NGA / Office</span>
+                            </label>
+                            <label className={`flex-1 cursor-pointer border rounded-lg p-2.5 flex items-center gap-2 transition-all ${affiliationType === 'LGU' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                <input 
+                                    type="radio" 
+                                    className="hidden" 
+                                    checked={affiliationType === 'LGU'} 
+                                    onChange={() => setAffiliationType('LGU')}
+                                />
+                                <Landmark size={18} />
+                                <span className="font-medium text-sm">LGU</span>
+                            </label>
+                         </div>
+
+                         {affiliationType === 'Office' ? (
+                            <div className="animate-in fade-in zoom-in-95 duration-200">
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Office / Agency Name</label>
+                                <input 
+                                    required={affiliationType === 'Office'}
+                                    type="text"
+                                    placeholder="e.g. DILG Regional Office 10"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                    value={newParticipant.office}
+                                    onChange={e => setNewParticipant({...newParticipant, office: e.target.value})}
+                                />
+                            </div>
+                         ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-200">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Province / HUC</label>
+                                    <select 
+                                        required={affiliationType === 'LGU'}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        value={selectedProvince}
+                                        onChange={e => {
+                                            setSelectedProvince(e.target.value);
+                                            setSelectedCity('');
+                                        }}
+                                    >
+                                        <option value="">-- Select Province --</option>
+                                        {provinces.map(prov => (
+                                            <option key={prov} value={prov}>{prov}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">City / Municipality</label>
+                                    <select 
+                                        disabled={!selectedProvince}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                                        value={selectedCity}
+                                        onChange={e => setSelectedCity(e.target.value)}
+                                    >
+                                        <option value="">-- Optional --</option>
+                                        {cities.map(city => (
+                                            <option key={city} value={city}>{city}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                         )}
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Age Group</label>
+                            <select
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                value={newParticipant.age_group}
+                                onChange={e => setNewParticipant({...newParticipant, age_group: e.target.value})}
+                            >
+                                <option value="18-24">18-24</option>
+                                <option value="25-34">25-34</option>
+                                <option value="35-44">35-44</option>
+                                <option value="45-54">45-54</option>
+                                <option value="55-65">55-65</option>
+                                <option value="65+">65+</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
+                             <select
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                value={newParticipant.role}
+                                onChange={e => setNewParticipant({...newParticipant, role: e.target.value as any})}
+                            >
+                                <option value="Delegate">Delegate</option>
+                                <option value="Speaker">Speaker</option>
+                                <option value="Secretariat">Secretariat</option>
+                                <option value="Guest">Guest</option>
+                                <option value="VIP">VIP</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">PWD</label>
+                            <select
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                value={newParticipant.pwd}
+                                onChange={e => setNewParticipant({...newParticipant, pwd: e.target.value})}
+                            >
+                                <option value="No">No</option>
+                                <option value="Yes">Yes</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Indigenous People</label>
+                            <select
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                value={newParticipant.indigenous_people}
+                                onChange={e => setNewParticipant({...newParticipant, indigenous_people: e.target.value})}
+                            >
+                                <option value="No">No</option>
+                                <option value="Yes">Yes</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {selectedEvent?.has_accommodation && (
+                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input 
+                                    type="checkbox"
+                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                    checked={newParticipant.needs_accommodation}
+                                    onChange={e => setNewParticipant({...newParticipant, needs_accommodation: e.target.checked})}
+                                />
+                                <span className="text-sm font-medium text-slate-700">Needs Accommodation</span>
+                            </label>
+                            
+                            {newParticipant.needs_accommodation && (
+                                <div className="mt-2 pl-6 animate-in fade-in slide-in-from-top-1">
+                                    <label className="block text-xs font-medium text-slate-500 mb-1">Pax Count</label>
+                                    <input 
+                                        type="number"
+                                        min="1"
+                                        className="w-24 px-2 py-1 text-sm border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none"
+                                        value={newParticipant.accommodation_pax}
+                                        onChange={e => setNewParticipant({...newParticipant, accommodation_pax: parseInt(e.target.value) || 0})}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Data Privacy Consent */}
+                    <div className="flex flex-col gap-3 bg-slate-50 p-4 rounded-lg border border-slate-100 mt-4">
+                        <div className="text-xs text-slate-600 leading-relaxed text-justify">
+                            <strong>Privacy Notice</strong><br/>
+                            DILG 10 Regional Office collects your data for event documentation, monitoring, and evaluation. Records are stored for one year. Photos and recordings may be captured for documentation or used in official publications.<br/>
+                            To withdraw consent or report concerns, contact records.dilg10@gmail.com or the DILG Data Protection Officer at dpo.dilg@gmail.com.
+                        </div>
+                        
+                        <div className="text-xs font-bold text-slate-700 mt-2">Consent:</div>
+                        
+                        <div className="flex items-start gap-3">
+                            <div className="flex items-center h-5">
+                                <input
+                                    id="modal-accept-photo-video"
+                                    type="checkbox"
+                                    checked={newParticipant.accept_photo_video}
+                                    onChange={(e) => setNewParticipant({...newParticipant, accept_photo_video: e.target.checked})}
+                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                />
+                            </div>
+                            <label htmlFor="modal-accept-photo-video" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
+                                I consent to the capture of my photo, video, and audio for use in DILG publications.
+                            </label>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                            <div className="flex items-center h-5">
+                                <input
+                                    id="modal-store-to-db"
+                                    type="checkbox"
+                                    checked={newParticipant.store_to_db}
+                                    onChange={(e) => setNewParticipant({...newParticipant, store_to_db: e.target.checked})}
+                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                />
+                            </div>
+                            <label htmlFor="modal-store-to-db" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
+                                I consent to the storage of my data in the organizer’s database for future document processing.
+                            </label>
+                        </div>
+                    </div>
+
+                    <div className="pt-2">
+                        <button 
+                            type="submit" 
+                            disabled={isAddingParticipant}
+                            className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-all flex justify-center items-center gap-2"
+                        >
+                            {isAddingParticipant ? <Loader2 className="animate-spin" size={18} /> : 'Add to Event'}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
       )}
