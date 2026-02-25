@@ -14,6 +14,8 @@ const EventsList: React.FC = () => {
   const [offices, setOffices] = useState<Office[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const navigate = useNavigate();
   
   // Modal States
@@ -554,6 +556,17 @@ const EventsList: React.FC = () => {
     );
   }, [events, searchTerm]);
 
+  const totalPages = Math.ceil(filteredEvents.length / itemsPerPage);
+  const paginatedEvents = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredEvents.slice(start, start + itemsPerPage);
+  }, [filteredEvents, currentPage]);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -577,8 +590,8 @@ const EventsList: React.FC = () => {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="overflow-x-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-visible">
+          <div className="overflow-visible">
               <table className="w-full text-sm text-left">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                       <tr>
@@ -616,7 +629,7 @@ const EventsList: React.FC = () => {
                           ))
                       ) : (
                           <>
-                              {filteredEvents.map((event) => (
+                              {paginatedEvents.map((event) => (
                                   <tr 
                                       key={event.event_id} 
                                       onClick={() => handleRowClick(event)}
@@ -677,7 +690,7 @@ const EventsList: React.FC = () => {
                                                             setOpenActionMenuId(null);
                                                         }}
                                                     />
-                                                    <div className="absolute right-10 top-1/2 -translate-y-1/2 w-36 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-20 animate-in fade-in zoom-in-95 duration-100">
+                                                    <div className="absolute right-10 top-1/2 -translate-y-1/2 w-36 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
                                                         <button 
                                                             onClick={(e) => {
                                                                 setOpenActionMenuId(null);
