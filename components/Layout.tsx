@@ -625,6 +625,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           <div className="flex items-center gap-6 relative ml-auto" ref={dropdownRef}>
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}>
+              <div className="hidden sm:block text-right mr-1">
+                <p className="text-sm font-medium text-slate-800">Hello, {user?.full_name?.split(' ')[0]}</p>
+              </div>
               <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-[#4322A7] font-bold text-xl overflow-hidden shadow-sm">
                 {user?.img_link ? (
                   <img src={user.img_link} alt="User Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
