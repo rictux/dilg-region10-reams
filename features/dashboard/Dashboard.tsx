@@ -29,7 +29,8 @@ import {
     startOfDay,
     endOfDay,
     isBefore,
-    isAfter
+    isAfter,
+    differenceInDays
 } from 'date-fns';
 
 interface DashboardEvent {
@@ -369,18 +370,32 @@ const Dashboard: React.FC = () => {
                             const event = slots[i];
                             if (event) {
                                 const { className, isStart } = getEventStyle(event, day);
+                                const isDisplayStart = isStart || day.getDay() === 0 || day.getDate() === 1;
+                                
+                                let spanWidth = '100%';
+                                if (isDisplayStart) {
+                                    const endOfWeekDay = endOfWeek(day);
+                                    const eventEnd = startOfDay(parseISO(event.end_date));
+                                    const endToUse = isBefore(eventEnd, endOfWeekDay) ? eventEnd : endOfWeekDay;
+                                    const daysSpan = differenceInDays(endToUse, startOfDay(day)) + 1;
+                                    spanWidth = `calc(${daysSpan * 100}% + ${(daysSpan - 1) * 9}px)`;
+                                }
+
                                 renderSlots.push(
                                     <div 
                                         key={`${event.event_id}-${day.toISOString()}`} 
-                                        className={className}
+                                        className={`${className} relative`}
                                         title={`${event.event_name} (${event.status})`}
                                     >
-                                        {(isStart || day.getDay() === 0 || day.getDate() === 1) && (
-                                            <span className="truncate font-medium">{event.event_name}</span>
+                                        {isDisplayStart && (
+                                            <span 
+                                                className="absolute left-1 truncate font-medium z-10 pointer-events-none"
+                                                style={{ width: `calc(${spanWidth} - 8px)` }}
+                                            >
+                                                {event.event_name}
+                                            </span>
                                         )}
-                                        {(!isStart && day.getDay() !== 0 && day.getDate() !== 1) && (
-                                            <span className="opacity-0 select-none">.</span>
-                                        )}
+                                        <span className="opacity-0 select-none truncate">{event.event_name}</span>
                                     </div>
                                 );
                             } else {
