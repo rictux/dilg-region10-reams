@@ -471,7 +471,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     return (
       <div className="min-h-screen bg-[#f4f5f9] flex flex-col">
         <header className="bg-white shadow-sm p-4 flex justify-between items-center z-10 sticky top-0">
-          <h1 className="text-xl font-bold text-[#4322A7]">Event Management Portal</h1>
+          <h1 className="text-xl font-bold text-[#4322A7]">Regional Event & Attendance Management System</h1>
           <div className="flex items-center gap-3">
              <button 
                 onClick={() => navigate('/admin/lookup')}
