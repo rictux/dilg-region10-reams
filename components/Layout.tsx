@@ -603,7 +603,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </nav>
 
         <div className={`p-8 mt-auto text-xs text-indigo-300 space-y-2 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-          <p className="font-medium text-indigo-200">DILG R10 Event Management Portal</p>
+          <p className="font-medium text-indigo-200">Regional Event & Attendance Management System</p>
           <p>© 2026 All Rights Reserved</p>
           <p>Created by: RICTU X</p>
         </div>
