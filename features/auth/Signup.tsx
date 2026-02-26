@@ -99,7 +99,7 @@ const Signup: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-indigo-600">Create Account</h1>
-          <p className="text-slate-500 mt-2">Join the Event Management Portal</p>
+          <p className="text-slate-500 mt-2">Join the Regional Event & Attendance Management System</p>
         </div>
 
         {error && (
