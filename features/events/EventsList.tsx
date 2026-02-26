@@ -84,6 +84,7 @@ const EventsList: React.FC = () => {
 
   // Delete Confirmation State
   const [participantToDelete, setParticipantToDelete] = useState<number | null>(null);
+  const [eventToDelete, setEventToDelete] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null);
   
@@ -293,13 +294,22 @@ const EventsList: React.FC = () => {
 
   const handleDelete = async (e: React.MouseEvent, id: number) => {
       e.stopPropagation(); // Prevent row click
-      if(!confirm('Are you sure? This will delete all attendance logs associated with this event.')) return;
+      setEventToDelete(id);
+  };
+
+  const confirmDeleteEvent = async () => {
+      if (!eventToDelete) return;
       
-      const { error } = await supabase.from('events').delete().eq('event_id', id);
-      if (error) {
-        alert("Error deleting event: " + error.message);
+      setIsDeleting(true);
+      try {
+          const { error } = await supabase.from('events').delete().eq('event_id', eventToDelete);
+          if (error) throw error;
+          setEventToDelete(null);
+      } catch (err: any) {
+          alert("Error deleting event: " + err.message);
+      } finally {
+          setIsDeleting(false);
       }
-      // fetchEvents handled by subscription
   };
 
   const openShareModal = (e: React.MouseEvent, event: Event) => {
@@ -1166,7 +1176,7 @@ const EventsList: React.FC = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal for Participant */}
       {participantToDelete && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setParticipantToDelete(null)}></div>
@@ -1188,6 +1198,39 @@ const EventsList: React.FC = () => {
                         </button>
                         <button 
                             onClick={confirmRemoveParticipant}
+                            disabled={isDeleting}
+                            className="flex-1 px-4 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                            {isDeleting ? <Loader2 className="animate-spin" size={18} /> : 'Delete'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal for Event */}
+      {eventToDelete && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setEventToDelete(null)}></div>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 relative z-20 animate-in zoom-in-95 duration-200">
+                <div className="flex flex-col items-center text-center">
+                    <div className="bg-red-100 p-3 rounded-full mb-4">
+                        <AlertTriangle className="text-red-600" size={32} />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-800 mb-2">Delete Event?</h3>
+                    <p className="text-sm text-slate-500 mb-6">
+                        Are you sure you want to delete this event? This action cannot be undone and will delete all attendance logs associated with this event.
+                    </p>
+                    <div className="flex gap-3 w-full">
+                        <button 
+                            onClick={() => setEventToDelete(null)}
+                            className="flex-1 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={confirmDeleteEvent}
                             disabled={isDeleting}
                             className="flex-1 px-4 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
                         >
