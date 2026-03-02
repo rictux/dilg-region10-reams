@@ -55,6 +55,8 @@ const AttendanceList: React.FC = () => {
       role: 'Delegate',
       office: '',
       mobile_no: '',
+      position: '',
+      gender: 'Male',
       age_group: '18-24',
       pwd: 'No',
       indigenous_people: 'No',
@@ -444,6 +446,8 @@ const AttendanceList: React.FC = () => {
           email: p.email || '',
           office: p.office || '',
           mobile_no: p.mobile_no || '',
+          position: p.position || '',
+          gender: p.gender || 'Male',
           age_group: p.age_group || '18-24',
           pwd: p.pwd || 'No',
           indigenous_people: p.indigenous_people || 'No',
@@ -518,6 +522,8 @@ const AttendanceList: React.FC = () => {
                 office: finalOfficeName,
                 location_id: finalLocationId,
                 mobile_no: newParticipant.mobile_no || null,
+                position: newParticipant.position || 'N/A',
+                gender: newParticipant.gender,
                 age_group: newParticipant.age_group,
                 pwd: newParticipant.pwd,
                 indigenous_people: newParticipant.indigenous_people
@@ -538,6 +544,8 @@ const AttendanceList: React.FC = () => {
                         office: finalOfficeName,
                         location_id: finalLocationId,
                         mobile_no: newParticipant.mobile_no || null,
+                        position: newParticipant.position || 'N/A',
+                        gender: newParticipant.gender,
                         age_group: newParticipant.age_group,
                         pwd: newParticipant.pwd,
                         indigenous_people: newParticipant.indigenous_people
@@ -555,7 +563,7 @@ const AttendanceList: React.FC = () => {
                         office: finalOfficeName,
                         location_id: finalLocationId,
                         participant_code: code,
-                        position: 'N/A', // Default
+                        position: newParticipant.position || 'N/A',
                         mobile_no: newParticipant.mobile_no || null,
                         age_group: newParticipant.age_group,
                         pwd: newParticipant.pwd,
@@ -578,7 +586,8 @@ const AttendanceList: React.FC = () => {
                     office: finalOfficeName,
                     location_id: finalLocationId,
                     participant_code: code,
-                    position: 'N/A',
+                    position: newParticipant.position || 'N/A',
+                    gender: newParticipant.gender,
                     mobile_no: newParticipant.mobile_no || null,
                     age_group: newParticipant.age_group,
                     pwd: newParticipant.pwd,
@@ -614,6 +623,8 @@ const AttendanceList: React.FC = () => {
               role: 'Delegate',
               office: '',
               mobile_no: '',
+              position: '',
+              gender: 'Male',
               age_group: '18-24',
               pwd: 'No',
               indigenous_people: 'No',
@@ -1022,6 +1033,29 @@ const AttendanceList: React.FC = () => {
                             }}
                             pattern="[0-9]{10,11}"
                             title="Mobile number must be 10 or 11 digits"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
+                        <select 
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            value={newParticipant.gender}
+                            onChange={e => setNewParticipant({...newParticipant, gender: e.target.value})}
+                        >
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Position</label>
+                        <input 
+                            type="text"
+                            placeholder="e.g. Regional Director, Administrative Officer"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            value={newParticipant.position}
+                            onChange={e => setNewParticipant({...newParticipant, position: e.target.value})}
                         />
                     </div>
                     
