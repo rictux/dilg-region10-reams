@@ -1185,11 +1185,7 @@ const AttendanceList: React.FC = () => {
 
                     {/* Data Privacy Consent */}
                     <div className="flex flex-col gap-3 bg-slate-50 p-4 rounded-lg border border-slate-100 mt-4">
-                        <div className="text-xs text-slate-600 leading-relaxed text-justify">
-                            <strong>Privacy Notice</strong><br/>
-                            DILG 10 Regional Office collects your data for event documentation, monitoring, and evaluation. Records are stored for one year. Photos and recordings may be captured for documentation or used in official publications.<br/>
-                            To withdraw consent or report concerns, contact records.dilg10@gmail.com or the DILG Data Protection Officer at dpo.dilg@gmail.com.
-                        </div>
+                       
                         
                         <div className="text-xs font-bold text-slate-700 mt-2">Consent:</div>
                         
@@ -1204,7 +1200,7 @@ const AttendanceList: React.FC = () => {
                                 />
                             </div>
                             <label htmlFor="modal-accept-photo-video" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
-                                I consent to the capture of my photo, video, and audio for use in DILG publications.
+                                He/She consents to the capture of his/her photo, video, and audio for use in DILG publications.
                             </label>
                         </div>
 
@@ -1219,7 +1215,7 @@ const AttendanceList: React.FC = () => {
                                 />
                             </div>
                             <label htmlFor="modal-store-to-db" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
-                                I consent to the storage of my data in the organizer’s database for future document processing.
+                                He/She consents to the storage of his/her data in the organizer’s database for future document processing.
                             </label>
                         </div>
                     </div>
