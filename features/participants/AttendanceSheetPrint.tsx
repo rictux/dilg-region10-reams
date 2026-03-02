@@ -144,19 +144,18 @@ const AttendanceSheetPrint: React.FC = () => {
                             <thead>
                                 <tr className="bg-gray-200 text-center font-bold uppercase font-sans print:bg-gray-200 print:print-color-adjust-exact">
                                     <th rowSpan={2} className="border border-black px-2 py-2 w-10">No.</th>
-                                    <th rowSpan={2} className="border border-black px-4 py-2 text-left">NAME</th>
-                                    <th rowSpan={2} className="border border-black px-4 py-2">POSITION</th>
-                                    <th rowSpan={2} className="border border-black px-4 py-2">OFFICE</th>
-                                    <th colSpan={2} className="border border-black px-2 py-1 w-20">GENDER</th>
-                                    <th colSpan={2} className="border border-black px-2 py-1 w-20">CONSENT</th>
-                                    <th rowSpan={2} className="border border-black px-4 py-2 w-28">AM</th>
-                                    <th rowSpan={2} className="border border-black px-4 py-2 w-28">PM</th>
+                                    <th rowSpan={2} className="border border-black px-4 py-2 text-left w-48">NAME</th>
+                                    <th rowSpan={2} className="border border-black px-4 py-2 w-32">POSITION</th>
+                                    <th rowSpan={2} className="border border-black px-4 py-2 w-32">OFFICE</th>
+                                    <th colSpan={2} className="border border-black px-2 py-1 w-16">GENDER</th>
+                                    <th rowSpan={2} className="border border-black px-1 py-1 w-24 text-[8px] leading-tight normal-case font-normal align-top">I consent to the capture of my photo, video, and audio for use in DILG publications.</th>
+                                    <th rowSpan={2} className="border border-black px-1 py-1 w-24 text-[8px] leading-tight normal-case font-normal align-top">I consent to the storage of my data in the organizer’s database for future document processing.</th>
+                                    <th rowSpan={2} className="border border-black px-4 py-2 w-24">AM</th>
+                                    <th rowSpan={2} className="border border-black px-4 py-2 w-24">PM</th>
                                 </tr>
                                 <tr className="bg-gray-200 text-center font-bold uppercase font-sans print:bg-gray-200 print:print-color-adjust-exact">
-                                    <th className="border border-black px-1 py-1 w-10">M</th>
-                                    <th className="border border-black px-1 py-1 w-10">F</th>
-                                    <th className="border border-black px-1 py-1 w-10" title="I consent to the capture of my photo, video, and audio for use in DILG publications.">A</th>
-                                    <th className="border border-black px-1 py-1 w-10" title="I consent to the storage of my data in the organizer’s database for future document processing.">B</th>
+                                    <th className="border border-black px-1 py-1 w-8">M</th>
+                                    <th className="border border-black px-1 py-1 w-8">F</th>
                                 </tr>
                             </thead>
                             <tbody className="font-sans text-xs">
@@ -184,9 +183,6 @@ const AttendanceSheetPrint: React.FC = () => {
                         </table>
                     </div>
                     <div className="w-full px-10 pb-6 pt-2 flex flex-col text-[10px] text-slate-600 font-sans">
-                        <div className="font-bold mb-0.5">Consent Legend:</div>
-                        <div><span className="font-bold">A</span> - I consent to the capture of my photo, video, and audio for use in DILG publications.</div>
-                        <div><span className="font-bold">B</span> - I consent to the storage of my data in the organizer’s database for future document processing.</div>
                         <div className="mt-2 text-slate-400">System Generated Report</div>
                     </div>
                 </div>
