@@ -794,6 +794,22 @@ const EventRegistration: React.FC = () => {
                         </div>
                         
                         <div className="text-xs font-bold text-slate-700 mt-2">Consent:</div>
+
+                        <div className="flex items-start gap-3">
+                            <div className="flex items-center h-5">
+                                <input
+                                    id="consent-checkbox"
+                                    type="checkbox"
+                                    required
+                                    checked={consent}
+                                    onChange={(e) => setConsent(e.target.checked)}
+                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                />
+                            </div>
+                            <label htmlFor="consent-checkbox" className="text-xs text-slate-700 font-bold leading-relaxed cursor-pointer">
+                                I have read and agree to the Data Privacy Notice above. *
+                            </label>
+                        </div>
                         
                         <div className="flex items-start gap-3">
                             <div className="flex items-center h-5">
