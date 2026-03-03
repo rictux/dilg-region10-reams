@@ -3,13 +3,16 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Participant, Event } from '../../types/database';
-import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Home, ChevronDown, Check, Filter, UserPlus, Building, Landmark } from 'lucide-react';
+import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Home, ChevronDown, Check, Filter, UserPlus, Building, Landmark, Download } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { format, parseISO, eachDayOfInterval, isSameMonth, isSameYear } from 'date-fns';
 import { toPng } from 'html-to-image';
+import * as XLSX from 'xlsx';
 
 interface AttendanceRow {
     participant: Participant;
+    role?: string;
+    needs_accommodation?: boolean;
     amLog?: { time: string, status: string };
     pmLog?: { time: string, status: string };
 }
@@ -210,7 +213,7 @@ const AttendanceList: React.FC = () => {
     try {
         const { data: eventParticipants, error: epError } = await supabase
             .from('event_participants')
-            .select('participant_id, participants(*)')
+            .select('participant_id, role, needs_accommodation, participants(*)')
             .eq('event_id', eventId);
         
         if (epError) throw epError;
@@ -224,9 +227,9 @@ const AttendanceList: React.FC = () => {
             
         if (eventParticipants) {
             const rows = eventParticipants
-                .map((ep: any) => ep.participants)
-                .filter((p: any) => p !== null) 
-                .map((p: Participant) => {
+                .filter((ep: any) => ep.participants !== null) 
+                .map((ep: any) => {
+                    const p = ep.participants as Participant;
                     const pLogs = logs?.filter(l => l.participant_id === p.participant_id) || [];
                     const daysLogs = pLogs.filter(l => l.attendance_date === dateStr);
 
@@ -235,6 +238,8 @@ const AttendanceList: React.FC = () => {
 
                     return {
                         participant: p,
+                        role: ep.role,
+                        needs_accommodation: ep.needs_accommodation,
                         amLog: amLogs.length > 0 ? { time: amLogs[0].scan_time, status: amLogs[0].scan_status } : undefined,
                         pmLog: pmLogs.length > 0 ? { time: pmLogs[pmLogs.length - 1].scan_time, status: pmLogs[pmLogs.length - 1].scan_status } : undefined,
                     };
@@ -293,6 +298,44 @@ const AttendanceList: React.FC = () => {
     if (selectedEventId && selectedDate) {
         fetchAttendance(selectedEventId, selectedDate);
     }
+  };
+
+  const generateReport = () => {
+      if (!selectedEvent || !selectedDate) return;
+
+      // Group data by Office
+      const groupedData = data.reduce((acc, row) => {
+          const office = row.participant.office || 'N/A';
+          if (!acc[office]) acc[office] = [];
+          acc[office].push(row);
+          return acc;
+      }, {} as Record<string, AttendanceRow[]>);
+
+      // Flatten grouped data into an array of objects for XLSX
+      const exportData: any[] = [];
+      
+      Object.keys(groupedData).sort().forEach(office => {
+          groupedData[office].forEach(row => {
+              exportData.push({
+                  'Name': row.participant.full_name,
+                  'Gender': row.participant.gender || 'N/A',
+                  'Position': row.participant.position || 'N/A',
+                  'Office': office,
+                  'Mobile No': row.participant.mobile_no || 'N/A',
+                  'Email': row.participant.email || 'N/A',
+                  'Event Name': selectedEvent.title || selectedEvent.event_name,
+                  'Role': row.role || 'Delegate',
+                  'Needs Accomodation': row.needs_accommodation ? 'Yes' : 'No',
+                  'Present (Have AM time)': row.amLog ? 'Yes' : 'No'
+              });
+          });
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
+      
+      XLSX.writeFile(workbook, `Attendance_Report_${selectedEvent.title || selectedEvent.event_name}_${selectedDate}.xlsx`);
   };
 
   const openManualModal = (e: React.MouseEvent, p: Participant) => {
@@ -771,11 +814,18 @@ const AttendanceList: React.FC = () => {
                      />
                  </div>
                  <button 
+                     onClick={generateReport}
+                     disabled={!selectedEvent || !selectedDate || data.length === 0}
+                     className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium shrink-0"
+                 >
+                     <Download size={20} /> <span className="hidden sm:inline">Export</span>
+                 </button>
+                 <button 
                      onClick={() => setShowAddParticipantModal(true)}
                      disabled={!selectedEvent}
                      className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium shrink-0"
                  >
-                     <UserPlus size={20} /> <span className="hidden sm:inline">Add Participant</span>
+                     <UserPlus size={20} /> <span className="hidden sm:inline">Add</span>
                  </button>
             </div>
         </div>
