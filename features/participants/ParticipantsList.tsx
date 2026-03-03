@@ -326,7 +326,7 @@ const AttendanceList: React.FC = () => {
                   'Event Name': selectedEvent.title || selectedEvent.event_name,
                   'Role': row.role || 'Delegate',
                   'Needs Accomodation': row.needs_accommodation ? 'Yes' : 'No',
-                  'Present (Have AM time)': row.amLog ? 'Yes' : 'No'
+                  'Present': row.amLog ? 'Yes' : 'No'
               });
           });
       });
