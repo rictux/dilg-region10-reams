@@ -24,7 +24,7 @@ const EventsList: React.FC = () => {
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   
   // Add Participant Modal State
-  const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
+  const [participantModalView, setParticipantModalView] = useState<'list' | 'add'>('list');
   const [isAddingParticipant, setIsAddingParticipant] = useState(false);
   const [newParticipant, setNewParticipant] = useState<{
       full_name: string;
@@ -599,7 +599,7 @@ const EventsList: React.FC = () => {
           if (regError && regError.code !== '23505') throw regError;
           
           // Success
-          setShowAddParticipantModal(false);
+          setParticipantModalView('list');
           setNewParticipant({
               full_name: '',
               email: '',
@@ -613,7 +613,9 @@ const EventsList: React.FC = () => {
               indigenous_people: 'No',
               needs_accommodation: false,
               accommodation_pax: 0,
-              participant_id: null
+              participant_id: null,
+              accept_photo_video: false,
+              store_to_db: false
           });
           setSuggestions([]);
           fetchEventParticipants(selectedEvent.event_id);
@@ -926,37 +928,58 @@ const EventsList: React.FC = () => {
       {/* Participants List Modal */}
       {showParticipantsModal && selectedEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowParticipantsModal(false)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[80vh] flex flex-col relative z-10 animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => { setShowParticipantsModal(false); setParticipantModalView('list'); }}></div>
+            <div className={`bg-white rounded-xl shadow-2xl w-full ${participantModalView === 'list' ? 'max-w-6xl' : 'max-w-2xl'} h-[80vh] flex flex-col relative z-10 animate-in zoom-in-95 duration-200`}>
                 {/* Header */}
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-xl">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-xl shrink-0">
                     <div>
                         <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                            <Users className="text-indigo-600" size={24} /> 
-                            {selectedEvent.event_name}
+                            {participantModalView === 'list' ? (
+                                <>
+                                    <Users className="text-indigo-600" size={24} /> 
+                                    {selectedEvent.event_name}
+                                </>
+                            ) : (
+                                <>
+                                    <UserPlus className="text-indigo-600" size={24} /> 
+                                    Add Participant
+                                </>
+                            )}
                         </h3>
-                        <p className="text-sm text-slate-500 mt-1">
-                            {formatEventDate(selectedEvent.start_date, selectedEvent.end_date)} • {selectedEvent.venue}
-                        </p>
+                        {participantModalView === 'list' && (
+                            <p className="text-sm text-slate-500 mt-1">
+                                {formatEventDate(selectedEvent.start_date, selectedEvent.end_date)} • {selectedEvent.venue}
+                            </p>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
-                        {hasPermission('MANAGE_PARTICIPANTS') && (
-                             <button 
-                                onClick={() => setShowAddParticipantModal(true)}
-                                className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors mr-2 shadow-sm"
+                        {participantModalView === 'list' ? (
+                            hasPermission('MANAGE_PARTICIPANTS') && (
+                                <button 
+                                    onClick={() => setParticipantModalView('add')}
+                                    className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors mr-2 shadow-sm"
+                                >
+                                    <UserPlus size={16} /> Add
+                                </button>
+                            )
+                        ) : (
+                            <button 
+                                onClick={() => setParticipantModalView('list')}
+                                className="bg-slate-100 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-slate-200 transition-colors mr-2 shadow-sm"
                             >
-                                <UserPlus size={16} /> Add
+                                <ArrowRight size={16} className="rotate-180" /> Return to List
                             </button>
                         )}
-                        <button onClick={() => setShowParticipantsModal(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
+                        <button onClick={() => { setShowParticipantsModal(false); setParticipantModalView('list'); }} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
                             <X size={24} />
                         </button>
                     </div>
                 </div>
 
-                {/* Table Content */}
+                {/* Content */}
                 <div className="flex-1 overflow-auto p-0">
-                    {loadingParticipants ? (
+                    {participantModalView === 'list' ? (
+                        loadingParticipants ? (
                         <div className="h-full flex items-center justify-center text-slate-400 gap-2">
                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div> Loading participants...
                         </div>
@@ -1164,27 +1187,320 @@ const EventsList: React.FC = () => {
                                 )}
                             </tbody>
                         </table>
+                    )) : (
+                        <div className="p-6 max-w-2xl mx-auto">
+                            <form onSubmit={handleAddParticipant} className="space-y-4">
+                                <div className="relative">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+                                    <input 
+                                        required
+                                        type="text"
+                                        placeholder="Full Name"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        value={newParticipant.full_name}
+                                        onChange={handleNameChange}
+                                        onFocus={() => { if(newParticipant.full_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
+                                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                        autoComplete="off"
+                                    />
+                                     {showSuggestions && suggestions.length > 0 && (
+                                        <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                                            {suggestions.map((p) => (
+                                                <li 
+                                                    key={p.participant_id}
+                                                    onClick={() => selectSuggestion(p)}
+                                                    className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
+                                                >
+                                                    <div className="flex justify-between items-center">
+                                                        <div className="font-medium text-slate-800 group-hover:text-indigo-700">{p.full_name}</div>
+                                                        <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Select</span>
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 mt-0.5">{p.email} • {p.office}</div>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Email (Optional)</label>
+                                    <input 
+                                        type="email"
+                                        placeholder="email@example.com"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        value={newParticipant.email}
+                                        onChange={e => setNewParticipant({...newParticipant, email: e.target.value})}
+                                        pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
+                                        title="Please enter a valid email address"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Mobile No.</label>
+                                    <input 
+                                        type="tel"
+                                        placeholder="09123456789"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        value={newParticipant.mobile_no}
+                                        onChange={e => {
+                                            const val = e.target.value.replace(/\D/g, '');
+                                            if (val.length <= 11) {
+                                                setNewParticipant({...newParticipant, mobile_no: val});
+                                            }
+                                        }}
+                                        pattern="[0-9]{10,11}"
+                                        title="Mobile number must be 10 or 11 digits"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
+                                    <select 
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        value={newParticipant.gender}
+                                        onChange={e => setNewParticipant({...newParticipant, gender: e.target.value})}
+                                    >
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Position</label>
+                                    <input 
+                                        type="text"
+                                        placeholder="e.g. Regional Director, Administrative Officer"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        value={newParticipant.position}
+                                        onChange={e => setNewParticipant({...newParticipant, position: e.target.value})}
+                                    />
+                                </div>
+                                
+                                <div className="pt-2">
+                                     <label className="block text-sm font-medium text-slate-700 mb-2">Affiliation Type</label>
+                                     <div className="flex gap-4 mb-4">
+                                        <label className={`flex-1 cursor-pointer border rounded-lg p-2.5 flex items-center gap-2 transition-all ${affiliationType === 'Office' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                            <input 
+                                                type="radio" 
+                                                className="hidden" 
+                                                checked={affiliationType === 'Office'} 
+                                                onChange={() => setAffiliationType('Office')}
+                                            />
+                                            <Building size={18} />
+                                            <span className="font-medium text-sm">NGA / Office</span>
+                                        </label>
+                                        <label className={`flex-1 cursor-pointer border rounded-lg p-2.5 flex items-center gap-2 transition-all ${affiliationType === 'LGU' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                            <input 
+                                                type="radio" 
+                                                className="hidden" 
+                                                checked={affiliationType === 'LGU'} 
+                                                onChange={() => setAffiliationType('LGU')}
+                                            />
+                                            <Landmark size={18} />
+                                            <span className="font-medium text-sm">LGU</span>
+                                        </label>
+                                     </div>
+
+                                     {affiliationType === 'Office' ? (
+                                        <div className="animate-in fade-in zoom-in-95 duration-200">
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Office / Agency Name</label>
+                                            <input 
+                                                required={affiliationType === 'Office'}
+                                                type="text"
+                                                placeholder="e.g. DILG Regional Office 10"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                                value={newParticipant.office}
+                                                onChange={e => setNewParticipant({...newParticipant, office: e.target.value})}
+                                            />
+                                        </div>
+                                     ) : (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-200">
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">Province / HUC</label>
+                                                <select 
+                                                    required={affiliationType === 'LGU'}
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                                    value={selectedProvince}
+                                                    onChange={e => {
+                                                        setSelectedProvince(e.target.value);
+                                                        setSelectedCity('');
+                                                        setNewParticipant({...newParticipant, office: ''});
+                                                    }}
+                                                >
+                                                    <option value="">Select Province/HUC</option>
+                                                    {provinces.map(p => (
+                                                        <option key={p} value={p}>{p}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">City / Municipality</label>
+                                                <select 
+                                                    required={affiliationType === 'LGU'}
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none disabled:bg-slate-50 disabled:text-slate-400"
+                                                    value={selectedCity}
+                                                    onChange={e => {
+                                                        setSelectedCity(e.target.value);
+                                                        setNewParticipant({...newParticipant, office: `LGU ${e.target.value}, ${selectedProvince}`});
+                                                    }}
+                                                    disabled={!selectedProvince}
+                                                >
+                                                    <option value="">Select City/Municipality</option>
+                                                    {cities.map(c => (
+                                                        <option key={c} value={c}>{c}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                     )}
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
+                                        <select 
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                            value={newParticipant.role}
+                                            onChange={e => setNewParticipant({...newParticipant, role: e.target.value})}
+                                        >
+                                            <option value="Delegate">Delegate</option>
+                                            <option value="Speaker">Speaker</option>
+                                            <option value="Secretariat">Secretariat</option>
+                                            <option value="Guest">Guest</option>
+                                            <option value="VIP">VIP</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Age Group</label>
+                                        <select 
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                            value={newParticipant.age_group}
+                                            onChange={e => setNewParticipant({...newParticipant, age_group: e.target.value})}
+                                        >
+                                            <option value="18-24">18-24</option>
+                                            <option value="25-34">25-34</option>
+                                            <option value="35-44">35-44</option>
+                                            <option value="45-54">45-54</option>
+                                            <option value="55-64">55-64</option>
+                                            <option value="65+">65+</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">PWD</label>
+                                        <select 
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                            value={newParticipant.pwd}
+                                            onChange={e => setNewParticipant({...newParticipant, pwd: e.target.value})}
+                                        >
+                                            <option value="No">No</option>
+                                            <option value="Yes">Yes</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Indigenous People</label>
+                                        <select 
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                            value={newParticipant.indigenous_people}
+                                            onChange={e => setNewParticipant({...newParticipant, indigenous_people: e.target.value})}
+                                        >
+                                            <option value="No">No</option>
+                                            <option value="Yes">Yes</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {selectedEvent?.has_accommodation && (
+                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input 
+                                                type="checkbox"
+                                                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                checked={newParticipant.needs_accommodation}
+                                                onChange={e => setNewParticipant({...newParticipant, needs_accommodation: e.target.checked, accommodation_pax: e.target.checked ? 1 : 0})}
+                                            />
+                                            <span className="text-sm font-medium text-slate-700">Needs Accommodation</span>
+                                        </label>
+                                    </div>
+                                )}
+
+                                {/* Data Privacy Consent */}
+                                <div className="flex flex-col gap-3 bg-slate-50 p-4 rounded-lg border border-slate-100 mt-4">
+                                    <div className="text-xs font-bold text-slate-700 mt-2">Consent:</div>
+                                    
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex items-center h-5">
+                                            <input
+                                                id="modal-accept-photo-video"
+                                                type="checkbox"
+                                                checked={newParticipant.accept_photo_video}
+                                                onChange={(e) => setNewParticipant({...newParticipant, accept_photo_video: e.target.checked})}
+                                                className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                            />
+                                        </div>
+                                        <label htmlFor="modal-accept-photo-video" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
+                                            He/She consents to the capture of his/her photo, video, and audio for use in DILG publications.
+                                        </label>
+                                    </div>
+
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex items-center h-5">
+                                            <input
+                                                id="modal-store-to-db"
+                                                type="checkbox"
+                                                checked={newParticipant.store_to_db}
+                                                onChange={(e) => setNewParticipant({...newParticipant, store_to_db: e.target.checked})}
+                                                className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                            />
+                                        </div>
+                                        <label htmlFor="modal-store-to-db" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
+                                            He/She consents to the storage of his/her data in the organizer’s database for future document processing.
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setParticipantModalView('list')}
+                                        className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        type="submit"
+                                        disabled={isAddingParticipant}
+                                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium flex items-center gap-2"
+                                    >
+                                        {isAddingParticipant ? <Loader2 className="animate-spin" size={18} /> : <UserPlus size={18} />}
+                                        Add Participant
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     )}
                 </div>
                 
                 {/* Footer stats */}
-                <div className="p-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 rounded-b-xl grid grid-cols-1 sm:grid-cols-3 gap-4">
-                     <div className="flex flex-col">
-                        <span className="text-xs uppercase text-slate-400 font-bold">Total Participants</span>
-                        <span className="text-lg font-bold text-slate-800">{totalCount}</span>
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-xs uppercase text-slate-400 font-bold">Total Delegates</span>
-                        <span className="text-lg font-bold text-slate-800">{delegateCount}</span>
-                    </div>
-                     <div className="flex flex-col">
-                        <span className="text-xs uppercase text-slate-400 font-bold">Accommodation</span>
-                        <div className="flex items-center gap-2">
-                            <span className="text-lg font-bold text-purple-700">{accommodationCount}</span>
-                            <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">Pax Requested</span>
+                {participantModalView === 'list' && (
+                    <div className="p-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 rounded-b-xl grid grid-cols-1 sm:grid-cols-3 gap-4">
+                         <div className="flex flex-col">
+                            <span className="text-xs uppercase text-slate-400 font-bold">Total Participants</span>
+                            <span className="text-lg font-bold text-slate-800">{totalCount}</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-xs uppercase text-slate-400 font-bold">Total Delegates</span>
+                            <span className="text-lg font-bold text-slate-800">{delegateCount}</span>
+                        </div>
+                         <div className="flex flex-col">
+                            <span className="text-xs uppercase text-slate-400 font-bold">Accommodation</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-lg font-bold text-purple-700">{accommodationCount}</span>
+                                <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">Pax Requested</span>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
       )}
@@ -1255,314 +1571,7 @@ const EventsList: React.FC = () => {
         </div>
       )}
 
-      {/* Add Participant Modal */}
-      {showAddParticipantModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddParticipantModal(false)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 relative z-10 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <UserPlus size={20} className="text-indigo-600" />
-                        Add Participant
-                    </h3>
-                    <button onClick={() => setShowAddParticipantModal(false)} className="text-slate-400 hover:text-slate-600">
-                        <X size={24} />
-                    </button>
-                </div>
-                
-                <form onSubmit={handleAddParticipant} className="space-y-4">
-                    <div className="relative">
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-                        <input 
-                            required
-                            type="text"
-                            placeholder="Full Name"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                            value={newParticipant.full_name}
-                            onChange={handleNameChange}
-                            onFocus={() => { if(newParticipant.full_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
-                            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                            autoComplete="off"
-                        />
-                         {showSuggestions && suggestions.length > 0 && (
-                            <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
-                                {suggestions.map((p) => (
-                                    <li 
-                                        key={p.participant_id}
-                                        onClick={() => selectSuggestion(p)}
-                                        className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
-                                    >
-                                        <div className="flex justify-between items-center">
-                                            <div className="font-medium text-slate-800 group-hover:text-indigo-700">{p.full_name}</div>
-                                            <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Select</span>
-                                        </div>
-                                        <div className="text-xs text-slate-500 mt-0.5">{p.email} • {p.office}</div>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Email (Optional)</label>
-                        <input 
-                            type="email"
-                            placeholder="email@example.com"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                            value={newParticipant.email}
-                            onChange={e => setNewParticipant({...newParticipant, email: e.target.value})}
-                            pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
-                            title="Please enter a valid email address"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Mobile No.</label>
-                        <input 
-                            type="tel"
-                            placeholder="09123456789"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                            value={newParticipant.mobile_no}
-                            onChange={e => {
-                                const val = e.target.value.replace(/\D/g, '');
-                                if (val.length <= 11) {
-                                    setNewParticipant({...newParticipant, mobile_no: val});
-                                }
-                            }}
-                            pattern="[0-9]{10,11}"
-                            title="Mobile number must be 10 or 11 digits"
-                        />
-                    </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
-                        <select 
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                            value={newParticipant.gender}
-                            onChange={e => setNewParticipant({...newParticipant, gender: e.target.value})}
-                        >
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Position</label>
-                        <input 
-                            type="text"
-                            placeholder="e.g. Regional Director, Administrative Officer"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                            value={newParticipant.position}
-                            onChange={e => setNewParticipant({...newParticipant, position: e.target.value})}
-                        />
-                    </div>
-                    
-                    <div className="pt-2">
-                         <label className="block text-sm font-medium text-slate-700 mb-2">Affiliation Type</label>
-                         <div className="flex gap-4 mb-4">
-                            <label className={`flex-1 cursor-pointer border rounded-lg p-2.5 flex items-center gap-2 transition-all ${affiliationType === 'Office' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
-                                <input 
-                                    type="radio" 
-                                    className="hidden" 
-                                    checked={affiliationType === 'Office'} 
-                                    onChange={() => setAffiliationType('Office')}
-                                />
-                                <Building size={18} />
-                                <span className="font-medium text-sm">NGA / Office</span>
-                            </label>
-                            <label className={`flex-1 cursor-pointer border rounded-lg p-2.5 flex items-center gap-2 transition-all ${affiliationType === 'LGU' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
-                                <input 
-                                    type="radio" 
-                                    className="hidden" 
-                                    checked={affiliationType === 'LGU'} 
-                                    onChange={() => setAffiliationType('LGU')}
-                                />
-                                <Landmark size={18} />
-                                <span className="font-medium text-sm">LGU</span>
-                            </label>
-                         </div>
-
-                         {affiliationType === 'Office' ? (
-                            <div className="animate-in fade-in zoom-in-95 duration-200">
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Office / Agency Name</label>
-                                <input 
-                                    required={affiliationType === 'Office'}
-                                    type="text"
-                                    placeholder="e.g. DILG Regional Office 10"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                    value={newParticipant.office}
-                                    onChange={e => setNewParticipant({...newParticipant, office: e.target.value})}
-                                />
-                            </div>
-                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-200">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Province / HUC</label>
-                                    <select 
-                                        required={affiliationType === 'LGU'}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                                        value={selectedProvince}
-                                        onChange={e => {
-                                            setSelectedProvince(e.target.value);
-                                            setSelectedCity('');
-                                        }}
-                                    >
-                                        <option value="">-- Select Province --</option>
-                                        {provinces.map(prov => (
-                                            <option key={prov} value={prov}>{prov}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">City / Municipality</label>
-                                    <select 
-                                        disabled={!selectedProvince}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white disabled:bg-slate-100 disabled:text-slate-400"
-                                        value={selectedCity}
-                                        onChange={e => setSelectedCity(e.target.value)}
-                                    >
-                                        <option value="">-- Optional --</option>
-                                        {cities.map(city => (
-                                            <option key={city} value={city}>{city}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                         )}
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Age Group</label>
-                            <select
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                                value={newParticipant.age_group}
-                                onChange={e => setNewParticipant({...newParticipant, age_group: e.target.value})}
-                            >
-                                <option value="18-24">18-24</option>
-                                <option value="25-34">25-34</option>
-                                <option value="35-44">35-44</option>
-                                <option value="45-54">45-54</option>
-                                <option value="55-65">55-65</option>
-                                <option value="65+">65+</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
-                             <select
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                                value={newParticipant.role}
-                                onChange={e => setNewParticipant({...newParticipant, role: e.target.value as any})}
-                            >
-                                <option value="Delegate">Delegate</option>
-                                <option value="Speaker">Speaker</option>
-                                <option value="Secretariat">Secretariat</option>
-                                <option value="Guest">Guest</option>
-                                <option value="VIP">VIP</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">PWD</label>
-                            <select
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                                value={newParticipant.pwd}
-                                onChange={e => setNewParticipant({...newParticipant, pwd: e.target.value})}
-                            >
-                                <option value="No">No</option>
-                                <option value="Yes">Yes</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Indigenous People</label>
-                            <select
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                                value={newParticipant.indigenous_people}
-                                onChange={e => setNewParticipant({...newParticipant, indigenous_people: e.target.value})}
-                            >
-                                <option value="No">No</option>
-                                <option value="Yes">Yes</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {selectedEvent?.has_accommodation && (
-                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input 
-                                    type="checkbox"
-                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
-                                    checked={newParticipant.needs_accommodation}
-                                    onChange={e => setNewParticipant({...newParticipant, needs_accommodation: e.target.checked})}
-                                />
-                                <span className="text-sm font-medium text-slate-700">Needs Accommodation</span>
-                            </label>
-                            
-                            {newParticipant.needs_accommodation && (
-                                <div className="mt-2 pl-6 animate-in fade-in slide-in-from-top-1">
-                                    <label className="block text-xs font-medium text-slate-500 mb-1">Pax Count</label>
-                                    <input 
-                                        type="number"
-                                        min="1"
-                                        className="w-24 px-2 py-1 text-sm border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none"
-                                        value={newParticipant.accommodation_pax}
-                                        onChange={e => setNewParticipant({...newParticipant, accommodation_pax: parseInt(e.target.value) || 0})}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Data Privacy Consent */}
-                    <div className="flex flex-col gap-3 bg-slate-50 p-4 rounded-lg border border-slate-100 mt-4">
-                       
-                        
-                        <div className="text-xs font-bold text-slate-700 mt-2">Consent:</div>
-                        
-                        <div className="flex items-start gap-3">
-                            <div className="flex items-center h-5">
-                                <input
-                                    id="modal-accept-photo-video"
-                                    type="checkbox"
-                                    checked={newParticipant.accept_photo_video}
-                                    onChange={(e) => setNewParticipant({...newParticipant, accept_photo_video: e.target.checked})}
-                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
-                                />
-                            </div>
-                            <label htmlFor="modal-accept-photo-video" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
-                                He/She consents to the capture of his/her photo, video, and audio for use in DILG publications.
-                            </label>
-                        </div>
-
-                        <div className="flex items-start gap-3">
-                            <div className="flex items-center h-5">
-                                <input
-                                    id="modal-store-to-db"
-                                    type="checkbox"
-                                    checked={newParticipant.store_to_db}
-                                    onChange={(e) => setNewParticipant({...newParticipant, store_to_db: e.target.checked})}
-                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
-                                />
-                            </div>
-                            <label htmlFor="modal-store-to-db" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
-                                He/She consents to the storage of his/her data in the organizer’s database for future document processing.
-                            </label>
-                        </div>
-                    </div>
-
-                    <div className="pt-2">
-                        <button 
-                            type="submit" 
-                            disabled={isAddingParticipant}
-                            className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-all flex justify-center items-center gap-2"
-                        >
-                            {isAddingParticipant ? <Loader2 className="animate-spin" size={18} /> : 'Add to Event'}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-      )}
 
       {/* Create/Edit Event Modal */}
       {showEventModal && (
