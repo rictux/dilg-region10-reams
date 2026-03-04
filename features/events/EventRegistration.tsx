@@ -747,7 +747,7 @@ const EventRegistration: React.FC = () => {
                                             name="accommodation"
                                             className="hidden"
                                             checked={formData.needs_accommodation}
-                                            onChange={() => setFormData(prev => ({ ...prev, needs_accommodation: true, accommodation_pax: Math.max(1, prev.accommodation_pax) }))}
+                                            onChange={() => setFormData(prev => ({ ...prev, needs_accommodation: true, accommodation_pax: 1 }))}
                                         />
                                         <span className="text-sm font-medium text-slate-700 group-hover:text-indigo-700">Yes</span>
                                     </label>
@@ -767,21 +767,6 @@ const EventRegistration: React.FC = () => {
                                     </label>
                                 </div>
                              </div>
-
-                             {formData.needs_accommodation && (
-                                 <div className="animate-in fade-in slide-in-from-top-2">
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Number of Pax</label>
-                                    <input 
-                                        type="number"
-                                        min="1"
-                                        required={formData.needs_accommodation}
-                                        className="w-full px-4 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        value={formData.accommodation_pax}
-                                        onChange={e => setFormData({...formData, accommodation_pax: parseInt(e.target.value) || 0})}
-                                    />
-                                    <p className="text-xs text-indigo-500 mt-1">Specify number of people needing stay (including yourself).</p>
-                                 </div>
-                             )}
                         </div>
                     )}
 
