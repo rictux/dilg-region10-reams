@@ -469,25 +469,14 @@ const EventsList: React.FC = () => {
               return;
           }
           
-          if (selectedCity) {
-              const loc = locations.find(l => l.province_huc === selectedProvince && l.city_mun === selectedCity);
-              if (loc) {
-                  finalLocationId = loc.location_id;
-                  finalOfficeName = `LGU ${selectedCity}, ${selectedProvince}`;
-              } else {
-                  alert("Selected location is invalid.");
-                  return;
-              }
+          const loc = locations.find(l => l.province_huc === selectedProvince && !l.city_mun);
+          if (loc) {
+              finalLocationId = loc.location_id;
+          }
+          if (selectedProvince.toLowerCase().includes('city')) {
+                finalOfficeName = `LGU ${selectedProvince}`;
           } else {
-              const loc = locations.find(l => l.province_huc === selectedProvince && !l.city_mun);
-              if (loc) {
-                  finalLocationId = loc.location_id;
-              }
-              if (selectedProvince.toLowerCase().includes('city')) {
-                   finalOfficeName = `LGU ${selectedProvince}`;
-              } else {
-                   finalOfficeName = `Provincial Gov't of ${selectedProvince}`;
-              }
+                finalOfficeName = `Provincial Gov't of ${selectedProvince}`;
           }
       } else {
           if (!newParticipant.office.trim()) {
@@ -1233,7 +1222,10 @@ const EventsList: React.FC = () => {
                                             value={newParticipant.f_name}
                                             onChange={(e) => handleNameChange(e, 'f_name')}
                                             onFocus={() => { if(newParticipant.f_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
-                                            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                            onBlur={(e) => {
+                                                setNewParticipant({ ...newParticipant, f_name: toProperCase(e.target.value) });
+                                                setTimeout(() => setShowSuggestions(false), 200);
+                                            }}
                                             autoComplete="off"
                                         />
                                         {showSuggestions && suggestions.length > 0 && (
@@ -1263,6 +1255,7 @@ const EventsList: React.FC = () => {
                                             className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                             value={newParticipant.l_name}
                                             onChange={(e) => handleNameChange(e, 'l_name')}
+                                            onBlur={(e) => setNewParticipant({ ...newParticipant, l_name: toProperCase(e.target.value) })}
                                             autoComplete="off"
                                         />
                                     </div>
@@ -1287,6 +1280,7 @@ const EventsList: React.FC = () => {
                                             className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                             value={newParticipant.suffix}
                                             onChange={e => setNewParticipant({...newParticipant, suffix: e.target.value})}
+                                            onBlur={e => setNewParticipant({...newParticipant, suffix: toProperCase(e.target.value)})}
                                         />
                                     </div>
                                 </div>
@@ -1391,30 +1385,13 @@ const EventsList: React.FC = () => {
                                                     onChange={e => {
                                                         setSelectedProvince(e.target.value);
                                                         setSelectedCity('');
-                                                        setNewParticipant({...newParticipant, office: ''});
+                                                        const officeName = e.target.value.toLowerCase().includes('city') ? `LGU ${e.target.value}` : `Provincial Gov't of ${e.target.value}`;
+                                                        setNewParticipant({...newParticipant, office: officeName});
                                                     }}
                                                 >
                                                     <option value="">Select Province/HUC</option>
                                                     {provinces.map(p => (
                                                         <option key={p} value={p}>{p}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">City / Municipality</label>
-                                                <select 
-                                                    required={affiliationType === 'LGU'}
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none disabled:bg-slate-50 disabled:text-slate-400"
-                                                    value={selectedCity}
-                                                    onChange={e => {
-                                                        setSelectedCity(e.target.value);
-                                                        setNewParticipant({...newParticipant, office: `LGU ${e.target.value}, ${selectedProvince}`});
-                                                    }}
-                                                    disabled={!selectedProvince}
-                                                >
-                                                    <option value="">Select City/Municipality</option>
-                                                    {cities.map(c => (
-                                                        <option key={c} value={c}>{c}</option>
                                                     ))}
                                                 </select>
                                             </div>
