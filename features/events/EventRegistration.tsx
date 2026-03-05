@@ -157,6 +157,10 @@ const EventRegistration: React.FC = () => {
       setShowSuggestions(false);
   };
 
+  const toProperCase = (str: string) => {
+    return str.toLowerCase().replace(/(^|\s)\S/g, l => l.toUpperCase());
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -252,10 +256,10 @@ const EventRegistration: React.FC = () => {
             // STEP 2: USE SANITIZED VARIABLES IN UPDATE
             // ---------------------------------------------------------
             const { data: updatedUser, error: updateError } = await supabase.from('participants').update({
-                f_name: formData.f_name,
-                l_name: formData.l_name,
-                m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim(),
-                suffix: formData.suffix.trim() === '' ? null : formData.suffix.trim(),
+                f_name: toProperCase(formData.f_name.trim()),
+                l_name: toProperCase(formData.l_name.trim()),
+                m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim().toUpperCase(),
+                suffix: formData.suffix.trim() === '' ? null : toProperCase(formData.suffix.trim()),
                 gender: formData.gender,
                 position: formData.position,
                 office: finalOfficeName,
@@ -282,10 +286,10 @@ const EventRegistration: React.FC = () => {
             const { data: newUser, error: createError } = await supabase
                 .from('participants')
                 .insert([{
-                    f_name: formData.f_name,
-                    l_name: formData.l_name,
-                    m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim(),
-                    suffix: formData.suffix.trim() === '' ? null : formData.suffix.trim(),
+                    f_name: toProperCase(formData.f_name.trim()),
+                    l_name: toProperCase(formData.l_name.trim()),
+                    m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim().toUpperCase(),
+                    suffix: formData.suffix.trim() === '' ? null : toProperCase(formData.suffix.trim()),
                     email: finalEmail,       // <--- Used here
                     mobile_no: finalMobile,  // <--- Used here
                     gender: formData.gender,
@@ -521,8 +525,8 @@ const EventRegistration: React.FC = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">First Name</label>
                                 <div className="relative">
                                     <User className="absolute left-3 top-3 text-slate-400" size={18} />
-                                    <input
-                                        required
+                                    <input 
+                                        required 
                                         type="text"
                                         className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                                         placeholder="First Name"
@@ -535,7 +539,7 @@ const EventRegistration: React.FC = () => {
                                     {showSuggestions && suggestions.length > 0 && (
                                         <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
                                             {suggestions.map((p) => (
-                                                <li
+                                                <li 
                                                     key={p.participant_id}
                                                     onClick={() => selectSuggestion(p)}
                                                     className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
@@ -555,8 +559,8 @@ const EventRegistration: React.FC = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Last Name</label>
                                 <div className="relative">
                                     <User className="absolute left-3 top-3 text-slate-400" size={18} />
-                                    <input
-                                        required
+                                    <input 
+                                        required 
                                         type="text"
                                         className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                                         placeholder="Last Name"
@@ -584,7 +588,7 @@ const EventRegistration: React.FC = () => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Suffix (Jr, Sr, III)</label>
-                                <input
+                                <input 
                                     type="text"
                                     maxLength={10}
                                     className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
