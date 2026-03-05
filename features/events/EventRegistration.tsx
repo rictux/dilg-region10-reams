@@ -533,7 +533,10 @@ const EventRegistration: React.FC = () => {
                                         value={formData.f_name}
                                         onChange={(e) => handleNameChange(e, 'f_name')}
                                         onFocus={() => { if(formData.f_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
-                                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                        onBlur={(e) => {
+                                            setFormData({ ...formData, f_name: toProperCase(e.target.value) });
+                                            setTimeout(() => setShowSuggestions(false), 200);
+                                        }}
                                         autoComplete="off"
                                     />
                                     {showSuggestions && suggestions.length > 0 && (
@@ -567,7 +570,10 @@ const EventRegistration: React.FC = () => {
                                         value={formData.l_name}
                                         onChange={(e) => handleNameChange(e, 'l_name')}
                                         onFocus={() => { if(formData.l_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
-                                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                        onBlur={(e) => {
+                                            setFormData({ ...formData, l_name: toProperCase(e.target.value) });
+                                            setTimeout(() => setShowSuggestions(false), 200);
+                                        }}
                                         autoComplete="off"
                                     />
                                 </div>
@@ -595,6 +601,7 @@ const EventRegistration: React.FC = () => {
                                     placeholder="e.g. Jr"
                                     value={formData.suffix}
                                     onChange={e => setFormData({...formData, suffix: e.target.value})}
+                                    onBlur={e => setFormData({...formData, suffix: toProperCase(e.target.value)})}
                                 />
                             </div>
                         </div>
