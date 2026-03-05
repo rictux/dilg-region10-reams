@@ -45,6 +45,10 @@ export interface Participant {
   participant_id: number;
   participant_code: string;
   full_name: string;
+  f_name: string;
+  l_name: string;
+  m_initial?: string | null;
+  suffix?: string | null;
   gender?: string | null;
   position?: string | null;
   office?: string | null;
@@ -91,6 +95,10 @@ export interface ParticipantWithQR extends Participant {
 export interface AttendanceLogWithDetails extends AttendanceLog {
   participants?: {
     full_name: string;
+    f_name: string;
+    l_name: string;
+    m_initial?: string | null;
+    suffix?: string | null;
     participant_code: string;
     office?: string | null;
     gender?: string | null;

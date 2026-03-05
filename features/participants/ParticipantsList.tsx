@@ -53,6 +53,10 @@ const AttendanceList: React.FC = () => {
   const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
   const [isAddingParticipant, setIsAddingParticipant] = useState(false);
   const [newParticipant, setNewParticipant] = useState({
+      f_name: '',
+      l_name: '',
+      m_initial: '',
+      suffix: '',
       full_name: '',
       email: '',
       role: 'Delegate',
@@ -440,9 +444,9 @@ const AttendanceList: React.FC = () => {
       return format(d, 'h:mm a');
   };
 
-  const handleNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNameChange = async (e: React.ChangeEvent<HTMLInputElement>, field: 'f_name' | 'l_name') => {
     const val = e.target.value;
-    setNewParticipant({ ...newParticipant, full_name: val });
+    setNewParticipant({ ...newParticipant, [field]: val, participant_id: null });
     
     if (val.length >= 2) {
         const { data } = await supabase
@@ -485,6 +489,10 @@ const AttendanceList: React.FC = () => {
 
       setNewParticipant(prev => ({
           ...prev,
+          f_name: p.f_name,
+          l_name: p.l_name,
+          m_initial: p.m_initial || '',
+          suffix: p.suffix || '',
           full_name: p.full_name,
           email: p.email || '',
           office: p.office || '',
@@ -560,7 +568,10 @@ const AttendanceList: React.FC = () => {
              participantId = newParticipant.participant_id;
              // Optional: Update participant details if changed
              await supabase.from('participants').update({
-                full_name: newParticipant.full_name,
+                f_name: newParticipant.f_name,
+                l_name: newParticipant.l_name,
+                m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim(),
+                suffix: newParticipant.suffix.trim() === '' ? null : newParticipant.suffix.trim(),
                 email: newParticipant.email || null,
                 office: finalOfficeName,
                 location_id: finalLocationId,
@@ -583,7 +594,10 @@ const AttendanceList: React.FC = () => {
                    participantId = existingUser.participant_id;
                    // Update details
                    await supabase.from('participants').update({
-                        full_name: newParticipant.full_name,
+                        f_name: newParticipant.f_name,
+                        l_name: newParticipant.l_name,
+                        m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim(),
+                        suffix: newParticipant.suffix.trim() === '' ? null : newParticipant.suffix.trim(),
                         office: finalOfficeName,
                         location_id: finalLocationId,
                         mobile_no: newParticipant.mobile_no || null,
@@ -595,13 +609,16 @@ const AttendanceList: React.FC = () => {
                     }).eq('participant_id', participantId);
                } else {
                    // Create
-                    const initials = newParticipant.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 3);
+                    const initials = `${newParticipant.f_name[0] || ''}${newParticipant.l_name[0] || ''}`.toUpperCase().substring(0, 3);
                     const code = `${initials}-${Date.now().toString().slice(-6)}`;
                     
                     const { data: newUser, error: createError } = await supabase
                     .from('participants')
                     .insert([{
-                        full_name: newParticipant.full_name,
+                        f_name: newParticipant.f_name,
+                        l_name: newParticipant.l_name,
+                        m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim(),
+                        suffix: newParticipant.suffix.trim() === '' ? null : newParticipant.suffix.trim(),
                         email: newParticipant.email,
                         office: finalOfficeName,
                         location_id: finalLocationId,
@@ -619,12 +636,15 @@ const AttendanceList: React.FC = () => {
                }
           } else {
                // Create (No Email provided)
-               const initials = newParticipant.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 3);
+               const initials = `${newParticipant.f_name[0] || ''}${newParticipant.l_name[0] || ''}`.toUpperCase().substring(0, 3);
                const code = `${initials}-${Date.now().toString().slice(-6)}`;
                const { data: newUser, error: createError } = await supabase
                 .from('participants')
                 .insert([{
-                    full_name: newParticipant.full_name,
+                    f_name: newParticipant.f_name,
+                    l_name: newParticipant.l_name,
+                    m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim(),
+                    suffix: newParticipant.suffix.trim() === '' ? null : newParticipant.suffix.trim(),
                     email: null,
                     office: finalOfficeName,
                     location_id: finalLocationId,
@@ -661,6 +681,10 @@ const AttendanceList: React.FC = () => {
           // Success
           setShowAddParticipantModal(false);
           setNewParticipant({
+              f_name: '',
+              l_name: '',
+              m_initial: '',
+              suffix: '',
               full_name: '',
               email: '',
               role: 'Delegate',
@@ -1025,36 +1049,73 @@ const AttendanceList: React.FC = () => {
                 </div>
                 
                 <form onSubmit={handleAddParticipant} className="space-y-4">
-                    <div className="relative">
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-                        <input 
-                            required
-                            type="text"
-                            placeholder="Full Name"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                            value={newParticipant.full_name}
-                            onChange={handleNameChange}
-                            onFocus={() => { if(newParticipant.full_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
-                            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                            autoComplete="off"
-                        />
-                         {showSuggestions && suggestions.length > 0 && (
-                            <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
-                                {suggestions.map((p) => (
-                                    <li 
-                                        key={p.participant_id}
-                                        onClick={() => selectSuggestion(p)}
-                                        className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
-                                    >
-                                        <div className="flex justify-between items-center">
-                                            <div className="font-medium text-slate-800 group-hover:text-indigo-700">{p.full_name}</div>
-                                            <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Select</span>
-                                        </div>
-                                        <div className="text-xs text-slate-500 mt-0.5">{p.email} • {p.office}</div>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="relative">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">First Name</label>
+                            <input
+                                required
+                                type="text"
+                                placeholder="First Name"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                value={newParticipant.f_name}
+                                onChange={(e) => handleNameChange(e, 'f_name')}
+                                onFocus={() => { if(newParticipant.f_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
+                                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                autoComplete="off"
+                            />
+                             {showSuggestions && suggestions.length > 0 && (
+                                <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                                    {suggestions.map((p) => (
+                                        <li
+                                            key={p.participant_id}
+                                            onClick={() => selectSuggestion(p)}
+                                            className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
+                                        >
+                                            <div className="flex justify-between items-center">
+                                                <div className="font-medium text-slate-800 group-hover:text-indigo-700">{p.full_name}</div>
+                                                <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Select</span>
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-0.5">{p.email} • {p.office}</div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Last Name</label>
+                            <input
+                                required
+                                type="text"
+                                placeholder="Last Name"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                value={newParticipant.l_name}
+                                onChange={(e) => handleNameChange(e, 'l_name')}
+                                autoComplete="off"
+                            />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Middle Initial</label>
+                            <input
+                                type="text"
+                                maxLength={1}
+                                placeholder="e.g. A"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                value={newParticipant.m_initial}
+                                onChange={e => setNewParticipant({...newParticipant, m_initial: e.target.value.toUpperCase()})}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Suffix</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. Jr"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                value={newParticipant.suffix}
+                                onChange={e => setNewParticipant({...newParticipant, suffix: e.target.value})}
+                            />
+                        </div>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Email (Optional)</label>
