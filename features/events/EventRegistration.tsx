@@ -36,7 +36,11 @@ const EventRegistration: React.FC = () => {
   const [consent, setConsent] = useState(false);
 
   const [formData, setFormData] = useState({
-    full_name: '',
+    f_name: '',
+    l_name: '',
+    m_initial: '',
+    suffix: '',
+    full_name: '', // We'll keep this to store the returned full_name from backend
     email: '',
     gender: 'Male',
     position: '',
@@ -86,9 +90,11 @@ const EventRegistration: React.FC = () => {
     }
   };
 
-  const handleNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNameChange = async (e: React.ChangeEvent<HTMLInputElement>, field: 'f_name' | 'l_name') => {
     const value = e.target.value;
-    setFormData(prev => ({ ...prev, full_name: value }));
+    setFormData(prev => ({ ...prev, [field]: value, participant_id: null }));
+
+    const searchTerm = field === 'f_name' ? value : formData.f_name + ' ' + value;
 
     if (value.length >= 2) {
         const { data } = await supabase
@@ -132,6 +138,10 @@ const EventRegistration: React.FC = () => {
 
       setFormData({
           ...formData,
+          f_name: p.f_name,
+          l_name: p.l_name,
+          m_initial: p.m_initial || '',
+          suffix: p.suffix || '',
           full_name: p.full_name,
           email: p.email || '',
           gender: p.gender || 'Male',
@@ -241,8 +251,11 @@ const EventRegistration: React.FC = () => {
             // ---------------------------------------------------------
             // STEP 2: USE SANITIZED VARIABLES IN UPDATE
             // ---------------------------------------------------------
-            await supabase.from('participants').update({
-                full_name: formData.full_name,
+            const { data: updatedUser, error: updateError } = await supabase.from('participants').update({
+                f_name: formData.f_name,
+                l_name: formData.l_name,
+                m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim(),
+                suffix: formData.suffix.trim() === '' ? null : formData.suffix.trim(),
                 gender: formData.gender,
                 position: formData.position,
                 office: finalOfficeName,
@@ -251,10 +264,16 @@ const EventRegistration: React.FC = () => {
                 age_group: formData.age_group,
                 pwd: formData.pwd,
                 indigenous_people: formData.indigenous_people
-            }).eq('participant_id', participantId);
+            }).eq('participant_id', participantId)
+            .select()
+            .single();
+
+            if (updateError) throw updateError;
+            setFormData(prev => ({ ...prev, full_name: updatedUser.full_name }));
+
         } else {
             // Create new participant
-            const initials = formData.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 3);
+            const initials = `${formData.f_name[0] || ''}${formData.l_name[0] || ''}`.toUpperCase().substring(0, 3);
             const code = `${initials}-${Date.now().toString().slice(-6)}`;
 
             // ---------------------------------------------------------
@@ -263,7 +282,10 @@ const EventRegistration: React.FC = () => {
             const { data: newUser, error: createError } = await supabase
                 .from('participants')
                 .insert([{
-                    full_name: formData.full_name,
+                    f_name: formData.f_name,
+                    l_name: formData.l_name,
+                    m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim(),
+                    suffix: formData.suffix.trim() === '' ? null : formData.suffix.trim(),
                     email: finalEmail,       // <--- Used here
                     mobile_no: finalMobile,  // <--- Used here
                     gender: formData.gender,
@@ -281,6 +303,7 @@ const EventRegistration: React.FC = () => {
             if (createError) throw createError;
             participantId = newUser.participant_id;
             finalParticipantCode = newUser.participant_code;
+            setFormData(prev => ({ ...prev, full_name: newUser.full_name }));
         }
 
         // 2. Register for Event
@@ -493,38 +516,82 @@ const EventRegistration: React.FC = () => {
                     <div className="space-y-4">
                         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b pb-2 mb-4">Personal Information</h3>
                         
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Full Name</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="relative">
-                                <User className="absolute left-3 top-3 text-slate-400" size={18} />
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">First Name</label>
+                                <div className="relative">
+                                    <User className="absolute left-3 top-3 text-slate-400" size={18} />
+                                    <input
+                                        required
+                                        type="text"
+                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                                        placeholder="First Name"
+                                        value={formData.f_name}
+                                        onChange={(e) => handleNameChange(e, 'f_name')}
+                                        onFocus={() => { if(formData.f_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
+                                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                        autoComplete="off"
+                                    />
+                                    {showSuggestions && suggestions.length > 0 && (
+                                        <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                                            {suggestions.map((p) => (
+                                                <li
+                                                    key={p.participant_id}
+                                                    onClick={() => selectSuggestion(p)}
+                                                    className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
+                                                >
+                                                    <div className="flex justify-between items-center">
+                                                        <div className="font-medium text-slate-800 group-hover:text-indigo-700">{p.full_name}</div>
+                                                        <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Select</span>
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 mt-0.5">{p.email} • {p.office}</div>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Last Name</label>
+                                <div className="relative">
+                                    <User className="absolute left-3 top-3 text-slate-400" size={18} />
+                                    <input
+                                        required
+                                        type="text"
+                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                                        placeholder="Last Name"
+                                        value={formData.l_name}
+                                        onChange={(e) => handleNameChange(e, 'l_name')}
+                                        onFocus={() => { if(formData.l_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
+                                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                        autoComplete="off"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Middle Initial</label>
                                 <input 
-                                    required 
                                     type="text"
-                                    className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                                    placeholder="Type your name..."
-                                    value={formData.full_name}
-                                    onChange={handleNameChange}
-                                    onFocus={() => { if(formData.full_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
-                                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                                    autoComplete="off"
+                                    maxLength={1}
+                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                                    placeholder="e.g. A"
+                                    value={formData.m_initial}
+                                    onChange={e => setFormData({...formData, m_initial: e.target.value.toUpperCase()})}
                                 />
-                                {showSuggestions && suggestions.length > 0 && (
-                                    <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
-                                        {suggestions.map((p) => (
-                                            <li 
-                                                key={p.participant_id}
-                                                onClick={() => selectSuggestion(p)}
-                                                className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
-                                            >
-                                                <div className="flex justify-between items-center">
-                                                    <div className="font-medium text-slate-800 group-hover:text-indigo-700">{p.full_name}</div>
-                                                    <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Select</span>
-                                                </div>
-                                                <div className="text-xs text-slate-500 mt-0.5">{p.email} • {p.office}</div>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Suffix (Jr, Sr, III)</label>
+                                <input
+                                    type="text"
+                                    maxLength={10}
+                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                                    placeholder="e.g. Jr"
+                                    value={formData.suffix}
+                                    onChange={e => setFormData({...formData, suffix: e.target.value})}
+                                />
                             </div>
                         </div>
 
