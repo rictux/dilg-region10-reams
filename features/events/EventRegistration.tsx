@@ -289,7 +289,7 @@ const EventRegistration: React.FC = () => {
                     f_name: toProperCase(formData.f_name.trim()),
                     l_name: toProperCase(formData.l_name.trim()),
                     m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim().toUpperCase(),
-                    suffix: formData.suffix.trim() === '' ? null : toProperCase(formData.suffix.trim()),
+                    suffix: formData.suffix.trim() === '' ? null : formData.suffix.trim(),
                     email: finalEmail,       // <--- Used here
                     mobile_no: finalMobile,  // <--- Used here
                     gender: formData.gender,
