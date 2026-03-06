@@ -257,10 +257,10 @@ const EventsList: React.FC = () => {
       e.stopPropagation(); // Prevent row click
       setEditingEventId(event.event_id);
       setFormData({
-          event_name: event.event_name,
-          venue: event.venue,
-          start_date: event.start_date,
-          end_date: event.end_date,
+          event_name: event.event_name || '',
+          venue: event.venue || '',
+          start_date: event.start_date || '',
+          end_date: event.end_date || '',
           status: event.status,
           organize_by: event.organize_by,
           has_accommodation: event.has_accommodation,
@@ -433,11 +433,11 @@ const EventsList: React.FC = () => {
 
       setNewParticipant(prev => ({
           ...prev,
-          f_name: p.f_name,
-          l_name: p.l_name,
+          f_name: p.f_name || '',
+          l_name: p.l_name || '',
           m_initial: p.m_initial || '',
           suffix: p.suffix || '',
-          full_name: p.full_name,
+          full_name: p.full_name || '',
           email: p.email || '',
           office: p.office || '',
           mobile_no: p.mobile_no || '',
@@ -545,7 +545,7 @@ const EventsList: React.FC = () => {
                         f_name: toProperCase(newParticipant.f_name.trim()),
                         l_name: toProperCase(newParticipant.l_name.trim()),
                         m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                        suffix: newParticipant.suffix.trim() === '' ? null : newParticipant.suffix.trim(),
+                        suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
                         office: finalOfficeName,
                         location_id: finalLocationId,
                         mobile_no: newParticipant.mobile_no || null,
@@ -557,20 +557,16 @@ const EventsList: React.FC = () => {
                     }).eq('participant_id', participantId);
                } else {
                    // Create
-                    const initials = `${newParticipant.f_name[0] || ''}${newParticipant.l_name[0] || ''}`.toUpperCase().substring(0, 3);
-                    const code = `${initials}-${Date.now().toString().slice(-6)}`;
-                    
                     const { data: newUser, error: createError } = await supabase
                     .from('participants')
                     .insert([{
                         f_name: toProperCase(newParticipant.f_name.trim()),
                         l_name: toProperCase(newParticipant.l_name.trim()),
                         m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                        suffix: newParticipant.suffix.trim() === '' ? null : newParticipant.suffix.trim(),
+                        suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
                         email: newParticipant.email,
                         office: finalOfficeName,
                         location_id: finalLocationId,
-                        participant_code: code,
                         position: newParticipant.position || 'N/A',
                         mobile_no: newParticipant.mobile_no || null,
                         age_group: newParticipant.age_group,
@@ -584,19 +580,16 @@ const EventsList: React.FC = () => {
                }
           } else {
                // Create (No Email provided)
-               const initials = `${newParticipant.f_name[0] || ''}${newParticipant.l_name[0] || ''}`.toUpperCase().substring(0, 3);
-               const code = `${initials}-${Date.now().toString().slice(-6)}`;
                const { data: newUser, error: createError } = await supabase
                 .from('participants')
                 .insert([{
                     f_name: toProperCase(newParticipant.f_name.trim()),
                     l_name: toProperCase(newParticipant.l_name.trim()),
                     m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                    suffix: newParticipant.suffix.trim() === '' ? null : newParticipant.suffix.trim(),
+                    suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
                     email: null,
                     office: finalOfficeName,
                     location_id: finalLocationId,
-                    participant_code: code,
                     position: newParticipant.position || 'N/A',
                     gender: newParticipant.gender,
                     mobile_no: newParticipant.mobile_no || null,
@@ -961,7 +954,7 @@ const EventsList: React.FC = () => {
       {showParticipantsModal && selectedEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => { setShowParticipantsModal(false); setParticipantModalView('list'); }}></div>
-            <div className={`bg-white rounded-xl shadow-2xl w-full ${participantModalView === 'list' ? 'max-w-6xl' : 'max-w-2xl'} h-[80vh] flex flex-col relative z-10 animate-in zoom-in-95 duration-200`}>
+            <div className={`bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[80vh] flex flex-col relative z-10 animate-in zoom-in-95 duration-200`}>
                 {/* Header */}
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-xl shrink-0">
                     <div>
@@ -1220,7 +1213,7 @@ const EventsList: React.FC = () => {
                             </tbody>
                         </table>
                     )) : (
-                        <div className="p-6 max-w-2xl mx-auto">
+                        <div className="p-6 max-w-2xl mx-auto w-full">
                             <form onSubmit={handleAddParticipant} className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="relative">
