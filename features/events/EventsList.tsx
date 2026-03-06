@@ -469,14 +469,25 @@ const EventsList: React.FC = () => {
               return;
           }
           
-          const loc = locations.find(l => l.province_huc === selectedProvince && !l.city_mun);
-          if (loc) {
-              finalLocationId = loc.location_id;
-          }
-          if (selectedProvince.toLowerCase().includes('city')) {
-                finalOfficeName = `LGU ${selectedProvince}`;
+          if (selectedCity) {
+              const loc = locations.find(l => l.province_huc === selectedProvince && l.city_mun === selectedCity);
+              if (loc) {
+                  finalLocationId = loc.location_id;
+                  finalOfficeName = `LGU ${selectedCity}, ${selectedProvince}`;
+              } else {
+                  alert("Selected location is invalid.");
+                  return;
+              }
           } else {
-                finalOfficeName = `Provincial Gov't of ${selectedProvince}`;
+              const loc = locations.find(l => l.province_huc === selectedProvince && !l.city_mun);
+              if (loc) {
+                  finalLocationId = loc.location_id;
+              }
+              if (selectedProvince.toLowerCase().includes('city')) {
+                    finalOfficeName = `LGU ${selectedProvince}`;
+              } else {
+                    finalOfficeName = `Provincial Gov't of ${selectedProvince}`;
+              }
           }
       } else {
           if (!newParticipant.office.trim()) {
@@ -1392,6 +1403,23 @@ const EventsList: React.FC = () => {
                                                     <option value="">Select Province/HUC</option>
                                                     {provinces.map(p => (
                                                         <option key={p} value={p}>{p}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">City / Municipality</label>
+                                                <select 
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none disabled:bg-slate-50 disabled:text-slate-400"
+                                                    value={selectedCity}
+                                                    onChange={e => {
+                                                        setSelectedCity(e.target.value);
+                                                        setNewParticipant({...newParticipant, office: `LGU ${e.target.value}, ${selectedProvince}`});
+                                                    }}
+                                                    disabled={!selectedProvince}
+                                                >
+                                                    <option value="">-- Select City/Mun --</option>
+                                                    {cities.map(c => (
+                                                        <option key={c} value={c}>{c}</option>
                                                     ))}
                                                 </select>
                                             </div>
