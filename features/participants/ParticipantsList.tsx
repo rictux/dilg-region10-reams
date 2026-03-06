@@ -489,11 +489,11 @@ const AttendanceList: React.FC = () => {
 
       setNewParticipant(prev => ({
           ...prev,
-          f_name: p.f_name,
-          l_name: p.l_name,
+          f_name: p.f_name || '',
+          l_name: p.l_name || '',
           m_initial: p.m_initial || '',
           suffix: p.suffix || '',
-          full_name: p.full_name,
+          full_name: p.full_name || '',
           email: p.email || '',
           office: p.office || '',
           mobile_no: p.mobile_no || '',
@@ -575,7 +575,7 @@ const AttendanceList: React.FC = () => {
                 f_name: toProperCase(newParticipant.f_name.trim()),
                 l_name: toProperCase(newParticipant.l_name.trim()),
                 m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                suffix: newParticipant.suffix.trim() === '' ? null : newParticipant.suffix.trim(),
+                suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
                 email: newParticipant.email || null,
                 office: finalOfficeName,
                 location_id: finalLocationId,
@@ -601,7 +601,7 @@ const AttendanceList: React.FC = () => {
                         f_name: toProperCase(newParticipant.f_name.trim()),
                         l_name: toProperCase(newParticipant.l_name.trim()),
                         m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                        suffix: newParticipant.suffix.trim() === '' ? null : newParticipant.suffix.trim(),
+                        suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
                         office: finalOfficeName,
                         location_id: finalLocationId,
                         mobile_no: newParticipant.mobile_no || null,
@@ -613,20 +613,16 @@ const AttendanceList: React.FC = () => {
                     }).eq('participant_id', participantId);
                } else {
                    // Create
-                    const initials = `${newParticipant.f_name[0] || ''}${newParticipant.l_name[0] || ''}`.toUpperCase().substring(0, 3);
-                    const code = `${initials}-${Date.now().toString().slice(-6)}`;
-                    
                     const { data: newUser, error: createError } = await supabase
                     .from('participants')
                     .insert([{
                         f_name: toProperCase(newParticipant.f_name.trim()),
                         l_name: toProperCase(newParticipant.l_name.trim()),
                         m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                        suffix: newParticipant.suffix.trim() === '' ? null : newParticipant.suffix.trim(),
+                        suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
                         email: newParticipant.email,
                         office: finalOfficeName,
                         location_id: finalLocationId,
-                        participant_code: code,
                         position: newParticipant.position || 'N/A',
                         mobile_no: newParticipant.mobile_no || null,
                         age_group: newParticipant.age_group,
@@ -640,19 +636,16 @@ const AttendanceList: React.FC = () => {
                }
           } else {
                // Create (No Email provided)
-               const initials = `${newParticipant.f_name[0] || ''}${newParticipant.l_name[0] || ''}`.toUpperCase().substring(0, 3);
-               const code = `${initials}-${Date.now().toString().slice(-6)}`;
                const { data: newUser, error: createError } = await supabase
                 .from('participants')
                 .insert([{
                     f_name: toProperCase(newParticipant.f_name.trim()),
                     l_name: toProperCase(newParticipant.l_name.trim()),
                     m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                    suffix: newParticipant.suffix.trim() === '' ? null : newParticipant.suffix.trim(),
+                    suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
                     email: null,
                     office: finalOfficeName,
                     location_id: finalLocationId,
-                    participant_code: code,
                     position: newParticipant.position || 'N/A',
                     gender: newParticipant.gender,
                     mobile_no: newParticipant.mobile_no || null,
@@ -1041,7 +1034,7 @@ const AttendanceList: React.FC = () => {
       {showAddParticipantModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddParticipantModal(false)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 relative z-10 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl p-6 relative z-10 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <UserPlus size={20} className="text-indigo-600" />
@@ -1052,7 +1045,8 @@ const AttendanceList: React.FC = () => {
                     </button>
                 </div>
                 
-                <form onSubmit={handleAddParticipant} className="space-y-4">
+                <div className="max-w-2xl mx-auto w-full">
+                    <form onSubmit={handleAddParticipant} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="relative">
                             <label className="block text-sm font-medium text-slate-700 mb-1">First Name</label>
@@ -1389,6 +1383,7 @@ const AttendanceList: React.FC = () => {
                         </button>
                     </div>
                 </form>
+                </div>
             </div>
         </div>
       )}
