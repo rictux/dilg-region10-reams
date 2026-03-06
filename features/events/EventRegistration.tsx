@@ -138,11 +138,11 @@ const EventRegistration: React.FC = () => {
 
       setFormData({
           ...formData,
-          f_name: p.f_name,
-          l_name: p.l_name,
+          f_name: p.f_name || '',
+          l_name: p.l_name || '',
           m_initial: p.m_initial || '',
           suffix: p.suffix || '',
-          full_name: p.full_name,
+          full_name: p.full_name || '',
           email: p.email || '',
           gender: p.gender || 'Male',
           position: p.position || '',
@@ -259,7 +259,7 @@ const EventRegistration: React.FC = () => {
                 f_name: toProperCase(formData.f_name.trim()),
                 l_name: toProperCase(formData.l_name.trim()),
                 m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim().toUpperCase(),
-                suffix: formData.suffix.trim() === '' ? null : formData.suffix.trim(),
+                suffix: formData.suffix.trim() === '' ? null : toProperCase(formData.suffix.trim()),
                 gender: formData.gender,
                 position: formData.position,
                 office: finalOfficeName,
@@ -273,13 +273,10 @@ const EventRegistration: React.FC = () => {
             .single();
 
             if (updateError) throw updateError;
-            setFormData(prev => ({ ...prev, full_name: updatedUser.full_name }));
+            setFormData(prev => ({ ...prev, full_name: updatedUser.full_name || '' }));
 
         } else {
             // Create new participant
-            const initials = `${formData.f_name[0] || ''}${formData.l_name[0] || ''}`.toUpperCase().substring(0, 3);
-            const code = `${initials}-${Date.now().toString().slice(-6)}`;
-
             // ---------------------------------------------------------
             // STEP 3: USE SANITIZED VARIABLES IN INSERT
             // ---------------------------------------------------------
@@ -289,14 +286,13 @@ const EventRegistration: React.FC = () => {
                     f_name: toProperCase(formData.f_name.trim()),
                     l_name: toProperCase(formData.l_name.trim()),
                     m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim().toUpperCase(),
-                    suffix: formData.suffix.trim() === '' ? null : formData.suffix.trim(),
+                    suffix: formData.suffix.trim() === '' ? null : toProperCase(formData.suffix.trim()),
                     email: finalEmail,       // <--- Used here
                     mobile_no: finalMobile,  // <--- Used here
                     gender: formData.gender,
                     position: formData.position,
                     office: finalOfficeName,
                     location_id: finalLocationId,
-                    participant_code: code,
                     age_group: formData.age_group,
                     pwd: formData.pwd,
                     indigenous_people: formData.indigenous_people
@@ -307,7 +303,7 @@ const EventRegistration: React.FC = () => {
             if (createError) throw createError;
             participantId = newUser.participant_id;
             finalParticipantCode = newUser.participant_code;
-            setFormData(prev => ({ ...prev, full_name: newUser.full_name }));
+            setFormData(prev => ({ ...prev, full_name: newUser.full_name || '' }));
         }
 
         // 2. Register for Event
