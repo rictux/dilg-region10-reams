@@ -137,6 +137,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (username: string, passwordPlain: string, remember: boolean = false) => {
     setLoading(true);
     try {
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {
+        // Ignore error
+      }
+      
       // 1. Fetch user by username
       const { data, error } = await supabase
         .from('users')
@@ -260,6 +266,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('eventpulse_user');
     sessionStorage.removeItem('eventpulse_user');
     setUser(null);
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('Error signing out of Supabase', e);
+    }
   };
 
   // Granular Permission Check
