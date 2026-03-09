@@ -14,6 +14,8 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
   changePassword: (newPw: string) => Promise<void>;
   hasPermission: (permission: Permission) => boolean;
+  loginWithGoogle: () => Promise<void>;
+  signupWithGoogle: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,11 +26,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Load user from local storage or session storage on mount
   useEffect(() => {
+    const checkSupabaseAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && session.user) {
+          const email = session.user.email;
+          const full_name = session.user.user_metadata?.full_name || email?.split('@')[0] || 'Google User';
+          
+          const { data: userRecord } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .single();
+            
+          const authIntent = localStorage.getItem('auth_intent');
+          
+          if (userRecord) {
+            if (userRecord.status === 'Active') {
+              setUser(userRecord as User);
+              localStorage.setItem('eventpulse_user', JSON.stringify(userRecord));
+            } else {
+              await supabase.auth.signOut();
+              localStorage.setItem('auth_error', 'Your account is currently Inactive. Please contact the administrator.');
+            }
+          } else {
+            if (authIntent === 'signup') {
+              const salt = await bcrypt.genSalt(10);
+              const hash = await bcrypt.hash(Math.random().toString(36), salt);
+              
+              const { data: newUser, error: insertError } = await supabase.from('users').insert([{
+                username: email,
+                password_hash: hash,
+                full_name: full_name,
+                email: email,
+                position: 'Google User',
+                role: 'EventManager',
+                status: 'Inactive'
+              }]).select().single();
+              
+              if (!insertError && newUser) {
+                await supabase.auth.signOut();
+                localStorage.setItem('auth_success', 'Account Created! Your account is currently Inactive. Please contact the administrator to activate your account before logging in.');
+              } else {
+                await supabase.auth.signOut();
+                localStorage.setItem('auth_error', 'Failed to create account with Google.');
+              }
+            } else {
+              await supabase.auth.signOut();
+              localStorage.setItem('auth_error', 'Account not found. Please sign up first.');
+            }
+          }
+          localStorage.removeItem('auth_intent');
+        }
+      } catch (e) {
+        console.error("Error checking Supabase Auth", e);
+      }
+    };
+
     const storedUser = localStorage.getItem('eventpulse_user') || sessionStorage.getItem('eventpulse_user');
     if (storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
-        // Verify user still exists in DB (optional security step)
         refreshUserProfile(parsedUser.user_id);
       } catch (e) {
         localStorage.removeItem('eventpulse_user');
@@ -36,8 +94,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
       }
     } else {
-      setLoading(false);
+      checkSupabaseAuth().finally(() => setLoading(false));
     }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        checkSupabaseAuth();
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const refreshUserProfile = async (userId: number) => {
@@ -149,6 +215,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithGoogle = async () => {
+    localStorage.setItem('auth_intent', 'login');
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + '/'
+      }
+    });
+  };
+
+  const signupWithGoogle = async () => {
+    localStorage.setItem('auth_intent', 'signup');
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + '/signup'
+      }
+    });
+  };
+
   const changePassword = async (newPw: string) => {
     if (!user) throw new Error("No user logged in");
     
@@ -188,7 +274,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, signOut, refreshProfile, changePassword, hasPermission }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, signOut, refreshProfile, changePassword, hasPermission, loginWithGoogle, signupWithGoogle }}>
       {children}
     </AuthContext.Provider>
   );
