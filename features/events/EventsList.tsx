@@ -14,8 +14,9 @@ const EventsList: React.FC = () => {
   const [offices, setOffices] = useState<Office[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('All');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const itemsPerPage = 10;
   const navigate = useNavigate();
   
   // Modal States
@@ -90,6 +91,7 @@ const EventsList: React.FC = () => {
   const [viewingParticipants, setViewingParticipants] = useState<any[]>([]);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [participantSearchTerm, setParticipantSearchTerm] = useState('');
   
   // Role Editing State
   const [editingRole, setEditingRole] = useState<{ participantId: number; role: string } | null>(null);
@@ -665,14 +667,25 @@ const EventsList: React.FC = () => {
       setTimeout(() => setCopied(false), 2000);
   };
 
+  // Filtered Participants
+  const filteredParticipants = useMemo(() => {
+    if (!participantSearchTerm.trim()) return viewingParticipants;
+    const lower = participantSearchTerm.toLowerCase();
+    return viewingParticipants.filter(p => 
+      p.participants?.full_name?.toLowerCase().includes(lower) ||
+      p.participants?.email?.toLowerCase().includes(lower) ||
+      p.participants?.office?.toLowerCase().includes(lower)
+    );
+  }, [viewingParticipants, participantSearchTerm]);
+
   // Grouping Logic
   const specialRoles = ['Speaker', 'Secretariat', 'VIP', 'Guest'];
-  const specialParticipants = viewingParticipants.filter(p => specialRoles.includes(p.role));
-  const delegateParticipants = viewingParticipants.filter(p => p.role === 'Delegate');
+  const specialParticipants = filteredParticipants.filter(p => specialRoles.includes(p.role));
+  const delegateParticipants = filteredParticipants.filter(p => p.role === 'Delegate');
 
   // Stats Logic
   const totalCount = viewingParticipants.length;
-  const delegateCount = delegateParticipants.length;
+  const delegateCount = viewingParticipants.filter(p => p.role === 'Delegate').length;
   const accommodationCount = React.useMemo(() => {
       return viewingParticipants.filter(p => p.needs_accommodation).length;
   }, [viewingParticipants]);
@@ -699,13 +712,19 @@ const EventsList: React.FC = () => {
 
   // Filtered list for search
   const filteredEvents = useMemo(() => {
-    if (!searchTerm.trim()) return events;
-    const lower = searchTerm.toLowerCase();
-    return events.filter(e => 
-      e.event_name.toLowerCase().includes(lower) || 
-      e.venue.toLowerCase().includes(lower)
-    );
-  }, [events, searchTerm]);
+    let result = events;
+    if (statusFilter !== 'All') {
+      result = result.filter(e => e.status === statusFilter);
+    }
+    if (searchTerm.trim()) {
+      const lower = searchTerm.toLowerCase();
+      result = result.filter(e => 
+        e.event_name.toLowerCase().includes(lower) || 
+        e.venue.toLowerCase().includes(lower)
+      );
+    }
+    return result;
+  }, [events, searchTerm, statusFilter]);
 
   const totalPages = Math.ceil(filteredEvents.length / itemsPerPage);
   const paginatedEvents = useMemo(() => {
@@ -713,25 +732,38 @@ const EventsList: React.FC = () => {
     return filteredEvents.slice(start, start + itemsPerPage);
   }, [filteredEvents, currentPage]);
 
-  // Reset to page 1 when search changes
+  // Reset to page 1 when search or filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, statusFilter]);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="relative w-full sm:w-64">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-            <Search size={18} />
+        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+          <div className="relative w-full sm:w-64">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <Search size={18} />
+            </div>
+            <input 
+              type="text" 
+              placeholder="Search events..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+            />
           </div>
-          <input 
-            type="text" 
-            placeholder="Search events..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full sm:w-48 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+          >
+            <option value="All">All Statuses</option>
+            <option value="Scheduled">Scheduled</option>
+            <option value="Ongoing">Ongoing</option>
+            <option value="Completed">Completed</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
         </div>
         <button 
             onClick={openCreateModal}
@@ -746,9 +778,9 @@ const EventsList: React.FC = () => {
               <table className="w-full text-sm text-left">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                       <tr>
-                          <th className="px-6 py-4 text-center">Event Details</th>
-                          <th className="px-6 py-4 text-center">Venue</th>
-                          <th className="px-6 py-4 text-center">Date</th>
+                          <th className="px-6 py-4 text-left">Event Details</th>
+                          <th className="px-6 py-4 text-left">Venue</th>
+                          <th className="px-6 py-4 text-left">Date</th>
                           <th className="px-6 py-4 text-center">Status</th>
                           <th className="px-6 py-4 text-center">Actions</th>
                       </tr>
@@ -763,10 +795,10 @@ const EventsList: React.FC = () => {
                                       <div className="h-3 bg-slate-100 rounded w-24 mx-auto"></div>
                                   </td>
                                   <td className="px-6 py-4">
-                                      <div className="h-4 bg-slate-200 rounded w-32 mx-auto"></div>
+                                      <div className="h-4 bg-slate-200 rounded w-32"></div>
                                   </td>
                                   <td className="px-6 py-4">
-                                      <div className="h-4 bg-slate-200 rounded w-24 mx-auto"></div>
+                                      <div className="h-4 bg-slate-200 rounded w-24"></div>
                                   </td>
                                   <td className="px-6 py-4">
                                       <div className="h-6 bg-slate-200 rounded-full w-20 mx-auto"></div>
@@ -787,11 +819,11 @@ const EventsList: React.FC = () => {
                                       className="group hover:bg-indigo-50/30 transition-all duration-200 cursor-pointer hover:shadow-sm"
                                       title="Click to view participants"
                                   >
-                                      <td className="px-6 py-4 text-center border-l-2 border-l-transparent group-hover:border-l-indigo-500">
+                                      <td className="px-6 py-4 text-left border-l-2 border-l-transparent group-hover:border-l-indigo-500">
                                           <div className="font-semibold text-sm text-slate-800 group-hover:text-indigo-700 transition-colors">
                                             {event.event_name}
                                           </div>
-                                          <div className="flex gap-2 mt-1.5 justify-center">
+                                          <div className="flex gap-2 mt-1.5 justify-start">
                                             {event.has_accommodation && (
                                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
                                                     <Home size={10} className="mr-1" /> Accommodation
@@ -804,14 +836,14 @@ const EventsList: React.FC = () => {
                                             )}
                                           </div>
                                       </td>
-                                      <td className="px-6 py-4 text-slate-600 text-center">
-                                          <div className="flex items-center justify-center gap-1.5 text-xs">
+                                      <td className="px-6 py-4 text-slate-600 text-left">
+                                          <div className="flex items-center justify-start gap-1.5 text-xs">
                                             <MapPin size={12} className="text-slate-400" />
                                             {event.venue}
                                           </div>
                                       </td>
-                                      <td className="px-6 py-4 text-slate-600 font-medium text-center">
-                                          <div className="flex items-center justify-center gap-1.5 text-xs">
+                                      <td className="px-6 py-4 text-slate-600 font-medium text-left">
+                                          <div className="flex items-center justify-start gap-1.5 text-xs">
                                             <Calendar size={12} className="text-slate-400" />
                                             {formatEventDate(event.start_date, event.end_date)}
                                           </div>
@@ -894,6 +926,46 @@ const EventsList: React.FC = () => {
                   </tbody>
               </table>
           </div>
+          
+          {/* Pagination Controls */}
+          {!loading && totalPages > 1 && (
+              <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+                  <div className="text-sm text-slate-500">
+                      Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredEvents.length)}</span> of <span className="font-medium">{filteredEvents.length}</span> results
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <button
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                          className="px-3 py-1 border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                          Previous
+                      </button>
+                      <div className="flex items-center gap-1">
+                          {[...Array(totalPages)].map((_, i) => (
+                              <button
+                                  key={i + 1}
+                                  onClick={() => setCurrentPage(i + 1)}
+                                  className={`w-8 h-8 flex items-center justify-center rounded-md text-sm font-medium transition-colors
+                                      ${currentPage === i + 1 
+                                          ? 'bg-indigo-600 text-white' 
+                                          : 'text-slate-700 hover:bg-slate-100'
+                                      }`}
+                              >
+                                  {i + 1}
+                              </button>
+                          ))}
+                      </div>
+                      <button
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          disabled={currentPage === totalPages}
+                          className="px-3 py-1 border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                          Next
+                      </button>
+                  </div>
+              </div>
+          )}
       </div>
 
       {/* Share / Registration Modal */}
@@ -978,6 +1050,20 @@ const EventsList: React.FC = () => {
                         )}
                     </div>
                     <div className="flex items-center gap-2">
+                        {participantModalView === 'list' && (
+                            <div className="relative mr-2">
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                                    <Search size={16} />
+                                </div>
+                                <input 
+                                    type="text" 
+                                    placeholder="Search participant..." 
+                                    value={participantSearchTerm}
+                                    onChange={(e) => setParticipantSearchTerm(e.target.value)}
+                                    className="w-48 pl-9 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                />
+                            </div>
+                        )}
                         {participantModalView === 'list' ? (
                             hasPermission('MANAGE_PARTICIPANTS') && (
                                 <button 
@@ -1203,10 +1289,10 @@ const EventsList: React.FC = () => {
                                     </>
                                 )}
 
-                                {viewingParticipants.length === 0 && (
+                                {filteredParticipants.length === 0 && (
                                     <tr>
                                         <td colSpan={hasPermission('MANAGE_PARTICIPANTS') ? 6 : 5} className="text-center py-10 text-slate-400">
-                                            No participants registered yet.
+                                            {participantSearchTerm ? 'No participants found matching your search.' : 'No participants registered yet.'}
                                         </td>
                                     </tr>
                                 )}
