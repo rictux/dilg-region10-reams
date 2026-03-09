@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { Event, Participant, RefLocation } from '../../types/database';
 import QRCode from 'react-qr-code';
 import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock, Landmark, Download, Info } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import { toPng } from 'html-to-image';
 
 const EventRegistration: React.FC = () => {
@@ -34,6 +34,26 @@ const EventRegistration: React.FC = () => {
 
   // Consent State
   const [consent, setConsent] = useState(false);
+
+  const formatEventDate = (start: string, end: string) => {
+    if (!start) return 'TBD';
+    const startDate = parseISO(start);
+    const endDate = end ? parseISO(end) : startDate;
+
+    if (start === end) {
+        return format(startDate, 'MMMM d, yyyy');
+    }
+
+    if (isSameMonth(startDate, endDate) && isSameYear(startDate, endDate)) {
+        return `${format(startDate, 'MMMM d')} - ${format(endDate, 'd, yyyy')}`;
+    }
+
+    if (!isSameMonth(startDate, endDate) && isSameYear(startDate, endDate)) {
+        return `${format(startDate, 'MMMM d')} - ${format(endDate, 'MMMM d, yyyy')}`;
+    }
+
+    return `${format(startDate, 'MMMM d, yyyy')} - ${format(endDate, 'MMMM d, yyyy')}`;
+  };
 
   const [formData, setFormData] = useState({
     f_name: '',
@@ -490,7 +510,7 @@ const EventRegistration: React.FC = () => {
                     <div className="flex flex-col gap-2 mt-4 text-indigo-100 text-sm font-medium">
                         <div className="flex items-center gap-2">
                             <Calendar size={16} />
-                            <span>{format(new Date(event.start_date), 'MMMM d, yyyy')}</span>
+                            <span>{formatEventDate(event.start_date, event.end_date)}</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <MapPin size={16} />
