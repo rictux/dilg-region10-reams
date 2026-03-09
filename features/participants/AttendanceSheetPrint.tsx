@@ -11,6 +11,23 @@ interface AttendanceRow {
     pmLog?: { time: string, status: string };
 }
 
+const chunkArray = <T,>(arr: T[], size: number): T[][] => {
+    return Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
+        arr.slice(i * size, i * size + size)
+    );
+};
+
+const renderCellText = (text: string | null | undefined, threshold1: number, threshold2: number) => {
+    if (!text) return '';
+    if (text.length > threshold2) {
+        return <div className="text-[8px] leading-[1.1] line-clamp-3">{text}</div>;
+    }
+    if (text.length > threshold1) {
+        return <div className="text-[10px] leading-[1.15] line-clamp-2">{text}</div>;
+    }
+    return <div className="text-xs leading-tight line-clamp-2">{text}</div>;
+};
+
 const AttendanceSheetPrint: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
@@ -122,9 +139,11 @@ const AttendanceSheetPrint: React.FC = () => {
         </div>
 
         {eventDates.map((date, dateIndex) => {
-            const rows = getRowsForDate(date);
-            return (
-                <div key={date.toISOString()} className="w-[297mm] h-[210mm] mx-auto bg-white shadow-xl mb-10 print:mb-0 print:shadow-none print:w-full print:h-screen print:max-w-none page-break-after relative overflow-hidden flex flex-col">
+            const allRows = getRowsForDate(date);
+            const rowChunks = allRows.length > 0 ? chunkArray(allRows, 12) : [[]];
+
+            return rowChunks.map((rows, chunkIndex) => (
+                <div key={`${date.toISOString()}-${chunkIndex}`} className="w-[297mm] h-[210mm] mx-auto bg-white shadow-xl mb-10 print:mb-0 print:shadow-none print:w-full print:h-screen print:max-w-none page-break-after relative overflow-hidden flex flex-col">
                     <div className="flex items-center pt-8 px-8 mb-2">
                         <div className="w-24 h-24 mr-4 flex-shrink-0 flex items-center justify-center">
                             <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/6/6f/DILG_Seal.svg'; }} />
@@ -140,7 +159,7 @@ const AttendanceSheetPrint: React.FC = () => {
                         <div className="text-sm font-sans text-slate-900 mt-1">{format(date, 'MMMM d, yyyy')}</div>
                     </div>
                     <div className="px-8 flex-1">
-                        <table className="w-full text-xs">
+                        <table className="w-full text-xs table-fixed">
                             <thead>
                                 <tr className="bg-gray-200 text-center font-bold uppercase font-sans print:bg-gray-200 print:print-color-adjust-exact">
                                     <th rowSpan={2} className="border border-black px-2 py-2 w-10">No.</th>
@@ -164,29 +183,38 @@ const AttendanceSheetPrint: React.FC = () => {
                                         <td colSpan={11} className="text-center py-12 text-slate-500 italic">No attendance recorded for this date.</td>
                                     </tr>
                                 ) : (
-                                    rows.map((row, index) => (
-                                        <tr key={row.participant.participant_id} className="text-center h-8 hover:bg-slate-50 print:hover:bg-transparent">
-                                            <td className="px-2 py-1.5 border border-black">{index + 1}</td>
-                                            <td className="px-3 py-1.5 text-left capitalize border border-black">{row.participant.full_name}</td>
-                                            <td className="px-2 py-1.5 border border-black">{row.participant.position}</td>
-                                            <td className="px-2 py-1.5 border border-black">{row.participant.office}</td>
-                                            <td className="px-1 py-1.5 font-bold border border-black">{(row.participant.gender === 'Male' || row.participant.gender === 'M') && '✓'}</td>
-                                            <td className="px-1 py-1.5 font-bold border border-black">{(row.participant.gender === 'Female' || row.participant.gender === 'F') && '✓'}</td>
-                                            <td className="px-1 py-1.5 font-bold border border-black">{(row.participant as any).accept_photo_video ? '✓' : ''}</td>
-                                            <td className="px-1 py-1.5 font-bold border border-black">{(row.participant as any).store_to_db ? '✓' : ''}</td>
-                                            <td className="px-2 py-1.5 font-mono border border-black">{row.amLog ? formatLogTime(row.amLog.time) : ''}</td>
-                                            <td className="px-2 py-1.5 font-mono border border-black">{row.pmLog ? formatLogTime(row.pmLog.time) : ''}</td>
-                                        </tr>
-                                    ))
+                                    rows.map((row, index) => {
+                                        const globalIndex = chunkIndex * 12 + index + 1;
+                                        return (
+                                            <tr key={row.participant.participant_id} className="text-center h-[38px] hover:bg-slate-50 print:hover:bg-transparent overflow-hidden">
+                                                <td className="px-2 py-1 border border-black">{globalIndex}</td>
+                                                <td className="px-3 py-1 text-left capitalize border border-black">
+                                                    {renderCellText(row.participant.full_name, 25, 40)}
+                                                </td>
+                                                <td className="px-2 py-1 border border-black">
+                                                    {renderCellText(row.participant.position, 20, 35)}
+                                                </td>
+                                                <td className="px-2 py-1 border border-black">
+                                                    {renderCellText(row.participant.office, 20, 35)}
+                                                </td>
+                                                <td className="px-1 py-1 font-bold border border-black">{(row.participant.gender === 'Male' || row.participant.gender === 'M') && '✓'}</td>
+                                                <td className="px-1 py-1 font-bold border border-black">{(row.participant.gender === 'Female' || row.participant.gender === 'F') && '✓'}</td>
+                                                <td className="px-1 py-1 font-bold border border-black">{(row.participant as any).accept_photo_video ? '✓' : ''}</td>
+                                                <td className="px-1 py-1 font-bold border border-black">{(row.participant as any).store_to_db ? '✓' : ''}</td>
+                                                <td className="px-2 py-1 font-mono border border-black">{row.amLog ? formatLogTime(row.amLog.time) : ''}</td>
+                                                <td className="px-2 py-1 font-mono border border-black">{row.pmLog ? formatLogTime(row.pmLog.time) : ''}</td>
+                                            </tr>
+                                        );
+                                    })
                                 )}
                             </tbody>
                         </table>
                     </div>
                     <div className="w-full px-10 pb-6 pt-2 flex flex-col text-[10px] text-slate-600 font-sans">
-                        <div className="mt-2 text-slate-400">System Generated Report</div>
+                        <div className="mt-2 text-slate-400">System Generated Report - Page {chunkIndex + 1} of {rowChunks.length}</div>
                     </div>
                 </div>
-            );
+            ));
         })}
     </div>
   );
