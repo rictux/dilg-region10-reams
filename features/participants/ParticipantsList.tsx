@@ -1034,7 +1034,7 @@ const AttendanceList: React.FC = () => {
       {showAddParticipantModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddParticipantModal(false)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl p-6 relative z-10 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl p-6 relative z-10 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <UserPlus size={20} className="text-indigo-600" />
