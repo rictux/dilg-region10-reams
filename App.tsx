@@ -16,6 +16,7 @@ import AttendanceSheetPrint from './features/participants/AttendanceSheetPrint';
 import ScanLogsPrint from './features/reports/ScanLogsPrint';
 import UserManagement from './features/users/UserManagement';
 import NameLookup from './features/lookup/NameLookup';
+import About from './features/about/About';
 import { Permission } from './config/permissions';
 
 const ProtectedRoute = ({ children, requiredPermission }: React.PropsWithChildren<{ requiredPermission?: Permission }>) => {
@@ -113,6 +114,13 @@ const App: React.FC = () => {
           <Route path="/scan" element={
             <ProtectedRoute requiredPermission="SCAN_QR">
               <Layout><Scanner /></Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* About Route */}
+          <Route path="/about" element={
+            <ProtectedRoute>
+              <Layout><About /></Layout>
             </ProtectedRoute>
           } />
 
