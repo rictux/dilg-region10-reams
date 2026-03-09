@@ -78,6 +78,14 @@ const Scanner: React.FC = () => {
   const eventIdRef = useRef(selectedEventId);
   const isProcessingRef = useRef(false);
 
+  // Utility function to generate 8 character alphanumeric string
+  const generateDeviceToken = () => {
+    return 'web-' + Math.random().toString(36).substring(2, 10);
+  };
+
+  // Ref to hold device token
+  const deviceTokenRef = useRef(generateDeviceToken());
+
   useEffect(() => {
     eventIdRef.current = selectedEventId;
   }, [selectedEventId]);
@@ -371,7 +379,7 @@ const Scanner: React.FC = () => {
                 participant_code: qrToken,
                 scan_time: deviceScanTime,
                 session: session,
-                scanner_device: navigator.userAgent + " (Offline)",
+                scanner_device: deviceTokenRef.current + " (Offline)",
                 timestamp: Date.now()
             };
 
@@ -444,7 +452,7 @@ const Scanner: React.FC = () => {
                     .from('attendance_logs')
                     .update({ 
                         scan_time: deviceScanTime,
-                        scanner_device: navigator.userAgent,
+                        scanner_device: deviceTokenRef.current,
                         remarks: 'Updated PM Time'
                     })
                     .eq('attendance_id', existingLog.attendance_id);
@@ -478,7 +486,7 @@ const Scanner: React.FC = () => {
           action_session: session,
           remarks: notes,
           scan_time: scanTimeStr,
-          scanner_device: navigator.userAgent
+          scanner_device: deviceTokenRef.current
       });
   };
 
