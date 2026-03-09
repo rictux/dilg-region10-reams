@@ -22,7 +22,8 @@ import {
   User,
   Eye,
   EyeOff,
-  Camera
+  Camera,
+  Info
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -553,6 +554,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       case '/reports': return 'Reports';
       case '/users': return 'Users';
       case '/scan': return 'Scan Mode';
+      case '/about': return 'About';
       default: return 'Dashboard';
     }
   };
@@ -600,6 +602,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           {hasPermission('SCAN_QR') && (
               <NavItem to="/scan" icon={ScanLine} label="Scan Mode" />
           )}
+
+          <NavItem to="/about" icon={Info} label="About" />
         </nav>
 
         <div className={`p-8 mt-auto text-xs text-indigo-300 space-y-2 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
