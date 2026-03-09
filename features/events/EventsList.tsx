@@ -1026,7 +1026,7 @@ const EventsList: React.FC = () => {
       {showParticipantsModal && selectedEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => { setShowParticipantsModal(false); setParticipantModalView('list'); }}></div>
-            <div className={`bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[80vh] flex flex-col relative z-10 animate-in zoom-in-95 duration-200`}>
+            <div className={`bg-white rounded-xl shadow-2xl w-full ${participantModalView === 'list' ? 'max-w-6xl' : 'max-w-3xl'} h-[80vh] flex flex-col relative z-10 animate-in zoom-in-95 duration-200`}>
                 {/* Header */}
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-xl shrink-0">
                     <div>
