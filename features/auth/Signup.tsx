@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,38 +15,80 @@ const Signup: React.FC = () => {
     confirmPassword: '',
     office_id: ''
   });
-  
+
   const [offices, setOffices] = useState<Office[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  
+
   const navigate = useNavigate();
   const { signup, signupWithGoogle } = useAuth();
 
   useEffect(() => {
-    const authError = localStorage.getItem('auth_error');
-    if (authError) {
-      setError(authError);
-      localStorage.removeItem('auth_error');
-    }
-    const authSuccess = localStorage.getItem('auth_success');
-    if (authSuccess) {
-      setSuccess(true);
-      localStorage.removeItem('auth_success');
-      setTimeout(() => {
-        navigate('/');
-      }, 4000);
-    }
+    const handleAuthReturn = async () => {
+      const authError = localStorage.getItem('auth_error');
+      if (authError) {
+        setError(authError);
+        localStorage.removeItem('auth_error');
+        return;
+      }
+
+      const authSuccess = localStorage.getItem('auth_success');
+      if (authSuccess) {
+        setSuccess(true);
+        localStorage.removeItem('auth_success');
+        setTimeout(() => {
+          navigate('/');
+        }, 4000);
+        return;
+      }
+
+      const hash = window.location.hash;
+      const searchParams = new URLSearchParams(window.location.search);
+
+      const cameFromOAuth =
+        hash.includes('access_token=') ||
+        hash.includes('refresh_token=') ||
+        searchParams.get('code') ||
+        searchParams.get('error');
+
+      if (cameFromOAuth) {
+        const { data, error } = await supabase.auth.getSession();
+
+        if (error) {
+          setError(error.message || 'Authentication failed.');
+          return;
+        }
+
+        if (data.session?.user) {
+          setSuccess(true);
+
+          window.history.replaceState({}, document.title, '/signup');
+
+          setTimeout(() => {
+            navigate('/');
+          }, 4000);
+        }
+      }
+    };
+
+    handleAuthReturn();
   }, [navigate]);
 
   useEffect(() => {
     const fetchOffices = async () => {
-      const { data } = await supabase.from('offices').select('*').order('name');
-      if (data) setOffices(data);
+      const { data, error } = await supabase
+        .from('offices')
+        .select('*')
+        .order('name');
+
+      if (!error && data) {
+        setOffices(data);
+      }
     };
+
     fetchOffices();
   }, []);
 
@@ -56,12 +97,12 @@ const Signup: React.FC = () => {
     setError(null);
 
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
+      setError('Passwords do not match');
       return;
     }
 
     if (formData.password.length < 4) {
-      setError("Password must be at least 4 characters");
+      setError('Password must be at least 4 characters');
       return;
     }
 
@@ -76,13 +117,24 @@ const Signup: React.FC = () => {
         passwordPlain: formData.password,
         office_id: formData.office_id ? parseInt(formData.office_id) : null
       });
-      
+
       setSuccess(true);
       setTimeout(() => {
         navigate('/');
       }, 4000);
     } catch (err: any) {
       setError(err.message || 'Failed to create account.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignup = async () => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      await signupWithGoogle();
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign up with Google.');
       setIsLoading(false);
     }
   };
@@ -96,10 +148,9 @@ const Signup: React.FC = () => {
           </div>
           <h2 className="text-2xl font-bold text-slate-800 mb-2">Account Created!</h2>
           <p className="text-slate-600 mb-6">
-            Your account has been successfully created and is currently <strong>Inactive</strong>. 
-            Please contact the administrator to activate your account before logging in.
+            Your account has been successfully created. You may now proceed to log in.
           </p>
-          <button 
+          <button
             onClick={() => navigate('/')}
             className="text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
           >
@@ -132,7 +183,7 @@ const Signup: React.FC = () => {
               <input
                 type="text"
                 value={formData.fullName}
-                onChange={(e) => setFormData({...formData, fullName: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                 required
                 className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                 placeholder="John Doe"
@@ -147,7 +198,7 @@ const Signup: React.FC = () => {
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
                 className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                 placeholder="john@example.com"
@@ -161,7 +212,7 @@ const Signup: React.FC = () => {
               <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <select
                 value={formData.office_id}
-                onChange={(e) => setFormData({...formData, office_id: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, office_id: e.target.value })}
                 required
                 className="w-full pl-10 pr-8 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all bg-white appearance-none text-slate-600"
               >
@@ -173,7 +224,9 @@ const Signup: React.FC = () => {
                 ))}
               </select>
               <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
               </div>
             </div>
           </div>
@@ -185,7 +238,7 @@ const Signup: React.FC = () => {
               <input
                 type="text"
                 value={formData.position}
-                onChange={(e) => setFormData({...formData, position: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, position: e.target.value })}
                 required
                 className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                 placeholder="Event Organizer"
@@ -200,7 +253,7 @@ const Signup: React.FC = () => {
               <input
                 type="text"
                 value={formData.username}
-                onChange={(e) => setFormData({...formData, username: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 required
                 className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                 placeholder="Choose a username"
@@ -210,47 +263,47 @@ const Signup: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
-                <div className="relative">
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+              <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input
-                    type={showPassword ? "text" : "password"}
-                    value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
-                    required
-                    className="w-full pl-10 pr-8 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                    placeholder="••••••"
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required
+                  className="w-full pl-10 pr-8 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                  placeholder="••••••"
                 />
                 <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
                 >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
-                </div>
+              </div>
             </div>
-            
+
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm</label>
-                <div className="relative">
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm</label>
+              <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={formData.confirmPassword}
-                    onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                    required
-                    className="w-full pl-10 pr-8 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                    placeholder="••••••"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  required
+                  className="w-full pl-10 pr-8 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                  placeholder="••••••"
                 />
                 <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
                 >
-                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
-                </div>
+              </div>
             </div>
           </div>
 
@@ -280,7 +333,7 @@ const Signup: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => signupWithGoogle()}
+            onClick={handleGoogleSignup}
             disabled={isLoading}
             className="w-full bg-white border border-slate-300 text-slate-700 font-semibold py-3 rounded-lg hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
           >
@@ -304,10 +357,10 @@ const Signup: React.FC = () => {
             </svg>
             Sign up with Google
           </button>
-          
+
           <div className="text-center mt-4">
             <Link to="/" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">
-                Already have an account? Log in
+              Already have an account? Log in
             </Link>
           </div>
         </form>
