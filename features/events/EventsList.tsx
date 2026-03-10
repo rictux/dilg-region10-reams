@@ -104,16 +104,15 @@ const EventsList: React.FC = () => {
   
   // Form State
   const initialFormState = {
-      event_name: '',
-      venue: '',
-      start_date: '',
-      end_date: '',
-      status: 'Scheduled' as const,
-      organize_by: null as number | null,
-      has_accommodation: false,
-      registration_open: true
-  };
-  const [formData, setFormData] = useState<Partial<Event>>(initialFormState);
+  event_name: '',
+  venue: '',
+  start_date: '',
+  end_date: '',
+  organize_by: null as number | null,
+  has_accommodation: false,
+  registration_open: true
+};
+  const [formData, setFormData] = useState(initialFormState);
 
   useEffect(() => {
     fetchEvents();
@@ -246,65 +245,84 @@ const EventsList: React.FC = () => {
   // --- Handlers ---
 
   const openCreateModal = () => {
-      setEditingEventId(null);
-      // Pre-select user's office if applicable, unless Admin who can choose
-      setFormData({
-          ...initialFormState,
-          organize_by: user?.role === 'Admin' ? null : (user?.office_id || null)
-      });
-      setShowEventModal(true);
-  };
+  setEditingEventId(null);
+
+  setFormData({
+    ...initialFormState,
+    organize_by: user?.role === 'Admin'
+      ? null
+      : (user?.office_id || null)
+  });
+
+  setShowEventModal(true);
+};
 
   const openEditModal = (e: React.MouseEvent, event: Event) => {
-      e.stopPropagation(); // Prevent row click
-      setEditingEventId(event.event_id);
-      setFormData({
-          event_name: event.event_name || '',
-          venue: event.venue || '',
-          start_date: event.start_date || '',
-          end_date: event.end_date || '',
-          status: event.status,
-          organize_by: event.organize_by,
-          has_accommodation: event.has_accommodation,
-          registration_open: event.registration_open
-      });
-      setShowEventModal(true);
-  };
+  e.stopPropagation();
+
+  setEditingEventId(event.event_id);
+
+  setFormData({
+    event_name: event.event_name || '',
+    venue: event.venue || '',
+    start_date: event.start_date || '',
+    end_date: event.end_date || '',
+    organize_by: event.organize_by,
+    has_accommodation: event.has_accommodation,
+    registration_open: event.registration_open
+  });
+
+  setShowEventModal(true);
+};
 
   const handleSaveEvent = async (e: React.FormEvent) => {
-      e.preventDefault();
-      
-      // If not admin, force assignment to their office (security fallback)
-      let payload = { ...formData };
-      if (user?.role !== 'Admin' && user?.office_id) {
-          payload.organize_by = user.office_id;
-      }
+  e.preventDefault();
 
-      let error;
-      if (editingEventId) {
-          // Update
-          const { error: updateError } = await supabase
-            .from('events')
-            .update(payload)
-            .eq('event_id', editingEventId);
-          error = updateError;
-      } else {
-          // Create
-          const { error: insertError } = await supabase
-            .from('events')
-            .insert([payload]);
-          error = insertError;
-      }
+  if (user?.role !== 'Admin' && !user?.office_id) {
+    alert('Your account has no office assigned.');
+    return;
+  }
 
-      if (!error) {
-          setShowEventModal(false);
-          setEditingEventId(null);
-          setFormData(initialFormState);
-          fetchEvents(); 
-      } else {
-        alert("Error saving event: " + error.message);
-      }
+  const payload = {
+    event_name: formData.event_name,
+    venue: formData.venue,
+    start_date: formData.start_date,
+    end_date: formData.end_date,
+    organize_by:
+      user?.role !== 'Admin'
+        ? (user?.office_id || null)
+        : (formData.organize_by ?? null),
+    has_accommodation: formData.has_accommodation ?? false,
+    registration_open: formData.registration_open ?? true
   };
+
+  let error;
+
+  if (editingEventId) {
+    const { error: updateError } = await supabase
+      .from('events')
+      .update(payload)
+      .eq('event_id', editingEventId);
+
+    error = updateError;
+  } else {
+    const { error: insertError } = await supabase
+      .from('events')
+      .insert([payload]);
+
+    error = insertError;
+  }
+
+  if (!error) {
+    setShowEventModal(false);
+    setEditingEventId(null);
+    setFormData(initialFormState);
+    fetchEvents();
+  } else {
+    console.error('Event Save Error:', error);
+    alert('Error saving event: ' + error.message);
+  }
+};
 
   const handleDelete = async (e: React.MouseEvent, id: number) => {
       e.stopPropagation(); // Prevent row click
@@ -1850,22 +1868,7 @@ const EventsList: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     {/* Status */}
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
-                        <div className="relative group">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <Clock className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                            </div>
-                            <select 
-                                className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
-                                value={formData.status}
-                                onChange={e => setFormData({...formData, status: e.target.value as any})}
-                            >
-                                <option value="Scheduled">Scheduled</option>
-                                <option value="Ongoing">Ongoing</option>
-                                <option value="Completed">Completed</option>
-                                <option value="Cancelled">Cancelled</option>
-                            </select>
-                        </div>
+                    
                     </div>
 
                     <div className="flex flex-col gap-3 pt-2">
