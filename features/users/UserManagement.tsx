@@ -6,6 +6,7 @@ import { User, Office } from '../../types/database';
 import { Trash2, UserPlus, Shield, CheckCircle, XCircle, Search, Mail, Briefcase, Lock, X, Loader2, AlertCircle, Edit, Building2, Eye, EyeOff } from 'lucide-react';
 import { format } from 'date-fns';
 import bcrypt from 'bcryptjs';
+import ParticipantsList from './ParticipantsList';
 
 // Extend User type locally to include joined office data
 interface UserWithOffice extends User {
@@ -17,16 +18,24 @@ interface UserWithOffice extends User {
 
 const UserManagement: React.FC = () => {
   const { user: currentUser } = useAuth();
+  const [activeTab, setActiveTab] = useState<'users' | 'participants'>('users');
   const [users, setUsers] = useState<UserWithOffice[]>([]);
   const [offices, setOffices] = useState<Office[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
   
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
+  
+  // Delete Modal State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<UserWithOffice | null>(null);
+  const [deleting, setDeleting] = useState(false);
   
   // Password Visibility
   const [showPassword, setShowPassword] = useState(false);
@@ -84,17 +93,25 @@ const UserManagement: React.FC = () => {
         return;
     }
 
-    if (!confirm(`Are you sure you want to delete user "${targetUser.username}"? This action cannot be undone.`)) {
-        return;
-    }
+    setUserToDelete(targetUser);
+    setShowDeleteModal(true);
+  };
 
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
+    
+    setDeleting(true);
     try {
-        const { error } = await supabase.from('users').delete().eq('user_id', targetUser.user_id);
+        const { error } = await supabase.from('users').delete().eq('user_id', userToDelete.user_id);
         if (error) throw error;
         
-        setUsers(users.filter(u => u.user_id !== targetUser.user_id));
+        setUsers(users.filter(u => u.user_id !== userToDelete.user_id));
+        setShowDeleteModal(false);
+        setUserToDelete(null);
     } catch (err: any) {
         alert("Error deleting user: " + err.message);
+    } finally {
+        setDeleting(false);
     }
   };
 
@@ -200,16 +217,50 @@ const UserManagement: React.FC = () => {
       u.offices?.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const paginatedUsers = filteredUsers.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+  );
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex border-b border-slate-200">
+        <button
+          className={`py-3 px-6 font-medium text-sm border-b-2 transition-colors ${
+            activeTab === 'users'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+          }`}
+          onClick={() => setActiveTab('users')}
+        >
+          System Users
+        </button>
+        <button
+          className={`py-3 px-6 font-medium text-sm border-b-2 transition-colors ${
+            activeTab === 'participants'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+          }`}
+          onClick={() => setActiveTab('participants')}
+        >
+          Participants
+        </button>
+      </div>
+
+      {activeTab === 'users' ? (
+        <>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input 
             type="text" 
             placeholder="Search users..." 
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+            }}
             className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
           />
         </div>
@@ -237,10 +288,10 @@ const UserManagement: React.FC = () => {
                   <tbody className="divide-y divide-slate-100">
                       {loading ? (
                           <tr><td colSpan={6} className="text-center py-8">Loading users...</td></tr>
-                      ) : filteredUsers.length === 0 ? (
+                      ) : paginatedUsers.length === 0 ? (
                           <tr><td colSpan={6} className="text-center py-8 text-slate-400">No users found.</td></tr>
                       ) : (
-                          filteredUsers.map((user) => (
+                          paginatedUsers.map((user) => (
                               <tr key={user.user_id} className="hover:bg-slate-50 transition-colors">
                                   <td className="px-6 py-4">
                                       <div className="flex items-center gap-3">
@@ -316,6 +367,34 @@ const UserManagement: React.FC = () => {
                   </tbody>
               </table>
           </div>
+
+          {/* Pagination Controls */}
+          {!loading && totalPages > 1 && (
+              <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+                  <div className="text-sm text-slate-500">
+                      Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredUsers.length)}</span> of <span className="font-medium">{filteredUsers.length}</span> results
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <button
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                          className="px-3 py-1 border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                          Previous
+                      </button>
+                      <div className="flex items-center gap-1 text-sm font-medium text-slate-700 px-2">
+                          {currentPage} of {totalPages}
+                      </div>
+                      <button
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          disabled={currentPage === totalPages}
+                          className="px-3 py-1 border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                          Next
+                      </button>
+                  </div>
+              </div>
+          )}
       </div>
 
       {/* Create/Edit User Modal */}
@@ -480,6 +559,50 @@ const UserManagement: React.FC = () => {
                 </form>
             </div>
         </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && userToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div 
+                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
+                onClick={() => !deleting && setShowDeleteModal(false)}
+            ></div>
+
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="p-6 text-center">
+                    <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <AlertCircle size={32} />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">Confirm Deletion</h3>
+                    <p className="text-slate-600 mb-6">
+                        Are you sure you want to delete user <strong>"{userToDelete.username}"</strong>? This action cannot be undone.
+                    </p>
+                    
+                    <div className="flex justify-center gap-3">
+                        <button 
+                            onClick={() => setShowDeleteModal(false)}
+                            disabled={deleting}
+                            className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={confirmDelete}
+                            disabled={deleting}
+                            className="bg-red-600 text-white px-6 py-2 rounded-lg shadow-md hover:bg-red-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
+                        >
+                            {deleting && <Loader2 className="animate-spin" size={16} />}
+                            {deleting ? 'Deleting...' : 'Yes, Delete User'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+        </>
+      ) : (
+        <ParticipantsList />
       )}
     </div>
   );
