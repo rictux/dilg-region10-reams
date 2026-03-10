@@ -283,7 +283,7 @@ const Dashboard: React.FC = () => {
             ${isEnd ? 'rounded-r-md mr-1 border-r' : 'border-r-0 -mr-[1px]'}
             ${!isStart && !isEnd ? 'rounded-none' : ''}
             border-y cursor-pointer hover:brightness-95 transition-all
-            truncate block relative z-10
+            relative
           `,
           isStart,
           isEnd
@@ -372,13 +372,13 @@ const Dashboard: React.FC = () => {
                                 const { className, isStart } = getEventStyle(event, day);
                                 const isDisplayStart = isStart || day.getDay() === 0 || day.getDate() === 1;
                                 
-                                let spanWidth = '100%';
+                                let spanWidth = 'calc(100% - 8px)';
                                 if (isDisplayStart) {
                                     const endOfWeekDay = endOfWeek(day);
                                     const eventEnd = startOfDay(parseISO(event.end_date));
                                     const endToUse = isBefore(eventEnd, endOfWeekDay) ? eventEnd : endOfWeekDay;
                                     const daysSpan = differenceInDays(endToUse, startOfDay(day)) + 1;
-                                    spanWidth = `calc(${daysSpan * 100}% + ${(daysSpan - 1) * 9}px)`;
+                                    spanWidth = `calc(${daysSpan * 100}% + ${(daysSpan - 1) * 1 - 8}px)`;
                                 }
 
                                 renderSlots.push(
@@ -389,8 +389,8 @@ const Dashboard: React.FC = () => {
                                     >
                                         {isDisplayStart && (
                                             <span 
-                                                className="absolute left-1 truncate font-medium z-10 pointer-events-none"
-                                                style={{ width: `calc(${spanWidth} - 8px)` }}
+                                                className="absolute left-1 truncate font-medium z-50 pointer-events-none"
+                                                style={{ width: spanWidth }}
                                             >
                                                 {event.event_name}
                                             </span>
@@ -407,11 +407,12 @@ const Dashboard: React.FC = () => {
                             <div 
                                 key={idx} 
                                 className={`
-                                    min-h-[100px] flex flex-col relative group hover:z-20
+                                    min-h-[100px] flex flex-col relative group
                                     ${isCurrentMonth ? 'bg-white' : 'bg-slate-50/50 text-slate-300'}
                                     ${isTodayDate ? '!bg-indigo-50/30' : ''}
                                     transition-colors hover:bg-slate-50
                                 `}
+                                style={{ zIndex: calendarDays.length - idx }}
                             >
                                 <div className="text-xs font-medium p-2 flex justify-between items-center">
                                     <span className={`
@@ -427,7 +428,7 @@ const Dashboard: React.FC = () => {
                                     </span>
                                 </div>
                                 
-                                <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-1 z-0 relative">
+                                <div className="flex-1 flex flex-col pb-1">
                                     {renderSlots}
                                 </div>
                             </div>
