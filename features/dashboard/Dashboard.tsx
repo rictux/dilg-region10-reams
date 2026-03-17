@@ -82,7 +82,7 @@ const Dashboard: React.FC = () => {
   }, [user]);
 
   const fetchDashboardData = async () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = format(new Date(), 'yyyy-MM-dd');
 
     try {
         // 1. Stats
