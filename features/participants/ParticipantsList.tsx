@@ -42,7 +42,7 @@ const AttendanceList: React.FC = () => {
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualParticipant, setManualParticipant] = useState<Participant | null>(null);
   const [manualForm, setManualForm] = useState({
-      date: new Date().toISOString().split('T')[0],
+      date: format(new Date(), 'yyyy-MM-dd'),
       time: format(new Date(), 'HH:mm'),
       session: 'AM' as 'AM' | 'PM',
       status: 'Valid' as const
@@ -358,7 +358,7 @@ const AttendanceList: React.FC = () => {
 
       setManualParticipant(p);
       setManualForm({
-          date: selectedDate || new Date().toISOString().split('T')[0],
+          date: selectedDate || format(new Date(), 'yyyy-MM-dd'),
           time: format(new Date(), 'HH:mm'),
           session: new Date().getHours() < 12 ? 'AM' : 'PM',
           status: 'Valid'
