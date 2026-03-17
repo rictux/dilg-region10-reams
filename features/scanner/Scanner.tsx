@@ -118,7 +118,7 @@ const Scanner: React.FC = () => {
   useEffect(() => {
     const loadEvents = async () => {
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = format(new Date(), 'yyyy-MM-dd');
 
         let query = supabase
           .from('events')
