@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Lock, User, Eye, EyeOff } from 'lucide-react';
 
@@ -197,6 +197,13 @@ const Login: React.FC = () => {
             </svg>
             Sign in with Google
           </button>
+
+          <p className="text-center text-sm text-slate-600 mt-6">
+            Don't have an account?{' '}
+            <Link to="/signup" className="font-semibold text-indigo-600 hover:text-indigo-500">
+              Sign up
+            </Link>
+          </p>
         </form>
       </div>
     </div>
