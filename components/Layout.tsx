@@ -23,7 +23,8 @@ import {
   Eye,
   EyeOff,
   Camera,
-  Info
+  Info,
+  Settings
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -525,6 +526,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         >
                             <KeyRound size={16} /> Change Password
                         </button>
+                        {user?.role === 'Admin' && (
+                            <button
+                                onClick={() => {
+                                    navigate('/settings');
+                                    setIsProfileDropdownOpen(false);
+                                }}
+                                className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-indigo-50 hover:text-[#4322A7] transition-colors"
+                            >
+                                <Settings size={16} /> Settings
+                            </button>
+                        )}
                         <button
                             onClick={handleSignOut}
                             className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
@@ -554,6 +566,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       case '/reports': return 'Reports';
       case '/users': return 'Users';
       case '/scan': return 'Scan Mode';
+      case '/settings': return 'Settings';
       case '/about': return 'About';
       default: return 'Dashboard';
     }
@@ -601,6 +614,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           {hasPermission('SCAN_QR') && (
               <NavItem to="/scan" icon={ScanLine} label="Scan Mode" />
+          )}
+
+          {user?.role === 'Admin' && (
+              <NavItem to="/settings" icon={Settings} label="Settings" />
           )}
 
           <NavItem to="/about" icon={Info} label="About" />
