@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import QRCode from 'react-qr-code';
 import { supabase } from '../../lib/supabase';
 import { Participant } from '../../types/database';
-import { ArrowLeft, Printer } from 'lucide-react';
+import { ArrowLeft, Download } from 'lucide-react';
+import { toPng } from 'html-to-image';
 
 const BadgePrint: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -11,6 +12,7 @@ const BadgePrint: React.FC = () => {
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [qrToken, setQrToken] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const badgeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -30,6 +32,21 @@ const BadgePrint: React.FC = () => {
     fetchData();
   }, [id]);
 
+  const handleSaveBadge = async () => {
+      if (badgeRef.current && participant) {
+          try {
+              const dataUrl = await toPng(badgeRef.current, { cacheBust: true, backgroundColor: '#ffffff' });
+              const link = document.createElement('a');
+              link.download = `${participant.full_name.replace(/\s+/g, '_')}_Badge.png`;
+              link.href = dataUrl;
+              link.click();
+          } catch (err) {
+              console.error('Error generating badge image:', err);
+              alert('Failed to save badge image.');
+          }
+      }
+  };
+
   if (loading) return <div>Loading...</div>;
   if (!participant) return <div>Participant not found</div>;
 
@@ -41,13 +58,13 @@ const BadgePrint: React.FC = () => {
         <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-600 hover:text-slate-900">
             <ArrowLeft size={20} /> Back
         </button>
-        <button onClick={() => window.print()} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-md">
-            <Printer size={20} /> Print Badge
+        <button onClick={handleSaveBadge} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-md">
+            <Download size={20} /> Save Badge
         </button>
       </div>
 
       {/* Badge Card */}
-      <div className="bg-white w-[350px] h-[500px] shadow-2xl rounded-xl border border-slate-200 flex flex-col items-center justify-between p-8 text-center print:shadow-none print:border print:w-full print:h-full print:absolute print:inset-0 print:m-0">
+      <div ref={badgeRef} className="bg-white w-[350px] h-[500px] shadow-2xl rounded-xl border border-slate-200 flex flex-col items-center justify-between p-8 text-center">
           <div className="w-full border-b-2 border-indigo-600 pb-4 mb-4">
               <h1 className="text-2xl font-bold text-indigo-800 uppercase tracking-widest">Event Pass</h1>
               <p className="text-slate-400 text-xs mt-1">AUTHORIZED PERSONNEL</p>
@@ -62,10 +79,6 @@ const BadgePrint: React.FC = () => {
                   <p className="text-slate-500 font-medium">{participant.position}</p>
                   <p className="text-slate-400 text-sm mt-1">{participant.office}</p>
               </div>
-          </div>
-
-          <div className="w-full pt-6 border-t border-slate-100">
-              <p className="text-xs text-slate-300 font-mono">{participant.participant_code}</p>
           </div>
       </div>
     </div>
