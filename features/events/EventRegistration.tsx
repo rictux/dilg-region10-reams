@@ -7,6 +7,7 @@ import QRCode from 'react-qr-code';
 import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock, Landmark, Download, Info } from 'lucide-react';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import { toPng } from 'html-to-image';
+import QrScanner from './QrScanner';
 
 const EventRegistration: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -17,6 +18,7 @@ const EventRegistration: React.FC = () => {
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showQrScanner, setShowQrScanner] = useState(false);
   
   // Ref for saving image
   const ticketRef = useRef<HTMLDivElement>(null);
@@ -108,6 +110,57 @@ const EventRegistration: React.FC = () => {
 
   const toProperCase = (str: string) => {
     return str.toLowerCase().replace(/(^|\s)\S/g, l => l.toUpperCase());
+  };
+
+  const handleQrScanSuccess = async (decodedText: string) => {
+    setShowQrScanner(false);
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('participants')
+        .select('*')
+        .eq('participant_code', decodedText)
+        .single();
+
+      if (error || !data) {
+        setError("QR Code invalid or participant not found.");
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          f_name: data.f_name || '',
+          l_name: data.l_name || '',
+          m_initial: data.m_initial || '',
+          suffix: data.suffix || '',
+          email: data.email || '',
+          gender: data.gender || 'Male',
+          position: data.position || '',
+          office: data.office || '',
+          mobile_no: data.mobile_no || '',
+          age_group: data.age_group || '18-24',
+          pwd: data.pwd || 'No',
+          indigenous_people: data.indigenous_people || 'No',
+          location_id: data.location_id
+        }));
+
+        if (data.location_id) {
+          const loc = locations.find(l => l.location_id === data.location_id);
+          if (loc) {
+            setAffiliationType('LGU');
+            setSelectedProvince(loc.province_huc);
+            setSelectedCity(loc.city_mun || '');
+          } else {
+            setAffiliationType('Office');
+          }
+        } else {
+          setAffiliationType('Office');
+        }
+        setError(null);
+      }
+    } catch (err: any) {
+      setError("Failed to fetch participant details.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -478,6 +531,29 @@ const EventRegistration: React.FC = () => {
                 {error && (
                     <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 text-red-700 text-sm rounded">
                         {error}
+                    </div>
+                )}
+                
+                <div className="mb-6 bg-indigo-50 border border-indigo-100 p-4 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-sm text-indigo-800">
+                        <strong>Already have a QR code?</strong> Click 'Scan' to quickly fill out this form.
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setShowQrScanner(!showQrScanner)}
+                        className="whitespace-nowrap bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                    >
+                        {showQrScanner ? 'Close Scanner' : 'Scan'}
+                    </button>
+                </div>
+
+                {showQrScanner && (
+                    <div className="mb-6 p-4 border border-slate-200 rounded-lg bg-slate-50">
+                        <QrScanner 
+                            onScanSuccess={handleQrScanSuccess} 
+                            onScanFailure={(err) => console.log(err)} 
+                        />
+                        <p className="text-xs text-center text-slate-500 mt-2">Position the QR code within the frame to scan.</p>
                     </div>
                 )}
                 
