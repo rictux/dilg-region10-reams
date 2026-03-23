@@ -15,6 +15,7 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure }) =
   useEffect(() => {
     const scanner = new Html5Qrcode("qr-reader");
     scannerRef.current = scanner;
+    let isStopped = false;
 
     const startScanner = async () => {
       try {
@@ -26,16 +27,27 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure }) =
           },
           (decodedText) => {
             // Stop scanning once we get a success to prevent multiple triggers
+            if (isStopped) return;
+            isStopped = true;
+            
             if (scannerRef.current) {
-              scannerRef.current.stop().then(() => {
+              try {
+                scannerRef.current.stop().then(() => {
+                  onScanSuccess(decodedText);
+                }).catch((err) => {
+                  console.error(err);
+                  onScanSuccess(decodedText);
+                });
+              } catch (err) {
+                console.error(err);
                 onScanSuccess(decodedText);
-              }).catch(console.error);
+              }
             } else {
               onScanSuccess(decodedText);
             }
           },
           (errorMessage) => {
-            if (onScanFailure) {
+            if (onScanFailure && !isStopped) {
               onScanFailure(errorMessage);
             }
           }
@@ -51,10 +63,15 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure }) =
     startScanner();
 
     return () => {
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch((e) => {
-          // Ignore errors on unmount stop
-        });
+      if (scannerRef.current && !isStopped) {
+        isStopped = true;
+        try {
+          scannerRef.current.stop().catch((e) => {
+            // Ignore errors on unmount stop
+          });
+        } catch (e) {
+          // Ignore synchronous errors
+        }
       }
     };
   }, [onScanSuccess, onScanFailure]);
