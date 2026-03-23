@@ -22,10 +22,6 @@ const EventRegistration: React.FC = () => {
   const ticketRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // Auto-suggestion state
-  const [suggestions, setSuggestions] = useState<Participant[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-
   // Location / Office State
   const [locations, setLocations] = useState<RefLocation[]>([]);
   const [affiliationType, setAffiliationType] = useState<'Office' | 'LGU'>('Office');
@@ -108,73 +104,6 @@ const EventRegistration: React.FC = () => {
     if (data) {
         setLocations(data);
     }
-  };
-
-  const handleNameChange = async (e: React.ChangeEvent<HTMLInputElement>, field: 'f_name' | 'l_name') => {
-    const value = e.target.value;
-    setFormData(prev => ({ ...prev, [field]: value, participant_id: null }));
-
-    const searchTerm = field === 'f_name' ? value : formData.f_name + ' ' + value;
-
-    if (value.length >= 2) {
-        const { data } = await supabase
-            .from('participants')
-            .select('*')
-            .ilike('full_name', `%${value}%`)
-            .limit(5);
-        
-        if (data && data.length > 0) {
-            setSuggestions(data);
-            setShowSuggestions(true);
-        } else {
-            setSuggestions([]);
-            setShowSuggestions(false);
-        }
-    } else {
-        setSuggestions([]);
-        setShowSuggestions(false);
-    }
-  };
-
-  const selectSuggestion = (p: Participant) => {
-      // Determine affiliation type based on location_id
-      let affType: 'Office' | 'LGU' = 'Office';
-      let prov = '';
-      let city = '';
-      let locId = p.location_id || null;
-
-      if (locId && locations.length > 0) {
-          const loc = locations.find(l => l.location_id === locId);
-          if (loc) {
-              affType = 'LGU';
-              prov = loc.province_huc;
-              city = loc.city_mun || '';
-          }
-      }
-
-      setAffiliationType(affType);
-      setSelectedProvince(prov);
-      setSelectedCity(city);
-
-      setFormData({
-          ...formData,
-          f_name: p.f_name || '',
-          l_name: p.l_name || '',
-          m_initial: p.m_initial || '',
-          suffix: p.suffix || '',
-          full_name: p.full_name || '',
-          email: p.email || '',
-          gender: p.gender || 'Male',
-          position: p.position || '',
-          office: p.office || '',
-          mobile_no: p.mobile_no || '',
-          age_group: p.age_group || '18-24',
-          pwd: p.pwd || 'No',
-          indigenous_people: p.indigenous_people || 'No',
-          location_id: locId
-      });
-      setSuggestions([]);
-      setShowSuggestions(false);
   };
 
   const toProperCase = (str: string) => {
@@ -263,7 +192,29 @@ const EventRegistration: React.FC = () => {
                 .from('participants')
                 .select('participant_id, participant_code')
                 .eq('email', finalEmail)
-                .single();
+                .limit(1)
+                .maybeSingle();
+             existingUser = data;
+        }
+
+        if (!existingUser && finalMobile) {
+             const { data } = await supabase
+                .from('participants')
+                .select('participant_id, participant_code')
+                .eq('mobile_no', finalMobile)
+                .limit(1)
+                .maybeSingle();
+             existingUser = data;
+        }
+
+        if (!existingUser) {
+             const { data } = await supabase
+                .from('participants')
+                .select('participant_id, participant_code')
+                .ilike('f_name', formData.f_name.trim())
+                .ilike('l_name', formData.l_name.trim())
+                .limit(1)
+                .maybeSingle();
              existingUser = data;
         }
 
@@ -547,31 +498,10 @@ const EventRegistration: React.FC = () => {
                                         className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                                         placeholder="First Name"
                                         value={formData.f_name}
-                                        onChange={(e) => handleNameChange(e, 'f_name')}
-                                        onFocus={() => { if(formData.f_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
-                                        onBlur={(e) => {
-                                            setFormData({ ...formData, f_name: toProperCase(e.target.value) });
-                                            setTimeout(() => setShowSuggestions(false), 200);
-                                        }}
+                                        onChange={(e) => setFormData({ ...formData, f_name: e.target.value })}
+                                        onBlur={(e) => setFormData({ ...formData, f_name: toProperCase(e.target.value) })}
                                         autoComplete="off"
                                     />
-                                    {showSuggestions && suggestions.length > 0 && (
-                                        <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
-                                            {suggestions.map((p) => (
-                                                <li 
-                                                    key={p.participant_id}
-                                                    onClick={() => selectSuggestion(p)}
-                                                    className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
-                                                >
-                                                    <div className="flex justify-between items-center">
-                                                        <div className="font-medium text-slate-800 group-hover:text-indigo-700">{p.full_name}</div>
-                                                        <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Select</span>
-                                                    </div>
-                                                    <div className="text-xs text-slate-500 mt-0.5">{p.email} • {p.office}</div>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
                                 </div>
                             </div>
                             <div>
@@ -584,12 +514,8 @@ const EventRegistration: React.FC = () => {
                                         className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                                         placeholder="Last Name"
                                         value={formData.l_name}
-                                        onChange={(e) => handleNameChange(e, 'l_name')}
-                                        onFocus={() => { if(formData.l_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
-                                        onBlur={(e) => {
-                                            setFormData({ ...formData, l_name: toProperCase(e.target.value) });
-                                            setTimeout(() => setShowSuggestions(false), 200);
-                                        }}
+                                        onChange={(e) => setFormData({ ...formData, l_name: e.target.value })}
+                                        onBlur={(e) => setFormData({ ...formData, l_name: toProperCase(e.target.value) })}
                                         autoComplete="off"
                                     />
                                 </div>
