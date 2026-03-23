@@ -72,7 +72,8 @@ const EventRegistration: React.FC = () => {
     accommodation_pax: 0,
     location_id: null as number | null,
     accept_photo_video: false,
-    store_to_db: false
+    store_to_db: false,
+    participant_code: ''
   });
 
   useEffect(() => {
@@ -139,7 +140,8 @@ const EventRegistration: React.FC = () => {
           age_group: data.age_group || '18-24',
           pwd: data.pwd || 'No',
           indigenous_people: data.indigenous_people || 'No',
-          location_id: data.location_id
+          location_id: data.location_id,
+          participant_code: data.participant_code || decodedText
         }));
 
         if (data.location_id) {
@@ -240,7 +242,17 @@ const EventRegistration: React.FC = () => {
         // If email is provided, search by it.
         let existingUser = null;
         
-        if (finalEmail) {
+        if (formData.participant_code) {
+             const { data } = await supabase
+                .from('participants')
+                .select('participant_id, participant_code')
+                .eq('participant_code', formData.participant_code)
+                .limit(1)
+                .maybeSingle();
+             existingUser = data;
+        }
+
+        if (!existingUser && finalEmail) {
              const { data } = await supabase
                 .from('participants')
                 .select('participant_id, participant_code')
@@ -563,6 +575,16 @@ const EventRegistration: React.FC = () => {
                     <div className="space-y-4">
                         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b pb-2 mb-4">Personal Information</h3>
                         
+                        {formData.participant_code && (
+                            <div className="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center gap-3">
+                                <CheckCircle className="text-indigo-600" size={20} />
+                                <div>
+                                    <p className="text-xs text-indigo-600 font-semibold uppercase">Scanned Participant Code</p>
+                                    <p className="text-sm font-medium text-slate-800">{formData.participant_code}</p>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="relative">
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">First Name</label>
