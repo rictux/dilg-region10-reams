@@ -48,6 +48,7 @@ const AttendanceList: React.FC = () => {
       status: 'Valid' as const
   });
   const [savingManual, setSavingManual] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
 
   // Add Participant State
   const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
@@ -81,6 +82,7 @@ const AttendanceList: React.FC = () => {
   const [selectedProvince, setSelectedProvince] = useState<string>('');
   const [selectedCity, setSelectedCity] = useState<string>('');
   const [locations, setLocations] = useState<any[]>([]);
+  const badgeRef = useRef<HTMLDivElement>(null);
 
   const provinces = Array.from(new Set(locations.map(l => l.province_huc))).sort();
   const cities = locations
@@ -371,6 +373,7 @@ const AttendanceList: React.FC = () => {
       if (!manualParticipant || !selectedEventId || !user) return;
       
       setSavingManual(true);
+      setManualError(null);
       try {
           const localDate = new Date(`${manualForm.date}T${manualForm.time}:00`);
           const scanTimeStr = localDate.toISOString();
@@ -433,7 +436,11 @@ const AttendanceList: React.FC = () => {
           setShowManualModal(false);
           // fetchAttendance will be triggered by supabase real-time channel
       } catch (err: any) {
-          alert("Error adding log: " + err.message);
+          if (err.code === '23505') {
+              setManualError("Duplicate entry: This participant already has an attendance log for this session.");
+          } else {
+              setManualError(err.message || "An error occurred while saving attendance.");
+          }
       } finally {
           setSavingManual(false);
       }
@@ -442,6 +449,21 @@ const AttendanceList: React.FC = () => {
   const formatLogTime = (timeStr: string) => {
       const d = new Date(timeStr.endsWith('Z') || timeStr.includes('+') ? timeStr : timeStr + 'Z');
       return format(d, 'h:mm a');
+  };
+
+  const handleSaveBadge = async () => {
+      if (badgeRef.current && selectedParticipant) {
+          try {
+              const dataUrl = await toPng(badgeRef.current, { cacheBust: true, backgroundColor: '#ffffff' });
+              const link = document.createElement('a');
+              link.download = `${selectedParticipant.full_name.replace(/\s+/g, '_')}_Badge.png`;
+              link.href = dataUrl;
+              link.click();
+          } catch (err) {
+              console.error('Error generating badge image:', err);
+              alert('Failed to save badge image.');
+          }
+      }
   };
 
   const handleNameChange = async (e: React.ChangeEvent<HTMLInputElement>, field: 'f_name' | 'l_name') => {
@@ -1402,6 +1424,12 @@ const AttendanceList: React.FC = () => {
                 </div>
                 
                 <form onSubmit={handleManualSubmit} className="p-6 space-y-4">
+                    {manualError && (
+                        <div className="bg-red-50 text-red-600 p-3 rounded-lg border border-red-100 flex items-start gap-2 text-sm">
+                            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                            <p>{manualError}</p>
+                        </div>
+                    )}
                     <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 mb-2">
                         <p className="text-xs text-indigo-500 uppercase font-bold tracking-wider mb-1">Participant</p>
                         <p className="font-bold text-slate-800">{manualParticipant.full_name}</p>
@@ -1454,7 +1482,7 @@ const AttendanceList: React.FC = () => {
                         <X size={20} />
                     </button>
                 </div>
-                <div className="p-8 flex flex-col items-center text-center">
+                <div className="p-8 flex flex-col items-center text-center" ref={badgeRef}>
                      <>
                         <div className="border-4 border-slate-900 p-3 rounded-xl mb-6 bg-white shadow-sm">
                             {qrToken && <QRCode value={qrToken} size={160} />}
@@ -1462,13 +1490,12 @@ const AttendanceList: React.FC = () => {
                         <h2 className="text-xl font-bold text-slate-800">{selectedParticipant.full_name}</h2>
                         <p className="text-indigo-600 font-medium mb-1">{selectedParticipant.position}</p>
                         <p className="text-slate-500 text-sm">{selectedParticipant.office}</p>
-                        <div className="mt-6 pt-6 border-t border-slate-100 w-full">
-                            <p className="text-xs text-slate-400 font-mono mb-4">{selectedParticipant.participant_code}</p>
-                            <button onClick={() => window.print()} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors">
-                                <Printer size={18} /> Print Badge
-                            </button>
-                        </div>
                      </>
+                </div>
+                <div className="px-8 pb-8 pt-0">
+                    <button onClick={handleSaveBadge} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors">
+                        <Download size={18} /> Save Badge
+                    </button>
                 </div>
             </div>
         </div>
