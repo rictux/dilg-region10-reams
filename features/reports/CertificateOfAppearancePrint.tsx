@@ -5,6 +5,7 @@ import { Event, Participant } from '../../types/database';
 import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
+import QRCode from 'react-qr-code';
 
 const CertificateOfAppearancePrint: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -165,11 +166,21 @@ const CertificateOfAppearancePrint: React.FC = () => {
                 className="w-[210mm] h-[297mm] bg-white print:shadow-none shadow-md mb-8 print:mb-0 relative overflow-hidden page-break-after-always flex flex-col"
               >
                 {pair.map((participant, index) => (
-                  <div key={participant.participant_id} className="flex-1 flex flex-col relative box-border p-8">
+                  <div key={participant.participant_id} className="h-[148.5mm] flex flex-col relative box-border p-8">
                     
                     {/* Certificate Content */}
-                    <div className="flex-1 flex flex-col justify-center">
+                    <div className="flex-1 flex flex-col justify-center relative">
                       
+                      {/* Left QR Code */}
+                      <div className="absolute bottom-0 left-0">
+                        <QRCode value={`${window.location.origin}/lookup?event=${event.event_id}&participant=${participant.participant_id}`} size={64} />
+                      </div>
+
+                      {/* Right QR Code */}
+                      <div className="absolute bottom-0 right-0">
+                        <QRCode value={`${window.location.origin}/lookup?participant=${participant.participant_id}`} size={64} />
+                      </div>
+
                       {/* Header */}
                       <div className="text-center mb-4">
                         <img 
