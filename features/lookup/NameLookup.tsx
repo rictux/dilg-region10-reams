@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Search, Calendar, MapPin, User, Clock, ChevronRight, Loader2, Landmark, History, AlertCircle, Shield } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { useSearchParams } from 'react-router-dom';
 
 interface AttendedEvent {
   event_id: number;
@@ -25,6 +26,7 @@ interface NameLookupProps {
 }
 
 const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
+  const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState<ParticipantSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -33,6 +35,69 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleSelectParticipant = async (participant: ParticipantSuggestion) => {
+    setSelectedParticipant(participant);
+    setShowSuggestions(false);
+    setLoading(true);
+
+    try {
+      const { data: logsData } = await supabase
+        .from('attendance_logs')
+        .select('event_id')
+        .eq('participant_id', participant.participant_id);
+      
+      const attendedEventIds = Array.from(new Set((logsData || []).map(l => l.event_id).filter(id => id !== null)));
+
+      if (attendedEventIds.length === 0) {
+        setAttendedEvents([]);
+        setSearchTerm(''); 
+        setLoading(false);
+        return;
+      }
+
+      const { data: epData, error: epError } = await supabase
+        .from('event_participants')
+        .select(`
+          role,
+          event_id,
+          events (
+            event_id,
+            event_name,
+            venue,
+            start_date,
+            end_date
+          )
+        `)
+        .eq('participant_id', participant.participant_id)
+        .in('event_id', attendedEventIds);
+
+      if (epError) throw epError;
+
+      if (epData) {
+        let mapped = epData.map((item: any) => ({
+          event_id: item.events.event_id,
+          event_name: item.events.event_name,
+          venue: item.events.venue,
+          start_date: item.events.start_date,
+          end_date: item.events.end_date,
+          role: item.role
+        }));
+        
+        const eventIdParam = searchParams.get('event');
+        if (eventIdParam) {
+            mapped = mapped.filter(m => m.event_id === parseInt(eventIdParam));
+        }
+
+        setAttendedEvents(mapped);
+        setSearchTerm(''); 
+      }
+    } catch (err) {
+      console.error("Error fetching attended events", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -43,6 +108,36 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const participantIdParam = searchParams.get('participant');
+    if (participantIdParam) {
+      const fetchParticipant = async () => {
+        setLoading(true);
+        try {
+          const { data, error } = await supabase
+            .from('participants')
+            .select('participant_id, full_name, office, position')
+            .eq('participant_id', parseInt(participantIdParam))
+            .single();
+          
+          if (data && !error) {
+            handleSelectParticipant({
+              participant_id: data.participant_id,
+              full_name: data.full_name,
+              office: data.office || 'N/A',
+              position: data.position || 'N/A'
+            });
+          }
+        } catch (err) {
+          console.error("Error fetching participant from URL", err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchParticipant();
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -85,63 +180,6 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
     const timer = setTimeout(fetchSuggestions, 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
-
-  const handleSelectParticipant = async (participant: ParticipantSuggestion) => {
-    setSelectedParticipant(participant);
-    setShowSuggestions(false);
-    setLoading(true);
-
-    try {
-      const { data: logsData } = await supabase
-        .from('attendance_logs')
-        .select('event_id')
-        .eq('participant_id', participant.participant_id);
-      
-      const attendedEventIds = Array.from(new Set((logsData || []).map(l => l.event_id).filter(id => id !== null)));
-
-      if (attendedEventIds.length === 0) {
-        setAttendedEvents([]);
-        setSearchTerm(''); 
-        setLoading(false);
-        return;
-      }
-
-      const { data: epData, error: epError } = await supabase
-        .from('event_participants')
-        .select(`
-          role,
-          event_id,
-          events (
-            event_id,
-            event_name,
-            venue,
-            start_date,
-            end_date
-          )
-        `)
-        .eq('participant_id', participant.participant_id)
-        .in('event_id', attendedEventIds);
-
-      if (epError) throw epError;
-
-      if (epData) {
-        const mapped = epData.map((item: any) => ({
-          event_id: item.events.event_id,
-          event_name: item.events.event_name,
-          venue: item.events.venue,
-          start_date: item.events.start_date,
-          end_date: item.events.end_date,
-          role: item.role
-        }));
-        setAttendedEvents(mapped);
-        setSearchTerm(''); 
-      }
-    } catch (err) {
-      console.error("Error fetching attended events", err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const formatEventDate = (start: string, end: string) => {
     const startDate = parseISO(start);
