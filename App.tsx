@@ -14,7 +14,9 @@ import Scanner from './features/scanner/Scanner';
 import Reports from './features/reports/Reports';
 import AttendanceSheetPrint from './features/participants/AttendanceSheetPrint';
 import ScanLogsPrint from './features/reports/ScanLogsPrint';
+import CertificateOfAppearancePrint from './features/reports/CertificateOfAppearancePrint';
 import UserManagement from './features/users/UserManagement';
+import Settings from './features/settings/Settings';
 import NameLookup from './features/lookup/NameLookup';
 import About from './features/about/About';
 import { Permission } from './config/permissions';
@@ -110,10 +112,24 @@ const App: React.FC = () => {
             </ProtectedRoute>
           } />
 
+          {/* Certificate of Appearance Print View - (Printable) - Requires VIEW_REPORTS */}
+          <Route path="/print-certificate/:eventId" element={
+            <ProtectedRoute requiredPermission="VIEW_REPORTS">
+              <CertificateOfAppearancePrint />
+            </ProtectedRoute>
+          } />
+
           {/* Scanner Route - Requires SCAN_QR */}
           <Route path="/scan" element={
             <ProtectedRoute requiredPermission="SCAN_QR">
               <Layout><Scanner /></Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* Settings Route */}
+          <Route path="/settings" element={
+            <ProtectedRoute requiredPermission="MANAGE_USERS">
+              <Layout><Settings /></Layout>
             </ProtectedRoute>
           } />
 
