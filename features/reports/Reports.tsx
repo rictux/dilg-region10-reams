@@ -68,6 +68,12 @@ const Reports: React.FC = () => {
     }
   };
 
+  const handlePrintCertificate = () => {
+    if (selectedEventId) {
+        navigate(`/print-certificate/${selectedEventId}`);
+    }
+  };
+
   const filteredEvents = events.filter(e => 
     e.event_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -169,7 +175,7 @@ const Reports: React.FC = () => {
         </div>
 
         {/* Actions Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             
             {/* Print Scan Logs Card */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
@@ -204,6 +210,25 @@ const Reports: React.FC = () => {
                     className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
                 >
                     <Printer size={18} /> Print Attendance Sheet
+                </button>
+            </div>
+
+            {/* Print Certificate of Appearance Card */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+                <div className="bg-amber-100 p-3 rounded-lg text-amber-600 mb-4">
+                    <ScrollText size={24} />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 mb-2">Certificate of Appearance</h3>
+                <p className="text-slate-500 text-sm mb-6 flex-1">
+                    Generate Certificates of Appearance for participants who have attendance logs. Two certificates per A4 page.
+                    {selectedEventId ? ' Creates certificates for the selected event.' : ' Please select an event first.'}
+                </p>
+                <button 
+                    onClick={handlePrintCertificate}
+                    disabled={!selectedEventId}
+                    className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
+                >
+                    <Printer size={18} /> Print Certificates
                 </button>
             </div>
 
