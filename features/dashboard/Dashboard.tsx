@@ -303,7 +303,7 @@ const Dashboard: React.FC = () => {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="h-full min-h-0 overflow-y-auto pr-1 space-y-8">
       {/* Top Stats Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard icon={CalendarIcon} label="Total Events" value={stats.totalEvents} color="bg-[#5C3CCE]" />

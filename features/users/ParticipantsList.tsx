@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Participant } from '../../types/database';
-import { Search, Edit, Loader2, X, Save, User } from 'lucide-react';
+import { Search, Edit, Loader2, X, Save, User, Mail, Briefcase, Phone } from 'lucide-react';
 
 const ParticipantsList: React.FC = () => {
     const { user: currentUser } = useAuth();
@@ -96,7 +96,7 @@ const ParticipantsList: React.FC = () => {
     );
 
     return (
-        <div className="space-y-6">
+        <div className="h-full min-h-0 flex flex-col gap-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="relative w-full sm:w-64">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -113,16 +113,16 @@ const ParticipantsList: React.FC = () => {
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-                <div className="overflow-x-auto">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
+                <div className="hidden md:block flex-1 min-h-0 overflow-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                        <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                             <tr>
-                                <th className="px-6 py-4">Participant Name</th>
-                                <th className="px-6 py-4">Contact</th>
-                                <th className="px-6 py-4">Office & Position</th>
-                                <th className="px-6 py-4">Demographics</th>
-                                {currentUser?.role === 'Admin' && <th className="px-6 py-4 text-right">Actions</th>}
+                                <th className="px-6 py-4 bg-slate-50">Participant Name</th>
+                                <th className="px-6 py-4 bg-slate-50">Contact</th>
+                                <th className="px-6 py-4 bg-slate-50">Office & Position</th>
+                                <th className="px-6 py-4 bg-slate-50">Demographics</th>
+                                {currentUser?.role === 'Admin' && <th className="px-6 py-4 text-right bg-slate-50">Actions</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -178,6 +178,71 @@ const ParticipantsList: React.FC = () => {
                             )}
                         </tbody>
                     </table>
+                </div>
+
+                <div className="md:hidden flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+                    {loading ? (
+                        [...Array(3)].map((_, i) => (
+                            <div key={i} className="animate-pulse rounded-xl border border-slate-200 p-4 space-y-3">
+                                <div className="h-5 bg-slate-200 rounded w-2/3"></div>
+                                <div className="h-4 bg-slate-100 rounded w-1/2"></div>
+                                <div className="h-4 bg-slate-100 rounded w-1/3"></div>
+                            </div>
+                        ))
+                    ) : paginatedParticipants.length === 0 ? (
+                        <div className="text-center py-8 text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100">No participants found.</div>
+                    ) : (
+                        paginatedParticipants.map((participant) => (
+                            <div key={participant.participant_id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg shrink-0">
+                                            {participant.f_name?.charAt(0) || <User size={20} />}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="font-medium text-slate-800 truncate">{participant.full_name}</div>
+                                            <div className="text-xs text-slate-500 font-mono">{participant.participant_code}</div>
+                                        </div>
+                                    </div>
+                                    {currentUser?.role === 'Admin' && (
+                                        <button
+                                            onClick={() => handleEdit(participant)}
+                                            className="shrink-0 p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                            title="Edit Participant"
+                                        >
+                                            <Edit size={18} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="mt-4 space-y-3 text-sm">
+                                    <div className="flex items-start gap-2 text-slate-600">
+                                        <Mail size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                                        <span>{participant.email || '-'}</span>
+                                    </div>
+                                    <div className="flex items-start gap-2 text-slate-600">
+                                        <Phone size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                                        <span>{participant.mobile_no || '-'}</span>
+                                    </div>
+                                    <div className="flex items-start gap-2 text-slate-600">
+                                        <Briefcase size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                                        <div>
+                                            <div>{participant.office || '-'}</div>
+                                            <div className="text-xs text-slate-500 mt-1">{participant.position || '-'}</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-xs text-slate-600 rounded-lg bg-slate-50 border border-slate-200 p-3">
+                                        <div>Gender: {participant.gender || '-'}</div>
+                                        <div>Age: {participant.age_group || '-'}</div>
+                                        <div className="flex gap-2 mt-2">
+                                            {participant.pwd === 'Yes' && <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-medium">PWD</span>}
+                                            {participant.indigenous_people === 'Yes' && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px] font-medium">IP</span>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
 
                 {/* Pagination Controls */}

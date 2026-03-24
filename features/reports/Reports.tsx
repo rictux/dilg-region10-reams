@@ -81,7 +81,7 @@ const Reports: React.FC = () => {
   const selectedEvent = events.find(e => e.event_id.toString() === selectedEventId);
 
   return (
-    <div className="space-y-8">
+    <div className="h-full min-h-0 overflow-y-auto pr-1 space-y-8">
         {/* Filters */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
             <div className="flex flex-col md:flex-row gap-4 items-end">

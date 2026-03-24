@@ -224,7 +224,7 @@ const UserManagement: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 flex flex-col gap-6">
       <div className="flex border-b border-slate-200">
         <button
           className={`py-3 px-6 font-medium text-sm border-b-2 transition-colors ${
@@ -249,7 +249,7 @@ const UserManagement: React.FC = () => {
       </div>
 
       {activeTab === 'users' ? (
-        <>
+        <div className="flex-1 min-h-0 flex flex-col gap-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -272,17 +272,17 @@ const UserManagement: React.FC = () => {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="overflow-x-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
+          <div className="hidden md:block flex-1 min-h-0 overflow-auto">
               <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                  <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                       <tr>
-                          <th className="px-6 py-4">User Details</th>
-                          <th className="px-6 py-4">Office Code</th>
-                          <th className="px-6 py-4">Role & Position</th>
-                          <th className="px-6 py-4">Status</th>
-                          <th className="px-6 py-4">Created</th>
-                          <th className="px-6 py-4 text-right">Actions</th>
+                          <th className="px-6 py-4 bg-slate-50">User Details</th>
+                          <th className="px-6 py-4 bg-slate-50">Office Code</th>
+                          <th className="px-6 py-4 bg-slate-50">Role & Position</th>
+                          <th className="px-6 py-4 bg-slate-50">Status</th>
+                          <th className="px-6 py-4 bg-slate-50">Created</th>
+                          <th className="px-6 py-4 text-right bg-slate-50">Actions</th>
                       </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -366,6 +366,90 @@ const UserManagement: React.FC = () => {
                       )}
                   </tbody>
               </table>
+          </div>
+
+          <div className="md:hidden flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+              {loading ? (
+                  [...Array(3)].map((_, i) => (
+                      <div key={i} className="animate-pulse rounded-xl border border-slate-200 p-4 space-y-3">
+                          <div className="h-5 bg-slate-200 rounded w-2/3"></div>
+                          <div className="h-4 bg-slate-100 rounded w-1/2"></div>
+                          <div className="h-4 bg-slate-100 rounded w-1/3"></div>
+                      </div>
+                  ))
+              ) : paginatedUsers.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100">
+                      No users found.
+                  </div>
+              ) : (
+                  paginatedUsers.map((user) => (
+                      <div key={user.user_id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                          <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                  <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg shrink-0">
+                                      {user.full_name.charAt(0)}
+                                  </div>
+                                  <div className="min-w-0">
+                                      <div className="font-medium text-slate-800 truncate">{user.full_name}</div>
+                                      <div className="text-xs text-slate-500">@{user.username}</div>
+                                  </div>
+                              </div>
+                              <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border shrink-0
+                                  ${user.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-slate-100 text-slate-600 border-slate-200'}
+                              `}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-green-500' : 'bg-slate-400'}`}></span>
+                                  {user.status}
+                              </span>
+                          </div>
+
+                          <div className="mt-4 space-y-2 text-sm">
+                              <div className="text-slate-700">{user.email || '-'}</div>
+                              <div className="text-slate-500">{user.position || '-'}</div>
+                              <div className="flex flex-wrap gap-2 items-center">
+                                  <span className={`inline-flex items-center gap-1.5 w-fit px-2 py-0.5 rounded-full text-xs font-semibold
+                                      ${user.role === 'Admin' ? 'bg-purple-100 text-purple-700' : ''}
+                                      ${user.role === 'Scanner' ? 'bg-orange-100 text-orange-700' : ''}
+                                      ${user.role === 'EventManager' ? 'bg-blue-100 text-blue-700' : ''}
+                                  `}>
+                                      {user.role === 'Admin' && <Shield size={12} />}
+                                      {user.role}
+                                  </span>
+                                  {user.offices ? (
+                                      <span className="font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold">
+                                          {user.offices.code}
+                                      </span>
+                                  ) : (
+                                      <span className="text-slate-400 text-xs italic">Unassigned</span>
+                                  )}
+                              </div>
+                              <div className="text-xs text-slate-500">
+                                  Created: {user.created_at ? format(new Date(user.created_at), 'MMM d, yyyy') : '-'}
+                              </div>
+                          </div>
+
+                          <div className="mt-4 flex gap-2">
+                              <button
+                                  onClick={() => openEditModal(user)}
+                                  className="flex-1 p-2 text-sm text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors flex items-center justify-center gap-2"
+                              >
+                                  <Edit size={16} /> Edit
+                              </button>
+                              <button
+                                  onClick={() => handleDelete(user)}
+                                  disabled={user.role === 'Admin' || user.user_id === currentUser?.user_id}
+                                  className={`flex-1 p-2 text-sm rounded-lg transition-colors flex items-center justify-center gap-2
+                                      ${(user.role === 'Admin' || user.user_id === currentUser?.user_id)
+                                          ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                                          : 'bg-red-50 text-red-700 hover:bg-red-100'
+                                      }
+                                  `}
+                              >
+                                  <Trash2 size={16} /> Delete
+                              </button>
+                          </div>
+                      </div>
+                  ))
+              )}
           </div>
 
           {/* Pagination Controls */}
@@ -600,9 +684,11 @@ const UserManagement: React.FC = () => {
             </div>
         </div>
       )}
-        </>
+        </div>
       ) : (
-        <ParticipantsList />
+        <div className="flex-1 min-h-0">
+          <ParticipantsList />
+        </div>
       )}
     </div>
   );

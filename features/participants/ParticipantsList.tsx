@@ -763,9 +763,9 @@ const AttendanceList: React.FC = () => {
   const completeLogsCount = data.filter(r => r.amLog && r.pmLog).length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-        <div className="flex flex-col md:flex-row gap-4 w-full items-start md:items-center">
+    <div className="h-full min-h-0 flex flex-col gap-6">
+      <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+        <div className="flex flex-col xl:flex-row gap-4 w-full items-start xl:items-center">
             <div className="w-full md:w-[512px] relative" ref={dropdownRef}>
                 <div 
                     className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors shadow-sm"
@@ -822,67 +822,73 @@ const AttendanceList: React.FC = () => {
                 )}
             </div>
 
-            {eventDays.length > 1 && (
-                <div className="flex bg-white rounded-lg border border-slate-200 p-1 overflow-x-auto no-scrollbar max-w-full">
-                    {eventDays.map((day, idx) => {
-                        const dStr = format(day, 'yyyy-MM-dd');
-                        const isSelected = selectedDate === dStr;
-                        return (
-                            <button
-                                key={dStr}
-                                onClick={() => setSelectedDate(dStr)}
-                                className={`px-3 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all flex flex-col items-center min-w-[60px]
-                                    ${isSelected 
-                                        ? 'bg-indigo-600 text-white shadow-sm' 
-                                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
-                                    }`}
-                            >
-                                <span>Day {idx + 1}</span>
-                                <span className={`text-[9px] font-normal ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>
-                                    {format(day, 'MMM d')}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
-            )}
+            <div className="flex-1 w-full flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
+                {eventDays.length > 1 && (
+                    <div className="flex bg-white rounded-lg border border-slate-200 p-1 overflow-x-auto no-scrollbar max-w-full">
+                        {eventDays.map((day, idx) => {
+                            const dStr = format(day, 'yyyy-MM-dd');
+                            const isSelected = selectedDate === dStr;
+                            return (
+                                <button
+                                    key={dStr}
+                                    onClick={() => setSelectedDate(dStr)}
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all flex flex-col items-center min-w-[60px]
+                                        ${isSelected 
+                                            ? 'bg-indigo-600 text-white shadow-sm' 
+                                            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                                        }`}
+                                >
+                                    <span>Day {idx + 1}</span>
+                                    <span className={`text-[9px] font-normal ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>
+                                        {format(day, 'MMM d')}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
 
-            <div className="flex items-center gap-3 w-full md:w-auto ml-auto">
-                 <div className="relative w-full md:w-64">
-                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                         <Search size={18} />
-                     </div>
-                     <input 
-                        type="text" 
-                        placeholder="Search participants..." 
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                     />
-                 </div>
-                 <button 
-                     onClick={generateReport}
-                     disabled={!selectedEvent || !selectedDate || data.length === 0}
-                     className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium shrink-0"
-                 >
-                     <Download size={20} /> <span className="hidden sm:inline">Export</span>
-                 </button>
-                 <button 
-                     onClick={() => setShowAddParticipantModal(true)}
-                     disabled={!selectedEvent}
-                     className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium shrink-0"
-                 >
-                     <UserPlus size={20} /> <span className="hidden sm:inline">Add</span>
-                 </button>
+                <div className="flex-1 w-full flex flex-col md:flex-row gap-3 lg:ml-auto">
+                    <div className="relative flex-1 min-w-0 lg:max-w-sm">
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                            <Search size={18} />
+                        </div>
+                        <input 
+                            type="text" 
+                            placeholder="Search participants..." 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        />
+                    </div>
+
+                    <div className="flex gap-3 md:w-auto">
+                        <button 
+                            onClick={generateReport}
+                            disabled={!selectedEvent || !selectedDate || data.length === 0}
+                            className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium shrink-0"
+                        >
+                            <Download size={20} /> <span>Export</span>
+                        </button>
+                        <button 
+                            onClick={() => setShowAddParticipantModal(true)}
+                            disabled={!selectedEvent}
+                            className="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium shrink-0"
+                        >
+                            <UserPlus size={20} /> <span>Add</span>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
       </div>
 
       {/* Stats Cards as Filters */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto lg:overflow-visible pb-1">
+        <div className="flex gap-3 w-max lg:w-full lg:grid lg:grid-cols-5">
           <button 
             onClick={() => setFilter('Show All')}
-            className={`p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`min-w-[168px] sm:min-w-[180px] md:min-w-[190px] lg:min-w-0 p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                 ${filter === 'Show All' ? 'ring-2 ring-slate-400 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-slate-300'}
                 bg-white
             `}
@@ -898,7 +904,7 @@ const AttendanceList: React.FC = () => {
 
           <button 
             onClick={() => setFilter('Present')}
-            className={`p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`min-w-[168px] sm:min-w-[180px] md:min-w-[190px] lg:min-w-0 p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                 ${filter === 'Present' ? 'ring-2 ring-green-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-green-200'}
                 bg-white
             `}
@@ -914,7 +920,7 @@ const AttendanceList: React.FC = () => {
 
           <button 
             onClick={() => setFilter('No Logs')}
-            className={`p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`min-w-[168px] sm:min-w-[180px] md:min-w-[190px] lg:min-w-0 p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                 ${filter === 'No Logs' ? 'ring-2 ring-red-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-red-200'}
                 bg-white
             `}
@@ -930,7 +936,7 @@ const AttendanceList: React.FC = () => {
 
           <button 
             onClick={() => setFilter('No PM')}
-            className={`p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`min-w-[168px] sm:min-w-[180px] md:min-w-[190px] lg:min-w-0 p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                 ${filter === 'No PM' ? 'ring-2 ring-amber-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-amber-200'}
                 bg-white
             `}
@@ -946,7 +952,7 @@ const AttendanceList: React.FC = () => {
 
           <button 
             onClick={() => setFilter('Complete Logs')}
-            className={`p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200 col-span-2 sm:col-span-1
+            className={`min-w-[168px] sm:min-w-[180px] md:min-w-[190px] lg:min-w-0 p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                 ${filter === 'Complete Logs' ? 'ring-2 ring-indigo-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-indigo-200'}
                 bg-white
             `}
@@ -959,6 +965,7 @@ const AttendanceList: React.FC = () => {
               </div>
               <p className="text-2xl font-bold text-indigo-600">{completeLogsCount}</p>
           </button>
+        </div>
       </div>
 
       {loading && data.length === 0 ? (
@@ -966,7 +973,7 @@ const AttendanceList: React.FC = () => {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
             {/* Active Filter Indicator in Table Header */}
             {filter !== 'Show All' && (
                 <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2 text-sm text-slate-600">
@@ -981,17 +988,17 @@ const AttendanceList: React.FC = () => {
                 </div>
             )}
             
-            <div className="overflow-x-auto">
+            <div className="hidden md:block flex-1 min-h-0 overflow-auto">
                 <table className="w-full text-sm text-left">
-                    <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                    <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                         <tr>
-                            <th className="px-6 py-4 w-16">#</th>
-                            <th className="px-6 py-4">Name</th>
-                            <th className="px-6 py-4">Position</th>
-                            <th className="px-6 py-4">Office</th>
-                            <th className="px-6 py-4">AM Time</th>
-                            <th className="px-6 py-4">PM Time</th>
-                            <th className="px-6 py-4 text-center">Actions</th>
+                            <th className="px-6 py-4 w-16 bg-slate-50">#</th>
+                            <th className="px-6 py-4 bg-slate-50">Name</th>
+                            <th className="px-6 py-4 bg-slate-50">Position</th>
+                            <th className="px-6 py-4 bg-slate-50">Office</th>
+                            <th className="px-6 py-4 bg-slate-50">AM Time</th>
+                            <th className="px-6 py-4 bg-slate-50">PM Time</th>
+                            <th className="px-6 py-4 text-center bg-slate-50">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1052,6 +1059,68 @@ const AttendanceList: React.FC = () => {
                         )}
                     </tbody>
                 </table>
+            </div>
+
+            <div className="md:hidden flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+                {filteredData.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100">
+                        {events.length === 0 ? (
+                            <div className="flex flex-col items-center">
+                                <Calendar className="w-10 h-10 mb-2 opacity-20" />
+                                <p>No events found.</p>
+                            </div>
+                        ) : (
+                            <p>No participants found matching "{filter}"</p>
+                        )}
+                    </div>
+                ) : (
+                    filteredData.map((row, index) => (
+                        <div
+                            key={row.participant.participant_id}
+                            onClick={() => handleRowClick(row.participant)}
+                            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:scale-[0.99] transition-transform"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="text-xs text-slate-400 font-mono mb-1">#{index + 1}</p>
+                                    <h3 className="font-semibold text-slate-800 leading-tight">{row.participant.full_name}</h3>
+                                    <p className="text-sm text-slate-600 mt-1">{row.participant.position || 'No position'}</p>
+                                    <p className="text-sm text-slate-500 mt-1">{row.participant.office || 'No office'}</p>
+                                </div>
+                                <button
+                                    onClick={(e) => openManualModal(e, row.participant)}
+                                    className="shrink-0 p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                    title="Manual Log Entry"
+                                >
+                                    <PlusCircle size={18} />
+                                </button>
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-2 gap-3">
+                                <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">AM Time</p>
+                                    {row.amLog ? (
+                                        <span className="inline-flex bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold">
+                                            {formatLogTime(row.amLog.time)}
+                                        </span>
+                                    ) : (
+                                        <span className="text-slate-300 text-sm">-</span>
+                                    )}
+                                </div>
+                                <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">PM Time</p>
+                                    {row.pmLog ? (
+                                        <span className="inline-flex bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold">
+                                            {formatLogTime(row.pmLog.time)}
+                                        </span>
+                                    ) : (
+                                        <span className="text-slate-300 text-sm">-</span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
         </div>
       )}

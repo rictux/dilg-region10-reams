@@ -303,7 +303,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
   };
 
   const contentClass = isInternal
-    ? 'w-full space-y-6'
+    ? 'w-full h-full min-h-0 flex flex-col gap-6'
     : 'min-h-screen bg-slate-50 flex flex-col items-center p-4 sm:p-8 w-full';
 
   const renderPublicTimeline = () => {
@@ -388,7 +388,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
     }
 
     return (
-      <div className="overflow-x-auto w-full">
+      <div className="flex-1 min-h-0 overflow-auto w-full">
         <table className="w-full text-sm text-left min-w-[600px]">
           <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
             <tr>
@@ -450,7 +450,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
         </div>
       )}
 
-      <div className={isInternal ? 'w-full space-y-6' : 'w-full max-w-5xl space-y-6'}>
+      <div className={isInternal ? 'w-full flex-1 min-h-0 flex flex-col gap-6' : 'w-full max-w-5xl space-y-6'}>
         {isInternal ? (
           <div className="relative" ref={dropdownRef}>
             <div className="text-center mb-4">
@@ -581,14 +581,14 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
           </div>
         )}
 
-        <div className="space-y-6">
+        <div className={isInternal ? 'flex-1 min-h-0 flex flex-col gap-6' : 'space-y-6'}>
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12 text-slate-400">
               <Loader2 className="animate-spin mb-3" size={32} />
               <p className="text-sm font-medium">Retrieving attendance logs...</p>
             </div>
           ) : selectedParticipant ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+            <div className={isInternal ? 'animate-in fade-in slide-in-from-bottom-4 duration-500 flex-1 min-h-0 flex flex-col gap-6' : 'animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6'}>
               <div className="bg-white border border-slate-200 rounded-2xl p-5 md:p-6 shadow-sm flex flex-col sm:flex-row items-center gap-5">
                 <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl font-bold shrink-0">
                   {selectedParticipant.full_name.charAt(0)}
@@ -609,7 +609,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
               </div>
 
               {isInternal ? (
-                <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
                   <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
                     <History className="text-indigo-600" size={18} />
                     <h4 className="text-sm font-bold text-slate-800">Event History</h4>

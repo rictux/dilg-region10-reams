@@ -8,7 +8,7 @@ const About: React.FC = () => {
   const githubLink = "https://github.com/iamrudyard/Event-Portal/";
 
   return (
-    <div className="w-full space-y-8 pb-12">
+    <div className="h-full min-h-0 overflow-y-auto pr-1 w-full space-y-8 pb-12">
       {/* Tabs */}
       <div className="flex space-x-1 bg-slate-100/50 p-1 rounded-xl w-fit">
         <button

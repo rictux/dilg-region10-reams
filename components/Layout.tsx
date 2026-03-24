@@ -573,7 +573,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f5f9] flex flex-col md:flex-row font-sans">
+    <div className="h-screen bg-[#f4f5f9] flex flex-col md:flex-row font-sans overflow-hidden">
       <aside className={`
         fixed inset-y-0 left-0 z-30 bg-[#4322A7] transform transition-all duration-300 ease-in-out
         md:translate-x-0 md:static md:shadow-none
@@ -630,7 +630,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto p-4 md:p-8 h-screen flex flex-col min-w-0">
+      <main className="flex-1 overflow-hidden p-4 md:p-8 h-screen flex flex-col min-w-0">
         <header className="flex items-center justify-between mb-8 shrink-0">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-600 hover:text-[#4322A7] md:hidden">
@@ -702,7 +702,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </header>
 
-        <div className="flex-1">
+        <div className="flex-1 min-h-0">
           {children}
         </div>
       </main>

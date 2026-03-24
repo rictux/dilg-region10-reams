@@ -748,7 +748,7 @@ const EventsList: React.FC = () => {
   }, [searchTerm, statusFilter]);
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
           <div className="relative w-full sm:w-64">
@@ -772,10 +772,11 @@ const EventsList: React.FC = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto lg:overflow-visible pb-1">
+        <div className="flex gap-3 w-max lg:w-full lg:grid lg:grid-cols-5">
           <button
             onClick={() => setStatusFilter('All')}
-            className={`p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`min-w-[168px] sm:min-w-[180px] md:min-w-[190px] lg:min-w-0 p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
               ${statusFilter === 'All' ? 'ring-2 ring-slate-400 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-slate-300'}
               bg-white
             `}
@@ -791,7 +792,7 @@ const EventsList: React.FC = () => {
 
           <button
             onClick={() => setStatusFilter('Ongoing')}
-            className={`p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`min-w-[168px] sm:min-w-[180px] md:min-w-[190px] lg:min-w-0 p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
               ${statusFilter === 'Ongoing' ? 'ring-2 ring-emerald-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-emerald-200'}
               bg-white
             `}
@@ -807,7 +808,7 @@ const EventsList: React.FC = () => {
 
           <button
             onClick={() => setStatusFilter('Scheduled')}
-            className={`p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`min-w-[168px] sm:min-w-[180px] md:min-w-[190px] lg:min-w-0 p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
               ${statusFilter === 'Scheduled' ? 'ring-2 ring-blue-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-blue-200'}
               bg-white
             `}
@@ -823,7 +824,7 @@ const EventsList: React.FC = () => {
 
           <button
             onClick={() => setStatusFilter('Completed')}
-            className={`p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`min-w-[168px] sm:min-w-[180px] md:min-w-[190px] lg:min-w-0 p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
               ${statusFilter === 'Completed' ? 'ring-2 ring-indigo-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-indigo-200'}
               bg-white
             `}
@@ -839,7 +840,7 @@ const EventsList: React.FC = () => {
 
           <button
             onClick={() => setStatusFilter('Cancelled')}
-            className={`p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200 col-span-2 md:col-span-1
+            className={`min-w-[168px] sm:min-w-[180px] md:min-w-[190px] lg:min-w-0 p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
               ${statusFilter === 'Cancelled' ? 'ring-2 ring-red-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-red-200'}
               bg-white
             `}
@@ -852,9 +853,10 @@ const EventsList: React.FC = () => {
               </div>
               <p className="text-2xl font-bold text-red-600">{eventSummary.cancelled}</p>
           </button>
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-visible">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
           {statusFilter !== 'All' && (
               <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2 text-sm text-slate-600">
                   <Clock size={14} />
@@ -867,15 +869,15 @@ const EventsList: React.FC = () => {
                   </button>
               </div>
           )}
-          <div className="overflow-visible">
+          <div className="hidden md:block flex-1 min-h-0 overflow-auto">
               <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                  <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                       <tr>
-                          <th className="px-6 py-4 text-left">Event Details</th>
-                          <th className="px-6 py-4 text-left">Venue</th>
-                          <th className="px-6 py-4 text-left">Date</th>
-                          <th className="px-6 py-4 text-center">Status</th>
-                          <th className="px-6 py-4 text-center">Actions</th>
+                          <th className="px-6 py-4 text-left bg-slate-50">Event Details</th>
+                          <th className="px-6 py-4 text-left bg-slate-50">Venue</th>
+                          <th className="px-6 py-4 text-left bg-slate-50">Date</th>
+                          <th className="px-6 py-4 text-center bg-slate-50">Status</th>
+                          <th className="px-6 py-4 text-center bg-slate-50">Actions</th>
                       </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1018,6 +1020,102 @@ const EventsList: React.FC = () => {
                       )}
                   </tbody>
               </table>
+          </div>
+
+          <div className="md:hidden flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+              {loading ? (
+                  [...Array(3)].map((_, i) => (
+                      <div key={i} className="animate-pulse rounded-xl border border-slate-200 p-4 space-y-3">
+                          <div className="h-5 bg-slate-200 rounded w-2/3"></div>
+                          <div className="h-4 bg-slate-100 rounded w-1/2"></div>
+                          <div className="h-4 bg-slate-100 rounded w-1/3"></div>
+                          <div className="flex gap-2">
+                              <div className="h-8 bg-slate-100 rounded flex-1"></div>
+                              <div className="h-8 bg-slate-100 rounded flex-1"></div>
+                          </div>
+                      </div>
+                  ))
+              ) : filteredEvents.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100">
+                      <div className="flex flex-col items-center justify-center">
+                          {searchTerm ? <Search className="w-12 h-12 text-slate-300 mb-3" /> : <Calendar className="w-12 h-12 text-slate-300 mb-3" />}
+                          <p className="font-medium text-slate-500">{searchTerm ? `No results for "${searchTerm}"` : 'No events found'}</p>
+                          <p className="text-xs mt-1">{searchTerm ? 'Try adjusting your search terms' : 'Create a new event to get started'}</p>
+                      </div>
+                  </div>
+              ) : (
+                  paginatedEvents.map((event) => (
+                      <div
+                          key={event.event_id}
+                          onClick={() => handleRowClick(event)}
+                          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:scale-[0.99] transition-transform"
+                      >
+                          <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                  <h3 className="font-semibold text-slate-800 leading-tight">{event.event_name}</h3>
+                                  <div className="flex flex-wrap gap-2 mt-2">
+                                      {event.has_accommodation && (
+                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
+                                              <Home size={10} className="mr-1" /> Accommodation
+                                          </span>
+                                      )}
+                                      {!event.registration_open && (
+                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100">
+                                              <Lock size={10} className="mr-1" /> Closed
+                                          </span>
+                                      )}
+                                  </div>
+                              </div>
+                              <div className="shrink-0">
+                                  {getStatusBadge(event.status)}
+                              </div>
+                          </div>
+
+                          <div className="mt-4 space-y-2 text-sm text-slate-600">
+                              <div className="flex items-start gap-2">
+                                  <MapPin size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                                  <span>{event.venue}</span>
+                              </div>
+                              <div className="flex items-start gap-2">
+                                  <Calendar size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                                  <span>{formatEventDate(event.start_date, event.end_date)}</span>
+                              </div>
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                              <button
+                                  onClick={(e) => {
+                                      e.stopPropagation();
+                                      openShareModal(e, event);
+                                  }}
+                                  className="flex-1 min-w-[90px] px-3 py-2 text-sm rounded-lg border border-slate-200 text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
+                              >
+                                  <Share2 size={14} /> Share
+                              </button>
+                              <button
+                                  onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditModal(e, event);
+                                  }}
+                                  className="flex-1 min-w-[90px] px-3 py-2 text-sm rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
+                              >
+                                  <Edit size={14} /> Edit
+                              </button>
+                              {hasPermission('DELETE_EVENTS') && (
+                                  <button
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDelete(e, event.event_id);
+                                      }}
+                                      className="flex-1 min-w-[90px] px-3 py-2 text-sm rounded-lg border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+                                  >
+                                      <Trash2 size={14} /> Delete
+                                  </button>
+                              )}
+                          </div>
+                      </div>
+                  ))
+              )}
           </div>
           
           {/* Pagination Controls */}

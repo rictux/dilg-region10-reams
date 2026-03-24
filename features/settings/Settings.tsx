@@ -209,7 +209,7 @@ const Settings: React.FC = () => {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="h-full min-h-0 overflow-y-auto pr-1 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-800">Settings</h1>
       </div>
