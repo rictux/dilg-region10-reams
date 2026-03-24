@@ -9,7 +9,9 @@ import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import { toPng } from 'html-to-image';
 import QrScanner from './QrScanner';
 
-type ParticipantMatch = Pick<Participant, 'participant_id' | 'participant_code'> & Partial<Pick<Participant, 'full_name' | 'f_name' | 'l_name' | 'm_initial' | 'suffix' | 'email' | 'mobile_no' | 'office' | 'position'>>;
+type ParticipantMatch = Pick<Participant, 'participant_id' | 'participant_code'> & Partial<Pick<Participant, 'full_name' | 'f_name' | 'l_name' | 'm_initial' | 'suffix' | 'email' | 'mobile_no' | 'office' | 'position'>> & {
+  participatedEventsCount?: number;
+};
 
 const EventRegistration: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -169,6 +171,7 @@ const EventRegistration: React.FC = () => {
     <div key={match.participant_id} className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
       <div>
         <p className="text-base font-bold text-slate-900">{getMaskedFullName(match)}</p>
+        <p className="text-sm text-slate-600 mt-2">Participated Events: <span className="font-medium">{match.participatedEventsCount ?? 0}</span></p>
         {match.office && <p className="text-sm text-slate-600 mt-2">Office: <span className="font-medium">{maskText(match.office)}</span></p>}
         {match.position && <p className="text-sm text-slate-600 mt-1">Position: <span className="font-medium">{match.position}</span></p>}
         <p className="text-sm text-slate-600 mt-1">Mobile No: <span className="font-medium">{match.mobile_no ? maskMobile(match.mobile_no) : '-'}</span></p>
@@ -177,6 +180,32 @@ const EventRegistration: React.FC = () => {
       {action}
     </div>
   );
+
+  const attachParticipationCounts = async (matches: ParticipantMatch[]) => {
+    if (matches.length === 0) return matches;
+
+    const participantIds = matches.map((match) => match.participant_id);
+    const { data, error } = await supabase
+      .from('attendance_logs')
+      .select('participant_id, event_id')
+      .in('participant_id', participantIds)
+      .eq('scan_status', 'Valid');
+
+    if (error) throw error;
+
+    const countsByParticipant = new Map<number, Set<number>>();
+    (data || []).forEach((record) => {
+      if (!countsByParticipant.has(record.participant_id)) {
+        countsByParticipant.set(record.participant_id, new Set<number>());
+      }
+      countsByParticipant.get(record.participant_id)?.add(record.event_id);
+    });
+
+    return matches.map((match) => ({
+      ...match,
+      participatedEventsCount: countsByParticipant.get(match.participant_id)?.size || 0
+    }));
+  };
 
   const getSubmissionContext = () => {
     if (!consent) {
@@ -254,15 +283,16 @@ const EventRegistration: React.FC = () => {
       normalizeNamePart(participant.l_name || '') === normalizedLastName
     );
 
-    if (!targetMiddleInitial) {
-      return baseMatches;
-    }
+    const selectedMatches = !targetMiddleInitial
+      ? baseMatches
+      : (() => {
+        const exactMiddleMatches = baseMatches.filter(
+          (participant) => normalizeMiddleInitial(participant.m_initial) === targetMiddleInitial
+        );
+        return exactMiddleMatches.length > 0 ? exactMiddleMatches : baseMatches;
+      })();
 
-    const exactMiddleMatches = baseMatches.filter(
-      (participant) => normalizeMiddleInitial(participant.m_initial) === targetMiddleInitial
-    );
-
-    return exactMiddleMatches.length > 0 ? exactMiddleMatches : baseMatches;
+    return attachParticipationCounts(selectedMatches);
   };
 
   const processRegistration = async (options?: { existingUser?: ParticipantMatch | null; skipPotentialMatch?: boolean }) => {
