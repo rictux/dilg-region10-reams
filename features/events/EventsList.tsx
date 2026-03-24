@@ -1345,12 +1345,12 @@ const EventsList: React.FC = () => {
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <div className="flex items-center gap-2 group/role">
+                                                        <div className="flex items-center gap-2">
                                                             <span className="font-medium text-indigo-600">{record.role}</span>
                                                             {hasPermission('MANAGE_PARTICIPANTS') && (
                                                                 <button 
                                                                     onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participants.participant_id, role: record.role }); }}
-                                                                    className="opacity-0 group-hover/role:opacity-100 text-slate-400 hover:text-indigo-600 transition-opacity p-1"
+                                                                    className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1 rounded"
                                                                     title="Edit Role"
                                                                 >
                                                                     <Edit size={12} />
@@ -1436,12 +1436,12 @@ const EventsList: React.FC = () => {
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <div className="flex items-center gap-2 group/role">
+                                                        <div className="flex items-center gap-2">
                                                             <span className="font-medium text-indigo-600">{record.role}</span>
                                                             {hasPermission('MANAGE_PARTICIPANTS') && (
                                                                 <button 
                                                                     onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participants.participant_id, role: record.role }); }}
-                                                                    className="opacity-0 group-hover/role:opacity-100 text-slate-400 hover:text-indigo-600 transition-opacity p-1"
+                                                                    className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1 rounded"
                                                                     title="Edit Role"
                                                                 >
                                                                     <Edit size={12} />

@@ -113,6 +113,9 @@ const EventRegistration: React.FC = () => {
     return str.toLowerCase().replace(/(^|\s)\S/g, l => l.toUpperCase());
   };
 
+  const normalizeNamePart = (value: string) => value.trim().toLowerCase();
+  const normalizeMiddleInitial = (value?: string | null) => (value || '').trim().toUpperCase();
+
   const handleQrScanSuccess = async (decodedText: string) => {
     setShowQrScanner(false);
     setLoading(true);
@@ -273,14 +276,22 @@ const EventRegistration: React.FC = () => {
         }
 
         if (!existingUser) {
+             const normalizedFirstName = normalizeNamePart(formData.f_name);
+             const normalizedLastName = normalizeNamePart(formData.l_name);
+             const targetMiddleInitial = normalizeMiddleInitial(formData.m_initial);
+
              const { data } = await supabase
                 .from('participants')
-                .select('participant_id, participant_code')
+                .select('participant_id, participant_code, f_name, l_name, m_initial')
                 .ilike('f_name', formData.f_name.trim())
                 .ilike('l_name', formData.l_name.trim())
-                .limit(1)
-                .maybeSingle();
-             existingUser = data;
+                .limit(10);
+
+             existingUser = (data || []).find((participant) =>
+                normalizeNamePart(participant.f_name || '') === normalizedFirstName &&
+                normalizeNamePart(participant.l_name || '') === normalizedLastName &&
+                normalizeMiddleInitial(participant.m_initial) === targetMiddleInitial
+             ) || null;
         }
 
         if (existingUser) {
@@ -296,6 +307,7 @@ const EventRegistration: React.FC = () => {
                 l_name: toProperCase(formData.l_name.trim()),
                 m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim().toUpperCase(),
                 suffix: formData.suffix.trim() === '' ? null : toProperCase(formData.suffix.trim()),
+                email: finalEmail,
                 gender: formData.gender,
                 position: formData.position,
                 office: finalOfficeName,
