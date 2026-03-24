@@ -188,7 +188,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
   };
 
   const contentClass = isInternal 
-    ? "w-full max-w-5xl space-y-6" 
+    ? "w-full space-y-6" 
     : "min-h-screen bg-slate-50 flex flex-col items-center p-4 sm:p-8 w-full";
 
   return (
@@ -308,10 +308,10 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
                     <table className="w-full text-sm text-left min-w-[600px]">
                         <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                             <tr>
-                                <th className="px-5 py-3 w-1/3">Event Name</th>
-                                <th className="px-5 py-3 w-1/4">Date</th>
-                                <th className="px-5 py-3 w-1/4">Venue</th>
-                                <th className="px-5 py-3 w-auto">Role</th>
+                                <th className="px-5 py-3 w-[36%]">Event Name</th>
+                                <th className="px-5 py-3 w-[18%]">Date</th>
+                                <th className="px-5 py-3 w-[30%]">Venue</th>
+                                <th className="px-5 py-3 w-[16%]">Role</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">

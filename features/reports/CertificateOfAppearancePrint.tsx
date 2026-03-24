@@ -171,14 +171,12 @@ const CertificateOfAppearancePrint: React.FC = () => {
                     {/* Certificate Content */}
                     <div className="flex-1 flex flex-col justify-center relative">
                       
-                      {/* Left QR Code */}
-                      <div className="absolute bottom-0 left-0">
-                        <QRCode value={`${window.location.origin}/lookup?event=${event.event_id}&participant=${participant.participant_id}`} size={64} />
-                      </div>
-
                       {/* Right QR Code */}
-                      <div className="absolute bottom-0 right-0">
-                        <QRCode value={`${window.location.origin}/lookup?participant=${participant.participant_id}`} size={64} />
+                      <div className="absolute bottom-0 right-0 flex flex-col items-center text-center">
+                        <QRCode value={`${window.location.origin}/lookup?participant=${participant.participant_id}`} size={52} />
+                        <p className="mt-2 text-[9px] font-medium text-slate-700 max-w-[90px] leading-tight">
+                          Scan to verify
+                        </p>
                       </div>
 
                       {/* Header */}
