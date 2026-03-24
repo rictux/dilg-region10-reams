@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Save, Loader2, CheckCircle, AlertCircle, Building2 } from 'lucide-react';
+import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload } from 'lucide-react';
 import { Office } from '../../types/database';
 
 const Settings: React.FC = () => {
@@ -18,6 +18,8 @@ const Settings: React.FC = () => {
     position: '',
     esig_link: ''
   });
+  const [selectedSignatureFile, setSelectedSignatureFile] = useState<File | null>(null);
+  const [signaturePreviewUrl, setSignaturePreviewUrl] = useState('');
 
   useEffect(() => {
     if (user?.role === 'Admin') {
@@ -32,8 +34,18 @@ const Settings: React.FC = () => {
       fetchSignatory(selectedOfficeId);
     } else {
       setSignatory({ name: '', position: '', esig_link: '' });
+      setSelectedSignatureFile(null);
+      setSignaturePreviewUrl('');
     }
   }, [selectedOfficeId]);
+
+  useEffect(() => {
+    return () => {
+      if (signaturePreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(signaturePreviewUrl);
+      }
+    };
+  }, [signaturePreviewUrl]);
 
   const fetchOffices = async () => {
     try {
@@ -57,6 +69,8 @@ const Settings: React.FC = () => {
 
   const fetchSignatory = async (officeId: number) => {
     try {
+      setSelectedSignatureFile(null);
+      setSignaturePreviewUrl('');
       const { data, error } = await supabase
         .from('tbl_signatory')
         .select('*')
@@ -73,12 +87,33 @@ const Settings: React.FC = () => {
           position: data.position || '',
           esig_link: data.esig_link || ''
         });
+        setSignaturePreviewUrl(data.esig_link || '');
       } else {
         setSignatory({ name: '', position: '', esig_link: '' });
+        setSignaturePreviewUrl('');
       }
     } catch (err) {
       console.error('Error fetching signatory:', err);
     }
+  };
+
+  const handleSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setMessage({ type: 'error', text: 'Please upload a valid image file for the e-signature.' });
+      e.target.value = '';
+      return;
+    }
+
+    setMessage(null);
+    setSelectedSignatureFile(file);
+    setSignaturePreviewUrl(URL.createObjectURL(file));
+    e.target.value = '';
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -89,6 +124,31 @@ const Settings: React.FC = () => {
     setMessage(null);
 
     try {
+      let esigLink = signatory.esig_link;
+
+      if (selectedSignatureFile) {
+        const fileExtension = selectedSignatureFile.name.includes('.')
+          ? selectedSignatureFile.name.split('.').pop()?.toLowerCase()
+          : '';
+        const filePath = `office-${selectedOfficeId}/esignature-${selectedOfficeId}-${Date.now()}${fileExtension ? `.${fileExtension}` : ''}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('signatory')
+          .upload(filePath, selectedSignatureFile, {
+            cacheControl: '3600',
+            upsert: true,
+            contentType: selectedSignatureFile.type
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('signatory')
+          .getPublicUrl(filePath);
+
+        esigLink = publicUrlData.publicUrl;
+      }
+
       // Check if exists
       const { data: existing } = await supabase
         .from('tbl_signatory')
@@ -102,7 +162,7 @@ const Settings: React.FC = () => {
           .update({
             name: signatory.name,
             position: signatory.position,
-            esig_link: signatory.esig_link
+            esig_link: esigLink
           })
           .eq('id', existing.id);
           
@@ -114,12 +174,15 @@ const Settings: React.FC = () => {
             office_id: selectedOfficeId,
             name: signatory.name,
             position: signatory.position,
-            esig_link: signatory.esig_link
+            esig_link: esigLink
           });
           
         if (error) throw error;
       }
 
+      setSignatory((prev) => ({ ...prev, esig_link: esigLink }));
+      setSelectedSignatureFile(null);
+      setSignaturePreviewUrl(esigLink);
       setMessage({ type: 'success', text: 'Signatory settings saved successfully.' });
     } catch (err: any) {
       console.error('Error saving signatory:', err);
@@ -220,16 +283,41 @@ const Settings: React.FC = () => {
                 />
               </div>
 
-              <div className="space-y-2 md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700">E-Signature Link (Optional)</label>
-                <input
-                  type="url"
-                  value={signatory.esig_link}
-                  onChange={(e) => setSignatory({ ...signatory, esig_link: e.target.value })}
-                  placeholder="https://example.com/signature.png"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                />
-                <p className="text-xs text-slate-500">Provide a direct URL to an image of the signature (PNG with transparent background recommended).</p>
+              <div className="space-y-4 md:col-span-2">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700">E-Signature Image (Optional)</label>
+                  <label className="flex items-center justify-center gap-3 w-full px-4 py-4 border border-dashed border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer text-slate-600">
+                    <Upload className="w-5 h-5" />
+                    <span className="text-sm font-medium">
+                      {selectedSignatureFile ? selectedSignatureFile.name : 'Upload signature image'}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleSignatureChange}
+                      className="hidden"
+                    />
+                  </label>
+                  <p className="text-xs text-slate-500">
+                    Upload the signature image and it will be saved to the `signatory` bucket. PNG with transparent background is recommended.
+                  </p>
+                </div>
+
+                {signaturePreviewUrl && (
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <p className="text-sm font-medium text-slate-700 mb-3">
+                      {selectedSignatureFile ? 'Signature Preview' : 'Current E-Signature'}
+                    </p>
+                    <div className="h-28 flex items-center justify-center rounded-lg bg-slate-50">
+                      <img
+                        src={signaturePreviewUrl}
+                        alt="Signatory e-signature"
+                        className="max-h-20 max-w-full object-contain"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
