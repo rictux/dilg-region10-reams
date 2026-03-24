@@ -638,7 +638,7 @@ const EventRegistration: React.FC = () => {
                                     type="text"
                                     maxLength={10}
                                     className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                                    placeholder="e.g. Jr"
+                                    placeholder="e.g. Jr if none leave blank"
                                     value={formData.suffix}
                                     onChange={e => setFormData({...formData, suffix: e.target.value})}
                                     onBlur={e => setFormData({...formData, suffix: toProperCase(e.target.value)})}
