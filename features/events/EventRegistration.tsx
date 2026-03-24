@@ -9,6 +9,8 @@ import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import { toPng } from 'html-to-image';
 import QrScanner from './QrScanner';
 
+type ParticipantMatch = Pick<Participant, 'participant_id' | 'participant_code'> & Partial<Pick<Participant, 'full_name' | 'f_name' | 'l_name' | 'm_initial' | 'suffix' | 'email' | 'mobile_no' | 'office' | 'position'>>;
+
 const EventRegistration: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const [event, setEvent] = useState<Event | null>(null);
@@ -19,6 +21,8 @@ const EventRegistration: React.FC = () => {
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showQrScanner, setShowQrScanner] = useState(false);
+  const [showMatchPrompt, setShowMatchPrompt] = useState(false);
+  const [potentialMatches, setPotentialMatches] = useState<ParticipantMatch[]>([]);
   
   // Ref for saving image
   const ticketRef = useRef<HTMLDivElement>(null);
@@ -115,6 +119,294 @@ const EventRegistration: React.FC = () => {
 
   const normalizeNamePart = (value: string) => value.trim().toLowerCase();
   const normalizeMiddleInitial = (value?: string | null) => (value || '').trim().toUpperCase();
+  const closeMatchPrompt = () => {
+    setShowMatchPrompt(false);
+    setPotentialMatches([]);
+  };
+
+  const maskText = (value?: string | null) => {
+    if (!value) return '';
+    return value
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => {
+        if (part.length <= 2) return `${part.charAt(0)}*`;
+        if (part.length === 3) return `${part.charAt(0)}**`;
+        return `${part.charAt(0)}${'*'.repeat(Math.max(part.length - 2, 2))}${part.charAt(part.length - 1)}`;
+      })
+      .join(' ');
+  };
+
+  const maskEmail = (value?: string | null) => {
+    if (!value) return '';
+    const [localPart, domain] = value.split('@');
+    if (!localPart || !domain) return maskText(value);
+    return `${localPart.charAt(0)}***@${domain}`;
+  };
+
+  const maskMobile = (value?: string | null) => {
+    if (!value) return '';
+    if (value.length <= 4) return `${value.slice(0, 1)}***`;
+    return `${value.slice(0, 2)}${'*'.repeat(Math.max(value.length - 4, 3))}${value.slice(-2)}`;
+  };
+
+  const getMaskedFullName = (match: ParticipantMatch) => {
+    const parts = [
+      match.f_name || '',
+      match.m_initial ? `${match.m_initial}` : '',
+      match.l_name || '',
+      match.suffix || ''
+    ].filter(Boolean);
+
+    if (parts.length > 0) {
+      return parts.map((part) => maskText(part)).join(' ');
+    }
+
+    return maskText(match.full_name || 'Unknown Participant');
+  };
+
+  const renderPotentialMatchCard = (match: ParticipantMatch, action?: React.ReactNode) => (
+    <div key={match.participant_id} className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
+      <div>
+        <p className="text-base font-bold text-slate-900">{getMaskedFullName(match)}</p>
+        {match.office && <p className="text-sm text-slate-600 mt-2">Office: <span className="font-medium">{maskText(match.office)}</span></p>}
+        {match.position && <p className="text-sm text-slate-600 mt-1">Position: <span className="font-medium">{match.position}</span></p>}
+        <p className="text-sm text-slate-600 mt-1">Mobile No: <span className="font-medium">{match.mobile_no ? maskMobile(match.mobile_no) : '-'}</span></p>
+        <p className="text-sm text-slate-600 mt-1">Email: <span className="font-medium">{match.email ? maskEmail(match.email) : '-'}</span></p>
+      </div>
+      {action}
+    </div>
+  );
+
+  const getSubmissionContext = () => {
+    if (!consent) {
+      setError("You must accept the Data Privacy consent to proceed.");
+      return null;
+    }
+
+    if (formData.needs_accommodation && formData.accommodation_pax < 1) {
+      setError("Please specify at least 1 pax for accommodation.");
+      return null;
+    }
+
+    let finalLocationId = null as number | null;
+    let finalOfficeName = formData.office;
+
+    if (affiliationType === 'LGU') {
+      if (!selectedProvince) {
+        setError("Please select a Province/HUC for LGU.");
+        return null;
+      }
+      
+      if (selectedCity) {
+        const loc = locations.find(l => l.province_huc === selectedProvince && l.city_mun === selectedCity);
+        if (loc) {
+          finalLocationId = loc.location_id;
+          finalOfficeName = `LGU ${selectedCity}, ${selectedProvince}`;
+        } else {
+          setError("Selected location is invalid.");
+          return null;
+        }
+      } else {
+        const loc = locations.find(l => l.province_huc === selectedProvince && !l.city_mun);
+        if (loc) {
+          finalLocationId = loc.location_id;
+        }
+        if (selectedProvince.toLowerCase().includes('city')) {
+          finalOfficeName = `LGU ${selectedProvince}`;
+        } else {
+          finalOfficeName = `Provincial Gov't of ${selectedProvince}`;
+        }
+      }
+    } else if (!formData.office.trim()) {
+      setError("Please enter your Office / Agency name.");
+      return null;
+    }
+
+    return {
+      finalLocationId,
+      finalOfficeName,
+      finalEmail: formData.email.trim() === '' ? null : formData.email.trim(),
+      finalMobile: formData.mobile_no.trim() === '' ? null : formData.mobile_no.trim()
+    };
+  };
+
+  const findPotentialNameMatches = async () => {
+    const normalizedFirstName = normalizeNamePart(formData.f_name);
+    const normalizedLastName = normalizeNamePart(formData.l_name);
+    const targetMiddleInitial = normalizeMiddleInitial(formData.m_initial);
+
+    if (!normalizedFirstName || !normalizedLastName) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from('participants')
+      .select('participant_id, participant_code, full_name, f_name, l_name, m_initial, suffix, email, mobile_no, office, position')
+      .ilike('f_name', formData.f_name.trim())
+      .ilike('l_name', formData.l_name.trim())
+      .limit(10);
+
+    if (error) throw error;
+
+    const baseMatches = (data || []).filter((participant) =>
+      normalizeNamePart(participant.f_name || '') === normalizedFirstName &&
+      normalizeNamePart(participant.l_name || '') === normalizedLastName
+    );
+
+    if (!targetMiddleInitial) {
+      return baseMatches;
+    }
+
+    const exactMiddleMatches = baseMatches.filter(
+      (participant) => normalizeMiddleInitial(participant.m_initial) === targetMiddleInitial
+    );
+
+    return exactMiddleMatches.length > 0 ? exactMiddleMatches : baseMatches;
+  };
+
+  const processRegistration = async (options?: { existingUser?: ParticipantMatch | null; skipPotentialMatch?: boolean }) => {
+    const submissionContext = getSubmissionContext();
+    if (!submissionContext) return;
+
+    setSubmitting(true);
+    setError(null);
+    setAlreadyRegistered(false);
+
+    try {
+      if (!event) throw new Error("Event not loaded");
+      if (!event.registration_open) throw new Error("Registration for this event is closed.");
+
+      const id = parseInt(eventId!);
+      const { finalLocationId, finalOfficeName, finalEmail, finalMobile } = submissionContext;
+
+      let participantId: number;
+      let finalParticipantCode = '';
+      let existingUser = options?.existingUser || null;
+
+      if (!existingUser && formData.participant_code) {
+        const { data } = await supabase
+          .from('participants')
+          .select('participant_id, participant_code')
+          .eq('participant_code', formData.participant_code)
+          .limit(1)
+          .maybeSingle();
+        existingUser = data;
+      }
+
+      if (!existingUser && finalEmail) {
+        const { data } = await supabase
+          .from('participants')
+          .select('participant_id, participant_code')
+          .eq('email', finalEmail)
+          .limit(1)
+          .maybeSingle();
+        existingUser = data;
+      }
+
+      if (!existingUser && finalMobile) {
+        const { data } = await supabase
+          .from('participants')
+          .select('participant_id, participant_code')
+          .eq('mobile_no', finalMobile)
+          .limit(1)
+          .maybeSingle();
+        existingUser = data;
+      }
+
+      if (!existingUser && !options?.skipPotentialMatch) {
+        const matches = await findPotentialNameMatches();
+        if (matches.length > 0) {
+          setPotentialMatches(matches);
+          setShowMatchPrompt(true);
+          return;
+        }
+      }
+
+      if (existingUser) {
+        participantId = existingUser.participant_id;
+        finalParticipantCode = existingUser.participant_code;
+
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('participants')
+          .update({
+            f_name: toProperCase(formData.f_name.trim()),
+            l_name: toProperCase(formData.l_name.trim()),
+            m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim().toUpperCase(),
+            suffix: formData.suffix.trim() === '' ? null : toProperCase(formData.suffix.trim()),
+            email: finalEmail,
+            gender: formData.gender,
+            position: formData.position,
+            office: finalOfficeName,
+            location_id: finalLocationId,
+            mobile_no: finalMobile,
+            age_group: formData.age_group,
+            pwd: formData.pwd,
+            indigenous_people: formData.indigenous_people
+          })
+          .eq('participant_id', participantId)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        setFormData((prev) => ({ ...prev, full_name: updatedUser.full_name || '' }));
+      } else {
+        const { data: newUser, error: createError } = await supabase
+          .from('participants')
+          .insert([{
+            f_name: toProperCase(formData.f_name.trim()),
+            l_name: toProperCase(formData.l_name.trim()),
+            m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim().toUpperCase(),
+            suffix: formData.suffix.trim() === '' ? null : toProperCase(formData.suffix.trim()),
+            email: finalEmail,
+            mobile_no: finalMobile,
+            gender: formData.gender,
+            position: formData.position,
+            office: finalOfficeName,
+            location_id: finalLocationId,
+            age_group: formData.age_group,
+            pwd: formData.pwd,
+            indigenous_people: formData.indigenous_people
+          }])
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        participantId = newUser.participant_id;
+        finalParticipantCode = newUser.participant_code;
+        setFormData((prev) => ({ ...prev, full_name: newUser.full_name || '' }));
+      }
+
+      const { error: regError } = await supabase
+        .from('event_participants')
+        .insert({
+          event_id: id,
+          participant_id: participantId,
+          registration_status: 'Registered',
+          role: 'Delegate',
+          needs_accommodation: formData.needs_accommodation,
+          accommodation_pax: formData.needs_accommodation ? formData.accommodation_pax : 0,
+          accept_photo_video: formData.accept_photo_video,
+          store_to_db: formData.store_to_db
+        });
+
+      if (regError) {
+        if (regError.code === '23505') {
+          setAlreadyRegistered(true);
+        } else {
+          throw regError;
+        }
+      }
+
+      closeMatchPrompt();
+      setQrToken(finalParticipantCode);
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message || "Registration failed. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleQrScanSuccess = async (decodedText: string) => {
     setShowQrScanner(false);
@@ -170,220 +462,7 @@ const EventRegistration: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!consent) {
-        setError("You must accept the Data Privacy consent to proceed.");
-        return;
-    }
-
-    // Validate Accommodation
-    if (formData.needs_accommodation && formData.accommodation_pax < 1) {
-        setError("Please specify at least 1 pax for accommodation.");
-        return;
-    }
-
-    // Prepare Office / Location Data
-    let finalLocationId = null;
-    let finalOfficeName = formData.office;
-
-    // ... (Your existing Location/Office Logic remains exactly the same here) ...
-    if (affiliationType === 'LGU') {
-        if (!selectedProvince) {
-            setError("Please select a Province/HUC for LGU.");
-            return;
-        }
-        
-        if (selectedCity) {
-            const loc = locations.find(l => l.province_huc === selectedProvince && l.city_mun === selectedCity);
-            if (loc) {
-                finalLocationId = loc.location_id;
-                finalOfficeName = `LGU ${selectedCity}, ${selectedProvince}`;
-            } else {
-                setError("Selected location is invalid.");
-                return;
-            }
-        } else {
-            const loc = locations.find(l => l.province_huc === selectedProvince && !l.city_mun);
-            if (loc) {
-                finalLocationId = loc.location_id;
-            }
-            if (selectedProvince.toLowerCase().includes('city')) {
-                 finalOfficeName = `LGU ${selectedProvince}`;
-            } else {
-                 finalOfficeName = `Provincial Gov't of ${selectedProvince}`;
-            }
-        }
-    } else {
-        if (!formData.office.trim()) {
-            setError("Please enter your Office / Agency name.");
-            return;
-        }
-    }
-
-    // ---------------------------------------------------------
-    //  STEP 1: SANITIZE DATA (Empty String -> NULL)
-    // ---------------------------------------------------------
-    // If the trimmed string is empty, set it to null. Otherwise, use the trimmed value.
-    const finalEmail = formData.email.trim() === '' ? null : formData.email.trim();
-    const finalMobile = formData.mobile_no.trim() === '' ? null : formData.mobile_no.trim();
-
-    setSubmitting(true);
-    setError(null);
-    setAlreadyRegistered(false);
-    
-    try {
-        if (!event) throw new Error("Event not loaded");
-        if (!event.registration_open) throw new Error("Registration for this event is closed.");
-        
-        const id = parseInt(eventId!);
-
-        // 1. Check if participant exists by email or mobile
-        let participantId: number;
-        let finalParticipantCode: string = '';
-
-        // NOTE: If searching by email, ensure we don't search for NULL or empty string
-        // If email is provided, search by it.
-        let existingUser = null;
-        
-        if (formData.participant_code) {
-             const { data } = await supabase
-                .from('participants')
-                .select('participant_id, participant_code')
-                .eq('participant_code', formData.participant_code)
-                .limit(1)
-                .maybeSingle();
-             existingUser = data;
-        }
-
-        if (!existingUser && finalEmail) {
-             const { data } = await supabase
-                .from('participants')
-                .select('participant_id, participant_code')
-                .eq('email', finalEmail)
-                .limit(1)
-                .maybeSingle();
-             existingUser = data;
-        }
-
-        if (!existingUser && finalMobile) {
-             const { data } = await supabase
-                .from('participants')
-                .select('participant_id, participant_code')
-                .eq('mobile_no', finalMobile)
-                .limit(1)
-                .maybeSingle();
-             existingUser = data;
-        }
-
-        if (!existingUser) {
-             const normalizedFirstName = normalizeNamePart(formData.f_name);
-             const normalizedLastName = normalizeNamePart(formData.l_name);
-             const targetMiddleInitial = normalizeMiddleInitial(formData.m_initial);
-
-             const { data } = await supabase
-                .from('participants')
-                .select('participant_id, participant_code, f_name, l_name, m_initial')
-                .ilike('f_name', formData.f_name.trim())
-                .ilike('l_name', formData.l_name.trim())
-                .limit(10);
-
-             existingUser = (data || []).find((participant) =>
-                normalizeNamePart(participant.f_name || '') === normalizedFirstName &&
-                normalizeNamePart(participant.l_name || '') === normalizedLastName &&
-                normalizeMiddleInitial(participant.m_initial) === targetMiddleInitial
-             ) || null;
-        }
-
-        if (existingUser) {
-            participantId = existingUser.participant_id;
-            finalParticipantCode = existingUser.participant_code;
-            
-            // Update existing participant details
-            // ---------------------------------------------------------
-            // STEP 2: USE SANITIZED VARIABLES IN UPDATE
-            // ---------------------------------------------------------
-            const { data: updatedUser, error: updateError } = await supabase.from('participants').update({
-                f_name: toProperCase(formData.f_name.trim()),
-                l_name: toProperCase(formData.l_name.trim()),
-                m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim().toUpperCase(),
-                suffix: formData.suffix.trim() === '' ? null : toProperCase(formData.suffix.trim()),
-                email: finalEmail,
-                gender: formData.gender,
-                position: formData.position,
-                office: finalOfficeName,
-                location_id: finalLocationId,
-                mobile_no: finalMobile, // <--- Used here
-                age_group: formData.age_group,
-                pwd: formData.pwd,
-                indigenous_people: formData.indigenous_people
-            }).eq('participant_id', participantId)
-            .select()
-            .single();
-
-            if (updateError) throw updateError;
-            setFormData(prev => ({ ...prev, full_name: updatedUser.full_name || '' }));
-
-        } else {
-            // Create new participant
-            // ---------------------------------------------------------
-            // STEP 3: USE SANITIZED VARIABLES IN INSERT
-            // ---------------------------------------------------------
-            const { data: newUser, error: createError } = await supabase
-                .from('participants')
-                .insert([{
-                    f_name: toProperCase(formData.f_name.trim()),
-                    l_name: toProperCase(formData.l_name.trim()),
-                    m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim().toUpperCase(),
-                    suffix: formData.suffix.trim() === '' ? null : toProperCase(formData.suffix.trim()),
-                    email: finalEmail,       // <--- Used here
-                    mobile_no: finalMobile,  // <--- Used here
-                    gender: formData.gender,
-                    position: formData.position,
-                    office: finalOfficeName,
-                    location_id: finalLocationId,
-                    age_group: formData.age_group,
-                    pwd: formData.pwd,
-                    indigenous_people: formData.indigenous_people
-                }])
-                .select()
-                .single();
-            
-            if (createError) throw createError;
-            participantId = newUser.participant_id;
-            finalParticipantCode = newUser.participant_code;
-            setFormData(prev => ({ ...prev, full_name: newUser.full_name || '' }));
-        }
-
-        // 2. Register for Event
-        const { error: regError } = await supabase
-            .from('event_participants')
-            .insert({
-                event_id: id,
-                participant_id: participantId,
-                registration_status: 'Registered',
-                role: 'Delegate',
-                needs_accommodation: formData.needs_accommodation,
-                accommodation_pax: formData.needs_accommodation ? formData.accommodation_pax : 0,
-                accept_photo_video: formData.accept_photo_video,
-                store_to_db: formData.store_to_db
-            });
-
-        if (regError) {
-            if (regError.code === '23505') {
-                setAlreadyRegistered(true);
-            } else {
-                throw regError;
-            }
-        }
-
-        setQrToken(finalParticipantCode);
-        setSuccess(true);
-
-    } catch (err: any) {
-        setError(err.message || "Registration failed. Please try again.");
-    } finally {
-        setSubmitting(false);
-    }
+    await processRegistration();
   };
 
   const handleDownload = async () => {
@@ -528,6 +607,7 @@ const EventRegistration: React.FC = () => {
   }
 
   return (
+    <>
     <div className="min-h-screen bg-slate-50 py-8 sm:py-12 px-4 sm:px-6 lg:px-8 flex justify-center">
         <div className="max-w-3xl w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
             {/* Event Header */}
@@ -971,6 +1051,101 @@ const EventRegistration: React.FC = () => {
             </div>
         </div>
     </div>
+    {showMatchPrompt && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeMatchPrompt}></div>
+        <div className="relative z-10 w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="px-6 py-5 border-b border-slate-100 bg-slate-50">
+            <h3 className="text-xl font-bold text-slate-900">
+              {potentialMatches.length === 1 ? 'We found a possible existing record' : 'Possible matches'}
+            </h3>
+            <p className="text-sm text-slate-600 mt-2">
+              {potentialMatches.length === 1
+                ? 'We found an existing record with similar details. Is this you?'
+                : 'We found multiple participant records with similar details. Please select your existing record, or create a new one.'}
+            </p>
+          </div>
+
+          <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+            {potentialMatches.length === 1 ? (
+              <>
+                {renderPotentialMatchCard(potentialMatches[0])}
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const selectedMatch = potentialMatches[0];
+                      closeMatchPrompt();
+                      await processRegistration({ existingUser: selectedMatch, skipPotentialMatch: true });
+                    }}
+                    className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors"
+                  >
+                    Yes, use existing record
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      closeMatchPrompt();
+                      await processRegistration({ skipPotentialMatch: true });
+                    }}
+                    className="flex-1 bg-white text-slate-700 py-3 rounded-xl font-semibold border border-slate-300 hover:bg-slate-50 transition-colors"
+                  >
+                    No, create new registration
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeMatchPrompt}
+                    className="sm:w-auto px-5 py-3 rounded-xl font-semibold text-slate-500 hover:bg-slate-100 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {potentialMatches.map((match) => (
+                  <div key={match.participant_id}>
+                    {renderPotentialMatchCard(
+                      match,
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          closeMatchPrompt();
+                          await processRegistration({ existingUser: match, skipPotentialMatch: true });
+                        }}
+                        className="mt-1 inline-flex items-center justify-center bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors"
+                      >
+                        Use this record
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      closeMatchPrompt();
+                      await processRegistration({ skipPotentialMatch: true });
+                    }}
+                    className="flex-1 bg-white text-slate-700 py-3 rounded-xl font-semibold border border-slate-300 hover:bg-slate-50 transition-colors"
+                  >
+                    None of these, create new record
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeMatchPrompt}
+                    className="sm:w-auto px-5 py-3 rounded-xl font-semibold text-slate-500 hover:bg-slate-100 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 

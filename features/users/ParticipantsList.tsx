@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Participant } from '../../types/database';
-import { Search, Edit, Loader2, X, Save, User, Mail, Briefcase, Phone } from 'lucide-react';
+import { Search, Edit, Loader2, X, Save, User, Mail, Briefcase, Phone, AlertCircle } from 'lucide-react';
 
 const ParticipantsList: React.FC = () => {
     const { user: currentUser } = useAuth();
