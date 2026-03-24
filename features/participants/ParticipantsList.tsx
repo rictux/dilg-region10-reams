@@ -49,6 +49,8 @@ const AttendanceList: React.FC = () => {
   });
   const [savingManual, setSavingManual] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
+  const [showManualBlockedModal, setShowManualBlockedModal] = useState(false);
+  const [manualBlockedMessage, setManualBlockedMessage] = useState('');
 
   // Add Participant State
   const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
@@ -347,14 +349,16 @@ const AttendanceList: React.FC = () => {
   const openManualModal = (e: React.MouseEvent, p: Participant) => {
       e.stopPropagation();
       
-      // Prevent manual entry for future dates
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const eventDate = new Date(selectedDate);
       eventDate.setHours(0, 0, 0, 0);
       
       if (eventDate > today) {
-          alert("Cannot log attendance for future dates.");
+          setManualBlockedMessage(
+              'Manual attendance is not available yet because the selected event date has not started.'
+          );
+          setShowManualBlockedModal(true);
           return;
       }
 
@@ -1437,7 +1441,13 @@ const AttendanceList: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
-                            <input type="date" required value={manualForm.date} onChange={e => setManualForm({...manualForm, date: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none" />
+                            <input
+                                type="date"
+                                required
+                                value={manualForm.date}
+                                disabled
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-100 text-slate-500 cursor-not-allowed"
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Time</label>
@@ -1466,6 +1476,46 @@ const AttendanceList: React.FC = () => {
                         Log Attendance
                     </button>
                 </form>
+            </div>
+          </div>
+      )}
+
+      {showManualBlockedModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+              onClick={() => setShowManualBlockedModal(false)}
+            ></div>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="bg-[#4322A7] px-6 py-4 flex justify-between items-center text-white">
+                    <h3 className="font-semibold flex items-center gap-2">
+                        <AlertCircle size={20} /> Manual Entry Unavailable
+                    </h3>
+                    <button onClick={() => setShowManualBlockedModal(false)} className="text-indigo-100 hover:text-white p-1 hover:bg-white/20 rounded-full transition">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <div className="p-6 space-y-4">
+                    <div className="bg-indigo-50 text-[#4322A7] p-4 rounded-lg border border-indigo-200 text-sm leading-relaxed">
+                        {manualBlockedMessage}
+                    </div>
+
+                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Selected Event Date</p>
+                        <p className="font-semibold text-slate-800">
+                            {selectedDate ? format(new Date(selectedDate), 'MMMM d, yyyy') : 'No date selected'}
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setShowManualBlockedModal(false)}
+                        className="w-full bg-[#4322A7] text-white font-bold py-2.5 rounded-lg hover:bg-indigo-800 transition-all"
+                    >
+                        Close
+                    </button>
+                </div>
             </div>
           </div>
       )}
