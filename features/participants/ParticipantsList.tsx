@@ -848,8 +848,8 @@ const AttendanceList: React.FC = () => {
                     </div>
                 )}
 
-                <div className="flex-1 w-full flex flex-col md:flex-row gap-3 lg:ml-auto">
-                    <div className="relative flex-1 min-w-0 lg:max-w-sm">
+                <div className="w-full lg:w-auto flex flex-col md:flex-row gap-3 md:justify-end lg:ml-auto">
+                    <div className="relative w-full md:w-[320px] lg:w-[360px] min-w-0">
                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                             <Search size={18} />
                         </div>
@@ -862,7 +862,7 @@ const AttendanceList: React.FC = () => {
                         />
                     </div>
 
-                    <div className="flex gap-3 md:w-auto">
+                    <div className="flex gap-3 md:w-auto md:justify-end">
                         <button 
                             onClick={generateReport}
                             disabled={!selectedEvent || !selectedDate || data.length === 0}
