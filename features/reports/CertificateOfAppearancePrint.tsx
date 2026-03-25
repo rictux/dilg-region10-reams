@@ -11,6 +11,7 @@ type CertificateParticipant = {
   participant: Participant;
   needs_accommodation: boolean;
   date_accommodation: string[];
+  log_dates: string[];
 };
 
 const CertificateOfAppearancePrint: React.FC = () => {
@@ -56,7 +57,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
       // Fetch Logs for the event
       const { data: logs } = await supabase
         .from('attendance_logs')
-        .select('participant_id')
+        .select('participant_id, attendance_date')
         .eq('event_id', id);
 
       if (!logs) {
@@ -66,6 +67,15 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
       // Get unique participant IDs who have logs
       const uniqueParticipantIds = Array.from(new Set(logs.map(log => log.participant_id)));
+      const logDatesByParticipant = new Map<number, Set<string>>();
+
+      logs.forEach((log) => {
+        if (!log.participant_id || !log.attendance_date) return;
+        if (!logDatesByParticipant.has(log.participant_id)) {
+          logDatesByParticipant.set(log.participant_id, new Set<string>());
+        }
+        logDatesByParticipant.get(log.participant_id)?.add(log.attendance_date);
+      });
 
       if (uniqueParticipantIds.length === 0) {
         setParticipants([]);
@@ -89,7 +99,8 @@ const CertificateOfAppearancePrint: React.FC = () => {
         .map((record: any) => ({
           participant: Array.isArray(record.participants) ? (record.participants[0] || null) : record.participants,
           needs_accommodation: !!record.needs_accommodation,
-          date_accommodation: (record.date_accommodation || []).filter(Boolean)
+          date_accommodation: (record.date_accommodation || []).filter(Boolean),
+          log_dates: Array.from(logDatesByParticipant.get(record.participant_id) || []).sort()
         }))
         .filter((record): record is CertificateParticipant => !!record.participant)
         .sort((a, b) => {
@@ -133,6 +144,11 @@ const CertificateOfAppearancePrint: React.FC = () => {
     const savedDates = (selectedEvent.dates_with_accom || []).filter(Boolean);
     if (savedDates.length > 0) return savedDates;
     return getEventDateRows(selectedEvent).map((row) => row.key);
+  };
+
+  const getParticipantDateRows = (selectedEvent: Event, participantRecord: CertificateParticipant) => {
+    const logDateSet = new Set(participantRecord.log_dates);
+    return getEventDateRows(selectedEvent).filter((row) => logDateSet.has(row.key));
   };
 
   const getProvisionColumns = (selectedEvent: Event, participantRecord: CertificateParticipant) => {
@@ -290,7 +306,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                       <div className="flex justify-center mb-4">
                         <table className="border-collapse border border-black w-3/4 text-center font-serif text-[13px]">
                           <tbody>
-                            {getEventDateRows(event).map((dateRow) => {
+                            {getParticipantDateRows(event, participantRecord).map((dateRow) => {
                               const eventAccommodationDates = new Set(getEventAccommodationDates(event));
                               const participantAccommodationDates = participantRecord.date_accommodation.filter((date) => eventAccommodationDates.has(date));
                               const hasAccommodationOnDate = participantRecord.needs_accommodation &&
