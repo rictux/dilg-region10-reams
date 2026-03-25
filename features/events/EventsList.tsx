@@ -8,6 +8,63 @@ import QRCode from 'react-qr-code';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
 
+type ParticipantFormData = {
+  f_name: string;
+  l_name: string;
+  m_initial: string;
+  suffix: string;
+  full_name: string;
+  email: string;
+  role: string;
+  office: string;
+  mobile_no: string;
+  position: string;
+  gender: string;
+  age_group: string;
+  pwd: string;
+  indigenous_people: string;
+  needs_accommodation: boolean;
+  accommodation_pax: number;
+  participant_id?: number | null;
+  accept_photo_video: boolean;
+  store_to_db: boolean;
+};
+
+type ParticipantModalRecord = {
+  id: number;
+  participant_id: number;
+  registration_status: string;
+  registered_at?: string | null;
+  role: string;
+  needs_accommodation: boolean;
+  accommodation_pax: number;
+  accept_photo_video: boolean;
+  store_to_db: boolean;
+  participants: Participant | null;
+};
+
+const createEmptyParticipantForm = (): ParticipantFormData => ({
+  f_name: '',
+  l_name: '',
+  m_initial: '',
+  suffix: '',
+  full_name: '',
+  email: '',
+  role: 'Delegate',
+  office: '',
+  mobile_no: '',
+  position: '',
+  gender: 'Male',
+  age_group: '18-24',
+  pwd: 'No',
+  indigenous_people: 'No',
+  needs_accommodation: false,
+  accommodation_pax: 0,
+  participant_id: null,
+  accept_photo_video: false,
+  store_to_db: false
+});
+
 const EventsList: React.FC = () => {
   const { user, hasPermission } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
@@ -25,49 +82,10 @@ const EventsList: React.FC = () => {
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   
   // Add Participant Modal State
-  const [participantModalView, setParticipantModalView] = useState<'list' | 'add'>('list');
+  const [participantModalView, setParticipantModalView] = useState<'list' | 'add' | 'edit'>('list');
   const [isAddingParticipant, setIsAddingParticipant] = useState(false);
-  const [newParticipant, setNewParticipant] = useState<{
-      f_name: string;
-      l_name: string;
-      m_initial: string;
-      suffix: string;
-      full_name: string;
-      email: string;
-      role: string;
-      office: string;
-      mobile_no: string;
-      position: string;
-      gender: string;
-      age_group: string;
-      pwd: string;
-      indigenous_people: string;
-      needs_accommodation: boolean;
-      accommodation_pax: number;
-      participant_id?: number | null; 
-      accept_photo_video: boolean;
-      store_to_db: boolean;
-  }>({
-      f_name: '',
-      l_name: '',
-      m_initial: '',
-      suffix: '',
-      full_name: '',
-      email: '',
-      role: 'Delegate',
-      office: '',
-      mobile_no: '',
-      position: '',
-      gender: 'Male',
-      age_group: '18-24',
-      pwd: 'No',
-      indigenous_people: 'No',
-      needs_accommodation: false,
-      accommodation_pax: 0,
-      participant_id: null,
-      accept_photo_video: false,
-      store_to_db: false
-  });
+  const [newParticipant, setNewParticipant] = useState<ParticipantFormData>(createEmptyParticipantForm());
+  const [editingParticipantRecord, setEditingParticipantRecord] = useState<ParticipantModalRecord | null>(null);
 
   // Affiliation State
   const [affiliationType, setAffiliationType] = useState<'Office' | 'LGU'>('Office');
@@ -88,7 +106,7 @@ const EventsList: React.FC = () => {
   // Selection States
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
-  const [viewingParticipants, setViewingParticipants] = useState<any[]>([]);
+  const [viewingParticipants, setViewingParticipants] = useState<ParticipantModalRecord[]>([]);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [copied, setCopied] = useState(false);
   const [participantSearchTerm, setParticipantSearchTerm] = useState('');
@@ -200,24 +218,42 @@ const EventsList: React.FC = () => {
         .from('event_participants')
         .select(`
             id,
+            participant_id,
             registration_status,
             registered_at,
             role,
             needs_accommodation,
             accommodation_pax,
+            accept_photo_video,
+            store_to_db,
             participants (
                 participant_id,
                 full_name,
                 participant_code,
                 email,
+                f_name,
+                l_name,
+                m_initial,
+                suffix,
                 position,
-                office
+                office,
+                mobile_no,
+                gender,
+                age_group,
+                pwd,
+                indigenous_people,
+                location_id
             )
         `)
         .eq('event_id', eventId);
     
     if (!error && data) {
-        setViewingParticipants(data);
+        const normalizedParticipants = data.map((record: any) => ({
+            ...record,
+            participants: Array.isArray(record.participants) ? (record.participants[0] || null) : (record.participants || null)
+        })) as ParticipantModalRecord[];
+
+        setViewingParticipants(normalizedParticipants);
     }
     setLoadingParticipants(false);
   };
@@ -341,6 +377,24 @@ const EventsList: React.FC = () => {
       // fetchEventParticipants is called in useEffect when modal opens
   };
 
+  const resetParticipantForm = () => {
+      setNewParticipant(createEmptyParticipantForm());
+      setEditingParticipantRecord(null);
+      setAffiliationType('Office');
+      setSelectedProvince('');
+      setSelectedCity('');
+      setSuggestions([]);
+      setShowSuggestions(false);
+  };
+
+  const closeParticipantsModal = () => {
+      setShowParticipantsModal(false);
+      setParticipantModalView('list');
+      setParticipantSearchTerm('');
+      setEditingRole(null);
+      resetParticipantForm();
+  };
+
   const initiateRemoveParticipant = (participantId: number) => {
       setParticipantToDelete(participantId);
   };
@@ -393,8 +447,19 @@ const EventsList: React.FC = () => {
 
   const handleNameChange = async (e: React.ChangeEvent<HTMLInputElement>, field: 'f_name' | 'l_name') => {
     const value = e.target.value;
-    // Clear participant_id when user types manually (implies new or search again)
-    setNewParticipant(prev => ({ ...prev, [field]: value, participant_id: null }));
+    const shouldSearchExistingParticipants = participantModalView === 'add';
+
+    setNewParticipant(prev => ({
+        ...prev,
+        [field]: value,
+        participant_id: shouldSearchExistingParticipants ? null : prev.participant_id
+    }));
+
+    if (!shouldSearchExistingParticipants) {
+        setSuggestions([]);
+        setShowSuggestions(false);
+        return;
+    }
 
     if (value.length >= 2) {
         const { data } = await supabase
@@ -460,17 +525,16 @@ const EventsList: React.FC = () => {
     return str.toLowerCase().replace(/(^|\s)\S/g, l => l.toUpperCase());
   };
 
-  const handleAddParticipant = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!selectedEvent) return;
-      
-      let finalLocationId = null;
-      let finalOfficeName = newParticipant.office;
+  const buildParticipantSubmission = () => {
+      if (!selectedEvent) return null;
+
+      let finalLocationId = null as number | null;
+      let finalOfficeName = newParticipant.office.trim();
 
       if (affiliationType === 'LGU') {
           if (!selectedProvince) {
               alert("Please select a Province/HUC for LGU.");
-              return;
+              return null;
           }
           
           if (selectedCity) {
@@ -480,7 +544,7 @@ const EventsList: React.FC = () => {
                   finalOfficeName = `LGU ${selectedCity}, ${selectedProvince}`;
               } else {
                   alert("Selected location is invalid.");
-                  return;
+                  return null;
               }
           } else {
               const loc = locations.find(l => l.province_huc === selectedProvince && !l.city_mun);
@@ -493,22 +557,112 @@ const EventsList: React.FC = () => {
                     finalOfficeName = `Provincial Gov't of ${selectedProvince}`;
               }
           }
-      } else {
-          if (!newParticipant.office.trim()) {
-              alert("Please enter your Office / Agency name.");
-              return;
-          }
+      } else if (!newParticipant.office.trim()) {
+          alert("Please enter your Office / Agency name.");
+          return null;
       }
 
-      if (newParticipant.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newParticipant.email)) {
+      const trimmedEmail = newParticipant.email.trim();
+      if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
           alert("Please enter a valid email address.");
-          return;
+          return null;
       }
 
       if (newParticipant.mobile_no && !/^[0-9]{10,11}$/.test(newParticipant.mobile_no)) {
           alert("Please enter a valid mobile number (10 or 11 digits).");
-          return;
+          return null;
       }
+
+      if (selectedEvent.has_accommodation && newParticipant.needs_accommodation && newParticipant.accommodation_pax < 1) {
+          alert("Please specify at least 1 pax for accommodation.");
+          return null;
+      }
+
+      return {
+          participantPayload: {
+              f_name: toProperCase(newParticipant.f_name.trim()),
+              l_name: toProperCase(newParticipant.l_name.trim()),
+              m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
+              suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
+              email: trimmedEmail || null,
+              office: finalOfficeName,
+              location_id: finalLocationId,
+              mobile_no: newParticipant.mobile_no || null,
+              position: newParticipant.position.trim() || 'N/A',
+              gender: newParticipant.gender,
+              age_group: newParticipant.age_group,
+              pwd: newParticipant.pwd,
+              indigenous_people: newParticipant.indigenous_people
+          },
+          eventParticipantPayload: {
+              role: newParticipant.role,
+              needs_accommodation: selectedEvent.has_accommodation ? newParticipant.needs_accommodation : false,
+              accommodation_pax: selectedEvent.has_accommodation && newParticipant.needs_accommodation ? Math.max(1, newParticipant.accommodation_pax) : 0,
+              accept_photo_video: newParticipant.accept_photo_video,
+              store_to_db: newParticipant.store_to_db
+          }
+      };
+  };
+
+  const openAddParticipantView = () => {
+      resetParticipantForm();
+      setEditingRole(null);
+      setParticipantModalView('add');
+  };
+
+  const openEditParticipantView = (record: ParticipantModalRecord) => {
+      const participant = record.participants;
+      if (!participant) return;
+
+      let affType: 'Office' | 'LGU' = 'Office';
+      let prov = '';
+      let city = '';
+
+      if (participant.location_id && locations.length > 0) {
+          const loc = locations.find(l => l.location_id === participant.location_id);
+          if (loc) {
+              affType = 'LGU';
+              prov = loc.province_huc;
+              city = loc.city_mun || '';
+          }
+      }
+
+      setEditingRole(null);
+      setEditingParticipantRecord(record);
+      setAffiliationType(affType);
+      setSelectedProvince(prov);
+      setSelectedCity(city);
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setNewParticipant({
+          f_name: participant.f_name || '',
+          l_name: participant.l_name || '',
+          m_initial: participant.m_initial || '',
+          suffix: participant.suffix || '',
+          full_name: participant.full_name || '',
+          email: participant.email || '',
+          role: record.role || 'Delegate',
+          office: participant.office || '',
+          mobile_no: participant.mobile_no || '',
+          position: participant.position || '',
+          gender: participant.gender || 'Male',
+          age_group: participant.age_group || '18-24',
+          pwd: participant.pwd || 'No',
+          indigenous_people: participant.indigenous_people || 'No',
+          needs_accommodation: !!record.needs_accommodation,
+          accommodation_pax: record.needs_accommodation ? Math.max(1, record.accommodation_pax || 1) : 0,
+          participant_id: participant.participant_id,
+          accept_photo_video: !!record.accept_photo_video,
+          store_to_db: !!record.store_to_db
+      });
+      setParticipantModalView('edit');
+  };
+
+  const handleAddParticipant = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedEvent) return;
+      const submission = buildParticipantSubmission();
+      if (!submission) return;
 
       setIsAddingParticipant(true);
       
@@ -519,64 +673,34 @@ const EventsList: React.FC = () => {
           if (newParticipant.participant_id) {
              participantId = newParticipant.participant_id;
              // Optional: Update participant details if changed
-             await supabase.from('participants').update({
-                f_name: toProperCase(newParticipant.f_name.trim()),
-                l_name: toProperCase(newParticipant.l_name.trim()),
-                m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
-                email: newParticipant.email || null,
-                office: finalOfficeName,
-                location_id: finalLocationId,
-                mobile_no: newParticipant.mobile_no || null,
-                position: newParticipant.position || 'N/A',
-                gender: newParticipant.gender,
-                age_group: newParticipant.age_group,
-                pwd: newParticipant.pwd,
-                indigenous_people: newParticipant.indigenous_people
-             }).eq('participant_id', participantId);
+             const { error: updateError } = await supabase
+                .from('participants')
+                .update(submission.participantPayload)
+                .eq('participant_id', participantId);
 
-          } else if (newParticipant.email) {
+             if (updateError) throw updateError;
+
+          } else if (submission.participantPayload.email) {
                const { data: existingUser } = await supabase
                 .from('participants')
                 .select('participant_id')
-                .eq('email', newParticipant.email)
+                .eq('email', submission.participantPayload.email)
                 .single();
                 
                if (existingUser) {
                    participantId = existingUser.participant_id;
                    // Update details
-                   await supabase.from('participants').update({
-                        f_name: toProperCase(newParticipant.f_name.trim()),
-                        l_name: toProperCase(newParticipant.l_name.trim()),
-                        m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                        suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
-                        office: finalOfficeName,
-                        location_id: finalLocationId,
-                        mobile_no: newParticipant.mobile_no || null,
-                        position: newParticipant.position || 'N/A',
-                        gender: newParticipant.gender,
-                        age_group: newParticipant.age_group,
-                        pwd: newParticipant.pwd,
-                        indigenous_people: newParticipant.indigenous_people
-                    }).eq('participant_id', participantId);
+                   const { error: updateError } = await supabase
+                    .from('participants')
+                    .update(submission.participantPayload)
+                    .eq('participant_id', participantId);
+
+                   if (updateError) throw updateError;
                } else {
                    // Create
                     const { data: newUser, error: createError } = await supabase
                     .from('participants')
-                    .insert([{
-                        f_name: toProperCase(newParticipant.f_name.trim()),
-                        l_name: toProperCase(newParticipant.l_name.trim()),
-                        m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                        suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
-                        email: newParticipant.email,
-                        office: finalOfficeName,
-                        location_id: finalLocationId,
-                        position: newParticipant.position || 'N/A',
-                        mobile_no: newParticipant.mobile_no || null,
-                        age_group: newParticipant.age_group,
-                        pwd: newParticipant.pwd,
-                        indigenous_people: newParticipant.indigenous_people
-                    }])
+                    .insert([submission.participantPayload])
                     .select()
                     .single();
                     if(createError) throw createError;
@@ -586,21 +710,7 @@ const EventsList: React.FC = () => {
                // Create (No Email provided)
                const { data: newUser, error: createError } = await supabase
                 .from('participants')
-                .insert([{
-                    f_name: toProperCase(newParticipant.f_name.trim()),
-                    l_name: toProperCase(newParticipant.l_name.trim()),
-                    m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                    suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
-                    email: null,
-                    office: finalOfficeName,
-                    location_id: finalLocationId,
-                    position: newParticipant.position || 'N/A',
-                    gender: newParticipant.gender,
-                    mobile_no: newParticipant.mobile_no || null,
-                    age_group: newParticipant.age_group,
-                    pwd: newParticipant.pwd,
-                    indigenous_people: newParticipant.indigenous_people
-                }])
+                .insert([submission.participantPayload])
                 .select()
                 .single();
                 if(createError) throw createError;
@@ -614,43 +724,53 @@ const EventsList: React.FC = () => {
                 event_id: selectedEvent.event_id,
                 participant_id: participantId,
                 registration_status: 'Registered',
-                role: newParticipant.role,
-                needs_accommodation: newParticipant.needs_accommodation,
-                accommodation_pax: newParticipant.needs_accommodation ? Math.max(1, newParticipant.accommodation_pax) : 0,
-                accept_photo_video: newParticipant.accept_photo_video,
-                store_to_db: newParticipant.store_to_db
+                ...submission.eventParticipantPayload
             });
 
           if (regError && regError.code !== '23505') throw regError;
           
           // Success
           setParticipantModalView('list');
-          setNewParticipant({
-              f_name: '',
-              l_name: '',
-              m_initial: '',
-              suffix: '',
-              full_name: '',
-              email: '',
-              role: 'Delegate',
-              office: '',
-              mobile_no: '',
-              position: '',
-              gender: 'Male',
-              age_group: '18-24',
-              pwd: 'No',
-              indigenous_people: 'No',
-              needs_accommodation: false,
-              accommodation_pax: 0,
-              participant_id: null,
-              accept_photo_video: false,
-              store_to_db: false
-          });
-          setSuggestions([]);
+          resetParticipantForm();
           fetchEventParticipants(selectedEvent.event_id);
 
       } catch (err: any) {
           alert("Error adding participant: " + err.message);
+      } finally {
+          setIsAddingParticipant(false);
+      }
+  };
+
+  const handleUpdateParticipantDetails = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedEvent || !editingParticipantRecord) return;
+
+      const submission = buildParticipantSubmission();
+      if (!submission) return;
+
+      setIsAddingParticipant(true);
+
+      try {
+          const { error: participantError } = await supabase
+            .from('participants')
+            .update(submission.participantPayload)
+            .eq('participant_id', editingParticipantRecord.participant_id);
+
+          if (participantError) throw participantError;
+
+          const { error: registrationError } = await supabase
+            .from('event_participants')
+            .update(submission.eventParticipantPayload)
+            .eq('event_id', selectedEvent.event_id)
+            .eq('participant_id', editingParticipantRecord.participant_id);
+
+          if (registrationError) throw registrationError;
+
+          setParticipantModalView('list');
+          resetParticipantForm();
+          fetchEventParticipants(selectedEvent.event_id);
+      } catch (err: any) {
+          alert("Error updating participant: " + err.message);
       } finally {
           setIsAddingParticipant(false);
       }
@@ -689,7 +809,10 @@ const EventsList: React.FC = () => {
   const totalCount = viewingParticipants.length;
   const delegateCount = viewingParticipants.filter(p => p.role === 'Delegate').length;
   const accommodationCount = React.useMemo(() => {
-      return viewingParticipants.filter(p => p.needs_accommodation).length;
+      return viewingParticipants.reduce((total, participant) => {
+          if (!participant.needs_accommodation) return total;
+          return total + Math.max(1, participant.accommodation_pax || 1);
+      }, 0);
   }, [viewingParticipants]);
 
   // Helper for status badges
@@ -1216,7 +1339,7 @@ const EventsList: React.FC = () => {
       {/* Participants List Modal */}
       {showParticipantsModal && selectedEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => { setShowParticipantsModal(false); setParticipantModalView('list'); }}></div>
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeParticipantsModal}></div>
             <div className={`bg-white rounded-xl shadow-2xl w-full ${participantModalView === 'list' ? 'max-w-6xl' : 'max-w-3xl'} h-[80vh] flex flex-col relative z-10 animate-in zoom-in-95 duration-200`}>
                 {/* Header */}
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-xl shrink-0">
@@ -1226,6 +1349,11 @@ const EventsList: React.FC = () => {
                                 <>
                                     <Users className="text-indigo-600" size={24} /> 
                                     {selectedEvent.event_name}
+                                </>
+                            ) : participantModalView === 'edit' ? (
+                                <>
+                                    <Edit className="text-indigo-600" size={24} />
+                                    Edit Participant
                                 </>
                             ) : (
                                 <>
@@ -1258,7 +1386,7 @@ const EventsList: React.FC = () => {
                         {participantModalView === 'list' ? (
                             hasPermission('MANAGE_PARTICIPANTS') && (
                                 <button 
-                                    onClick={() => setParticipantModalView('add')}
+                                    onClick={openAddParticipantView}
                                     className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors mr-2 shadow-sm"
                                 >
                                     <UserPlus size={16} /> Add
@@ -1266,13 +1394,13 @@ const EventsList: React.FC = () => {
                             )
                         ) : (
                             <button 
-                                onClick={() => setParticipantModalView('list')}
+                                onClick={() => { setParticipantModalView('list'); resetParticipantForm(); }}
                                 className="bg-slate-100 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-slate-200 transition-colors mr-2 shadow-sm"
                             >
                                 <ArrowRight size={16} className="rotate-180" /> Return to List
                             </button>
                         )}
-                        <button onClick={() => { setShowParticipantsModal(false); setParticipantModalView('list'); }} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
+                        <button onClick={closeParticipantsModal} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
                             <X size={24} />
                         </button>
                     </div>
@@ -1306,7 +1434,7 @@ const EventsList: React.FC = () => {
                                             </td>
                                         </tr>
                                         {specialParticipants.map((record, index) => {
-                                            const isEditing = editingRole?.participantId === record.participants.participant_id;
+                                            const isEditing = editingRole?.participantId === record.participant_id;
                                             return (
                                             <tr key={record.id} className="hover:bg-slate-50">
                                                 <td className="px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
@@ -1349,7 +1477,7 @@ const EventsList: React.FC = () => {
                                                             <span className="font-medium text-indigo-600">{record.role}</span>
                                                             {hasPermission('MANAGE_PARTICIPANTS') && (
                                                                 <button 
-                                                                    onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participants.participant_id, role: record.role }); }}
+                                                                    onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participant_id, role: record.role }); }}
                                                                     className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1 rounded"
                                                                     title="Edit Role"
                                                                 >
@@ -1360,7 +1488,7 @@ const EventsList: React.FC = () => {
                                                     )}
                                                     {record.needs_accommodation && (
                                                         <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded flex items-center w-fit gap-1 mt-0.5">
-                                                            <Home size={8} /> Stay
+                                                            <Home size={8} /> Stay ({Math.max(1, record.accommodation_pax || 1)} pax)
                                                         </span>
                                                     )}
                                                 </td>
@@ -1374,13 +1502,22 @@ const EventsList: React.FC = () => {
                                                 </td>
                                                 {hasPermission('MANAGE_PARTICIPANTS') && (
                                                     <td className="px-6 py-3 text-right">
-                                                        <button 
-                                                            onClick={() => initiateRemoveParticipant(record.participants.participant_id)}
-                                                            className="text-slate-400 hover:text-red-600 transition-colors p-1"
-                                                            title="Remove Participant"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            <button
+                                                                onClick={() => openEditParticipantView(record)}
+                                                                className="text-slate-400 hover:text-indigo-600 transition-colors p-1"
+                                                                title="Edit Participant"
+                                                            >
+                                                                <Edit size={16} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => initiateRemoveParticipant(record.participant_id)}
+                                                                className="text-slate-400 hover:text-red-600 transition-colors p-1"
+                                                                title="Remove Participant"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 )}
                                             </tr>
@@ -1397,7 +1534,7 @@ const EventsList: React.FC = () => {
                                             </td>
                                         </tr>
                                         {delegateParticipants.map((record, index) => {
-                                            const isEditing = editingRole?.participantId === record.participants.participant_id;
+                                            const isEditing = editingRole?.participantId === record.participant_id;
                                             return (
                                             <tr key={record.id} className="hover:bg-slate-50">
                                                 <td className="px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
@@ -1440,7 +1577,7 @@ const EventsList: React.FC = () => {
                                                             <span className="font-medium text-indigo-600">{record.role}</span>
                                                             {hasPermission('MANAGE_PARTICIPANTS') && (
                                                                 <button 
-                                                                    onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participants.participant_id, role: record.role }); }}
+                                                                    onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participant_id, role: record.role }); }}
                                                                     className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1 rounded"
                                                                     title="Edit Role"
                                                                 >
@@ -1451,7 +1588,7 @@ const EventsList: React.FC = () => {
                                                     )}
                                                     {record.needs_accommodation && (
                                                         <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded flex items-center w-fit gap-1 mt-0.5">
-                                                            <Home size={8} /> Stay
+                                                            <Home size={8} /> Stay ({Math.max(1, record.accommodation_pax || 1)} pax)
                                                         </span>
                                                     )}
                                                 </td>
@@ -1465,13 +1602,22 @@ const EventsList: React.FC = () => {
                                                 </td>
                                                 {hasPermission('MANAGE_PARTICIPANTS') && (
                                                     <td className="px-6 py-3 text-right">
-                                                        <button 
-                                                            onClick={() => initiateRemoveParticipant(record.participants.participant_id)}
-                                                            className="text-slate-400 hover:text-red-600 transition-colors p-1"
-                                                            title="Remove Participant"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            <button
+                                                                onClick={() => openEditParticipantView(record)}
+                                                                className="text-slate-400 hover:text-indigo-600 transition-colors p-1"
+                                                                title="Edit Participant"
+                                                            >
+                                                                <Edit size={16} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => initiateRemoveParticipant(record.participant_id)}
+                                                                className="text-slate-400 hover:text-red-600 transition-colors p-1"
+                                                                title="Remove Participant"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 )}
                                             </tr>
@@ -1491,7 +1637,7 @@ const EventsList: React.FC = () => {
                         </table>
                     )) : (
                         <div className="p-6 max-w-2xl mx-auto w-full">
-                            <form onSubmit={handleAddParticipant} className="space-y-4">
+                            <form onSubmit={participantModalView === 'edit' ? handleUpdateParticipantDetails : handleAddParticipant} className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="relative">
                                         <label className="block text-sm font-medium text-slate-700 mb-1">First Name</label>
@@ -1502,14 +1648,14 @@ const EventsList: React.FC = () => {
                                             className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                             value={newParticipant.f_name}
                                             onChange={(e) => handleNameChange(e, 'f_name')}
-                                            onFocus={() => { if(newParticipant.f_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
+                                            onFocus={() => { if(participantModalView === 'add' && newParticipant.f_name.length >= 2 && suggestions.length > 0) setShowSuggestions(true); }}
                                             onBlur={(e) => {
                                                 setNewParticipant({ ...newParticipant, f_name: toProperCase(e.target.value) });
                                                 setTimeout(() => setShowSuggestions(false), 200);
                                             }}
                                             autoComplete="off"
                                         />
-                                        {showSuggestions && suggestions.length > 0 && (
+                                        {participantModalView === 'add' && showSuggestions && suggestions.length > 0 && (
                                             <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
                                                 {suggestions.map((p) => (
                                                     <li 
@@ -1806,7 +1952,7 @@ const EventsList: React.FC = () => {
                                 <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
                                     <button 
                                         type="button"
-                                        onClick={() => setParticipantModalView('list')}
+                                        onClick={() => { setParticipantModalView('list'); resetParticipantForm(); }}
                                         className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium"
                                     >
                                         Cancel
@@ -1817,7 +1963,7 @@ const EventsList: React.FC = () => {
                                         className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium flex items-center gap-2"
                                     >
                                         {isAddingParticipant ? <Loader2 className="animate-spin" size={18} /> : <UserPlus size={18} />}
-                                        Add Participant
+                                        {participantModalView === 'edit' ? 'Save Changes' : 'Add Participant'}
                                     </button>
                                 </div>
                             </form>
