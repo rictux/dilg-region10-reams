@@ -5,12 +5,36 @@ import { supabase } from '../../lib/supabase';
 import { Event, Participant, RefLocation } from '../../types/database';
 import QRCode from 'react-qr-code';
 import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock, Landmark, Download, Info } from 'lucide-react';
-import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
+import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import { toPng } from 'html-to-image';
 import QrScanner from './QrScanner';
 
 type ParticipantMatch = Pick<Participant, 'participant_id' | 'participant_code'> & Partial<Pick<Participant, 'full_name' | 'f_name' | 'l_name' | 'm_initial' | 'suffix' | 'email' | 'mobile_no' | 'office' | 'position'>> & {
   participatedEventsCount?: number;
+};
+
+const getDateRangeOptions = (start?: string, end?: string) => {
+  if (!start) return [] as string[];
+
+  try {
+    const startDate = parseISO(start);
+    const endDate = end ? parseISO(end) : startDate;
+    if (startDate > endDate) {
+      return [format(startDate, 'yyyy-MM-dd')];
+    }
+
+    return eachDayOfInterval({ start: startDate, end: endDate }).map((date) => format(date, 'yyyy-MM-dd'));
+  } catch {
+    return [start];
+  }
+};
+
+const formatAccommodationDateLabel = (value: string) => {
+  try {
+    return format(parseISO(value), 'EEE, MMM d, yyyy');
+  } catch {
+    return value;
+  }
 };
 
 const EventRegistration: React.FC = () => {
@@ -76,11 +100,43 @@ const EventRegistration: React.FC = () => {
     role: 'Delegate',
     needs_accommodation: false,
     accommodation_pax: 0,
+    date_accommodation: [] as string[],
     location_id: null as number | null,
     accept_photo_video: false,
     store_to_db: false,
     participant_code: ''
   });
+
+  const getEventAccommodationDates = () => {
+    if (!event?.has_accommodation) return [] as string[];
+    const savedDates = (event.dates_with_accom || []).filter(Boolean);
+    return savedDates.length > 0 ? savedDates : getDateRangeOptions(event.start_date, event.end_date);
+  };
+
+  const toggleAccommodation = (enabled: boolean) => {
+    const availableDates = getEventAccommodationDates();
+    const nextDates = enabled && availableDates.length === 1 ? [availableDates[0]] : [];
+
+    setFormData((prev) => ({
+      ...prev,
+      needs_accommodation: enabled,
+      accommodation_pax: enabled ? 1 : 0,
+      date_accommodation: nextDates
+    }));
+  };
+
+  const toggleAccommodationDate = (date: string) => {
+    setFormData((prev) => {
+      const nextDates = prev.date_accommodation.includes(date)
+        ? prev.date_accommodation.filter((value) => value !== date)
+        : [...prev.date_accommodation, date];
+
+      return {
+        ...prev,
+        date_accommodation: nextDates
+      };
+    });
+  };
 
   useEffect(() => {
     fetchEventDetails();
@@ -218,6 +274,21 @@ const EventRegistration: React.FC = () => {
       return null;
     }
 
+    const availableAccommodationDates = getEventAccommodationDates();
+    const normalizedAccommodationDates = formData.needs_accommodation && event?.has_accommodation
+      ? (() => {
+          const selectedDates = (formData.date_accommodation || []).filter((date) => availableAccommodationDates.includes(date));
+          if (selectedDates.length > 0) return selectedDates;
+          if (availableAccommodationDates.length === 1) return [availableAccommodationDates[0]];
+          return [];
+        })()
+      : [];
+
+    if (formData.needs_accommodation && event?.has_accommodation && normalizedAccommodationDates.length === 0) {
+      setError("Please select at least one accommodation date.");
+      return null;
+    }
+
     let finalLocationId = null as number | null;
     let finalOfficeName = formData.office;
 
@@ -256,7 +327,8 @@ const EventRegistration: React.FC = () => {
       finalLocationId,
       finalOfficeName,
       finalEmail: formData.email.trim() === '' ? null : formData.email.trim(),
-      finalMobile: formData.mobile_no.trim() === '' ? null : formData.mobile_no.trim()
+      finalMobile: formData.mobile_no.trim() === '' ? null : formData.mobile_no.trim(),
+      normalizedAccommodationDates
     };
   };
 
@@ -308,7 +380,7 @@ const EventRegistration: React.FC = () => {
       if (!event.registration_open) throw new Error("Registration for this event is closed.");
 
       const id = parseInt(eventId!);
-      const { finalLocationId, finalOfficeName, finalEmail, finalMobile } = submissionContext;
+      const { finalLocationId, finalOfficeName, finalEmail, finalMobile, normalizedAccommodationDates } = submissionContext;
 
       let participantId: number;
       let finalParticipantCode = '';
@@ -416,6 +488,7 @@ const EventRegistration: React.FC = () => {
           role: 'Delegate',
           needs_accommodation: formData.needs_accommodation,
           accommodation_pax: formData.needs_accommodation ? formData.accommodation_pax : 0,
+          date_accommodation: formData.needs_accommodation && event.has_accommodation ? normalizedAccommodationDates : null,
           accept_photo_video: formData.accept_photo_video,
           store_to_db: formData.store_to_db
         });
@@ -987,7 +1060,7 @@ const EventRegistration: React.FC = () => {
                                             name="accommodation"
                                             className="hidden"
                                             checked={formData.needs_accommodation}
-                                            onChange={() => setFormData(prev => ({ ...prev, needs_accommodation: true, accommodation_pax: 1 }))}
+                                            onChange={() => toggleAccommodation(true)}
                                         />
                                         <span className="text-sm font-medium text-slate-700 group-hover:text-indigo-700">Yes</span>
                                     </label>
@@ -1001,12 +1074,47 @@ const EventRegistration: React.FC = () => {
                                             name="accommodation"
                                             className="hidden"
                                             checked={!formData.needs_accommodation}
-                                            onChange={() => setFormData(prev => ({ ...prev, needs_accommodation: false, accommodation_pax: 0 }))}
+                                            onChange={() => toggleAccommodation(false)}
                                         />
                                         <span className="text-sm font-medium text-slate-700 group-hover:text-indigo-700">No</span>
                                     </label>
                                 </div>
                              </div>
+
+                             {formData.needs_accommodation && getEventAccommodationDates().length === 1 && (
+                                <div className="rounded-lg border border-indigo-100 bg-white/80 px-3 py-2">
+                                    <p className="text-xs text-slate-600">
+                                        Accommodation date is set automatically to <span className="font-semibold text-slate-800">{formatAccommodationDateLabel(getEventAccommodationDates()[0])}</span>.
+                                    </p>
+                                </div>
+                             )}
+
+                             {formData.needs_accommodation && getEventAccommodationDates().length > 1 && (
+                                <div className="space-y-2">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Select Accommodation Dates</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {getEventAccommodationDates().map((date) => {
+                                          const isChecked = formData.date_accommodation.includes(date);
+                                          return (
+                                            <label
+                                              key={date}
+                                              className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
+                                                isChecked ? 'border-indigo-400 bg-indigo-100/70 text-indigo-700' : 'border-indigo-100 bg-white text-slate-700 hover:border-indigo-300'
+                                              }`}
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={() => toggleAccommodationDate(date)}
+                                                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                              />
+                                              <span className="text-sm font-medium">{formatAccommodationDateLabel(date)}</span>
+                                            </label>
+                                          );
+                                        })}
+                                    </div>
+                                </div>
+                             )}
                         </div>
                     )}
 

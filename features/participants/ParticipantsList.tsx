@@ -72,6 +72,7 @@ const AttendanceList: React.FC = () => {
       indigenous_people: 'No',
       needs_accommodation: false,
       accommodation_pax: 0,
+      date_accommodation: [] as string[],
       participant_id: null as number | null,
       accept_photo_video: false,
       store_to_db: false
@@ -91,6 +92,36 @@ const AttendanceList: React.FC = () => {
       .filter(l => l.province_huc === selectedProvince && l.city_mun)
       .map(l => l.city_mun)
       .sort();
+
+  const getEventDateRangeOptions = (start?: string, end?: string) => {
+      if (!start) return [] as string[];
+
+      try {
+          const startDate = parseISO(start);
+          const endDate = end ? parseISO(end) : startDate;
+          if (startDate > endDate) {
+              return [format(startDate, 'yyyy-MM-dd')];
+          }
+
+          return eachDayOfInterval({ start: startDate, end: endDate }).map((date) => format(date, 'yyyy-MM-dd'));
+      } catch {
+          return [start];
+      }
+  };
+
+  const formatAccommodationDateLabel = (value: string) => {
+      try {
+          return format(parseISO(value), 'EEE, MMM d, yyyy');
+      } catch {
+          return value;
+      }
+  };
+
+  const getSelectedEventAccommodationDates = (event?: Event | null) => {
+      if (!event?.has_accommodation) return [] as string[];
+      const savedDates = (event.dates_with_accom || []).filter(Boolean);
+      return savedDates.length > 0 ? savedDates : getEventDateRangeOptions(event.start_date, event.end_date);
+  };
 
   // Click Outside Listener for Dropdown
   useEffect(() => {
@@ -541,6 +572,16 @@ const AttendanceList: React.FC = () => {
   const handleAddParticipant = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!selectedEvent) return;
+
+      const availableAccommodationDates = getSelectedEventAccommodationDates(selectedEvent);
+      const normalizedAccommodationDates = selectedEvent.has_accommodation && newParticipant.needs_accommodation
+          ? (() => {
+                const selectedDates = (newParticipant.date_accommodation || []).filter((date) => availableAccommodationDates.includes(date));
+                if (selectedDates.length > 0) return selectedDates;
+                if (availableAccommodationDates.length === 1) return [availableAccommodationDates[0]];
+                return [];
+            })()
+          : [];
       
       let finalLocationId = null;
       let finalOfficeName = newParticipant.office;
@@ -585,6 +626,11 @@ const AttendanceList: React.FC = () => {
 
       if (newParticipant.mobile_no && !/^[0-9]{10,11}$/.test(newParticipant.mobile_no)) {
           alert("Please enter a valid mobile number (10 or 11 digits).");
+          return;
+      }
+
+      if (selectedEvent.has_accommodation && newParticipant.needs_accommodation && normalizedAccommodationDates.length === 0) {
+          alert("Please select at least one accommodation date.");
           return;
       }
 
@@ -695,6 +741,7 @@ const AttendanceList: React.FC = () => {
                 role: newParticipant.role,
                 needs_accommodation: newParticipant.needs_accommodation,
                 accommodation_pax: newParticipant.needs_accommodation ? Math.max(1, newParticipant.accommodation_pax) : 0,
+                date_accommodation: selectedEvent.has_accommodation && newParticipant.needs_accommodation ? normalizedAccommodationDates : null,
                 accept_photo_video: newParticipant.accept_photo_video,
                 store_to_db: newParticipant.store_to_db
             });
@@ -720,7 +767,10 @@ const AttendanceList: React.FC = () => {
               indigenous_people: 'No',
               needs_accommodation: false,
               accommodation_pax: 0,
-              participant_id: null
+              date_accommodation: [],
+              participant_id: null,
+              accept_photo_video: false,
+              store_to_db: false
           });
           setSuggestions([]);
           // fetchAttendance will be triggered by supabase real-time channel
@@ -1439,10 +1489,55 @@ const AttendanceList: React.FC = () => {
                                     type="checkbox"
                                     className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
                                     checked={newParticipant.needs_accommodation}
-                                    onChange={e => setNewParticipant({...newParticipant, needs_accommodation: e.target.checked, accommodation_pax: e.target.checked ? 1 : 0})}
+                                    onChange={e => {
+                                        const availableDates = getSelectedEventAccommodationDates(selectedEvent);
+                                        const nextDates = e.target.checked && availableDates.length === 1 ? [availableDates[0]] : [];
+                                        setNewParticipant({
+                                            ...newParticipant,
+                                            needs_accommodation: e.target.checked,
+                                            accommodation_pax: e.target.checked ? 1 : 0,
+                                            date_accommodation: nextDates
+                                        });
+                                    }}
                                 />
                                 <span className="text-sm font-medium text-slate-700">Needs Accommodation</span>
                             </label>
+                            {newParticipant.needs_accommodation && getSelectedEventAccommodationDates(selectedEvent).length === 1 && (
+                                <p className="mt-2 text-xs text-slate-500">
+                                    Accommodation date is set automatically to {formatAccommodationDateLabel(getSelectedEventAccommodationDates(selectedEvent)[0])}.
+                                </p>
+                            )}
+                            {newParticipant.needs_accommodation && getSelectedEventAccommodationDates(selectedEvent).length > 1 && (
+                                <div className="mt-3 space-y-2">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Select Accommodation Dates</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {getSelectedEventAccommodationDates(selectedEvent).map((date) => {
+                                            const isChecked = newParticipant.date_accommodation.includes(date);
+                                            return (
+                                                <label
+                                                    key={date}
+                                                    className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
+                                                        isChecked ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300'
+                                                    }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onChange={() => setNewParticipant((prev) => {
+                                                            const selectedDates = prev.date_accommodation.includes(date)
+                                                                ? prev.date_accommodation.filter((value) => value !== date)
+                                                                : [...prev.date_accommodation, date];
+                                                            return { ...prev, date_accommodation: selectedDates };
+                                                        })}
+                                                        className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                    />
+                                                    <span className="text-sm font-medium">{formatAccommodationDateLabel(date)}</span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 

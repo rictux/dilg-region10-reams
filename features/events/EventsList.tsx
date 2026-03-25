@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event, Participant, Office } from '../../types/database';
 import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Home, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark } from 'lucide-react';
-import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
+import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
@@ -25,6 +25,7 @@ type ParticipantFormData = {
   indigenous_people: string;
   needs_accommodation: boolean;
   accommodation_pax: number;
+  date_accommodation: string[];
   participant_id?: number | null;
   accept_photo_video: boolean;
   store_to_db: boolean;
@@ -40,6 +41,7 @@ type ParticipantModalRecord = {
   accommodation_pax: number;
   accept_photo_video: boolean;
   store_to_db: boolean;
+  date_accommodation: string[] | null;
   participants: Participant | null;
 };
 
@@ -60,10 +62,33 @@ const createEmptyParticipantForm = (): ParticipantFormData => ({
   indigenous_people: 'No',
   needs_accommodation: false,
   accommodation_pax: 0,
+  date_accommodation: [],
   participant_id: null,
   accept_photo_video: false,
   store_to_db: false
 });
+
+const getDateRangeOptions = (start?: string | null, end?: string | null) => {
+  if (!start) return [];
+
+  try {
+    const startDate = parseISO(start);
+    const parsedEnd = end ? parseISO(end) : startDate;
+    const endDate = parsedEnd < startDate ? startDate : parsedEnd;
+
+    return eachDayOfInterval({ start: startDate, end: endDate }).map((date) => format(date, 'yyyy-MM-dd'));
+  } catch {
+    return [start];
+  }
+};
+
+const formatAccommodationDateLabel = (value: string) => {
+  try {
+    return format(parseISO(value), 'EEE, MMM d, yyyy');
+  } catch {
+    return value;
+  }
+};
 
 const EventsList: React.FC = () => {
   const { user, hasPermission } = useAuth();
@@ -129,7 +154,10 @@ const EventsList: React.FC = () => {
       status: 'Scheduled' as const,
       organize_by: null as number | null,
       has_accommodation: false,
-      registration_open: true
+      registration_open: true,
+      session: 'All_Day' as const,
+      days_accommodation: 0,
+      dates_with_accom: [] as string[]
   };
   const [formData, setFormData] = useState<Partial<Event>>(initialFormState);
 
@@ -226,6 +254,7 @@ const EventsList: React.FC = () => {
             accommodation_pax,
             accept_photo_video,
             store_to_db,
+            date_accommodation,
             participants (
                 participant_id,
                 full_name,
@@ -279,6 +308,100 @@ const EventsList: React.FC = () => {
     return `${format(startDate, 'MMM d, yyyy')} - ${format(endDate, 'MMM d, yyyy')}`;
   };
 
+  const getFormEventDateOptions = (start = formData.start_date, end = formData.end_date) => {
+      return getDateRangeOptions(start, end);
+  };
+
+  const normalizeAccommodationDates = (dates: string[], start = formData.start_date, end = formData.end_date) => {
+      const validOptions = getFormEventDateOptions(start, end);
+      return dates.filter((date) => validOptions.includes(date));
+  };
+
+  const getSelectedEventAccommodationDates = (event: Event | null) => {
+      if (!event?.has_accommodation) return [];
+      const savedDates = (event.dates_with_accom || []).filter(Boolean);
+      return savedDates.length > 0 ? savedDates : getDateRangeOptions(event.start_date, event.end_date);
+  };
+
+  const toggleParticipantAccommodation = (checked: boolean) => {
+      const availableDates = getSelectedEventAccommodationDates(selectedEvent);
+      const normalizedSelectedDates = (newParticipant.date_accommodation || []).filter((date) => availableDates.includes(date));
+      const nextDates = checked
+        ? (availableDates.length === 1
+            ? [availableDates[0]]
+            : normalizedSelectedDates)
+        : [];
+
+      setNewParticipant({
+          ...newParticipant,
+          needs_accommodation: checked,
+          accommodation_pax: checked ? 1 : 0,
+          date_accommodation: nextDates
+      });
+  };
+
+  const toggleParticipantAccommodationDate = (date: string) => {
+      setNewParticipant((prev) => {
+          const availableDates = getSelectedEventAccommodationDates(selectedEvent);
+          if (!availableDates.includes(date)) return prev;
+
+          const selectedDates = prev.date_accommodation.includes(date)
+            ? prev.date_accommodation.filter((value) => value !== date)
+            : [...prev.date_accommodation, date];
+
+          return {
+              ...prev,
+              date_accommodation: selectedDates
+          };
+      });
+  };
+
+  const updateEventDates = (field: 'start_date' | 'end_date', value: string) => {
+      const nextFormData = { ...formData, [field]: value };
+      const validDates = getDateRangeOptions(nextFormData.start_date, nextFormData.end_date);
+      const selectedDates = (nextFormData.dates_with_accom || []).filter((date) => validDates.includes(date));
+      const fallbackDates = nextFormData.has_accommodation && selectedDates.length === 0 ? validDates : selectedDates;
+
+      setFormData({
+          ...nextFormData,
+          dates_with_accom: fallbackDates,
+          days_accommodation: nextFormData.has_accommodation ? fallbackDates.length : 0
+      });
+  };
+
+  const toggleFormAccommodation = (checked: boolean) => {
+      const availableDates = getFormEventDateOptions();
+      const nextDates = checked
+        ? (() => {
+            const selectedDates = normalizeAccommodationDates(formData.dates_with_accom || []);
+            return selectedDates.length > 0 ? selectedDates : availableDates;
+          })()
+        : [];
+
+      setFormData({
+          ...formData,
+          has_accommodation: checked,
+          dates_with_accom: nextDates,
+          days_accommodation: checked ? nextDates.length : 0
+      });
+  };
+
+  const toggleFormAccommodationDate = (date: string) => {
+      const selectedDates = new Set(normalizeAccommodationDates(formData.dates_with_accom || []));
+      if (selectedDates.has(date)) {
+          selectedDates.delete(date);
+      } else {
+          selectedDates.add(date);
+      }
+
+      const nextDates = getFormEventDateOptions().filter((value) => selectedDates.has(value));
+      setFormData({
+          ...formData,
+          dates_with_accom: nextDates,
+          days_accommodation: nextDates.length
+      });
+  };
+
   // --- Handlers ---
 
   const openCreateModal = () => {
@@ -302,7 +425,10 @@ const EventsList: React.FC = () => {
           status: event.status,
           organize_by: event.organize_by,
           has_accommodation: event.has_accommodation,
-          registration_open: event.registration_open
+          registration_open: event.registration_open,
+          session: event.session || 'All_Day',
+          days_accommodation: event.days_accommodation || 0,
+          dates_with_accom: event.dates_with_accom || []
       });
       setShowEventModal(true);
   };
@@ -311,7 +437,19 @@ const EventsList: React.FC = () => {
       e.preventDefault();
       
       // If not admin, force assignment to their office (security fallback)
-      let payload = { ...formData };
+      const normalizedAccommodationDates = formData.has_accommodation
+        ? (() => {
+            const selectedDates = normalizeAccommodationDates(formData.dates_with_accom || []);
+            return selectedDates.length > 0 ? selectedDates : getFormEventDateOptions(formData.start_date, formData.end_date);
+          })()
+        : [];
+
+      let payload = {
+          ...formData,
+          session: formData.session || 'All_Day',
+          dates_with_accom: formData.has_accommodation ? normalizedAccommodationDates : null,
+          days_accommodation: formData.has_accommodation ? normalizedAccommodationDates.length : 0
+      };
       if (user?.role !== 'Admin' && user?.office_id) {
           payload.organize_by = user.office_id;
       }
@@ -527,6 +665,7 @@ const EventsList: React.FC = () => {
 
   const buildParticipantSubmission = () => {
       if (!selectedEvent) return null;
+      const availableAccommodationDates = getSelectedEventAccommodationDates(selectedEvent);
 
       let finalLocationId = null as number | null;
       let finalOfficeName = newParticipant.office.trim();
@@ -578,6 +717,21 @@ const EventsList: React.FC = () => {
           return null;
       }
 
+      const normalizedAccommodationDates = selectedEvent.has_accommodation && newParticipant.needs_accommodation
+        ? (() => {
+            const selectedDates = (newParticipant.date_accommodation || []).filter((date) => availableAccommodationDates.includes(date));
+            if (availableAccommodationDates.length === 1 && selectedDates.length === 0) {
+                return [availableAccommodationDates[0]];
+            }
+            return selectedDates;
+          })()
+        : [];
+
+      if (selectedEvent.has_accommodation && newParticipant.needs_accommodation && normalizedAccommodationDates.length === 0) {
+          alert("Please select at least one accommodation date.");
+          return null;
+      }
+
       return {
           participantPayload: {
               f_name: toProperCase(newParticipant.f_name.trim()),
@@ -599,7 +753,8 @@ const EventsList: React.FC = () => {
               needs_accommodation: selectedEvent.has_accommodation ? newParticipant.needs_accommodation : false,
               accommodation_pax: selectedEvent.has_accommodation && newParticipant.needs_accommodation ? Math.max(1, newParticipant.accommodation_pax) : 0,
               accept_photo_video: newParticipant.accept_photo_video,
-              store_to_db: newParticipant.store_to_db
+              store_to_db: newParticipant.store_to_db,
+              date_accommodation: selectedEvent.has_accommodation && newParticipant.needs_accommodation ? normalizedAccommodationDates : null
           }
       };
   };
@@ -613,6 +768,11 @@ const EventsList: React.FC = () => {
   const openEditParticipantView = (record: ParticipantModalRecord) => {
       const participant = record.participants;
       if (!participant) return;
+      const availableAccommodationDates = getSelectedEventAccommodationDates(selectedEvent);
+      const normalizedAccommodationDates = (record.date_accommodation || []).filter((date) => availableAccommodationDates.includes(date));
+      const defaultAccommodationDates = record.needs_accommodation && availableAccommodationDates.length === 1 && normalizedAccommodationDates.length === 0
+        ? [availableAccommodationDates[0]]
+        : normalizedAccommodationDates;
 
       let affType: 'Office' | 'LGU' = 'Office';
       let prov = '';
@@ -651,6 +811,7 @@ const EventsList: React.FC = () => {
           indigenous_people: participant.indigenous_people || 'No',
           needs_accommodation: !!record.needs_accommodation,
           accommodation_pax: record.needs_accommodation ? Math.max(1, record.accommodation_pax || 1) : 0,
+          date_accommodation: defaultAccommodationDates,
           participant_id: participant.participant_id,
           accept_photo_video: !!record.accept_photo_video,
           store_to_db: !!record.store_to_db
@@ -1925,10 +2086,44 @@ const EventsList: React.FC = () => {
                                                 type="checkbox"
                                                 className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
                                                 checked={newParticipant.needs_accommodation}
-                                                onChange={e => setNewParticipant({...newParticipant, needs_accommodation: e.target.checked, accommodation_pax: e.target.checked ? 1 : 0})}
+                                                onChange={e => toggleParticipantAccommodation(e.target.checked)}
                                             />
                                             <span className="text-sm font-medium text-slate-700">Needs Accommodation</span>
                                         </label>
+                                        {newParticipant.needs_accommodation && getSelectedEventAccommodationDates(selectedEvent).length === 1 && (
+                                            <p className="mt-2 text-xs text-slate-500">
+                                                Accommodation date is set automatically to {formatAccommodationDateLabel(getSelectedEventAccommodationDates(selectedEvent)[0])}.
+                                            </p>
+                                        )}
+                                        {newParticipant.needs_accommodation && getSelectedEventAccommodationDates(selectedEvent).length > 1 && (
+                                            <div className="mt-3 space-y-2">
+                                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Select Accommodation Dates</p>
+                                                <p className="text-xs text-slate-500">
+                                                    Selected: {newParticipant.date_accommodation.length} day(s)
+                                                </p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    {getSelectedEventAccommodationDates(selectedEvent).map((date) => {
+                                                        const isChecked = newParticipant.date_accommodation.includes(date);
+                                                        return (
+                                                            <label
+                                                                key={date}
+                                                                className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
+                                                                    isChecked ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300'
+                                                                }`}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isChecked}
+                                                                    onChange={() => toggleParticipantAccommodationDate(date)}
+                                                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                                />
+                                                                <span className="text-sm font-medium">{formatAccommodationDateLabel(date)}</span>
+                                                            </label>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -2179,24 +2374,24 @@ const EventsList: React.FC = () => {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Start Date</label>
                     <div className="relative group">
-                       <input 
+                      <input 
                         type="date" 
                         required 
                         className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all" 
                         value={formData.start_date} 
-                        onChange={e => setFormData({...formData, start_date: e.target.value})} 
+                        onChange={e => updateEventDates('start_date', e.target.value)} 
                       />
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">End Date</label>
                     <div className="relative group">
-                       <input 
+                      <input 
                         type="date" 
                         required 
                         className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all" 
                         value={formData.end_date} 
-                        onChange={e => setFormData({...formData, end_date: e.target.value})} 
+                        onChange={e => updateEventDates('end_date', e.target.value)} 
                       />
                     </div>
                   </div>
@@ -2223,6 +2418,19 @@ const EventsList: React.FC = () => {
                         </div>
                     </div>
 
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Event Session</label>
+                        <select 
+                            className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
+                            value={formData.session || 'All_Day'}
+                            onChange={e => setFormData({...formData, session: e.target.value as Event['session']})}
+                        >
+                            <option value="AM">AM Only</option>
+                            <option value="PM">PM Only</option>
+                            <option value="All_Day">All Day</option>
+                        </select>
+                    </div>
+
                     <div className="flex flex-row items-center gap-6 pt-2 sm:col-span-2">
                          {/* Registration Open Toggle */}
                          <label className="flex items-center gap-2 cursor-pointer group">
@@ -2247,12 +2455,52 @@ const EventsList: React.FC = () => {
                                 type="checkbox"
                                 className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
                                 checked={formData.has_accommodation || false}
-                                onChange={e => setFormData({...formData, has_accommodation: e.target.checked})}
+                                onChange={e => toggleFormAccommodation(e.target.checked)}
                             />
                             <span className="text-sm font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">Offers Accommodation</span>
                         </label>
                     </div>
                 </div>
+
+                {formData.has_accommodation && (
+                    <div className="space-y-3 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <p className="text-sm font-semibold text-indigo-900">Accommodation Dates</p>
+                                <p className="text-xs text-indigo-700">Select which event dates include accommodation.</p>
+                            </div>
+                            <span className="text-xs font-semibold text-indigo-700 bg-white/80 border border-indigo-100 px-2 py-1 rounded-full">
+                                {(formData.dates_with_accom || []).length} day(s)
+                            </span>
+                        </div>
+
+                        {getFormEventDateOptions().length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {getFormEventDateOptions().map((date) => {
+                                    const isChecked = (formData.dates_with_accom || []).includes(date);
+                                    return (
+                                        <label
+                                            key={date}
+                                            className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
+                                                isChecked ? 'border-indigo-400 bg-white text-indigo-700' : 'border-indigo-100 bg-white/70 text-slate-700 hover:border-indigo-300'
+                                            }`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={() => toggleFormAccommodationDate(date)}
+                                                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                            />
+                                            <span className="text-sm font-medium">{formatAccommodationDateLabel(date)}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-slate-500">Select the event start and end dates first.</p>
+                        )}
+                    </div>
+                )}
 
                 {/* Footer Actions */}
                 <div className="mt-8 flex justify-end gap-3 pt-5 border-t border-slate-100">

@@ -39,6 +39,9 @@ export interface Event {
   organize_by?: number | null;
   has_accommodation?: boolean | null;
   registration_open: boolean;
+  session: 'AM' | 'PM' | 'All_Day';
+  days_accommodation?: number | null;
+  dates_with_accom?: string[] | null;
 }
 
 export interface Participant {
@@ -72,6 +75,7 @@ export interface EventParticipant {
   needs_accommodation?: boolean | null;
   accept_photo_video?: boolean | null;
   store_to_db?: boolean | null;
+  date_accommodation?: string[] | null;
 }
 
 export interface AttendanceLog {

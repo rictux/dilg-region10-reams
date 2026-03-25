@@ -3,16 +3,22 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Event, Participant } from '../../types/database';
 import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { eachDayOfInterval, format, parseISO } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import QRCode from 'react-qr-code';
+
+type CertificateParticipant = {
+  participant: Participant;
+  needs_accommodation: boolean;
+  date_accommodation: string[];
+};
 
 const CertificateOfAppearancePrint: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [event, setEvent] = useState<Event | null>(null);
-  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [participants, setParticipants] = useState<CertificateParticipant[]>([]);
   const [signatory, setSignatory] = useState<{name: string, position: string, esig_link: string} | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -66,14 +72,33 @@ const CertificateOfAppearancePrint: React.FC = () => {
         return;
       }
 
-      // Fetch participant details
+      // Fetch participant details together with event registration details
       const { data: participantsData } = await supabase
-        .from('participants')
-        .select('*')
+        .from('event_participants')
+        .select(`
+          participant_id,
+          needs_accommodation,
+          date_accommodation,
+          participants (*)
+        `)
+        .eq('event_id', id)
         .in('participant_id', uniqueParticipantIds)
-        .order('l_name', { ascending: true });
+        .order('participant_id', { ascending: true });
 
-      setParticipants(participantsData || []);
+      const normalizedParticipants = (participantsData || [])
+        .map((record: any) => ({
+          participant: Array.isArray(record.participants) ? (record.participants[0] || null) : record.participants,
+          needs_accommodation: !!record.needs_accommodation,
+          date_accommodation: (record.date_accommodation || []).filter(Boolean)
+        }))
+        .filter((record): record is CertificateParticipant => !!record.participant)
+        .sort((a, b) => {
+          const lastNameCompare = (a.participant.l_name || '').localeCompare(b.participant.l_name || '');
+          if (lastNameCompare !== 0) return lastNameCompare;
+          return (a.participant.full_name || '').localeCompare(b.participant.full_name || '');
+        });
+
+      setParticipants(normalizedParticipants);
 
     } catch (e) {
       console.error("Error fetching data", e);
@@ -84,6 +109,50 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const getEventDateRows = (selectedEvent: Event) => {
+    try {
+      const start = parseISO(selectedEvent.start_date);
+      const end = selectedEvent.end_date ? parseISO(selectedEvent.end_date) : start;
+      const safeEnd = end < start ? start : end;
+      return eachDayOfInterval({ start, end: safeEnd }).map((date) => ({
+        key: format(date, 'yyyy-MM-dd'),
+        label: format(date, 'MMMM d, yyyy')
+      }));
+    } catch {
+      return [{
+        key: selectedEvent.start_date,
+        label: selectedEvent.start_date
+      }];
+    }
+  };
+
+  const getEventAccommodationDates = (selectedEvent: Event) => {
+    if (!selectedEvent.has_accommodation) return [] as string[];
+    const savedDates = (selectedEvent.dates_with_accom || []).filter(Boolean);
+    if (savedDates.length > 0) return savedDates;
+    return getEventDateRows(selectedEvent).map((row) => row.key);
+  };
+
+  const getProvisionColumns = (selectedEvent: Event, participantRecord: CertificateParticipant) => {
+    const eventAccommodationDates = new Set(getEventAccommodationDates(selectedEvent));
+    const participantAccommodationDates = participantRecord.date_accommodation.filter((date) => eventAccommodationDates.has(date));
+    const columns: string[] = ['Date'];
+
+    if (selectedEvent.session === 'AM' || selectedEvent.session === 'All_Day') {
+      columns.push('AM Snacks', 'Lunch');
+    }
+
+    if (selectedEvent.session === 'PM' || selectedEvent.session === 'All_Day') {
+      columns.push('PM Snacks');
+    }
+
+    if (participantRecord.needs_accommodation && participantAccommodationDates.length > 0) {
+      columns.push('Accommodation');
+    }
+
+    return columns;
   };
 
   if (loading) {
@@ -165,15 +234,15 @@ const CertificateOfAppearancePrint: React.FC = () => {
                 key={pageIndex} 
                 className="w-[210mm] h-[297mm] bg-white print:shadow-none shadow-md mb-8 print:mb-0 relative overflow-hidden page-break-after-always flex flex-col"
               >
-                {pair.map((participant, index) => (
-                  <div key={participant.participant_id} className="h-[148.5mm] flex flex-col relative box-border p-8">
+                {pair.map((participantRecord, index) => (
+                  <div key={participantRecord.participant.participant_id} className="h-[148.5mm] flex flex-col relative box-border p-8">
                     
                     {/* Certificate Content */}
                     <div className="flex-1 flex flex-col justify-center relative">
                       
                       {/* Right QR Code */}
                       <div className="absolute bottom-0 right-0 flex flex-col items-center text-center">
-                        <QRCode value={`${window.location.origin}/lookup?participant=${participant.participant_id}`} size={52} />
+                        <QRCode value={`${window.location.origin}/lookup?participant=${participantRecord.participant.participant_id}`} size={52} />
                         <p className="mt-2 text-[9px] font-medium text-slate-700 max-w-[90px] leading-tight">
                           Scan to verify
                         </p>
@@ -202,11 +271,11 @@ const CertificateOfAppearancePrint: React.FC = () => {
                       <div className="text-justify text-[13px] leading-relaxed font-serif mb-4 px-4">
                         <span className="ml-8">This is to certify that Mr./Ms.</span>
                         <span className="inline-block border-b border-black font-bold px-2 mx-1 min-w-[200px] text-center">
-                          {participant.full_name}
+                          {participantRecord.participant.full_name}
                         </span>
                         <span>with official station at</span>
                         <span className="inline-block border-b border-black font-bold px-2 mx-1 min-w-[150px] text-center">
-                          {participant.office || '______________________'}
+                          {participantRecord.participant.office || '______________________'}
                         </span>
                         <span>attended the</span>
                         <span className="font-bold mx-1">{event.event_name}</span>
@@ -221,11 +290,36 @@ const CertificateOfAppearancePrint: React.FC = () => {
                       <div className="flex justify-center mb-4">
                         <table className="border-collapse border border-black w-3/4 text-center font-serif text-[13px]">
                           <tbody>
-                            <tr>
-                              <td className="border border-black py-1 w-1/3">AM Snacks</td>
-                              <td className="border border-black py-1 w-1/3">Lunch</td>
-                              <td className="border border-black py-1 w-1/3">PM Snacks</td>
-                            </tr>
+                            {getEventDateRows(event).map((dateRow) => {
+                              const eventAccommodationDates = new Set(getEventAccommodationDates(event));
+                              const participantAccommodationDates = participantRecord.date_accommodation.filter((date) => eventAccommodationDates.has(date));
+                              const hasAccommodationOnDate = participantRecord.needs_accommodation &&
+                                participantAccommodationDates.includes(dateRow.key);
+                              const columns = getProvisionColumns(event, participantRecord);
+
+                              return (
+                                <tr key={`${participantRecord.participant.participant_id}-${dateRow.key}`}>
+                                  {columns.map((column) => {
+                                    let cellContent = column;
+
+                                    if (column === 'Date') {
+                                      cellContent = dateRow.label;
+                                    } else if (column === 'Accommodation') {
+                                      cellContent = hasAccommodationOnDate ? 'Accommodation' : '';
+                                    }
+
+                                    return (
+                                      <td
+                                        key={`${dateRow.key}-${column}`}
+                                        className="border border-black py-1 px-2"
+                                      >
+                                        {cellContent}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
