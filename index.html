@@ -20,6 +20,110 @@
       }
     </script>
     <style>
+      html {
+          font-size: 16px;
+      }
+
+      /* Slightly scale down rem-based text and spacing on smaller desktop/laptop screens */
+      @media (min-width: 1024px) and (max-width: 1366px) {
+          html {
+              font-size: 15px;
+          }
+      }
+
+      /* Keep small desktop layouts readable without letting utility text get too tiny */
+      @media (min-width: 1024px) and (max-width: 1180px), (min-width: 1024px) and (max-height: 820px) {
+          html {
+              font-size: 14px;
+          }
+
+          .text-xs {
+              font-size: max(12px, 0.75rem) !important;
+          }
+
+          .text-sm {
+              font-size: max(13px, 0.875rem) !important;
+          }
+
+          .text-base {
+              font-size: max(14px, 1rem) !important;
+          }
+      }
+
+      /* Compact density tuning for common laptop-size desktop screens */
+      @media (min-width: 1024px) and (max-width: 1600px) and (max-height: 920px) {
+          .desktop-compact-shell .app-sidebar.app-sidebar-expanded {
+              width: 252px !important;
+          }
+
+          .desktop-compact-shell .app-sidebar-header,
+          .desktop-compact-shell .app-sidebar-footer,
+          .desktop-compact-shell .app-main {
+              padding: 1.5rem !important;
+          }
+
+          .desktop-compact-shell .app-main-header {
+              margin-bottom: 1.5rem !important;
+          }
+
+          .desktop-compact-shell .app-sidebar-title {
+              font-size: 1.5rem !important;
+          }
+
+          .desktop-compact-shell .app-page-title {
+              font-size: 1.75rem !important;
+          }
+
+          .desktop-compact-shell .app-nav-label,
+          .desktop-compact-shell .app-profile-greeting {
+              font-size: 0.95rem !important;
+          }
+
+          .desktop-compact-shell .app-profile-avatar {
+              width: 2.75rem !important;
+              height: 2.75rem !important;
+              font-size: 1rem !important;
+          }
+
+          .attendance-page {
+              gap: 1.25rem !important;
+          }
+
+          .attendance-page .attendance-toolbar {
+              padding: 0.875rem !important;
+          }
+
+          .attendance-page .attendance-stats {
+              padding-bottom: 0.125rem !important;
+          }
+
+          .attendance-page .attendance-stat-card {
+              padding: 0.875rem !important;
+              min-width: 160px !important;
+          }
+
+          .events-stat-card,
+          .attendance-page .attendance-stat-card {
+              min-height: 84px !important;
+          }
+
+          .events-stat-value,
+          .attendance-page .attendance-stat-value {
+              font-size: 1.125rem !important;
+              line-height: 1.1 !important;
+          }
+
+          .attendance-page .attendance-table thead th,
+          .attendance-page .attendance-table tbody td {
+              padding: 0.85rem 1rem !important;
+          }
+
+          .attendance-page .attendance-table tbody td .bg-green-100,
+          .attendance-page .attendance-table tbody td .bg-indigo-100 {
+              padding: 0.35rem 0.5rem !important;
+          }
+      }
+
       /* Hide scrollbar for Chrome, Safari and Opera */
       .no-scrollbar::-webkit-scrollbar {
           display: none;

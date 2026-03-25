@@ -389,7 +389,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
 
     return (
       <div className="flex-1 min-h-0 overflow-auto w-full">
-        <table className="w-full text-sm text-left min-w-[600px]">
+        <table className="datatable w-full text-[13px] text-left min-w-[600px]">
           <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
             <tr>
               <th className="px-5 py-3 w-[36%]">Event Name</th>

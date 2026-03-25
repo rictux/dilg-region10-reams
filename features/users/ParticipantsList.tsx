@@ -127,7 +127,7 @@ const ParticipantsList: React.FC = () => {
 
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
                 <div className="hidden md:block flex-1 min-h-0 overflow-auto">
-                    <table className="w-full text-sm text-left">
+                    <table className="datatable w-full text-[13px] text-left">
                         <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                             <tr>
                                 <th className="px-6 py-4 bg-slate-50">Participant Name</th>

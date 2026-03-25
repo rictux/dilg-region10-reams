@@ -908,82 +908,82 @@ const EventsList: React.FC = () => {
         <div className="flex gap-3 w-max lg:w-full lg:grid lg:grid-cols-5">
           <button
             onClick={() => setStatusFilter('All')}
-            className={`min-w-[168px] sm:min-w-[180px] md:min-w-[190px] lg:min-w-0 p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`events-stat-card min-w-[150px] sm:min-w-[164px] md:min-w-[172px] lg:min-w-0 p-3 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
               ${statusFilter === 'All' ? 'ring-2 ring-slate-400 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-slate-300'}
               bg-white
             `}
           >
-              <div className="flex justify-between items-start mb-2 w-full">
+              <div className="flex justify-between items-start mb-1 w-full">
                   <p className="text-xs font-semibold text-slate-500 uppercase">Total Events</p>
-                  <div className={`p-1.5 rounded-lg ${statusFilter === 'All' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-600'}`}>
-                    <CalendarPlus size={16} />
+                  <div className={`p-1 rounded-lg ${statusFilter === 'All' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-600'}`}>
+                    <CalendarPlus size={15} />
                   </div>
               </div>
-              <p className="text-2xl font-bold text-slate-800">{eventSummary.total}</p>
+              <p className="events-stat-value text-lg font-bold text-slate-800">{eventSummary.total}</p>
           </button>
 
           <button
             onClick={() => setStatusFilter('Ongoing')}
-            className={`min-w-[168px] sm:min-w-[180px] md:min-w-[190px] lg:min-w-0 p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`events-stat-card min-w-[150px] sm:min-w-[164px] md:min-w-[172px] lg:min-w-0 p-3 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
               ${statusFilter === 'Ongoing' ? 'ring-2 ring-emerald-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-emerald-200'}
               bg-white
             `}
           >
-              <div className="flex justify-between items-start mb-2 w-full">
+              <div className="flex justify-between items-start mb-1 w-full">
                   <p className="text-xs font-semibold text-slate-500 uppercase">Ongoing</p>
-                  <div className={`p-1.5 rounded-lg ${statusFilter === 'Ongoing' ? 'bg-emerald-200 text-emerald-700' : 'bg-emerald-100 text-emerald-600'}`}>
-                    <Clock size={16} />
+                  <div className={`p-1 rounded-lg ${statusFilter === 'Ongoing' ? 'bg-emerald-200 text-emerald-700' : 'bg-emerald-100 text-emerald-600'}`}>
+                    <Clock size={15} />
                   </div>
               </div>
-              <p className="text-2xl font-bold text-emerald-600">{eventSummary.ongoing}</p>
+              <p className="events-stat-value text-lg font-bold text-emerald-600">{eventSummary.ongoing}</p>
           </button>
 
           <button
             onClick={() => setStatusFilter('Scheduled')}
-            className={`min-w-[168px] sm:min-w-[180px] md:min-w-[190px] lg:min-w-0 p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`events-stat-card min-w-[150px] sm:min-w-[164px] md:min-w-[172px] lg:min-w-0 p-3 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
               ${statusFilter === 'Scheduled' ? 'ring-2 ring-blue-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-blue-200'}
               bg-white
             `}
           >
-              <div className="flex justify-between items-start mb-2 w-full">
+              <div className="flex justify-between items-start mb-1 w-full">
                   <p className="text-xs font-semibold text-slate-500 uppercase">Scheduled</p>
-                  <div className={`p-1.5 rounded-lg ${statusFilter === 'Scheduled' ? 'bg-blue-200 text-blue-700' : 'bg-blue-100 text-blue-600'}`}>
-                    <Calendar size={16} />
+                  <div className={`p-1 rounded-lg ${statusFilter === 'Scheduled' ? 'bg-blue-200 text-blue-700' : 'bg-blue-100 text-blue-600'}`}>
+                    <Calendar size={15} />
                   </div>
               </div>
-              <p className="text-2xl font-bold text-blue-600">{eventSummary.scheduled}</p>
+              <p className="events-stat-value text-lg font-bold text-blue-600">{eventSummary.scheduled}</p>
           </button>
 
           <button
             onClick={() => setStatusFilter('Completed')}
-            className={`min-w-[168px] sm:min-w-[180px] md:min-w-[190px] lg:min-w-0 p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`events-stat-card min-w-[150px] sm:min-w-[164px] md:min-w-[172px] lg:min-w-0 p-3 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
               ${statusFilter === 'Completed' ? 'ring-2 ring-indigo-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-indigo-200'}
               bg-white
             `}
           >
-              <div className="flex justify-between items-start mb-2 w-full">
+              <div className="flex justify-between items-start mb-1 w-full">
                   <p className="text-xs font-semibold text-slate-500 uppercase">Completed</p>
-                  <div className={`p-1.5 rounded-lg ${statusFilter === 'Completed' ? 'bg-indigo-200 text-indigo-700' : 'bg-indigo-100 text-indigo-600'}`}>
-                    <Check size={16} />
+                  <div className={`p-1 rounded-lg ${statusFilter === 'Completed' ? 'bg-indigo-200 text-indigo-700' : 'bg-indigo-100 text-indigo-600'}`}>
+                    <Check size={15} />
                   </div>
               </div>
-              <p className="text-2xl font-bold text-indigo-600">{eventSummary.completed}</p>
+              <p className="events-stat-value text-lg font-bold text-indigo-600">{eventSummary.completed}</p>
           </button>
 
           <button
             onClick={() => setStatusFilter('Cancelled')}
-            className={`min-w-[168px] sm:min-w-[180px] md:min-w-[190px] lg:min-w-0 p-4 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`events-stat-card min-w-[150px] sm:min-w-[164px] md:min-w-[172px] lg:min-w-0 p-3 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
               ${statusFilter === 'Cancelled' ? 'ring-2 ring-red-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-red-200'}
               bg-white
             `}
           >
-              <div className="flex justify-between items-start mb-2 w-full">
+              <div className="flex justify-between items-start mb-1 w-full">
                   <p className="text-xs font-semibold text-slate-500 uppercase">Cancelled</p>
-                  <div className={`p-1.5 rounded-lg ${statusFilter === 'Cancelled' ? 'bg-red-200 text-red-700' : 'bg-red-100 text-red-600'}`}>
-                    <XCircle size={16} />
+                  <div className={`p-1 rounded-lg ${statusFilter === 'Cancelled' ? 'bg-red-200 text-red-700' : 'bg-red-100 text-red-600'}`}>
+                    <XCircle size={15} />
                   </div>
               </div>
-              <p className="text-2xl font-bold text-red-600">{eventSummary.cancelled}</p>
+              <p className="events-stat-value text-lg font-bold text-red-600">{eventSummary.cancelled}</p>
           </button>
         </div>
       </div>
@@ -1002,7 +1002,7 @@ const EventsList: React.FC = () => {
               </div>
           )}
           <div className="hidden md:block flex-1 min-h-0 overflow-auto">
-              <table className="w-full text-sm text-left">
+              <table className="datatable w-full text-[13px] text-left">
                   <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                       <tr>
                           <th className="px-6 py-4 text-left bg-slate-50">Event Details</th>
@@ -1432,7 +1432,7 @@ const EventsList: React.FC = () => {
                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div> Loading participants...
                         </div>
                     ) : (
-                        <table className="w-full text-sm text-left">
+                        <table className="datatable w-full text-[13px] text-left">
                             <thead className="bg-slate-50 text-slate-500 font-semibold sticky top-0 shadow-sm z-10">
                                 <tr>
                                     <th className="px-6 py-4 w-16 text-center">#</th>

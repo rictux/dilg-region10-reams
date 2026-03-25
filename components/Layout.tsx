@@ -220,7 +220,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               aria-hidden="true" 
             />
             {!isSidebarCollapsed && (
-              <span className="text-[15px] tracking-wide truncate">{label}</span>
+              <span className="app-nav-label text-[15px] tracking-wide truncate">{label}</span>
             )}
           </div>
         </button>
@@ -573,8 +573,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="h-screen bg-[#f4f5f9] flex flex-col md:flex-row font-sans overflow-hidden">
+    <div className="desktop-compact-shell h-screen bg-[#f4f5f9] flex flex-col md:flex-row font-sans overflow-hidden">
       <aside className={`
+        app-sidebar
+        ${isSidebarCollapsed ? 'app-sidebar-collapsed' : 'app-sidebar-expanded'}
         fixed inset-y-0 left-0 z-30 bg-[#4322A7] transform transition-all duration-300 ease-in-out
         md:translate-x-0 md:static md:shadow-none
         ${isMobileMenuOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full w-[280px]'}
@@ -582,12 +584,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         rounded-tr-3xl rounded-br-3xl md:rounded-r-3xl
         flex flex-col overflow-hidden
       `}>
-        <div className={`p-8 flex items-center gap-3 ${isSidebarCollapsed ? 'justify-center px-4' : ''}`}>
+        <div className={`app-sidebar-header p-8 flex items-center gap-3 ${isSidebarCollapsed ? 'justify-center px-4' : ''}`}>
           <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0 overflow-hidden p-1">
             <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" />
           </div>
           {!isSidebarCollapsed && (
-            <h1 className="text-2xl font-bold text-white tracking-wide whitespace-nowrap">Admin Portal</h1>
+            <h1 className="app-sidebar-title text-2xl font-bold text-white tracking-wide whitespace-nowrap">Admin Portal</h1>
           )}
         </div>
 
@@ -623,15 +625,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <NavItem to="/about" icon={Info} label="About" />
         </nav>
 
-        <div className={`p-8 mt-auto text-xs text-indigo-300 space-y-2 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
+        <div className={`app-sidebar-footer p-8 mt-auto text-xs text-indigo-300 space-y-2 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
           <p className="font-medium text-indigo-200">Regional Event & Attendance Management System</p>
           <p>© 2026 All Rights Reserved</p>
           <p>Created by: RICTU X</p>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-hidden p-4 md:p-8 h-screen flex flex-col min-w-0">
-        <header className="flex items-center justify-between mb-8 shrink-0">
+      <main className="app-main flex-1 overflow-hidden p-4 md:p-8 h-screen flex flex-col min-w-0">
+        <header className="app-main-header flex items-center justify-between mb-8 shrink-0">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-600 hover:text-[#4322A7] md:hidden">
               <Menu size={28} />
@@ -639,7 +641,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="p-2 text-slate-600 hover:text-[#4322A7] hidden md:block">
               <Menu size={28} />
             </button>
-            <h2 className="text-2xl font-bold text-slate-800 hidden sm:block">
+            <h2 className="app-page-title text-2xl font-bold text-slate-800 hidden sm:block">
               {getPageTitle()}
             </h2>
           </div>
@@ -647,9 +649,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex items-center gap-6 relative ml-auto" ref={dropdownRef}>
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}>
               <div className="hidden sm:block text-right mr-1">
-                <p className="text-sm font-medium text-slate-800">Hello, {user?.full_name?.split(' ')[0]}</p>
+                <p className="app-profile-greeting text-sm font-medium text-slate-800">Hello, {user?.full_name?.split(' ')[0]}</p>
               </div>
-              <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-[#4322A7] font-bold text-xl overflow-hidden shadow-sm">
+              <div className="app-profile-avatar w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-[#4322A7] font-bold text-xl overflow-hidden shadow-sm">
                 {user?.img_link ? (
                   <img src={user.img_link} alt="User Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
