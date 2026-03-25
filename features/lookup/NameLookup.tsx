@@ -464,7 +464,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
               <input
                 type="text"
                 placeholder="Enter full name to search..."
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-medium shadow-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-slate-400"
+                className="w-full pl-10 pr-16 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-medium shadow-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-slate-400"
                 value={searchTerm}
                 onChange={(e) => {
                   const value = e.target.value;
@@ -478,6 +478,18 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
                   if (suggestions.length > 0) setShowSuggestions(true);
                 }}
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setShowSuggestions(false);
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
             </div>
 
             {showSuggestions && suggestions.length > 0 && (

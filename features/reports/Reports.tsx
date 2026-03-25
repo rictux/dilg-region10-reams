@@ -128,9 +128,21 @@ const Reports: React.FC = () => {
                                             placeholder="Search event..."
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                                            className="w-full pl-9 pr-14 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                                             onClick={(e) => e.stopPropagation()}
                                         />
+                                        {searchTerm && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSearchTerm('');
+                                                }}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 

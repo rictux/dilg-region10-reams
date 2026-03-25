@@ -883,8 +883,17 @@ const EventsList: React.FC = () => {
               placeholder="Search events..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+              className="w-full pl-10 pr-16 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+              >
+                Clear
+              </button>
+            )}
           </div>
         </div>
         <button 
@@ -1379,8 +1388,17 @@ const EventsList: React.FC = () => {
                                     placeholder="Search participant..." 
                                     value={participantSearchTerm}
                                     onChange={(e) => setParticipantSearchTerm(e.target.value)}
-                                    className="w-48 pl-9 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    className="w-48 pl-9 pr-14 py-1.5 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                 />
+                                {participantSearchTerm && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setParticipantSearchTerm('')}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                                    >
+                                        Clear
+                                    </button>
+                                )}
                             </div>
                         )}
                         {participantModalView === 'list' ? (

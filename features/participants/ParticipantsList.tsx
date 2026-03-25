@@ -791,8 +791,17 @@ const AttendanceList: React.FC = () => {
                                     placeholder="Search event..."
                                     value={eventSearchTerm}
                                     onChange={(e) => setEventSearchTerm(e.target.value)}
-                                    className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                                    className="w-full pl-8 pr-14 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                                 />
+                                {eventSearchTerm && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setEventSearchTerm('')}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                                    >
+                                        Clear
+                                    </button>
+                                )}
                             </div>
                         </div>
                         <div className="max-h-60 overflow-y-auto">
@@ -858,8 +867,17 @@ const AttendanceList: React.FC = () => {
                             placeholder="Search participants..." 
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            className="w-full pl-10 pr-16 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                         />
+                        {searchQuery && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                            >
+                                Clear
+                            </button>
+                        )}
                     </div>
 
                     <div className="flex gap-3 md:w-auto md:justify-end">
