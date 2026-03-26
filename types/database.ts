@@ -34,6 +34,7 @@ export interface Event {
   venue: string;
   start_date: string; // ISO string (Date)
   end_date: string;   // ISO string (Date)
+  event_serial?: string | null;
   status: 'Scheduled' | 'Ongoing' | 'Completed' | 'Cancelled';
   created_at?: string;
   organize_by?: number | null;

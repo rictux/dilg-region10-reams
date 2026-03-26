@@ -157,6 +157,7 @@ const EventsList: React.FC = () => {
   const initialFormState = {
       event_name: '',
       venue: '',
+      event_serial: '',
       start_date: '',
       end_date: '',
       status: 'Scheduled' as const,
@@ -169,6 +170,7 @@ const EventsList: React.FC = () => {
   };
   const [formData, setFormData] = useState<Partial<Event>>(initialFormState);
   const [foodInclusionByDate, setFoodInclusionByDate] = useState<EventFoodInclusionMap>({});
+  const [hasEventCode, setHasEventCode] = useState(false);
 
   useEffect(() => {
     fetchEvents();
@@ -445,6 +447,7 @@ const EventsList: React.FC = () => {
           ...initialFormState,
           organize_by: user?.role === 'Admin' ? null : (user?.office_id || null)
       });
+      setHasEventCode(false);
       setFoodInclusionByDate({});
       setShowEventModal(true);
   };
@@ -455,6 +458,7 @@ const EventsList: React.FC = () => {
       setFormData({
           event_name: event.event_name || '',
           venue: event.venue || '',
+          event_serial: event.event_serial || '',
           start_date: event.start_date || '',
           end_date: event.end_date || '',
           status: event.status,
@@ -465,6 +469,7 @@ const EventsList: React.FC = () => {
           days_accommodation: event.days_accommodation || 0,
           dates_with_accom: event.dates_with_accom || []
       });
+      setHasEventCode(!!event.event_serial?.trim());
       setFoodInclusionByDate(
         parseFoodInclusion(
           event.food_inclusion || [],
@@ -486,9 +491,11 @@ const EventsList: React.FC = () => {
         : [];
       const validEventDates = getFormEventDateOptions(formData.start_date, formData.end_date);
       const normalizedFoodInclusion = serializeFoodInclusion(foodInclusionByDate, validEventDates);
+      const normalizedEventSerial = hasEventCode ? formData.event_serial?.trim() : '';
 
       let payload = {
           ...formData,
+          event_serial: normalizedEventSerial ? normalizedEventSerial : null,
           session: formData.session || 'All_Day',
           dates_with_accom: formData.has_accommodation ? normalizedAccommodationDates : null,
           days_accommodation: formData.has_accommodation ? normalizedAccommodationDates.length : 0,
@@ -520,6 +527,7 @@ const EventsList: React.FC = () => {
           setShowEventModal(false);
           setEditingEventId(null);
           setFormData(initialFormState);
+          setHasEventCode(false);
           setFoodInclusionByDate({});
           fetchEvents(); 
       } else {
@@ -2505,6 +2513,42 @@ const EventsList: React.FC = () => {
                             />
                             <span className="text-sm font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">Offers Accommodation</span>
                         </label>
+
+                        <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-2 cursor-pointer group">
+                                <input
+                                    type="checkbox"
+                                    className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                    checked={hasEventCode}
+                                    onChange={e => {
+                                        const checked = e.target.checked;
+                                        setHasEventCode(checked);
+                                        if (!checked) {
+                                            setFormData({...formData, event_serial: ''});
+                                        }
+                                    }}
+                                />
+                                <span className="text-sm font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">Event Code</span>
+                            </label>
+
+                            <div className="relative group w-[360px] max-w-full">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Type className={`h-4 w-4 transition-colors ${hasEventCode ? 'text-slate-400 group-focus-within:text-indigo-500' : 'text-slate-300'}`} />
+                                </div>
+                                <input
+                                    disabled={!hasEventCode}
+                                    maxLength={6}
+                                    className={`block w-full pl-10 pr-3 py-2.5 border rounded-lg sm:text-sm transition-all ${
+                                        hasEventCode
+                                          ? 'border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500'
+                                          : 'border-slate-200 bg-slate-50 text-slate-400 placeholder-slate-400 cursor-not-allowed'
+                                    }`}
+                                    placeholder={hasEventCode ? 'Example: RGM' : 'Note: This event code is used for serial no. in CA.'}
+                                    value={formData.event_serial || ''}
+                                    onChange={e => setFormData({...formData, event_serial: e.target.value})}
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
 

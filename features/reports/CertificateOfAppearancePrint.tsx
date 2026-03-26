@@ -89,12 +89,54 @@ const sanitizeFileName = (value: string) => {
     .replace(/\s+/g, '_');
 };
 
+const buildCertificateDateSerialSegment = (event: Event) => {
+  try {
+    const startDate = parseISO(event.start_date);
+    const endDate = event.end_date ? parseISO(event.end_date) : startDate;
+
+    if (event.end_date && event.start_date !== event.end_date) {
+      if (startDate.getMonth() === endDate.getMonth() && startDate.getFullYear() === endDate.getFullYear()) {
+        return `${format(startDate, 'yyyy-MMM-dd')}-${format(endDate, 'dd')}`;
+      }
+
+      if (startDate.getFullYear() === endDate.getFullYear()) {
+        return `${format(startDate, 'yyyy-MMM-dd')}-${format(endDate, 'MMM-dd')}`;
+      }
+
+      return `${format(startDate, 'yyyy-MMM-dd')}-${format(endDate, 'yyyy-MMM-dd')}`;
+    }
+
+    return format(startDate, 'yyyy-MMM-dd');
+  } catch {
+    return event.start_date;
+  }
+};
+
+const buildCertificateSerialNumber = (
+  event: Event,
+  officeCode: string | null,
+  participantOrder: number
+) => {
+  const serialCode = event.event_serial?.trim();
+  const normalizedOfficeCode = officeCode?.trim();
+
+  if (!serialCode || !normalizedOfficeCode) return null;
+
+  return [
+    normalizedOfficeCode,
+    buildCertificateDateSerialSegment(event),
+    serialCode,
+    String(participantOrder).padStart(2, '0')
+  ].join('-');
+};
+
 type CertificateCardProps = {
   event: Event;
   participantRecord: CertificateParticipant;
   signatory: Signatory;
   dateString: string;
   eventFoodInclusionMap: Record<string, string[]>;
+  certificateSerialNumber?: string | null;
   showDivider?: boolean;
 };
 
@@ -104,6 +146,7 @@ const CertificateCard: React.FC<CertificateCardProps> = ({
   signatory,
   dateString,
   eventFoodInclusionMap,
+  certificateSerialNumber,
   showDivider = false
 }) => {
   const participantDateRows = getParticipantDateRows(event, participantRecord);
@@ -119,6 +162,16 @@ const CertificateCard: React.FC<CertificateCardProps> = ({
       }`}
     >
       <div className={`relative flex flex-1 flex-col ${isDenseLayout ? 'justify-start' : 'justify-center'}`}>
+        {certificateSerialNumber && (
+          <p
+            className={`absolute right-0 top-0 text-right font-medium text-slate-800 ${
+              isCompactLayout ? 'text-[9px]' : isDenseLayout ? 'text-[10px]' : 'text-[11px]'
+            }`}
+          >
+            {certificateSerialNumber}
+          </p>
+        )}
+
         <div className={`absolute right-0 flex flex-col items-center text-center ${isDenseLayout ? 'bottom-1' : 'bottom-0'}`}>
           <QRCode
             value={`${window.location.origin}/lookup?participant=${participantRecord.participant.participant_id}`}
@@ -130,11 +183,21 @@ const CertificateCard: React.FC<CertificateCardProps> = ({
         </div>
 
         <div className={`text-center ${isCompactLayout ? 'mb-1.5' : isDenseLayout ? 'mb-2' : 'mb-3'}`}>
-          <img
-            src="/assets/dilg_logo.png"
-            alt="DILG Logo"
-            className={`${isCompactLayout ? 'w-14 h-14' : isDenseLayout ? 'w-16 h-16' : 'w-20 h-20'} mx-auto mb-1 object-contain`}
-          />
+          <div className={`mb-1 flex items-center justify-center ${isCompactLayout ? 'gap-2' : 'gap-3'}`}>
+            <img
+              src="/assets/dilg_logo.png"
+              alt="DILG Logo"
+              className={`${isCompactLayout ? 'w-10 h-10' : isDenseLayout ? 'w-12 h-12' : 'w-14 h-14'} object-contain`}
+            />
+            <img
+              src="/assets/bagong_pilipinas_logo.png"
+              alt="Bagong Pilipinas Logo"
+              className={`${isCompactLayout ? 'h-10 max-w-[48px]' : isDenseLayout ? 'h-12 max-w-[58px]' : 'h-14 max-w-[68px]'} object-contain`}
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          </div>
           <p className={`${isCompactLayout ? 'text-[9px]' : isDenseLayout ? 'text-[10px]' : 'text-[11px]'} font-serif leading-tight`}>Republic of the Philippines</p>
           <p className={`${isCompactLayout ? 'text-[10px]' : isDenseLayout ? 'text-[11px]' : 'text-[12px]'} font-bold font-serif leading-tight`}>DEPARTMENT OF THE INTERIOR AND LOCAL GOVERNMENT</p>
           <p className={`${isCompactLayout ? 'text-[10px]' : isDenseLayout ? 'text-[11px]' : 'text-[12px]'} font-bold font-serif leading-tight`}>REGION X - NORTHERN MINDANAO</p>
@@ -241,6 +304,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
   const [event, setEvent] = useState<Event | null>(null);
   const [participants, setParticipants] = useState<CertificateParticipant[]>([]);
   const [signatory, setSignatory] = useState<Signatory>(null);
+  const [officeCode, setOfficeCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [participantSearch, setParticipantSearch] = useState('');
   const [selectedParticipantId, setSelectedParticipantId] = useState<number | null>(null);
@@ -277,6 +341,8 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
       if (!eventData) throw new Error('Event not found');
       setEvent(eventData);
+      setSignatory(null);
+      setOfficeCode(null);
 
       if (eventData.organize_by) {
         const { data: sigData } = await supabase
@@ -287,6 +353,16 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
         if (sigData) {
           setSignatory(sigData);
+        }
+
+        const { data: officeData } = await supabase
+          .from('offices')
+          .select('code')
+          .eq('office_id', eventData.organize_by)
+          .maybeSingle();
+
+        if (officeData?.code) {
+          setOfficeCode(officeData.code);
         }
       }
 
@@ -393,6 +469,14 @@ const CertificateOfAppearancePrint: React.FC = () => {
       chunks.push(participants.slice(i, i + 2));
     }
     return chunks;
+  }, [participants]);
+
+  const participantOrderById = useMemo(() => {
+    const orderMap = new Map<number, number>();
+    participants.forEach((record, index) => {
+      orderMap.set(record.participant.participant_id, index + 1);
+    });
+    return orderMap;
   }, [participants]);
 
   const handlePrint = () => {
@@ -563,6 +647,11 @@ const CertificateOfAppearancePrint: React.FC = () => {
                       signatory={signatory}
                       dateString={dateString}
                       eventFoodInclusionMap={eventFoodInclusionMap}
+                      certificateSerialNumber={buildCertificateSerialNumber(
+                        event,
+                        officeCode,
+                        participantOrderById.get(selectedParticipant.participant.participant_id) || 1
+                      )}
                     />
                   </div>
                 </div>
@@ -590,6 +679,11 @@ const CertificateOfAppearancePrint: React.FC = () => {
                 signatory={signatory}
                 dateString={dateString}
                 eventFoodInclusionMap={eventFoodInclusionMap}
+                certificateSerialNumber={buildCertificateSerialNumber(
+                  event,
+                  officeCode,
+                  participantOrderById.get(participantRecord.participant.participant_id) || 1
+                )}
                 showDivider={index === 0}
               />
             ))}
