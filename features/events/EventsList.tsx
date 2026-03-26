@@ -150,6 +150,7 @@ const EventsList: React.FC = () => {
   // Delete Confirmation State
   const [participantToDelete, setParticipantToDelete] = useState<number | null>(null);
   const [eventToDelete, setEventToDelete] = useState<number | null>(null);
+  const [eventDeleteConfirmation, setEventDeleteConfirmation] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null);
   
@@ -537,17 +538,32 @@ const EventsList: React.FC = () => {
 
   const handleDelete = async (e: React.MouseEvent, id: number) => {
       e.stopPropagation(); // Prevent row click
+      setEventDeleteConfirmation('');
       setEventToDelete(id);
+  };
+
+  const closeDeleteEventModal = () => {
+      setEventDeleteConfirmation('');
+      setEventToDelete(null);
   };
 
   const confirmDeleteEvent = async () => {
       if (!eventToDelete) return;
       
+      const deletedEventId = eventToDelete;
       setIsDeleting(true);
       try {
-          const { error } = await supabase.from('events').delete().eq('event_id', eventToDelete);
+          const { error } = await supabase.from('events').delete().eq('event_id', deletedEventId);
           if (error) throw error;
-          setEventToDelete(null);
+
+          setEvents((prevEvents) => prevEvents.filter((event) => event.event_id !== deletedEventId));
+          setOpenActionMenuId(null);
+          if (selectedEvent?.event_id === deletedEventId) {
+              setSelectedEvent(null);
+              setShowParticipantsModal(false);
+              setShowShareModal(false);
+          }
+          closeDeleteEventModal();
       } catch (err: any) {
           alert("Error deleting event: " + err.message);
       } finally {
@@ -1072,6 +1088,7 @@ const EventsList: React.FC = () => {
     completed: events.filter((event) => event.status === 'Completed').length,
     cancelled: events.filter((event) => event.status === 'Cancelled').length,
   }), [events]);
+  const isAdmin = user?.role === 'Admin';
 
   const totalPages = Math.ceil(filteredEvents.length / itemsPerPage);
   const paginatedEvents = useMemo(() => {
@@ -1083,6 +1100,17 @@ const EventsList: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter]);
+
+  useEffect(() => {
+    if (totalPages === 0 && currentPage !== 1) {
+      setCurrentPage(1);
+      return;
+    }
+
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   return (
     <div className="h-full min-h-0 flex flex-col gap-6">
@@ -1293,59 +1321,72 @@ const EventsList: React.FC = () => {
                                           {getStatusBadge(event.status)}
                                       </td>
                                       <td className="px-6 py-4">
-                                          <div className="flex items-center justify-center relative">
+                                          <div className="flex items-center justify-center gap-2 relative">
                                             <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setOpenActionMenuId(openActionMenuId === event.event_id ? null : event.event_id);
-                                                }}
-                                                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                                title="Actions"
+                                                onClick={(e) => openShareModal(e, event)}
+                                                className="inline-flex items-center justify-center p-2 text-sm rounded-lg border border-slate-200 text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors"
+                                                title="Share"
+                                                aria-label="Share"
                                             >
-                                                <MoreVertical size={18} />
+                                                <Share2 size={14} />
                                             </button>
-                                            
-                                            {openActionMenuId === event.event_id && (
+
+                                            {isAdmin ? (
                                                 <>
-                                                    <div 
-                                                        className="fixed inset-0 z-10"
+                                                    <button 
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            setOpenActionMenuId(null);
+                                                            setOpenActionMenuId(openActionMenuId === event.event_id ? null : event.event_id);
                                                         }}
-                                                    />
-                                                    <div className="absolute right-10 top-1/2 -translate-y-1/2 w-36 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
-                                                        <button 
-                                                            onClick={(e) => {
-                                                                setOpenActionMenuId(null);
-                                                                openShareModal(e, event);
-                                                            }}
-                                                            className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors text-left"
-                                                        >
-                                                            <Share2 size={16} /> Share
-                                                        </button>
-                                                        <button 
-                                                            onClick={(e) => {
-                                                                setOpenActionMenuId(null);
-                                                                openEditModal(e, event);
-                                                            }}
-                                                            className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors text-left"
-                                                        >
-                                                            <Edit size={16} /> Edit
-                                                        </button>
-                                                        {hasPermission('DELETE_EVENTS') && (
-                                                            <button 
+                                                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                        title="Actions"
+                                                    >
+                                                        <MoreVertical size={18} />
+                                                    </button>
+                                                    
+                                                    {openActionMenuId === event.event_id && (
+                                                        <>
+                                                            <div 
+                                                                className="fixed inset-0 z-10"
                                                                 onClick={(e) => {
+                                                                    e.stopPropagation();
                                                                     setOpenActionMenuId(null);
-                                                                    handleDelete(e, event.event_id);
-                                                                }} 
-                                                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                                                            >
-                                                                <Trash2 size={16} /> Delete
-                                                            </button>
-                                                        )}
-                                                    </div>
+                                                                }}
+                                                            />
+                                                            <div className="absolute right-0 top-full mt-2 w-36 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                                                                <button 
+                                                                    onClick={(e) => {
+                                                                        setOpenActionMenuId(null);
+                                                                        openEditModal(e, event);
+                                                                    }}
+                                                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors text-left"
+                                                                >
+                                                                    <Edit size={16} /> Edit
+                                                                </button>
+                                                                {hasPermission('DELETE_EVENTS') && (
+                                                                    <button 
+                                                                        onClick={(e) => {
+                                                                            setOpenActionMenuId(null);
+                                                                            handleDelete(e, event.event_id);
+                                                                        }} 
+                                                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
+                                                                    >
+                                                                        <Trash2 size={16} /> Delete
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </>
+                                                    )}
                                                 </>
+                                            ) : (
+                                                <button
+                                                    onClick={(e) => openEditModal(e, event)}
+                                                    className="inline-flex items-center justify-center p-2 text-sm rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+                                                    title="Edit"
+                                                    aria-label="Edit"
+                                                >
+                                                    <Edit size={14} />
+                                                </button>
                                             )}
                                           </div>
                                       </td>
@@ -1428,34 +1469,76 @@ const EventsList: React.FC = () => {
                               </div>
                           </div>
 
-                          <div className="mt-4 flex flex-wrap gap-2">
+                          <div className="mt-4 flex items-center gap-2">
                               <button
                                   onClick={(e) => {
                                       e.stopPropagation();
                                       openShareModal(e, event);
                                   }}
-                                  className="flex-1 min-w-[90px] px-3 py-2 text-sm rounded-lg border border-slate-200 text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
+                                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors"
+                                  title="Share"
+                                  aria-label="Share"
                               >
-                                  <Share2 size={14} /> Share
+                                  <Share2 size={14} />
                               </button>
-                              <button
-                                  onClick={(e) => {
-                                      e.stopPropagation();
-                                      openEditModal(e, event);
-                                  }}
-                                  className="flex-1 min-w-[90px] px-3 py-2 text-sm rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
-                              >
-                                  <Edit size={14} /> Edit
-                              </button>
-                              {hasPermission('DELETE_EVENTS') && (
+                              {isAdmin ? (
+                                  <div className="relative">
+                                      <button
+                                          onClick={(e) => {
+                                              e.stopPropagation();
+                                              setOpenActionMenuId(openActionMenuId === event.event_id ? null : event.event_id);
+                                          }}
+                                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-colors"
+                                          title="Actions"
+                                          aria-label="Actions"
+                                      >
+                                          <MoreVertical size={14} />
+                                      </button>
+                                      {openActionMenuId === event.event_id && (
+                                          <>
+                                              <div
+                                                  className="fixed inset-0 z-10"
+                                                  onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setOpenActionMenuId(null);
+                                                  }}
+                                              />
+                                              <div className="absolute right-0 top-full mt-2 w-full min-w-[140px] bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                                                  <button
+                                                      onClick={(e) => {
+                                                          setOpenActionMenuId(null);
+                                                          openEditModal(e, event);
+                                                      }}
+                                                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors text-left"
+                                                  >
+                                                      <Edit size={16} /> Edit
+                                                  </button>
+                                                  {hasPermission('DELETE_EVENTS') && (
+                                                      <button
+                                                          onClick={(e) => {
+                                                              setOpenActionMenuId(null);
+                                                              handleDelete(e, event.event_id);
+                                                          }}
+                                                          className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
+                                                      >
+                                                          <Trash2 size={16} /> Delete
+                                                      </button>
+                                                  )}
+                                              </div>
+                                          </>
+                                      )}
+                                  </div>
+                              ) : (
                                   <button
                                       onClick={(e) => {
                                           e.stopPropagation();
-                                          handleDelete(e, event.event_id);
+                                          openEditModal(e, event);
                                       }}
-                                      className="flex-1 min-w-[90px] px-3 py-2 text-sm rounded-lg border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+                                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+                                      title="Edit"
+                                      aria-label="Edit"
                                   >
-                                      <Trash2 size={14} /> Delete
+                                      <Edit size={14} />
                                   </button>
                               )}
                           </div>
@@ -2297,27 +2380,41 @@ const EventsList: React.FC = () => {
       {/* Delete Confirmation Modal for Event */}
       {eventToDelete && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setEventToDelete(null)}></div>
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeDeleteEventModal}></div>
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 relative z-20 animate-in zoom-in-95 duration-200">
                 <div className="flex flex-col items-center text-center">
                     <div className="bg-red-100 p-3 rounded-full mb-4">
                         <AlertTriangle className="text-red-600" size={32} />
                     </div>
                     <h3 className="text-lg font-bold text-slate-800 mb-2">Delete Event?</h3>
-                    <p className="text-sm text-slate-500 mb-6">
+                    <p className="text-sm text-slate-500 mb-4">
                         Are you sure you want to delete this event? This action cannot be undone and will delete all attendance logs associated with this event.
                     </p>
+                    <div className="w-full mb-6 text-left">
+                        <label htmlFor="event-delete-confirmation" className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                            Type "delete" to confirm
+                        </label>
+                        <input
+                            id="event-delete-confirmation"
+                            type="text"
+                            value={eventDeleteConfirmation}
+                            onChange={(e) => setEventDeleteConfirmation(e.target.value)}
+                            placeholder='Type "delete"'
+                            autoComplete="off"
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
+                        />
+                    </div>
                     <div className="flex gap-3 w-full">
                         <button 
-                            onClick={() => setEventToDelete(null)}
+                            onClick={closeDeleteEventModal}
                             className="flex-1 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
                         >
                             Cancel
                         </button>
                         <button 
                             onClick={confirmDeleteEvent}
-                            disabled={isDeleting}
-                            className="flex-1 px-4 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                            disabled={isDeleting || eventDeleteConfirmation.trim().toLowerCase() !== 'delete'}
+                            className="flex-1 px-4 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
                         >
                             {isDeleting ? <Loader2 className="animate-spin" size={18} /> : 'Delete'}
                         </button>
