@@ -42,6 +42,7 @@ export interface Event {
   session: 'AM' | 'PM' | 'All_Day';
   days_accommodation?: number | null;
   dates_with_accom?: string[] | null;
+  food_inclusion?: string[] | null;
 }
 
 export interface Participant {

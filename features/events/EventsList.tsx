@@ -7,6 +7,14 @@ import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'da
 import QRCode from 'react-qr-code';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
+import {
+  type EventFoodInclusionMap,
+  type FoodMealOption,
+  FOOD_MEAL_OPTIONS,
+  normalizeFoodInclusionMap,
+  parseFoodInclusion,
+  serializeFoodInclusion
+} from '../../lib/eventFoodInclusion';
 
 type ParticipantFormData = {
   f_name: string;
@@ -160,6 +168,7 @@ const EventsList: React.FC = () => {
       dates_with_accom: [] as string[]
   };
   const [formData, setFormData] = useState<Partial<Event>>(initialFormState);
+  const [foodInclusionByDate, setFoodInclusionByDate] = useState<EventFoodInclusionMap>({});
 
   useEffect(() => {
     fetchEvents();
@@ -361,6 +370,9 @@ const EventsList: React.FC = () => {
       const validDates = getDateRangeOptions(nextFormData.start_date, nextFormData.end_date);
       const selectedDates = (nextFormData.dates_with_accom || []).filter((date) => validDates.includes(date));
       const fallbackDates = nextFormData.has_accommodation && selectedDates.length === 0 ? validDates : selectedDates;
+      const normalizedFoodInclusion = normalizeFoodInclusionMap(foodInclusionByDate, validDates);
+
+      setFoodInclusionByDate(normalizedFoodInclusion);
 
       setFormData({
           ...nextFormData,
@@ -402,6 +414,28 @@ const EventsList: React.FC = () => {
       });
   };
 
+  const toggleFoodInclusionMeal = (date: string, meal: FoodMealOption) => {
+      setFoodInclusionByDate((prev) => {
+          const validDates = getFormEventDateOptions();
+          if (!validDates.includes(date)) return prev;
+
+          const currentMeals = new Set(prev[date] || []);
+          if (currentMeals.has(meal)) {
+              currentMeals.delete(meal);
+          } else {
+              currentMeals.add(meal);
+          }
+
+          return normalizeFoodInclusionMap(
+            {
+              ...prev,
+              [date]: Array.from(currentMeals)
+            },
+            validDates
+          );
+      });
+  };
+
   // --- Handlers ---
 
   const openCreateModal = () => {
@@ -411,6 +445,7 @@ const EventsList: React.FC = () => {
           ...initialFormState,
           organize_by: user?.role === 'Admin' ? null : (user?.office_id || null)
       });
+      setFoodInclusionByDate({});
       setShowEventModal(true);
   };
 
@@ -430,6 +465,12 @@ const EventsList: React.FC = () => {
           days_accommodation: event.days_accommodation || 0,
           dates_with_accom: event.dates_with_accom || []
       });
+      setFoodInclusionByDate(
+        parseFoodInclusion(
+          event.food_inclusion || [],
+          getDateRangeOptions(event.start_date, event.end_date)
+        )
+      );
       setShowEventModal(true);
   };
 
@@ -443,12 +484,15 @@ const EventsList: React.FC = () => {
             return selectedDates.length > 0 ? selectedDates : getFormEventDateOptions(formData.start_date, formData.end_date);
           })()
         : [];
+      const validEventDates = getFormEventDateOptions(formData.start_date, formData.end_date);
+      const normalizedFoodInclusion = serializeFoodInclusion(foodInclusionByDate, validEventDates);
 
       let payload = {
           ...formData,
           session: formData.session || 'All_Day',
           dates_with_accom: formData.has_accommodation ? normalizedAccommodationDates : null,
-          days_accommodation: formData.has_accommodation ? normalizedAccommodationDates.length : 0
+          days_accommodation: formData.has_accommodation ? normalizedAccommodationDates.length : 0,
+          food_inclusion: normalizedFoodInclusion
       };
       if (user?.role !== 'Admin' && user?.office_id) {
           payload.organize_by = user.office_id;
@@ -476,6 +520,7 @@ const EventsList: React.FC = () => {
           setShowEventModal(false);
           setEditingEventId(null);
           setFormData(initialFormState);
+          setFoodInclusionByDate({});
           fetchEvents(); 
       } else {
         alert("Error saving event: " + error.message);
@@ -2501,6 +2546,57 @@ const EventsList: React.FC = () => {
                         )}
                     </div>
                 )}
+
+                <div className="space-y-3 rounded-xl border border-amber-100 bg-amber-50/70 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-sm font-semibold text-amber-900">Meals Included</p>
+                            <p className="text-xs text-amber-800">Choose the meals provided for each event date.</p>
+                        </div>
+                    </div>
+
+                    {getFormEventDateOptions().length > 0 ? (
+                        <div className="space-y-3">
+                            {getFormEventDateOptions().map((date) => {
+                                const selectedMeals = foodInclusionByDate[date] || [];
+
+                                return (
+                                    <div key={date} className="rounded-xl border border-amber-100 bg-white/90 p-3">
+                                        <p className="mb-3 text-sm font-semibold text-slate-800">
+                                            {formatAccommodationDateLabel(date)}
+                                        </p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                            {FOOD_MEAL_OPTIONS.map((meal) => {
+                                                const isChecked = selectedMeals.includes(meal);
+
+                                                return (
+                                                    <label
+                                                        key={`${date}-${meal}`}
+                                                        className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
+                                                            isChecked
+                                                              ? 'border-amber-300 bg-amber-50 text-amber-900'
+                                                              : 'border-slate-200 bg-white text-slate-700 hover:border-amber-200'
+                                                        }`}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isChecked}
+                                                            onChange={() => toggleFoodInclusionMeal(date, meal)}
+                                                            className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500"
+                                                        />
+                                                        <span className="text-sm font-medium">{meal}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <p className="text-xs text-slate-500">Select the event start and end dates first.</p>
+                    )}
+                </div>
 
                 {/* Footer Actions */}
                 <div className="mt-8 flex justify-end gap-3 pt-5 border-t border-slate-100">

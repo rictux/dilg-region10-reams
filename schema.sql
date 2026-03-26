@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS events (
     registration_open BOOLEAN DEFAULT TRUE,
     session TEXT NOT NULL DEFAULT 'All_Day' CHECK (session IN ('AM', 'PM', 'All_Day')),
     days_accommodation SMALLINT,
-    dates_with_accom DATE[]
+    dates_with_accom DATE[],
+    food_inclusion TEXT[]
 );
 
 -- 5. Participants Table

@@ -6,6 +6,7 @@ import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
 import { eachDayOfInterval, format, parseISO } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import QRCode from 'react-qr-code';
+import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
 
 type CertificateParticipant = {
   participant: Participant;
@@ -151,24 +152,21 @@ const CertificateOfAppearancePrint: React.FC = () => {
     return getEventDateRows(selectedEvent).filter((row) => logDateSet.has(row.key));
   };
 
-  const getProvisionColumns = (selectedEvent: Event, participantRecord: CertificateParticipant) => {
-    const eventAccommodationDates = new Set(getEventAccommodationDates(selectedEvent));
-    const participantAccommodationDates = participantRecord.date_accommodation.filter((date) => eventAccommodationDates.has(date));
-    const columns: string[] = ['Date'];
+  const getEventFoodInclusionMap = (selectedEvent: Event) => {
+    return parseFoodInclusion(
+      selectedEvent.food_inclusion || [],
+      getEventDateRows(selectedEvent).map((row) => row.key)
+    );
+  };
 
-    if (selectedEvent.session === 'AM' || selectedEvent.session === 'All_Day') {
-      columns.push('AM Snacks', 'Lunch');
-    }
+  const formatFoodInclusion = (meals: string[]) => {
+    return meals.length > 0 ? meals.join(', ') : '-';
+  };
 
-    if (selectedEvent.session === 'PM' || selectedEvent.session === 'All_Day') {
-      columns.push('PM Snacks');
-    }
-
-    if (participantRecord.needs_accommodation && participantAccommodationDates.length > 0) {
-      columns.push('Accommodation');
-    }
-
-    return columns;
+  const getCertificateLayoutMode = (rowCount: number) => {
+    if (rowCount >= 5) return 'compact';
+    if (rowCount >= 4) return 'dense';
+    return 'default';
   };
 
   if (loading) {
@@ -206,6 +204,8 @@ const CertificateOfAppearancePrint: React.FC = () => {
   } else {
     dateString = format(startDate, 'MMMM d, yyyy');
   }
+
+  const eventFoodInclusionMap = getEventFoodInclusionMap(event);
 
   // Chunk participants into pairs (2 per page)
   const chunkedParticipants = [];
@@ -250,41 +250,55 @@ const CertificateOfAppearancePrint: React.FC = () => {
                 key={pageIndex} 
                 className="w-[210mm] h-[297mm] bg-white print:shadow-none shadow-md mb-8 print:mb-0 relative overflow-hidden page-break-after-always flex flex-col"
               >
-                {pair.map((participantRecord, index) => (
-                  <div key={participantRecord.participant.participant_id} className="h-[148.5mm] flex flex-col relative box-border p-8">
+                {pair.map((participantRecord, index) => {
+                  const participantDateRows = getParticipantDateRows(event, participantRecord);
+                  const layoutMode = getCertificateLayoutMode(participantDateRows.length);
+                  const isDenseLayout = layoutMode !== 'default';
+                  const isCompactLayout = layoutMode === 'compact';
+
+                  return (
+                  <div
+                    key={participantRecord.participant.participant_id}
+                    className={`h-[148.5mm] flex flex-col relative box-border overflow-hidden ${
+                      isCompactLayout ? 'px-6 py-5' : isDenseLayout ? 'px-7 py-6' : 'p-8'
+                    }`}
+                  >
                     
                     {/* Certificate Content */}
-                    <div className="flex-1 flex flex-col justify-center relative">
+                    <div className={`flex-1 flex flex-col relative ${isDenseLayout ? 'justify-start' : 'justify-center'}`}>
                       
                       {/* Right QR Code */}
-                      <div className="absolute bottom-0 right-0 flex flex-col items-center text-center">
-                        <QRCode value={`${window.location.origin}/lookup?participant=${participantRecord.participant.participant_id}`} size={52} />
-                        <p className="mt-2 text-[9px] font-medium text-slate-700 max-w-[90px] leading-tight">
+                      <div className={`absolute right-0 flex flex-col items-center text-center ${isDenseLayout ? 'bottom-1' : 'bottom-0'}`}>
+                        <QRCode
+                          value={`${window.location.origin}/lookup?participant=${participantRecord.participant.participant_id}`}
+                          size={isCompactLayout ? 42 : isDenseLayout ? 46 : 52}
+                        />
+                        <p className={`mt-2 font-medium text-slate-700 leading-tight ${isCompactLayout ? 'text-[8px] max-w-[78px]' : 'text-[9px] max-w-[90px]'}`}>
                           Scan to verify
                         </p>
                       </div>
 
                       {/* Header */}
-                      <div className="text-center mb-4">
+                      <div className={`text-center ${isCompactLayout ? 'mb-2' : isDenseLayout ? 'mb-3' : 'mb-4'}`}>
                         <img 
                           src="/assets/dilg_logo.png" 
                           alt="DILG Logo" 
-                          className="w-20 h-20 mx-auto mb-1 object-contain"
+                          className={`${isCompactLayout ? 'w-14 h-14' : isDenseLayout ? 'w-16 h-16' : 'w-20 h-20'} mx-auto mb-1 object-contain`}
                         />
-                        <p className="text-[11px] font-serif leading-tight">Republic of the Philippines</p>
-                        <p className="text-[12px] font-bold font-serif leading-tight">DEPARTMENT OF THE INTERIOR AND LOCAL GOVERNMENT</p>
-                        <p className="text-[12px] font-bold font-serif leading-tight">REGION X - NORTHERN MINDANAO</p>
-                        <p className="text-[11px] font-serif leading-tight">Km 3 Fr. W.F. Masterson Avenue, Upper Carmen, Cagayan de Oro City</p>
-                        <p className="text-[11px] font-serif text-blue-600 underline leading-tight">www.region10.dilg.gov.ph</p>
+                        <p className={`${isCompactLayout ? 'text-[9px]' : isDenseLayout ? 'text-[10px]' : 'text-[11px]'} font-serif leading-tight`}>Republic of the Philippines</p>
+                        <p className={`${isCompactLayout ? 'text-[10px]' : isDenseLayout ? 'text-[11px]' : 'text-[12px]'} font-bold font-serif leading-tight`}>DEPARTMENT OF THE INTERIOR AND LOCAL GOVERNMENT</p>
+                        <p className={`${isCompactLayout ? 'text-[10px]' : isDenseLayout ? 'text-[11px]' : 'text-[12px]'} font-bold font-serif leading-tight`}>REGION X - NORTHERN MINDANAO</p>
+                        <p className={`${isCompactLayout ? 'text-[9px]' : isDenseLayout ? 'text-[10px]' : 'text-[11px]'} font-serif leading-tight`}>Km 3 Fr. W.F. Masterson Avenue, Upper Carmen, Cagayan de Oro City</p>
+                        <p className={`${isCompactLayout ? 'text-[9px]' : isDenseLayout ? 'text-[10px]' : 'text-[11px]'} font-serif text-blue-600 underline leading-tight`}>www.region10.dilg.gov.ph</p>
                       </div>
 
                       {/* Title */}
-                      <h2 className="text-lg font-bold text-center tracking-[0.4em] mb-4 font-serif">
+                      <h2 className={`${isCompactLayout ? 'text-[15px] mb-2 tracking-[0.28em]' : isDenseLayout ? 'text-base mb-3 tracking-[0.32em]' : 'text-lg mb-4 tracking-[0.4em]'} font-bold text-center font-serif`}>
                         CERTIFICATE OF APPEARANCE
                       </h2>
 
                       {/* Body */}
-                      <div className="text-justify text-[13px] leading-relaxed font-serif mb-4 px-4">
+                      <div className={`${isCompactLayout ? 'text-[11px] leading-snug mb-2 px-2' : isDenseLayout ? 'text-[12px] leading-snug mb-3 px-3' : 'text-[13px] leading-relaxed mb-4 px-4'} text-justify font-serif`}>
                         <span className="ml-8">This is to certify that Mr./Ms.</span>
                         <span className="inline-block border-b border-black font-bold px-2 mx-1 min-w-[200px] text-center">
                           {participantRecord.participant.full_name}
@@ -298,41 +312,43 @@ const CertificateOfAppearancePrint: React.FC = () => {
                         <span>held on {dateString}, at {event.venue}.</span>
                       </div>
 
-                      <div className="text-justify text-[13px] leading-relaxed font-serif mb-4 px-4">
+                      <div className={`${isCompactLayout ? 'text-[11px] leading-snug mb-2 px-2' : isDenseLayout ? 'text-[12px] leading-snug mb-3 px-3' : 'text-[13px] leading-relaxed mb-4 px-4'} text-justify font-serif`}>
                         <span className="ml-8">It is further certified that during the stay of the above-mentioned individual, this office provided the following:</span>
                       </div>
 
                       {/* Table */}
-                      <div className="flex justify-center mb-4">
-                        <table className="border-collapse border border-black w-3/4 text-center font-serif text-[13px]">
+                      <div className={`flex justify-center ${isCompactLayout ? 'mb-2' : isDenseLayout ? 'mb-3' : 'mb-4'}`}>
+                        <table className={`${isCompactLayout ? 'w-[88%] text-[10px]' : isDenseLayout ? 'w-[86%] text-[11px]' : 'w-4/5 text-[12px]'} border-collapse border border-black font-serif leading-tight table-fixed`}>
+                          <thead>
+                            <tr>
+                              <th className={`${isCompactLayout ? 'w-[32%]' : 'w-[30%]'} border border-black px-2 py-1 text-center font-bold`}>Date</th>
+                              <th className="border border-black px-2 py-1 text-center font-bold">Food Inclusion</th>
+                              {participantRecord.needs_accommodation && (
+                                <th className={`${isCompactLayout ? 'w-[18%]' : 'w-[20%]'} border border-black px-2 py-1 text-center font-bold`}>Accommodation</th>
+                              )}
+                            </tr>
+                          </thead>
                           <tbody>
-                            {getParticipantDateRows(event, participantRecord).map((dateRow) => {
+                            {participantDateRows.map((dateRow) => {
                               const eventAccommodationDates = new Set(getEventAccommodationDates(event));
                               const participantAccommodationDates = participantRecord.date_accommodation.filter((date) => eventAccommodationDates.has(date));
                               const hasAccommodationOnDate = participantRecord.needs_accommodation &&
                                 participantAccommodationDates.includes(dateRow.key);
-                              const columns = getProvisionColumns(event, participantRecord);
+                              const mealsForDate = eventFoodInclusionMap[dateRow.key] || [];
 
                               return (
                                 <tr key={`${participantRecord.participant.participant_id}-${dateRow.key}`}>
-                                  {columns.map((column) => {
-                                    let cellContent = column;
-
-                                    if (column === 'Date') {
-                                      cellContent = dateRow.label;
-                                    } else if (column === 'Accommodation') {
-                                      cellContent = hasAccommodationOnDate ? 'Accommodation' : '';
-                                    }
-
-                                    return (
-                                      <td
-                                        key={`${dateRow.key}-${column}`}
-                                        className="border border-black py-1 px-2"
-                                      >
-                                        {cellContent}
-                                      </td>
-                                    );
-                                  })}
+                                  <td className={`${isCompactLayout ? 'py-0.5' : 'py-1'} border border-black px-2 text-center align-top`}>
+                                    {dateRow.label}
+                                  </td>
+                                  <td className={`${isCompactLayout ? 'py-0.5' : 'py-1'} border border-black px-2 text-left align-top`}>
+                                    {formatFoodInclusion(mealsForDate)}
+                                  </td>
+                                  {participantRecord.needs_accommodation && (
+                                    <td className={`${isCompactLayout ? 'py-0.5' : 'py-1'} border border-black px-2 text-center align-top`}>
+                                      {hasAccommodationOnDate ? 'Provided' : '-'}
+                                    </td>
+                                  )}
                                 </tr>
                               );
                             })}
@@ -341,23 +357,23 @@ const CertificateOfAppearancePrint: React.FC = () => {
                       </div>
 
                       {/* Signatory */}
-                      <div className="mt-auto text-center font-serif flex flex-col items-center pt-4">
+                      <div className={`mt-auto text-center font-serif flex flex-col items-center ${isCompactLayout ? 'pt-2' : isDenseLayout ? 'pt-3' : 'pt-4'}`}>
                         <div className="relative inline-block">
                           {signatory?.esig_link && (
                             <img 
                               src={signatory.esig_link} 
                               alt="E-Signature" 
-                              className="absolute left-1/2 -translate-x-1/2 bottom-4 h-16 object-contain z-0 pointer-events-none"
+                              className={`absolute left-1/2 -translate-x-1/2 ${isCompactLayout ? 'bottom-3 h-12' : isDenseLayout ? 'bottom-3 h-14' : 'bottom-4 h-16'} object-contain z-0 pointer-events-none`}
                               referrerPolicy="no-referrer"
                             />
                           )}
-                          <p className="font-bold text-[14px] uppercase relative z-10">{signatory?.name || 'CORAZON S. VICENTE'}</p>
-                          <p className="text-[13px] relative z-10">{signatory?.position || 'Division Chief, LGMED'}</p>
+                          <p className={`${isCompactLayout ? 'text-[12px]' : 'text-[14px]'} font-bold uppercase relative z-10`}>{signatory?.name || 'CORAZON S. VICENTE'}</p>
+                          <p className={`${isCompactLayout ? 'text-[11px]' : isDenseLayout ? 'text-[12px]' : 'text-[13px]'} relative z-10`}>{signatory?.position || 'Division Chief, LGMED'}</p>
                         </div>
                       </div>
 
                       {/* Footer */}
-                      <div className="mt-6 text-center font-serif text-[10px] text-slate-800 leading-tight">
+                      <div className={`${isCompactLayout ? 'mt-3 text-[8px]' : isDenseLayout ? 'mt-4 text-[9px]' : 'mt-6 text-[10px]'} text-center font-serif text-slate-800 leading-tight`}>
                         <p className="italic font-bold">"Matino, Mahusay at Maasahan"</p>
                         <p>T: (088) 859-4181 E: records.dilg10@gmail.com FB: www.facebook.com/DILGX</p>
                       </div>
@@ -369,7 +385,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                       <div className="absolute bottom-0 left-8 right-8 border-b border-dashed border-slate-300 print:border-slate-400"></div>
                     )}
                   </div>
-                ))}
+                )})}
               </div>
             ))}
           </div>
