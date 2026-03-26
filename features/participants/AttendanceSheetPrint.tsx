@@ -124,6 +124,10 @@ const AttendanceSheetPrint: React.FC = () => {
   if (loading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin text-blue-600" /></div>;
   if (!event) return <div>Event not found</div>;
 
+  const visibleSessions: Array<'AM' | 'PM'> =
+      event.session === 'All_Day' ? ['AM', 'PM'] : [event.session];
+  const totalColumnCount = 8 + visibleSessions.length;
+
   return (
     <div className="min-h-screen bg-slate-50 p-8 font-serif print:p-0 print:bg-white">
         <div className="max-w-[297mm] mx-auto mb-8 flex justify-between no-print">
@@ -169,8 +173,11 @@ const AttendanceSheetPrint: React.FC = () => {
                                     <th colSpan={2} className="border border-black px-2 py-1 w-16">GENDER</th>
                                     <th rowSpan={2} className="border border-black px-1 py-1 w-24 text-[8px] leading-tight normal-case font-normal align-top">I consent to the capture of my photo, video, and audio for use in DILG publications.</th>
                                     <th rowSpan={2} className="border border-black px-1 py-1 w-24 text-[8px] leading-tight normal-case font-normal align-top">I consent to the storage of my data in the organizer’s database for future document processing.</th>
-                                    <th rowSpan={2} className="border border-black px-4 py-2 w-24">AM</th>
-                                    <th rowSpan={2} className="border border-black px-4 py-2 w-24">PM</th>
+                                    {visibleSessions.map((session) => (
+                                        <th key={session} rowSpan={2} className="border border-black px-4 py-2 w-24">
+                                            {session}
+                                        </th>
+                                    ))}
                                 </tr>
                                 <tr className="bg-gray-200 text-center font-bold uppercase font-sans print:bg-gray-200 print:print-color-adjust-exact">
                                     <th className="border border-black px-1 py-1 w-8">M</th>
@@ -180,7 +187,7 @@ const AttendanceSheetPrint: React.FC = () => {
                             <tbody className="font-sans text-xs">
                                 {rows.length === 0 ? (
                                     <tr>
-                                        <td colSpan={11} className="text-center py-12 text-slate-500 italic">No attendance recorded for this date.</td>
+                                        <td colSpan={totalColumnCount} className="text-center py-12 text-slate-500 italic">No attendance recorded for this date.</td>
                                     </tr>
                                 ) : (
                                     rows.map((row, index) => {
@@ -201,8 +208,13 @@ const AttendanceSheetPrint: React.FC = () => {
                                                 <td className="px-1 py-1 font-bold border border-black">{(row.participant.gender === 'Female' || row.participant.gender === 'F') && '✓'}</td>
                                                 <td className="px-1 py-1 font-bold border border-black">{(row.participant as any).accept_photo_video ? '✓' : ''}</td>
                                                 <td className="px-1 py-1 font-bold border border-black">{(row.participant as any).store_to_db ? '✓' : ''}</td>
-                                                <td className="px-2 py-1 font-mono border border-black">{row.amLog ? formatLogTime(row.amLog.time) : ''}</td>
-                                                <td className="px-2 py-1 font-mono border border-black">{row.pmLog ? formatLogTime(row.pmLog.time) : ''}</td>
+                                                {visibleSessions.map((session) => (
+                                                    <td key={session} className="px-2 py-1 font-mono border border-black">
+                                                        {session === 'AM'
+                                                            ? (row.amLog ? formatLogTime(row.amLog.time) : '')
+                                                            : (row.pmLog ? formatLogTime(row.pmLog.time) : '')}
+                                                    </td>
+                                                ))}
                                             </tr>
                                         );
                                     })

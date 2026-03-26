@@ -123,6 +123,14 @@ const AttendanceList: React.FC = () => {
       return savedDates.length > 0 ? savedDates : getEventDateRangeOptions(event.start_date, event.end_date);
   };
 
+  const getDefaultSessionForEvent = (event?: Event | null): 'AM' | 'PM' => {
+      if (!event || event.session === 'All_Day') {
+          return new Date().getHours() < 12 ? 'AM' : 'PM';
+      }
+
+      return event.session;
+  };
+
   // Click Outside Listener for Dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -218,6 +226,9 @@ const AttendanceList: React.FC = () => {
   const handleEventSelect = (event: Event) => {
       setSelectedEventId(event.event_id);
       setSelectedEvent(event);
+      if (event.session !== 'All_Day' && (filter === 'No PM' || filter === 'Complete Logs')) {
+          setFilter('Show All');
+      }
       
       const start = parseISO(event.start_date);
       const end = event.end_date ? parseISO(event.end_date) : start;
@@ -243,7 +254,7 @@ const AttendanceList: React.FC = () => {
       setIsDropdownOpen(false);
       setEventSearchTerm('');
       
-      setManualForm(prev => ({ ...prev, date: newDate }));
+      setManualForm(prev => ({ ...prev, date: newDate, session: getDefaultSessionForEvent(event) }));
   };
 
   const fetchAttendance = async (eventId: number, dateStr: string) => {
@@ -310,6 +321,14 @@ const AttendanceList: React.FC = () => {
     }
   };
 
+  const visibleSessions: Array<'AM' | 'PM'> =
+      selectedEvent?.session === 'All_Day'
+          ? ['AM', 'PM']
+          : selectedEvent?.session
+              ? [selectedEvent.session]
+              : ['AM', 'PM'];
+  const hasMultipleSessions = visibleSessions.length > 1;
+
   const filteredData = data.filter(row => {
     if (searchQuery && !row.participant.full_name.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false;
@@ -317,12 +336,13 @@ const AttendanceList: React.FC = () => {
     
     const hasAM = !!row.amLog;
     const hasPM = !!row.pmLog;
+    const isPresent = visibleSessions.some(session => session === 'AM' ? hasAM : hasPM);
 
     switch (filter) {
-        case 'No Logs': return !hasAM && !hasPM;
-        case 'Present': return hasAM || hasPM;
-        case 'No PM': return hasAM && !hasPM;
-        case 'Complete Logs': return hasAM && hasPM;
+        case 'No Logs': return !isPresent;
+        case 'Present': return isPresent;
+        case 'No PM': return hasMultipleSessions && hasAM && !hasPM;
+        case 'Complete Logs': return hasMultipleSessions && hasAM && hasPM;
         case 'Show All':
         default: return true;
     }
@@ -355,7 +375,7 @@ const AttendanceList: React.FC = () => {
       
       Object.keys(groupedData).sort().forEach(office => {
           groupedData[office].forEach(row => {
-              exportData.push({
+              const exportRow: Record<string, string> = {
                   'Name': row.participant.full_name,
                   'Gender': row.participant.gender || 'N/A',
                   'Position': row.participant.position || 'N/A',
@@ -365,8 +385,17 @@ const AttendanceList: React.FC = () => {
                   'Event Name': selectedEvent.title || selectedEvent.event_name,
                   'Role': row.role || 'Delegate',
                   'Needs Accomodation': row.needs_accommodation ? 'Yes' : 'No',
-                  'Present': row.amLog ? 'Yes' : 'No'
-              });
+                  'Present': visibleSessions.some(session => session === 'AM' ? !!row.amLog : !!row.pmLog) ? 'Yes' : 'No'
+              };
+
+              if (visibleSessions.includes('AM')) {
+                  exportRow['AM Time'] = row.amLog ? formatLogTime(row.amLog.time) : '';
+              }
+              if (visibleSessions.includes('PM')) {
+                  exportRow['PM Time'] = row.pmLog ? formatLogTime(row.pmLog.time) : '';
+              }
+
+              exportData.push(exportRow);
           });
       });
 
@@ -397,7 +426,7 @@ const AttendanceList: React.FC = () => {
       setManualForm({
           date: selectedDate || format(new Date(), 'yyyy-MM-dd'),
           time: format(new Date(), 'HH:mm'),
-          session: new Date().getHours() < 12 ? 'AM' : 'PM',
+          session: getDefaultSessionForEvent(selectedEvent),
           status: 'Valid'
       });
       setShowManualModal(true);
@@ -807,10 +836,10 @@ const AttendanceList: React.FC = () => {
   );
 
   const totalParticipants = data.length;
-  const presentCount = data.filter(r => r.amLog || r.pmLog).length;
-  const notPresentCount = data.filter(r => !r.amLog && !r.pmLog).length;
-  const noPmCount = data.filter(r => r.amLog && !r.pmLog).length;
-  const completeLogsCount = data.filter(r => r.amLog && r.pmLog).length;
+  const presentCount = data.filter(r => visibleSessions.some(session => session === 'AM' ? !!r.amLog : !!r.pmLog)).length;
+  const notPresentCount = data.filter(r => !visibleSessions.some(session => session === 'AM' ? !!r.amLog : !!r.pmLog)).length;
+  const noPmCount = hasMultipleSessions ? data.filter(r => r.amLog && !r.pmLog).length : 0;
+  const completeLogsCount = hasMultipleSessions ? data.filter(r => r.amLog && r.pmLog).length : 0;
 
   return (
     <div className="attendance-page h-full min-h-0 flex flex-col gap-6">
@@ -953,7 +982,7 @@ const AttendanceList: React.FC = () => {
 
       {/* Stats Cards as Filters */}
       <div className="attendance-stats -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto lg:overflow-visible pb-1">
-        <div className="flex gap-3 w-max lg:w-full lg:grid lg:grid-cols-5">
+        <div className={`flex gap-3 w-max lg:w-full lg:grid ${hasMultipleSessions ? 'lg:grid-cols-5' : 'lg:grid-cols-3'}`}>
           <button 
             onClick={() => setFilter('Show All')}
             className={`attendance-stat-card min-w-[150px] sm:min-w-[164px] md:min-w-[172px] lg:min-w-0 p-3 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
@@ -1002,37 +1031,41 @@ const AttendanceList: React.FC = () => {
               <p className="attendance-stat-value text-lg font-bold text-red-600">{notPresentCount}</p>
           </button>
 
-          <button 
-            onClick={() => setFilter('No PM')}
-            className={`attendance-stat-card min-w-[150px] sm:min-w-[164px] md:min-w-[172px] lg:min-w-0 p-3 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-                ${filter === 'No PM' ? 'ring-2 ring-amber-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-amber-200'}
-                bg-white
-            `}
-          >
-              <div className="flex justify-between items-start mb-1 w-full">
-                  <p className="text-xs font-semibold text-slate-500 uppercase">No PM</p>
-                  <div className={`p-1 rounded-lg ${filter === 'No PM' ? 'bg-amber-200 text-amber-700' : 'bg-amber-100 text-amber-600'}`}>
-                    <AlertCircle size={15} />
-                  </div>
-              </div>
-              <p className="attendance-stat-value text-lg font-bold text-amber-600">{noPmCount}</p>
-          </button>
+          {hasMultipleSessions && (
+            <button 
+              onClick={() => setFilter('No PM')}
+              className={`attendance-stat-card min-w-[150px] sm:min-w-[164px] md:min-w-[172px] lg:min-w-0 p-3 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+                  ${filter === 'No PM' ? 'ring-2 ring-amber-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-amber-200'}
+                  bg-white
+              `}
+            >
+                <div className="flex justify-between items-start mb-1 w-full">
+                    <p className="text-xs font-semibold text-slate-500 uppercase">No PM</p>
+                    <div className={`p-1 rounded-lg ${filter === 'No PM' ? 'bg-amber-200 text-amber-700' : 'bg-amber-100 text-amber-600'}`}>
+                      <AlertCircle size={15} />
+                    </div>
+                </div>
+                <p className="attendance-stat-value text-lg font-bold text-amber-600">{noPmCount}</p>
+            </button>
+          )}
 
-          <button 
-            onClick={() => setFilter('Complete Logs')}
-            className={`attendance-stat-card min-w-[150px] sm:min-w-[164px] md:min-w-[172px] lg:min-w-0 p-3 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-                ${filter === 'Complete Logs' ? 'ring-2 ring-indigo-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-indigo-200'}
-                bg-white
-            `}
-          >
-              <div className="flex justify-between items-start mb-1 w-full">
-                  <p className="text-xs font-semibold text-slate-500 uppercase">Complete</p>
-                  <div className={`p-1 rounded-lg ${filter === 'Complete Logs' ? 'bg-indigo-200 text-indigo-700' : 'bg-indigo-100 text-indigo-600'}`}>
-                    <CheckCircle size={15} />
-                  </div>
-              </div>
-              <p className="attendance-stat-value text-lg font-bold text-indigo-600">{completeLogsCount}</p>
-          </button>
+          {hasMultipleSessions && (
+            <button 
+              onClick={() => setFilter('Complete Logs')}
+              className={`attendance-stat-card min-w-[150px] sm:min-w-[164px] md:min-w-[172px] lg:min-w-0 p-3 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+                  ${filter === 'Complete Logs' ? 'ring-2 ring-indigo-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-indigo-200'}
+                  bg-white
+              `}
+            >
+                <div className="flex justify-between items-start mb-1 w-full">
+                    <p className="text-xs font-semibold text-slate-500 uppercase">Complete</p>
+                    <div className={`p-1 rounded-lg ${filter === 'Complete Logs' ? 'bg-indigo-200 text-indigo-700' : 'bg-indigo-100 text-indigo-600'}`}>
+                      <CheckCircle size={15} />
+                    </div>
+                </div>
+                <p className="attendance-stat-value text-lg font-bold text-indigo-600">{completeLogsCount}</p>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1064,8 +1097,11 @@ const AttendanceList: React.FC = () => {
                             <th className="px-5 py-4 w-[28%] bg-slate-50">Name</th>
                             <th className="px-5 py-4 w-[18%] bg-slate-50">Position</th>
                             <th className="px-5 py-4 w-[16%] bg-slate-50">Office</th>
-                            <th className="px-4 py-4 w-[112px] text-center bg-slate-50">AM Time</th>
-                            <th className="px-4 py-4 w-[112px] text-center bg-slate-50">PM Time</th>
+                            {visibleSessions.map((session) => (
+                                <th key={session} className="px-4 py-4 w-[112px] text-center bg-slate-50">
+                                    {session} Time
+                                </th>
+                            ))}
                             <th className="px-4 py-4 w-[84px] text-center bg-slate-50">Actions</th>
                         </tr>
                     </thead>
@@ -1092,24 +1128,24 @@ const AttendanceList: React.FC = () => {
                                         {row.participant.office}
                                     </div>
                                 </td>
-                                <td className="px-4 py-4 text-center">
-                                    {row.amLog ? (
-                                        <span className="inline-flex min-w-[78px] items-center justify-center whitespace-nowrap bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold">
-                                            {formatLogTime(row.amLog.time)}
-                                        </span>
-                                    ) : (
-                                        <span className="text-slate-300">-</span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-4 text-center">
-                                    {row.pmLog ? (
-                                        <span className="inline-flex min-w-[78px] items-center justify-center whitespace-nowrap bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold">
-                                            {formatLogTime(row.pmLog.time)}
-                                        </span>
-                                    ) : (
-                                        <span className="text-slate-300">-</span>
-                                    )}
-                                </td>
+                                {visibleSessions.map((session) => {
+                                    const sessionLog = session === 'AM' ? row.amLog : row.pmLog;
+                                    const badgeClassName = session === 'AM'
+                                        ? 'inline-flex min-w-[78px] items-center justify-center whitespace-nowrap bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold'
+                                        : 'inline-flex min-w-[78px] items-center justify-center whitespace-nowrap bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold';
+
+                                    return (
+                                        <td key={session} className="px-4 py-4 text-center">
+                                            {sessionLog ? (
+                                                <span className={badgeClassName}>
+                                                    {formatLogTime(sessionLog.time)}
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-300">-</span>
+                                            )}
+                                        </td>
+                                    );
+                                })}
                                 <td className="px-4 py-4 text-center">
                                     <button
                                         onClick={(e) => openManualModal(e, row.participant)}
@@ -1123,7 +1159,7 @@ const AttendanceList: React.FC = () => {
                         ))}
                         {filteredData.length === 0 && (
                             <tr>
-                                <td colSpan={7} className="text-center py-12 text-slate-400">
+                                <td colSpan={5 + visibleSessions.length} className="text-center py-12 text-slate-400">
                                     {events.length === 0 ? (
                                         <div className="flex flex-col items-center">
                                             <Calendar className="w-10 h-10 mb-2 opacity-20" />
@@ -1174,27 +1210,26 @@ const AttendanceList: React.FC = () => {
                                 </button>
                             </div>
 
-                            <div className="mt-4 grid grid-cols-2 gap-3">
-                                <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">AM Time</p>
-                                    {row.amLog ? (
-                                        <span className="inline-flex bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold">
-                                            {formatLogTime(row.amLog.time)}
-                                        </span>
-                                    ) : (
-                                        <span className="text-slate-300 text-sm">-</span>
-                                    )}
-                                </div>
-                                <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">PM Time</p>
-                                    {row.pmLog ? (
-                                        <span className="inline-flex bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold">
-                                            {formatLogTime(row.pmLog.time)}
-                                        </span>
-                                    ) : (
-                                        <span className="text-slate-300 text-sm">-</span>
-                                    )}
-                                </div>
+                            <div className={`mt-4 grid gap-3 ${hasMultipleSessions ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                {visibleSessions.map((session) => {
+                                    const sessionLog = session === 'AM' ? row.amLog : row.pmLog;
+                                    const badgeClassName = session === 'AM'
+                                        ? 'inline-flex bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold'
+                                        : 'inline-flex bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold';
+
+                                    return (
+                                        <div key={session} className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">{session} Time</p>
+                                            {sessionLog ? (
+                                                <span className={badgeClassName}>
+                                                    {formatLogTime(sessionLog.time)}
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-300 text-sm">-</span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     ))
@@ -1637,8 +1672,9 @@ const AttendanceList: React.FC = () => {
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Session</label>
                             <select value={manualForm.session} onChange={e => setManualForm({...manualForm, session: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
-                                <option value="AM">AM</option>
-                                <option value="PM">PM</option>
+                                {visibleSessions.map((session) => (
+                                    <option key={session} value={session}>{session}</option>
+                                ))}
                             </select>
                         </div>
                         <div>

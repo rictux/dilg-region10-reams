@@ -76,6 +76,7 @@ const Scanner: React.FC = () => {
   
   // Ref to hold selectedEventId to avoid restarting scanner on change
   const eventIdRef = useRef(selectedEventId);
+  const sessionRef = useRef<'AM' | 'PM'>(session);
   const isProcessingRef = useRef(false);
 
   // Utility function to generate 8 character alphanumeric string
@@ -86,9 +87,37 @@ const Scanner: React.FC = () => {
   // Ref to hold device token
   const deviceTokenRef = useRef(generateDeviceToken());
 
+  const getDefaultSessionForEvent = (event?: Event): 'AM' | 'PM' => {
+    if (!event || event.session === 'All_Day') {
+      return new Date().getHours() < 12 ? 'AM' : 'PM';
+    }
+
+    return event.session;
+  };
+
+  const selectedEvent = events.find((event) => event.event_id.toString() === selectedEventId);
+  const canToggleSession = selectedEvent?.session === 'All_Day';
+
   useEffect(() => {
     eventIdRef.current = selectedEventId;
   }, [selectedEventId]);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
+  useEffect(() => {
+    if (!selectedEvent) return;
+
+    if (selectedEvent.session === 'All_Day') {
+      setSession((prev) => prev);
+      return;
+    }
+
+    if (session !== selectedEvent.session) {
+      setSession(selectedEvent.session);
+    }
+  }, [selectedEvent, session]);
 
   // --- 1. Network Status Listeners & Queue Loading ---
   useEffect(() => {
@@ -140,6 +169,7 @@ const Scanner: React.FC = () => {
           
           if (data.length === 1) {
             setSelectedEventId(data[0].event_id.toString());
+            setSession(getDefaultSessionForEvent(data[0]));
           } else {
             setSelectedEventId('');
           }
@@ -367,6 +397,7 @@ const Scanner: React.FC = () => {
     }
 
     const deviceScanTime = new Date().toISOString();
+    const currentSession = sessionRef.current;
 
     if (!isOnline) {
         const cachedP = participantCache[qrToken];
@@ -378,7 +409,7 @@ const Scanner: React.FC = () => {
                 participant_id: cachedP.participant_id,
                 participant_code: qrToken,
                 scan_time: deviceScanTime,
-                session: session,
+                session: currentSession,
                 scanner_device: deviceTokenRef.current + " (Offline)",
                 timestamp: Date.now()
             };
@@ -427,7 +458,7 @@ const Scanner: React.FC = () => {
             .single();
 
         if (!regData || regData.registration_status !== 'Registered') {
-            await logScan(eventId, partData.participant_id, 'Invalid', deviceScanTime, 'Not Registered');
+            await logScan(eventId, partData.participant_id, 'Invalid', deviceScanTime, currentSession, 'Not Registered');
             processScanResult('Invalid', 'Not registered for this event.', participant.name, participant.position);
             return;
         }
@@ -439,13 +470,13 @@ const Scanner: React.FC = () => {
             .eq('event_id', eventId)
             .eq('participant_id', partData.participant_id)
             .eq('attendance_date', today)
-            .eq('action_session', session)
+            .eq('action_session', currentSession)
             .eq('scan_status', 'Valid')
             .single();
 
         if (existingLog) {
-            if (session === 'AM') {
-                processScanResult('Duplicate', `Already scanned for ${session}.`, participant.name, participant.position);
+            if (currentSession === 'AM') {
+                processScanResult('Duplicate', `Already scanned for ${currentSession}.`, participant.name, participant.position);
                 return;
             } else {
                 const { error: updateError } = await supabase
@@ -463,7 +494,7 @@ const Scanner: React.FC = () => {
             }
         }
 
-        await logScan(eventId, partData.participant_id, 'Valid', deviceScanTime, 'Success');
+        await logScan(eventId, partData.participant_id, 'Valid', deviceScanTime, currentSession, 'Success');
         processScanResult('Valid', 'Attendance Recorded', participant.name, participant.position);
 
     } catch (err: any) {
@@ -471,7 +502,7 @@ const Scanner: React.FC = () => {
     }
   };
 
-  const logScan = async (eventId: number, participantId: number, status: 'Valid' | 'Invalid' | 'Duplicate', scanTimeStr: string, notes?: string) => {
+  const logScan = async (eventId: number, participantId: number, status: 'Valid' | 'Invalid' | 'Duplicate', scanTimeStr: string, scanSession: 'AM' | 'PM', notes?: string) => {
       if (!user) return;
       const today = scanTimeStr.split('T')[0];
       const dbEventId = eventId === 0 ? null : eventId;
@@ -483,7 +514,7 @@ const Scanner: React.FC = () => {
           user_id: user.user_id,
           scan_status: status,
           attendance_date: today,
-          action_session: session,
+          action_session: scanSession,
           remarks: notes,
           scan_time: scanTimeStr,
           scanner_device: deviceTokenRef.current
@@ -553,7 +584,15 @@ const Scanner: React.FC = () => {
                                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                                 <select 
                                     value={selectedEventId}
-                                    onChange={(e) => setSelectedEventId(e.target.value)}
+                                    onChange={(e) => {
+                                        const nextEventId = e.target.value;
+                                        setSelectedEventId(nextEventId);
+
+                                        const nextEvent = events.find((event) => event.event_id.toString() === nextEventId);
+                                        if (nextEvent) {
+                                            setSession(getDefaultSessionForEvent(nextEvent));
+                                        }
+                                    }}
                                     className="w-full bg-slate-900/80 text-white text-sm font-medium rounded-xl pl-10 pr-8 py-3 border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-xl backdrop-blur-md appearance-none"
                                 >
                                     {events.length === 0 ? (
@@ -573,15 +612,24 @@ const Scanner: React.FC = () => {
                     </div>
                     
                     <button 
-                        onClick={() => setSession(session === 'AM' ? 'PM' : 'AM')}
+                        onClick={() => {
+                            if (canToggleSession) {
+                                setSession(session === 'AM' ? 'PM' : 'AM');
+                            }
+                        }}
+                        disabled={!selectedEventId || !canToggleSession}
                         className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 border shadow-xl backdrop-blur-md transition-all
                             ${session === 'AM' 
-                                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 hover:bg-amber-500/30' 
-                                : 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300 hover:bg-indigo-600/30'
+                                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300' 
+                                : 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300'
+                            }
+                            ${canToggleSession
+                                ? (session === 'AM' ? ' hover:bg-amber-500/30' : ' hover:bg-indigo-600/30')
+                                : ' opacity-80 cursor-default'
                             }`}
                     >
                         {session === 'AM' ? <Sun size={18} className="fill-current"/> : <Moon size={18} className="fill-current"/>}
-                        {session} Session
+                        {session} Session{canToggleSession ? '' : selectedEventId ? ' Locked' : ''}
                     </button>
                 </div>
             </div>
