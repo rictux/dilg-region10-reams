@@ -95,7 +95,6 @@ type CertificateCardProps = {
   signatory: Signatory;
   dateString: string;
   eventFoodInclusionMap: Record<string, string[]>;
-  preview?: boolean;
   showDivider?: boolean;
 };
 
@@ -105,7 +104,6 @@ const CertificateCard: React.FC<CertificateCardProps> = ({
   signatory,
   dateString,
   eventFoodInclusionMap,
-  preview = false,
   showDivider = false
 }) => {
   const participantDateRows = getParticipantDateRows(event, participantRecord);
@@ -116,9 +114,7 @@ const CertificateCard: React.FC<CertificateCardProps> = ({
 
   return (
     <div
-      className={`flex h-[148.5mm] flex-col relative box-border overflow-hidden bg-white ${
-        preview ? 'w-[210mm] max-w-full rounded-xl border border-slate-200 shadow-md' : 'w-full'
-      } ${
+      className={`relative box-border flex h-[148.5mm] w-full flex-col overflow-hidden bg-white ${
         isCompactLayout ? 'px-6 pt-3 pb-5' : isDenseLayout ? 'px-7 pt-4 pb-6' : 'px-8 pt-5 pb-8'
       }`}
     >
@@ -502,8 +498,17 @@ const CertificateOfAppearancePrint: React.FC = () => {
                 value={participantSearch}
                 onChange={(e) => setParticipantSearch(e.target.value)}
                 placeholder="Type participant name..."
-                className="w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-3 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-14 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
+              {participantSearch && (
+                <button
+                  type="button"
+                  onClick={() => setParticipantSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 transition-colors hover:text-indigo-600"
+                >
+                  Clear
+                </button>
+              )}
             </div>
           </div>
 
@@ -550,15 +555,16 @@ const CertificateOfAppearancePrint: React.FC = () => {
               </div>
 
               <div className="overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm sm:p-4">
-                <div ref={previewRef} className="mx-auto w-fit">
-                  <CertificateCard
-                    event={event}
-                    participantRecord={selectedParticipant}
-                    signatory={signatory}
-                    dateString={dateString}
-                    eventFoodInclusionMap={eventFoodInclusionMap}
-                    preview
-                  />
+                <div className="mx-auto overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md">
+                  <div ref={previewRef} className="w-[210mm] bg-white">
+                    <CertificateCard
+                      event={event}
+                      participantRecord={selectedParticipant}
+                      signatory={signatory}
+                      dateString={dateString}
+                      eventFoodInclusionMap={eventFoodInclusionMap}
+                    />
+                  </div>
                 </div>
               </div>
             </>
