@@ -260,7 +260,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                   <div
                     key={participantRecord.participant.participant_id}
                     className={`h-[148.5mm] flex flex-col relative box-border overflow-hidden ${
-                      isCompactLayout ? 'px-6 py-5' : isDenseLayout ? 'px-7 py-6' : 'p-8'
+                      isCompactLayout ? 'px-6 pt-3 pb-5' : isDenseLayout ? 'px-7 pt-4 pb-6' : 'px-8 pt-5 pb-8'
                     }`}
                   >
                     
@@ -279,7 +279,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                       </div>
 
                       {/* Header */}
-                      <div className={`text-center ${isCompactLayout ? 'mb-2' : isDenseLayout ? 'mb-3' : 'mb-4'}`}>
+                      <div className={`text-center ${isCompactLayout ? 'mb-1.5' : isDenseLayout ? 'mb-2' : 'mb-3'}`}>
                         <img 
                           src="/assets/dilg_logo.png" 
                           alt="DILG Logo" 
@@ -293,7 +293,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                       </div>
 
                       {/* Title */}
-                      <h2 className={`${isCompactLayout ? 'text-[15px] mb-2 tracking-[0.28em]' : isDenseLayout ? 'text-base mb-3 tracking-[0.32em]' : 'text-lg mb-4 tracking-[0.4em]'} font-bold text-center font-serif`}>
+                      <h2 className={`${isCompactLayout ? 'text-[15px] mb-1.5 tracking-[0.28em]' : isDenseLayout ? 'text-base mb-2 tracking-[0.32em]' : 'text-lg mb-3 tracking-[0.4em]'} font-bold text-center font-serif`}>
                         CERTIFICATE OF APPEARANCE
                       </h2>
 
@@ -318,7 +318,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
                       {/* Table */}
                       <div className={`flex justify-center ${isCompactLayout ? 'mb-2' : isDenseLayout ? 'mb-3' : 'mb-4'}`}>
-                        <table className={`${isCompactLayout ? 'w-[88%] text-[10px]' : isDenseLayout ? 'w-[86%] text-[11px]' : 'w-4/5 text-[12px]'} border-collapse border border-black font-serif leading-tight table-fixed`}>
+                        <table className={`${isCompactLayout ? 'w-[88%] text-[9px]' : isDenseLayout ? 'w-[86%] text-[10px]' : 'w-4/5 text-[11px]'} border-collapse border border-black font-serif leading-tight table-fixed`}>
                           <thead>
                             <tr>
                               <th className={`${isCompactLayout ? 'w-[32%]' : 'w-[30%]'} border border-black px-2 py-1 text-center font-bold`}>Date</th>
