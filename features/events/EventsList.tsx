@@ -2334,10 +2334,10 @@ const EventsList: React.FC = () => {
             ></div>
 
             {/* Modal Panel */}
-            <div className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl border border-slate-100">
+            <div className="relative flex max-h-[calc(100vh-1rem)] w-full max-w-[calc(100vw-1rem)] transform flex-col overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:max-h-[calc(100vh-3rem)] sm:max-w-5xl border border-slate-100">
               
               {/* Header */}
-              <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
+              <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-4 sm:px-6 flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-white flex items-center gap-2" id="modal-title">
                   <CalendarPlus className="h-5 w-5 text-indigo-100" />
                   {editingEventId ? 'Edit Event' : 'Create New Event'}
@@ -2351,7 +2351,7 @@ const EventsList: React.FC = () => {
               </div>
 
               {/* Form body */}
-              <form onSubmit={handleSaveEvent} className="p-6 space-y-5">
+              <form onSubmit={handleSaveEvent} className="overflow-y-auto p-4 sm:p-6 space-y-5">
                 
                 {/* Event Name */}
                 <div>
@@ -2370,52 +2370,54 @@ const EventsList: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Venue */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Venue Location</label>
-                  <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <MapPin className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  {/* Venue */}
+                  <div className={user?.role === 'Admin' ? '' : 'lg:col-span-2'}>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Venue Location</label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <MapPin className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                      </div>
+                      <input 
+                        required 
+                        className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all" 
+                        placeholder="e.g. Grand Convention Center, Hall A"
+                        value={formData.venue} 
+                        onChange={e => setFormData({...formData, venue: e.target.value})} 
+                      />
                     </div>
-                    <input 
-                      required 
-                      className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all" 
-                      placeholder="e.g. Grand Convention Center, Hall A"
-                      value={formData.venue} 
-                      onChange={e => setFormData({...formData, venue: e.target.value})} 
-                    />
                   </div>
+
+                  {/* Organized By - Admin Only */}
+                  {user?.role === 'Admin' && (
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1.5">Organized By</label>
+                          <div className="relative group">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                  <Building2 className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                              </div>
+                              <select 
+                                  className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
+                                  value={formData.organize_by || ''}
+                                  onChange={e => setFormData({...formData, organize_by: e.target.value ? Number(e.target.value) : null})}
+                              >
+                                  <option value="">-- Select Office --</option>
+                                  {offices.map(office => (
+                                      <option key={office.office_id} value={office.office_id}>
+                                          {office.name} ({office.code})
+                                      </option>
+                                  ))}
+                              </select>
+                              <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                                  <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                              </div>
+                          </div>
+                      </div>
+                  )}
                 </div>
 
-                {/* Organized By - Admin Only */}
-                {user?.role === 'Admin' && (
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Organized By</label>
-                        <div className="relative group">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <Building2 className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                            </div>
-                            <select 
-                                className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
-                                value={formData.organize_by || ''}
-                                onChange={e => setFormData({...formData, organize_by: e.target.value ? Number(e.target.value) : null})}
-                            >
-                                <option value="">-- Select Office --</option>
-                                {offices.map(office => (
-                                    <option key={office.office_id} value={office.office_id}>
-                                        {office.name} ({office.code})
-                                    </option>
-                                ))}
-                            </select>
-                            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Dates Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                {/* Dates and Session Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Start Date</label>
                     <div className="relative group">
@@ -2440,6 +2442,18 @@ const EventsList: React.FC = () => {
                       />
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Event Session</label>
+                    <select 
+                        className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
+                        value={formData.session || 'All_Day'}
+                        onChange={e => setFormData({...formData, session: e.target.value as Event['session']})}
+                    >
+                        <option value="AM">AM Only</option>
+                        <option value="PM">PM Only</option>
+                        <option value="All_Day">All Day</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -2461,19 +2475,6 @@ const EventsList: React.FC = () => {
                                 <option value="Cancelled">Cancelled</option>
                             </select>
                         </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Event Session</label>
-                        <select 
-                            className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
-                            value={formData.session || 'All_Day'}
-                            onChange={e => setFormData({...formData, session: e.target.value as Event['session']})}
-                        >
-                            <option value="AM">AM Only</option>
-                            <option value="PM">PM Only</option>
-                            <option value="All_Day">All Day</option>
-                        </select>
                     </div>
 
                     <div className="flex flex-row items-center gap-6 pt-2 sm:col-span-2">
@@ -2520,13 +2521,13 @@ const EventsList: React.FC = () => {
                         </div>
 
                         {getFormEventDateOptions().length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div className="flex flex-wrap gap-2">
                                 {getFormEventDateOptions().map((date) => {
                                     const isChecked = (formData.dates_with_accom || []).includes(date);
                                     return (
                                         <label
                                             key={date}
-                                            className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
+                                            className={`inline-flex w-fit items-center gap-2 rounded-lg border px-2.5 py-2 cursor-pointer transition-colors ${
                                                 isChecked ? 'border-indigo-400 bg-white text-indigo-700' : 'border-indigo-100 bg-white/70 text-slate-700 hover:border-indigo-300'
                                             }`}
                                         >
@@ -2534,9 +2535,9 @@ const EventsList: React.FC = () => {
                                                 type="checkbox"
                                                 checked={isChecked}
                                                 onChange={() => toggleFormAccommodationDate(date)}
-                                                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                className="h-3.5 w-3.5 flex-shrink-0 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
                                             />
-                                            <span className="text-sm font-medium">{formatAccommodationDateLabel(date)}</span>
+                                            <span className="whitespace-nowrap text-[13px] font-medium leading-tight">{formatAccommodationDateLabel(date)}</span>
                                         </label>
                                     );
                                 })}
@@ -2565,7 +2566,7 @@ const EventsList: React.FC = () => {
                                         <p className="mb-3 text-sm font-semibold text-slate-800">
                                             {formatAccommodationDateLabel(date)}
                                         </p>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                                             {FOOD_MEAL_OPTIONS.map((meal) => {
                                                 const isChecked = selectedMeals.includes(meal);
 
