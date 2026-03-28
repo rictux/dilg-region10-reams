@@ -6,7 +6,7 @@ import { ArrowLeft, Download, Loader2, Printer, Search } from 'lucide-react';
 import { eachDayOfInterval, format, parseISO } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import QRCode from 'react-qr-code';
-import { toPng } from 'html-to-image';
+import { toBlob, toPng } from 'html-to-image';
 import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
 
 type CertificateParticipant = {
@@ -112,9 +112,28 @@ const sanitizeFileName = (value: string) => {
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-const dataUrlToBlob = async (dataUrl: string) => {
+const renderCertificateBlob = async (node: HTMLElement, pixelRatio: number) => {
+  const blob = await toBlob(node, {
+    cacheBust: true,
+    backgroundColor: '#ffffff',
+    pixelRatio
+  });
+
+  if (blob) return blob;
+
+  const dataUrl = await toPng(node, {
+    cacheBust: true,
+    backgroundColor: '#ffffff',
+    pixelRatio
+  });
+
   const response = await fetch(dataUrl);
   return response.blob();
+};
+
+const getBatchCertificatePixelRatio = () => {
+  const devicePixelRatio = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+  return Math.min(devicePixelRatio, 1.5);
 };
 
 const ZIP_UTF8_FLAG = 0x0800;
@@ -815,20 +834,15 @@ const writeCertificatesToDirectory = async (
     try {
       if (selectedDownloadParticipants.length > 0) {
         const filesToSave: Array<{ fileName: string; blob: Blob }> = [];
+        const batchPixelRatio = getBatchCertificatePixelRatio();
 
         for (const participantRecord of selectedDownloadParticipants) {
           const node = batchPreviewRefs.current[participantRecord.participant.participant_id];
           if (!node) continue;
 
-          const dataUrl = await toPng(node, {
-            cacheBust: true,
-            backgroundColor: '#ffffff',
-            pixelRatio: 2
-          });
-
           filesToSave.push({
             fileName: buildCertificateFileName(participantRecord.participant.full_name),
-            blob: await dataUrlToBlob(dataUrl)
+            blob: await renderCertificateBlob(node, batchPixelRatio)
           });
         }
 
@@ -856,14 +870,8 @@ const writeCertificatesToDirectory = async (
           await wait(350);
         }
       } else if (previewRef.current && selectedParticipant) {
-        const dataUrl = await toPng(previewRef.current, {
-          cacheBust: true,
-          backgroundColor: '#ffffff',
-          pixelRatio: 2
-        });
-
         await triggerDownload(
-          await dataUrlToBlob(dataUrl),
+          await renderCertificateBlob(previewRef.current, 2),
           buildCertificateFileName(selectedParticipant.participant.full_name)
         );
       }
