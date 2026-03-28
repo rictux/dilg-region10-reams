@@ -117,6 +117,165 @@ const dataUrlToBlob = async (dataUrl: string) => {
   return response.blob();
 };
 
+const ZIP_UTF8_FLAG = 0x0800;
+const ZIP_STORE_METHOD = 0;
+
+const createCrc32Table = () => {
+  const table = new Uint32Array(256);
+
+  for (let i = 0; i < 256; i += 1) {
+    let c = i;
+
+    for (let j = 0; j < 8; j += 1) {
+      c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+
+    table[i] = c >>> 0;
+  }
+
+  return table;
+};
+
+const CRC32_TABLE = createCrc32Table();
+
+const calculateCrc32 = (data: Uint8Array) => {
+  let crc = 0xffffffff;
+
+  for (let i = 0; i < data.length; i += 1) {
+    crc = CRC32_TABLE[(crc ^ data[i]) & 0xff] ^ (crc >>> 8);
+  }
+
+  return (crc ^ 0xffffffff) >>> 0;
+};
+
+const getDosDateTime = (date = new Date()) => {
+  const year = Math.max(date.getFullYear(), 1980);
+
+  return {
+    time:
+      ((date.getHours() & 0x1f) << 11) |
+      ((date.getMinutes() & 0x3f) << 5) |
+      Math.floor(date.getSeconds() / 2),
+    date:
+      (((year - 1980) & 0x7f) << 9) |
+      (((date.getMonth() + 1) & 0x0f) << 5) |
+      (date.getDate() & 0x1f)
+  };
+};
+
+const combineUint8Arrays = (chunks: Uint8Array[]) => {
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const merged = new Uint8Array(totalLength);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  return merged;
+};
+
+const getUniqueCertificateFiles = (files: Array<{ fileName: string; blob: Blob }>) => {
+  const usedNames = new Set<string>();
+
+  return files.map((file) => {
+    const fileNameParts = file.fileName.split('.');
+    const extension = fileNameParts.length > 1 ? `.${fileNameParts.pop()}` : '';
+    const baseName = fileNameParts.join('.') || 'Certificate_of_Appearance';
+
+    let nextFileName = file.fileName;
+    let duplicateCount = 1;
+
+    while (usedNames.has(nextFileName)) {
+      duplicateCount += 1;
+      nextFileName = `${baseName}_${duplicateCount}${extension}`;
+    }
+
+    usedNames.add(nextFileName);
+
+    return {
+      ...file,
+      fileName: nextFileName
+    };
+  });
+};
+
+const createZipBlob = async (files: Array<{ fileName: string; blob: Blob }>) => {
+  const encoder = new TextEncoder();
+  const normalizedFiles = getUniqueCertificateFiles(files);
+  const zipChunks: Uint8Array[] = [];
+  const centralDirectoryChunks: Uint8Array[] = [];
+  const zipDateTime = getDosDateTime();
+  let offset = 0;
+
+  for (const file of normalizedFiles) {
+    const fileNameBytes = encoder.encode(file.fileName);
+    const fileBytes = new Uint8Array(await file.blob.arrayBuffer());
+    const crc32 = calculateCrc32(fileBytes);
+
+    const localHeader = new Uint8Array(30 + fileNameBytes.length);
+    const localHeaderView = new DataView(localHeader.buffer);
+
+    localHeaderView.setUint32(0, 0x04034b50, true);
+    localHeaderView.setUint16(4, 20, true);
+    localHeaderView.setUint16(6, ZIP_UTF8_FLAG, true);
+    localHeaderView.setUint16(8, ZIP_STORE_METHOD, true);
+    localHeaderView.setUint16(10, zipDateTime.time, true);
+    localHeaderView.setUint16(12, zipDateTime.date, true);
+    localHeaderView.setUint32(14, crc32, true);
+    localHeaderView.setUint32(18, fileBytes.length, true);
+    localHeaderView.setUint32(22, fileBytes.length, true);
+    localHeaderView.setUint16(26, fileNameBytes.length, true);
+    localHeaderView.setUint16(28, 0, true);
+    localHeader.set(fileNameBytes, 30);
+
+    zipChunks.push(localHeader, fileBytes);
+
+    const centralHeader = new Uint8Array(46 + fileNameBytes.length);
+    const centralHeaderView = new DataView(centralHeader.buffer);
+
+    centralHeaderView.setUint32(0, 0x02014b50, true);
+    centralHeaderView.setUint16(4, 20, true);
+    centralHeaderView.setUint16(6, 20, true);
+    centralHeaderView.setUint16(8, ZIP_UTF8_FLAG, true);
+    centralHeaderView.setUint16(10, ZIP_STORE_METHOD, true);
+    centralHeaderView.setUint16(12, zipDateTime.time, true);
+    centralHeaderView.setUint16(14, zipDateTime.date, true);
+    centralHeaderView.setUint32(16, crc32, true);
+    centralHeaderView.setUint32(20, fileBytes.length, true);
+    centralHeaderView.setUint32(24, fileBytes.length, true);
+    centralHeaderView.setUint16(28, fileNameBytes.length, true);
+    centralHeaderView.setUint16(30, 0, true);
+    centralHeaderView.setUint16(32, 0, true);
+    centralHeaderView.setUint16(34, 0, true);
+    centralHeaderView.setUint16(36, 0, true);
+    centralHeaderView.setUint32(38, 0, true);
+    centralHeaderView.setUint32(42, offset, true);
+    centralHeader.set(fileNameBytes, 46);
+
+    centralDirectoryChunks.push(centralHeader);
+    offset += localHeader.length + fileBytes.length;
+  }
+
+  const centralDirectory = combineUint8Arrays(centralDirectoryChunks);
+  const endOfCentralDirectory = new Uint8Array(22);
+  const endView = new DataView(endOfCentralDirectory.buffer);
+
+  endView.setUint32(0, 0x06054b50, true);
+  endView.setUint16(4, 0, true);
+  endView.setUint16(6, 0, true);
+  endView.setUint16(8, normalizedFiles.length, true);
+  endView.setUint16(10, normalizedFiles.length, true);
+  endView.setUint32(12, centralDirectory.length, true);
+  endView.setUint32(16, offset, true);
+  endView.setUint16(20, 0, true);
+
+  return new Blob([...zipChunks, centralDirectory, endOfCentralDirectory], {
+    type: 'application/zip'
+  });
+};
+
 const getWindowWithDirectoryPicker = () =>
   window as Window & {
     showDirectoryPicker?: () => Promise<DirectoryPickerHandle>;
@@ -126,6 +285,9 @@ const canPickDirectory = () => typeof getWindowWithDirectoryPicker().showDirecto
 
 const buildCertificateFileName = (fullName: string | null | undefined) =>
   `${sanitizeFileName(fullName || 'Certificate')}_Certificate_of_Appearance.png`;
+
+const buildCertificateArchiveFileName = (event: Event) =>
+  `${sanitizeFileName(event.event_name || 'Certificates')}_Certificates.zip`;
 
 const buildCertificateDateSerialSegment = (event: Event) => {
   try {
@@ -632,31 +794,17 @@ const CertificateOfAppearancePrint: React.FC = () => {
     URL.revokeObjectURL(objectUrl);
   };
 
-  const writeCertificatesToDirectory = async (
-    directoryHandle: DirectoryPickerHandle,
-    files: Array<{ fileName: string; blob: Blob }>
-  ) => {
-    const usedNames = new Set<string>();
+const writeCertificatesToDirectory = async (
+  directoryHandle: DirectoryPickerHandle,
+  files: Array<{ fileName: string; blob: Blob }>
+) => {
+  const normalizedFiles = getUniqueCertificateFiles(files);
 
-    for (const file of files) {
-      const fileNameParts = file.fileName.split('.');
-      const extension = fileNameParts.length > 1 ? `.${fileNameParts.pop()}` : '';
-      const baseName = fileNameParts.join('.') || 'Certificate_of_Appearance';
-
-      let nextFileName = file.fileName;
-      let duplicateCount = 1;
-
-      while (usedNames.has(nextFileName)) {
-        duplicateCount += 1;
-        nextFileName = `${baseName}_${duplicateCount}${extension}`;
-      }
-
-      usedNames.add(nextFileName);
-
-      const fileHandle = await directoryHandle.getFileHandle(nextFileName, { create: true });
-      const writable = await fileHandle.createWritable();
-      await writable.write(file.blob);
-      await writable.close();
+  for (const file of normalizedFiles) {
+    const fileHandle = await directoryHandle.getFileHandle(file.fileName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(file.blob);
+    await writable.close();
     }
   };
 
@@ -695,7 +843,15 @@ const CertificateOfAppearancePrint: React.FC = () => {
           }
         }
 
-        for (const file of filesToSave) {
+        if (filesToSave.length > 1) {
+          await triggerDownload(
+            await createZipBlob(filesToSave),
+            buildCertificateArchiveFileName(event)
+          );
+          return;
+        }
+
+        for (const file of getUniqueCertificateFiles(filesToSave)) {
           await triggerDownload(file.blob, file.fileName);
           await wait(350);
         }
