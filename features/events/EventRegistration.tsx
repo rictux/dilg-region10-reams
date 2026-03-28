@@ -176,29 +176,15 @@ const EventRegistration: React.FC = () => {
   };
 
   const normalizeNamePart = (value: string) => value.trim().toLowerCase();
-  const normalizeMiddleInitial = (value?: string | null) => (value || '').trim().toUpperCase();
   const closeMatchPrompt = () => {
     setShowMatchPrompt(false);
     setPotentialMatches([]);
   };
 
-  const maskText = (value?: string | null) => {
-    if (!value) return '';
-    return value
-      .split(' ')
-      .filter(Boolean)
-      .map((part) => {
-        if (part.length <= 2) return `${part.charAt(0)}*`;
-        if (part.length === 3) return `${part.charAt(0)}**`;
-        return `${part.charAt(0)}${'*'.repeat(Math.max(part.length - 2, 2))}${part.charAt(part.length - 1)}`;
-      })
-      .join(' ');
-  };
-
   const maskEmail = (value?: string | null) => {
     if (!value) return '';
     const [localPart, domain] = value.split('@');
-    if (!localPart || !domain) return maskText(value);
+    if (!localPart || !domain) return value;
     return `${localPart.charAt(0)}***@${domain}`;
   };
 
@@ -208,7 +194,7 @@ const EventRegistration: React.FC = () => {
     return `${value.slice(0, 2)}${'*'.repeat(Math.max(value.length - 4, 3))}${value.slice(-2)}`;
   };
 
-  const getMaskedFullName = (match: ParticipantMatch) => {
+  const getParticipantDisplayName = (match: ParticipantMatch) => {
     const parts = [
       match.f_name || '',
       match.m_initial ? `${match.m_initial}` : '',
@@ -217,18 +203,18 @@ const EventRegistration: React.FC = () => {
     ].filter(Boolean);
 
     if (parts.length > 0) {
-      return parts.map((part) => maskText(part)).join(' ');
+      return parts.join(' ');
     }
 
-    return maskText(match.full_name || 'Unknown Participant');
+    return match.full_name || 'Unknown Participant';
   };
 
   const renderPotentialMatchCard = (match: ParticipantMatch, action?: React.ReactNode) => (
     <div key={match.participant_id} className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
       <div>
-        <p className="text-base font-bold text-slate-900">{getMaskedFullName(match)}</p>
+        <p className="text-base font-bold text-slate-900">{getParticipantDisplayName(match)}</p>
         <p className="text-sm text-slate-600 mt-2">Participated Events: <span className="font-medium">{match.participatedEventsCount ?? 0}</span></p>
-        {match.office && <p className="text-sm text-slate-600 mt-2">Office: <span className="font-medium">{maskText(match.office)}</span></p>}
+        {match.office && <p className="text-sm text-slate-600 mt-2">Office: <span className="font-medium">{match.office}</span></p>}
         {match.position && <p className="text-sm text-slate-600 mt-1">Position: <span className="font-medium">{match.position}</span></p>}
         <p className="text-sm text-slate-600 mt-1">Mobile No: <span className="font-medium">{match.mobile_no ? maskMobile(match.mobile_no) : '-'}</span></p>
         <p className="text-sm text-slate-600 mt-1">Email: <span className="font-medium">{match.email ? maskEmail(match.email) : '-'}</span></p>
@@ -335,7 +321,6 @@ const EventRegistration: React.FC = () => {
   const findPotentialNameMatches = async () => {
     const normalizedFirstName = normalizeNamePart(formData.f_name);
     const normalizedLastName = normalizeNamePart(formData.l_name);
-    const targetMiddleInitial = normalizeMiddleInitial(formData.m_initial);
 
     if (!normalizedFirstName || !normalizedLastName) {
       return [];
@@ -355,16 +340,7 @@ const EventRegistration: React.FC = () => {
       normalizeNamePart(participant.l_name || '') === normalizedLastName
     );
 
-    const selectedMatches = !targetMiddleInitial
-      ? baseMatches
-      : (() => {
-        const exactMiddleMatches = baseMatches.filter(
-          (participant) => normalizeMiddleInitial(participant.m_initial) === targetMiddleInitial
-        );
-        return exactMiddleMatches.length > 0 ? exactMiddleMatches : baseMatches;
-      })();
-
-    return attachParticipationCounts(selectedMatches);
+    return attachParticipationCounts(baseMatches);
   };
 
   const processRegistration = async (options?: { existingUser?: ParticipantMatch | null; skipPotentialMatch?: boolean }) => {

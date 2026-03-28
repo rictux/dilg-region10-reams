@@ -1116,7 +1116,7 @@ const EventsList: React.FC = () => {
   return (
     <div className="h-full min-h-0 flex flex-col gap-6">
       <div className="flex items-center gap-3 w-full">
-        <div className="relative flex-1 min-w-0">
+        <div className="relative flex-1 min-w-0 lg:flex-none lg:w-[30%]">
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
               <Search size={18} />
             </div>
@@ -1142,7 +1142,7 @@ const EventsList: React.FC = () => {
             type="button"
             aria-label="Add event"
             title="Add event"
-            className="h-10 w-10 sm:h-auto sm:w-auto shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center justify-center gap-2 px-0 sm:px-4 py-2 shadow-sm transition-colors"
+            className="ml-auto h-10 w-10 sm:h-auto sm:w-auto shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center justify-center gap-2 px-0 sm:px-4 py-2 shadow-sm transition-colors"
         >
             <CalendarPlus size={20} />
             <span className="hidden sm:inline">New Event</span>
