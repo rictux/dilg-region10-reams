@@ -115,7 +115,7 @@ const EventRegistration: React.FC = () => {
 
   const toggleAccommodation = (enabled: boolean) => {
     const availableDates = getEventAccommodationDates();
-    const nextDates = enabled && availableDates.length === 1 ? [availableDates[0]] : [];
+    const nextDates = enabled ? availableDates : [];
 
     setFormData((prev) => ({
       ...prev,
@@ -1084,14 +1084,14 @@ const EventRegistration: React.FC = () => {
                              {formData.needs_accommodation && getEventAccommodationDates().length === 1 && (
                                 <div className="rounded-lg border border-indigo-100 bg-white/80 px-3 py-2">
                                     <p className="text-xs text-slate-600">
-                                        Accommodation date is set automatically to <span className="font-semibold text-slate-800">{formatAccommodationDateLabel(getEventAccommodationDates()[0])}</span>.
+                                        Accommodation date is  <span className="font-semibold text-slate-800">{formatAccommodationDateLabel(getEventAccommodationDates()[0])}</span>.
                                     </p>
                                 </div>
                              )}
 
                              {formData.needs_accommodation && getEventAccommodationDates().length > 1 && (
                                 <div className="space-y-2">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Select Accommodation Dates</p>
+                                    <p className="text-xs font-semibold tracking-wide text-indigo-700">The selected dates below reflect the event’s accommodation period. You can adjust them to match your preferred stay.</p>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         {getEventAccommodationDates().map((date) => {
                                           const isChecked = formData.date_accommodation.includes(date);

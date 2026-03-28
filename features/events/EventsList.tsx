@@ -1044,6 +1044,7 @@ const EventsList: React.FC = () => {
           return total + Math.max(1, participant.accommodation_pax || 1);
       }, 0);
   }, [viewingParticipants]);
+  const canManageParticipants = hasPermission('MANAGE_PARTICIPANTS');
 
   // Helper for status badges
   const getStatusBadge = (status: string) => {
@@ -1114,9 +1115,8 @@ const EventsList: React.FC = () => {
 
   return (
     <div className="h-full min-h-0 flex flex-col gap-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-          <div className="relative w-full sm:w-64">
+      <div className="flex items-center gap-3 w-full">
+        <div className="relative flex-1 min-w-0">
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
               <Search size={18} />
             </div>
@@ -1136,96 +1136,111 @@ const EventsList: React.FC = () => {
                 Clear
               </button>
             )}
-          </div>
         </div>
         <button 
             onClick={openCreateModal}
-            className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors"
+            type="button"
+            aria-label="Add event"
+            title="Add event"
+            className="h-10 w-10 sm:h-auto sm:w-auto shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center justify-center gap-2 px-0 sm:px-4 py-2 shadow-sm transition-colors"
         >
-            <CalendarPlus size={20} /> New Event
+            <CalendarPlus size={20} />
+            <span className="hidden sm:inline">New Event</span>
         </button>
       </div>
 
-      <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto lg:overflow-visible pb-1">
-        <div className="flex gap-3 w-max lg:w-full lg:grid lg:grid-cols-5">
+      <div className="w-full">
+        <div className="grid grid-cols-5 gap-2 sm:gap-3 w-full">
           <button
             onClick={() => setStatusFilter('All')}
-            className={`events-stat-card min-w-[136px] sm:min-w-[148px] md:min-w-[156px] lg:min-w-0 min-h-[72px] p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`events-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
               ${statusFilter === 'All' ? 'ring-2 ring-slate-400 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-slate-300'}
               bg-white
             `}
           >
               <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-xs font-semibold text-slate-500 uppercase">Total Events</p>
+                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
+                    <span className="sm:hidden">Total</span>
+                    <span className="hidden sm:inline">Total Events</span>
+                  </p>
                   <div className={`p-1 rounded-lg ${statusFilter === 'All' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-600'}`}>
-                    <CalendarPlus size={14} />
+                    <CalendarPlus size={12} className="sm:h-3.5 sm:w-3.5" />
                   </div>
               </div>
-              <p className="events-stat-value text-base font-bold text-slate-800">{eventSummary.total}</p>
+              <p className="events-stat-value text-sm sm:text-base font-bold text-slate-800">{eventSummary.total}</p>
           </button>
 
           <button
             onClick={() => setStatusFilter('Ongoing')}
-            className={`events-stat-card min-w-[136px] sm:min-w-[148px] md:min-w-[156px] lg:min-w-0 min-h-[72px] p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`events-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
               ${statusFilter === 'Ongoing' ? 'ring-2 ring-emerald-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-emerald-200'}
               bg-white
             `}
           >
               <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-xs font-semibold text-slate-500 uppercase">Ongoing</p>
+                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">Ongoing</p>
                   <div className={`p-1 rounded-lg ${statusFilter === 'Ongoing' ? 'bg-emerald-200 text-emerald-700' : 'bg-emerald-100 text-emerald-600'}`}>
-                    <Clock size={14} />
+                    <Clock size={12} className="sm:h-3.5 sm:w-3.5" />
                   </div>
               </div>
-              <p className="events-stat-value text-base font-bold text-emerald-600">{eventSummary.ongoing}</p>
+              <p className="events-stat-value text-sm sm:text-base font-bold text-emerald-600">{eventSummary.ongoing}</p>
           </button>
 
           <button
             onClick={() => setStatusFilter('Scheduled')}
-            className={`events-stat-card min-w-[136px] sm:min-w-[148px] md:min-w-[156px] lg:min-w-0 min-h-[72px] p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`events-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
               ${statusFilter === 'Scheduled' ? 'ring-2 ring-blue-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-blue-200'}
               bg-white
             `}
           >
               <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-xs font-semibold text-slate-500 uppercase">Scheduled</p>
+                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
+                    <span className="sm:hidden">Sched.</span>
+                    <span className="hidden sm:inline">Scheduled</span>
+                  </p>
                   <div className={`p-1 rounded-lg ${statusFilter === 'Scheduled' ? 'bg-blue-200 text-blue-700' : 'bg-blue-100 text-blue-600'}`}>
-                    <Calendar size={14} />
+                    <Calendar size={12} className="sm:h-3.5 sm:w-3.5" />
                   </div>
               </div>
-              <p className="events-stat-value text-base font-bold text-blue-600">{eventSummary.scheduled}</p>
+              <p className="events-stat-value text-sm sm:text-base font-bold text-blue-600">{eventSummary.scheduled}</p>
           </button>
 
           <button
             onClick={() => setStatusFilter('Completed')}
-            className={`events-stat-card min-w-[136px] sm:min-w-[148px] md:min-w-[156px] lg:min-w-0 min-h-[72px] p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`events-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
               ${statusFilter === 'Completed' ? 'ring-2 ring-indigo-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-indigo-200'}
               bg-white
             `}
           >
               <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-xs font-semibold text-slate-500 uppercase">Completed</p>
+                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
+                    <span className="sm:hidden">Done</span>
+                    <span className="hidden sm:inline">Completed</span>
+                  </p>
                   <div className={`p-1 rounded-lg ${statusFilter === 'Completed' ? 'bg-indigo-200 text-indigo-700' : 'bg-indigo-100 text-indigo-600'}`}>
-                    <Check size={14} />
+                    <Check size={12} className="sm:h-3.5 sm:w-3.5" />
                   </div>
               </div>
-              <p className="events-stat-value text-base font-bold text-indigo-600">{eventSummary.completed}</p>
+              <p className="events-stat-value text-sm sm:text-base font-bold text-indigo-600">{eventSummary.completed}</p>
           </button>
 
           <button
             onClick={() => setStatusFilter('Cancelled')}
-            className={`events-stat-card min-w-[136px] sm:min-w-[148px] md:min-w-[156px] lg:min-w-0 min-h-[72px] p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`events-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
               ${statusFilter === 'Cancelled' ? 'ring-2 ring-red-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-red-200'}
               bg-white
             `}
           >
               <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-xs font-semibold text-slate-500 uppercase">Cancelled</p>
+                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
+                    <span className="sm:hidden">Cancel</span>
+                    <span className="hidden sm:inline">Cancelled</span>
+                  </p>
                   <div className={`p-1 rounded-lg ${statusFilter === 'Cancelled' ? 'bg-red-200 text-red-700' : 'bg-red-100 text-red-600'}`}>
-                    <XCircle size={14} />
+                    <XCircle size={12} className="sm:h-3.5 sm:w-3.5" />
                   </div>
               </div>
-              <p className="events-stat-value text-base font-bold text-red-600">{eventSummary.cancelled}</p>
+              <p className="events-stat-value text-sm sm:text-base font-bold text-red-600">{eventSummary.cancelled}</p>
           </button>
         </div>
       </div>
@@ -1646,15 +1661,15 @@ const EventsList: React.FC = () => {
       {showParticipantsModal && selectedEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeParticipantsModal}></div>
-            <div className={`bg-white rounded-xl shadow-2xl w-full ${participantModalView === 'list' ? 'max-w-6xl' : 'max-w-3xl'} h-[80vh] flex flex-col relative z-10 animate-in zoom-in-95 duration-200`}>
+            <div className={`bg-white rounded-xl shadow-2xl w-full ${participantModalView === 'list' ? 'max-w-6xl' : 'max-w-3xl'} h-[85vh] sm:h-[80vh] flex flex-col relative z-10 animate-in zoom-in-95 duration-200`}>
                 {/* Header */}
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-xl shrink-0">
-                    <div>
-                        <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start bg-slate-50/50 rounded-t-xl shrink-0">
+                    <div className="min-w-0 flex-1">
+                        <h3 className="text-lg sm:text-xl font-bold text-slate-800 flex items-start gap-2 leading-tight">
                             {participantModalView === 'list' ? (
                                 <>
-                                    <Users className="text-indigo-600" size={24} /> 
-                                    {selectedEvent.event_name}
+                                    <Users className="text-indigo-600 mt-0.5 shrink-0" size={22} /> 
+                                    <span className="break-words">{selectedEvent.event_name}</span>
                                 </>
                             ) : participantModalView === 'edit' ? (
                                 <>
@@ -1674,9 +1689,9 @@ const EventsList: React.FC = () => {
                             </p>
                         )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
                         {participantModalView === 'list' && (
-                            <div className="relative mr-2">
+                            <div className="relative flex-1 min-w-[210px] sm:min-w-0 sm:w-48">
                                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                                     <Search size={16} />
                                 </div>
@@ -1685,7 +1700,7 @@ const EventsList: React.FC = () => {
                                     placeholder="Search participant..." 
                                     value={participantSearchTerm}
                                     onChange={(e) => setParticipantSearchTerm(e.target.value)}
-                                    className="w-48 pl-9 pr-14 py-1.5 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    className="w-full pl-9 pr-14 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                 />
                                 {participantSearchTerm && (
                                     <button
@@ -1699,10 +1714,10 @@ const EventsList: React.FC = () => {
                             </div>
                         )}
                         {participantModalView === 'list' ? (
-                            hasPermission('MANAGE_PARTICIPANTS') && (
+                            canManageParticipants && (
                                 <button 
                                     onClick={openAddParticipantView}
-                                    className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors mr-2 shadow-sm"
+                                    className="shrink-0 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-sm"
                                 >
                                     <UserPlus size={16} /> Add
                                 </button>
@@ -1710,12 +1725,12 @@ const EventsList: React.FC = () => {
                         ) : (
                             <button 
                                 onClick={() => { setParticipantModalView('list'); resetParticipantForm(); }}
-                                className="bg-slate-100 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-slate-200 transition-colors mr-2 shadow-sm"
+                                className="w-full sm:w-auto bg-slate-100 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors shadow-sm"
                             >
                                 <ArrowRight size={16} className="rotate-180" /> Return to List
                             </button>
                         )}
-                        <button onClick={closeParticipantsModal} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
+                        <button onClick={closeParticipantsModal} className="ml-auto sm:ml-0 text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
                             <X size={24} />
                         </button>
                     </div>
@@ -1732,19 +1747,19 @@ const EventsList: React.FC = () => {
                         <table className="datatable w-full text-[13px] text-left">
                             <thead className="bg-slate-50 text-slate-500 font-semibold sticky top-0 shadow-sm z-10">
                                 <tr>
-                                    <th className="px-6 py-4 w-16 text-center">#</th>
-                                    <th className="px-6 py-4">Participant Name</th>
-                                    <th className="px-6 py-4">Role</th>
-                                    <th className="px-6 py-4">Office</th>
-                                    <th className="px-6 py-4">Status</th>
-                                    {hasPermission('MANAGE_PARTICIPANTS') && <th className="px-6 py-4 text-right">Action</th>}
+                                    <th className="hidden md:table-cell px-6 py-4 w-16 text-center">#</th>
+                                    <th className="px-4 sm:px-6 py-4">Participant Name</th>
+                                    <th className="px-4 sm:px-6 py-4">Role</th>
+                                    <th className="hidden md:table-cell px-6 py-4">Office</th>
+                                    <th className="hidden md:table-cell px-6 py-4">Status</th>
+                                    {canManageParticipants && <th className="px-4 sm:px-6 py-4 text-right">Action</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {specialParticipants.length > 0 && (
                                     <>
                                         <tr className="bg-indigo-50/50">
-                                            <td colSpan={hasPermission('MANAGE_PARTICIPANTS') ? 6 : 5} className="px-6 py-2 text-xs font-bold text-indigo-800 uppercase tracking-wider">
+                                            <td colSpan={canManageParticipants ? 6 : 5} className="px-4 sm:px-6 py-2 text-xs font-bold text-indigo-800 uppercase tracking-wider">
                                                 Event Officials & Guests ({specialParticipants.length})
                                             </td>
                                         </tr>
@@ -1752,16 +1767,16 @@ const EventsList: React.FC = () => {
                                             const isEditing = editingRole?.participantId === record.participant_id;
                                             return (
                                             <tr key={record.id} className="hover:bg-slate-50">
-                                                <td className="px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
-                                                <td className="px-6 py-3">
+                                                <td className="hidden md:table-cell px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
+                                                <td className="px-4 sm:px-6 py-3">
                                                     <div className="font-medium text-slate-800">{record.participants?.full_name}</div>
-                                                    <div className="text-xs text-slate-500">{record.participants?.email}</div>
+                                                    <div className="hidden sm:block text-xs text-slate-500">{record.participants?.email}</div>
                                                 </td>
-                                                <td className="px-6 py-3 text-slate-600">
+                                                <td className="px-4 sm:px-6 py-3 text-slate-600">
                                                     {isEditing ? (
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-1 sm:gap-2">
                                                             <select
-                                                                className="text-xs border border-slate-300 rounded p-1 bg-white focus:outline-none focus:border-indigo-500"
+                                                                className="min-w-0 text-xs border border-slate-300 rounded p-1 bg-white focus:outline-none focus:border-indigo-500"
                                                                 value={editingRole.role}
                                                                 onChange={(e) => setEditingRole({ ...editingRole, role: e.target.value })}
                                                                 onClick={(e) => e.stopPropagation()}
@@ -1788,9 +1803,9 @@ const EventsList: React.FC = () => {
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-1 sm:gap-2">
                                                             <span className="font-medium text-indigo-600">{record.role}</span>
-                                                            {hasPermission('MANAGE_PARTICIPANTS') && (
+                                                            {canManageParticipants && (
                                                                 <button 
                                                                     onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participant_id, role: record.role }); }}
                                                                     className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1 rounded"
@@ -1807,16 +1822,16 @@ const EventsList: React.FC = () => {
                                                         </span>
                                                     )}
                                                 </td>
-                                                <td className="px-6 py-3 text-slate-600">{record.participants?.office}</td>
-                                                <td className="px-6 py-3">
+                                                <td className="hidden md:table-cell px-6 py-3 text-slate-600">{record.participants?.office}</td>
+                                                <td className="hidden md:table-cell px-6 py-3">
                                                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold
                                                         ${record.registration_status === 'Registered' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}
                                                     `}>
                                                         {record.registration_status}
                                                     </span>
                                                 </td>
-                                                {hasPermission('MANAGE_PARTICIPANTS') && (
-                                                    <td className="px-6 py-3 text-right">
+                                                {canManageParticipants && (
+                                                    <td className="px-4 sm:px-6 py-3 text-right">
                                                         <div className="flex items-center justify-end gap-1">
                                                             <button
                                                                 onClick={() => openEditParticipantView(record)}
@@ -1844,7 +1859,7 @@ const EventsList: React.FC = () => {
                                 {delegateParticipants.length > 0 && (
                                     <>
                                          <tr className="bg-slate-50/80">
-                                            <td colSpan={hasPermission('MANAGE_PARTICIPANTS') ? 6 : 5} className="px-6 py-2 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                            <td colSpan={canManageParticipants ? 6 : 5} className="px-4 sm:px-6 py-2 text-xs font-bold text-slate-600 uppercase tracking-wider">
                                                 Delegates ({delegateParticipants.length})
                                             </td>
                                         </tr>
@@ -1852,16 +1867,16 @@ const EventsList: React.FC = () => {
                                             const isEditing = editingRole?.participantId === record.participant_id;
                                             return (
                                             <tr key={record.id} className="hover:bg-slate-50">
-                                                <td className="px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
-                                                <td className="px-6 py-3">
+                                                <td className="hidden md:table-cell px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
+                                                <td className="px-4 sm:px-6 py-3">
                                                     <div className="font-medium text-slate-800">{record.participants?.full_name}</div>
-                                                    <div className="text-xs text-slate-500">{record.participants?.email}</div>
+                                                    <div className="hidden sm:block text-xs text-slate-500">{record.participants?.email}</div>
                                                 </td>
-                                                <td className="px-6 py-3 text-slate-600">
+                                                <td className="px-4 sm:px-6 py-3 text-slate-600">
                                                     {isEditing ? (
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-1 sm:gap-2">
                                                             <select
-                                                                className="text-xs border border-slate-300 rounded p-1 bg-white focus:outline-none focus:border-indigo-500"
+                                                                className="min-w-0 text-xs border border-slate-300 rounded p-1 bg-white focus:outline-none focus:border-indigo-500"
                                                                 value={editingRole.role}
                                                                 onChange={(e) => setEditingRole({ ...editingRole, role: e.target.value })}
                                                                 onClick={(e) => e.stopPropagation()}
@@ -1888,9 +1903,9 @@ const EventsList: React.FC = () => {
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-1 sm:gap-2">
                                                             <span className="font-medium text-indigo-600">{record.role}</span>
-                                                            {hasPermission('MANAGE_PARTICIPANTS') && (
+                                                            {canManageParticipants && (
                                                                 <button 
                                                                     onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participant_id, role: record.role }); }}
                                                                     className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1 rounded"
@@ -1907,16 +1922,16 @@ const EventsList: React.FC = () => {
                                                         </span>
                                                     )}
                                                 </td>
-                                                <td className="px-6 py-3 text-slate-600">{record.participants?.office}</td>
-                                                <td className="px-6 py-3">
+                                                <td className="hidden md:table-cell px-6 py-3 text-slate-600">{record.participants?.office}</td>
+                                                <td className="hidden md:table-cell px-6 py-3">
                                                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold
                                                         ${record.registration_status === 'Registered' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}
                                                     `}>
                                                         {record.registration_status}
                                                     </span>
                                                 </td>
-                                                {hasPermission('MANAGE_PARTICIPANTS') && (
-                                                    <td className="px-6 py-3 text-right">
+                                                {canManageParticipants && (
+                                                    <td className="px-4 sm:px-6 py-3 text-right">
                                                         <div className="flex items-center justify-end gap-1">
                                                             <button
                                                                 onClick={() => openEditParticipantView(record)}
@@ -1943,7 +1958,7 @@ const EventsList: React.FC = () => {
 
                                 {filteredParticipants.length === 0 && (
                                     <tr>
-                                        <td colSpan={hasPermission('MANAGE_PARTICIPANTS') ? 6 : 5} className="text-center py-10 text-slate-400">
+                                        <td colSpan={canManageParticipants ? 6 : 5} className="text-center py-10 text-slate-400">
                                             {participantSearchTerm ? 'No participants found matching your search.' : 'No participants registered yet.'}
                                         </td>
                                     </tr>
@@ -2322,20 +2337,20 @@ const EventsList: React.FC = () => {
                 
                 {/* Footer stats */}
                 {participantModalView === 'list' && (
-                    <div className="p-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 rounded-b-xl grid grid-cols-1 sm:grid-cols-3 gap-4">
-                         <div className="flex flex-col">
-                            <span className="text-xs uppercase text-slate-400 font-bold">Total Participants</span>
-                            <span className="text-lg font-bold text-slate-800">{totalCount}</span>
+                    <div className="p-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 rounded-b-xl grid grid-cols-3 gap-3">
+                         <div className="flex min-w-0 flex-col justify-end">
+                            <span className="text-[10px] sm:text-xs uppercase text-slate-400 font-bold leading-tight">Total Participants</span>
+                            <span className="text-lg sm:text-xl font-bold text-slate-800">{totalCount}</span>
                         </div>
-                        <div className="flex flex-col">
-                            <span className="text-xs uppercase text-slate-400 font-bold">Total Delegates</span>
-                            <span className="text-lg font-bold text-slate-800">{delegateCount}</span>
+                        <div className="flex min-w-0 flex-col justify-end">
+                            <span className="text-[10px] sm:text-xs uppercase text-slate-400 font-bold leading-tight">Total Delegates</span>
+                            <span className="text-lg sm:text-xl font-bold text-slate-800">{delegateCount}</span>
                         </div>
-                         <div className="flex flex-col">
-                            <span className="text-xs uppercase text-slate-400 font-bold">Accommodation</span>
-                            <div className="flex items-center gap-2">
-                                <span className="text-lg font-bold text-purple-700">{accommodationCount}</span>
-                                <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">Pax Requested</span>
+                         <div className="flex min-w-0 flex-col justify-end">
+                            <span className="text-[10px] sm:text-xs uppercase text-slate-400 font-bold leading-tight">Accommodation</span>
+                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                                <span className="text-lg sm:text-xl font-bold text-purple-700">{accommodationCount}</span>
+                                <span className="text-[10px] sm:text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">Pax Requested</span>
                             </div>
                         </div>
                     </div>

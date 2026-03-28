@@ -96,7 +96,10 @@ const Scanner: React.FC = () => {
   };
 
   const selectedEvent = events.find((event) => event.event_id.toString() === selectedEventId);
-  const canToggleSession = selectedEvent?.session === 'All_Day';
+  const isSessionEnabled = (sessionOption: 'AM' | 'PM') => {
+    if (!selectedEvent) return false;
+    return selectedEvent.session === 'All_Day' || selectedEvent.session === sessionOption;
+  };
 
   useEffect(() => {
     eventIdRef.current = selectedEventId;
@@ -549,93 +552,122 @@ const Scanner: React.FC = () => {
   };
     
   return (
-    <div className="h-full w-full flex flex-col lg:flex-row bg-slate-900 overflow-hidden">
+    <div className="h-full w-full flex flex-col gap-2 bg-slate-100 p-2 sm:gap-3 sm:p-4 lg:flex-row lg:gap-0 lg:bg-slate-900 lg:p-0 overflow-hidden">
         
-        {/* LEFT/TOP: Camera Section */}
-        <div className="flex-1 flex flex-col relative bg-black">
-            
-            {/* Top Bar Overlay */}
-            <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/80 to-transparent">
-                 <div className="flex flex-col sm:flex-row gap-3 max-w-4xl mx-auto items-center">
-                    
-                    {/* Status Indicators */}
-                    <div className="flex items-center gap-2 absolute top-4 right-4 sm:relative sm:top-0 sm:right-0 sm:order-last">
+        {/* LEFT/TOP: Controls + Camera Section */}
+        <div className="flex-1 flex flex-col overflow-hidden rounded-[28px] border border-slate-900/90 bg-slate-950 shadow-[0_18px_40px_rgba(15,23,42,0.28)] lg:rounded-none lg:border-0 lg:shadow-none">
+            <div className="shrink-0 border-b border-slate-800 bg-slate-950/95 p-2.5 sm:p-4">
+                 <div className="flex flex-col gap-3 max-w-5xl mx-auto">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="space-y-1 min-w-0">
+                            <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.28em] text-slate-500">Scan Setup</p>
+                            <p className="hidden sm:block text-sm font-medium text-slate-300">Select the event and active session before scanning.</p>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
                         {isOnline ? (
-                            <div className="bg-green-500/20 text-green-400 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 backdrop-blur-md border border-green-500/30">
+                            <div className="bg-green-500/20 text-green-400 px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-bold flex items-center gap-1.5 backdrop-blur-md border border-green-500/30">
                                 <Wifi size={14} /> Online
                             </div>
                         ) : (
-                            <div className="bg-red-500/20 text-red-400 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 backdrop-blur-md border border-red-500/30">
+                            <div className="bg-red-500/20 text-red-400 px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-bold flex items-center gap-1.5 backdrop-blur-md border border-red-500/30">
                                 <WifiOff size={14} /> Offline Mode
                             </div>
                         )}
                         {offlineQueue.length > 0 && (
-                             <div className="bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 backdrop-blur-md border border-amber-500/30 animate-pulse">
+                             <div className="bg-amber-500/20 text-amber-400 px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-bold flex items-center gap-1.5 backdrop-blur-md border border-amber-500/30 animate-pulse">
                                 <CloudUpload size={14} /> {offlineQueue.length} Pending
                              </div>
                         )}
                     </div>
-
-                    <div className="flex-1 w-full sm:w-auto mt-8 sm:mt-0">
-                        {loadingEvents ? (
-                            <div className="h-11 bg-slate-800 rounded-lg animate-pulse"></div>
-                        ) : (
-                            <div className="relative">
-                                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                <select 
-                                    value={selectedEventId}
-                                    onChange={(e) => {
-                                        const nextEventId = e.target.value;
-                                        setSelectedEventId(nextEventId);
-
-                                        const nextEvent = events.find((event) => event.event_id.toString() === nextEventId);
-                                        if (nextEvent) {
-                                            setSession(getDefaultSessionForEvent(nextEvent));
-                                        }
-                                    }}
-                                    className="w-full bg-slate-900/80 text-white text-sm font-medium rounded-xl pl-10 pr-8 py-3 border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-xl backdrop-blur-md appearance-none"
-                                >
-                                    {events.length === 0 ? (
-                                        <option value="">No Events Today</option>
-                                    ) : (
-                                        <>
-                                            {(events.length > 1 || !selectedEventId) && <option value="">-- Select Event --</option>}
-                                            {events.map(e => <option key={e.event_id} value={e.event_id}>{e.event_name}</option>)}
-                                        </>
-                                    )}
-                                </select>
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                                </div>
-                            </div>
-                        )}
                     </div>
-                    
-                    <button 
-                        onClick={() => {
-                            if (canToggleSession) {
-                                setSession(session === 'AM' ? 'PM' : 'AM');
-                            }
-                        }}
-                        disabled={!selectedEventId || !canToggleSession}
-                        className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 border shadow-xl backdrop-blur-md transition-all
-                            ${session === 'AM' 
-                                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300' 
-                                : 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300'
-                            }
-                            ${canToggleSession
-                                ? (session === 'AM' ? ' hover:bg-amber-500/30' : ' hover:bg-indigo-600/30')
-                                : ' opacity-80 cursor-default'
-                            }`}
-                    >
-                        {session === 'AM' ? <Sun size={18} className="fill-current"/> : <Moon size={18} className="fill-current"/>}
-                        {session} Session{canToggleSession ? '' : selectedEventId ? ' Locked' : ''}
-                    </button>
+
+                    <div className="grid gap-2 sm:gap-3 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
+                        <div className="flex-1 w-full rounded-2xl border border-slate-800 bg-slate-900/70 p-1.5 sm:p-2">
+                            <p className="px-2 pb-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Event</p>
+                            {loadingEvents ? (
+                                <div className="h-11 sm:h-12 bg-slate-800 rounded-xl animate-pulse"></div>
+                            ) : (
+                                <div className="relative">
+                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                    <select 
+                                        value={selectedEventId}
+                                        onChange={(e) => {
+                                            const nextEventId = e.target.value;
+                                            setSelectedEventId(nextEventId);
+
+                                            const nextEvent = events.find((event) => event.event_id.toString() === nextEventId);
+                                            if (nextEvent) {
+                                                setSession(getDefaultSessionForEvent(nextEvent));
+                                            }
+                                        }}
+                                        className="w-full bg-slate-950 text-white text-sm font-medium rounded-xl pl-10 pr-8 py-2.5 sm:py-3 border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm appearance-none"
+                                    >
+                                        {events.length === 0 ? (
+                                            <option value="">No Events Today</option>
+                                        ) : (
+                                            <>
+                                                {(events.length > 1 || !selectedEventId) && <option value="">-- Select Event --</option>}
+                                                {events.map(e => <option key={e.event_id} value={e.event_id}>{e.event_name}</option>)}
+                                            </>
+                                        )}
+                                    </select>
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="w-full xl:w-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-1.5 sm:p-2 shadow-sm">
+                            <p className="px-2 pb-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Session</p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setSession('AM')}
+                                    disabled={!isSessionEnabled('AM')}
+                                    aria-pressed={session === 'AM'}
+                                    className={`px-4 py-2.5 sm:py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all border
+                                        ${session === 'AM'
+                                            ? 'bg-amber-500/20 border-amber-400/60 text-amber-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                                            : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                                        }
+                                        ${isSessionEnabled('AM')
+                                            ? 'hover:bg-amber-500/10'
+                                            : 'opacity-40 cursor-not-allowed text-slate-500'
+                                        }`}
+                                >
+                                    <Sun size={18} className="fill-current" />
+                                    AM
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSession('PM')}
+                                    disabled={!isSessionEnabled('PM')}
+                                    aria-pressed={session === 'PM'}
+                                    className={`px-4 py-2.5 sm:py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all border
+                                        ${session === 'PM'
+                                            ? 'bg-indigo-600/20 border-indigo-500/60 text-indigo-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                                            : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                                        }
+                                        ${isSessionEnabled('PM')
+                                            ? 'hover:bg-indigo-600/10'
+                                            : 'opacity-40 cursor-not-allowed text-slate-500'
+                                        }`}
+                                >
+                                    <Moon size={18} className="fill-current" />
+                                    PM
+                                </button>
+                            </div>
+                            <p className="px-2 pt-1.5 text-[10px] sm:text-[11px] font-medium text-slate-400 text-center">
+                                {!selectedEvent ? 'Select an event to choose a session.' : `${selectedEvent.session} only event`}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             {/* Camera Viewport */}
-            <div className="flex-1 relative flex items-center justify-center overflow-hidden bg-black">
+            <div className="relative flex min-h-[58vh] flex-1 items-center justify-center overflow-hidden bg-black sm:min-h-[520px] lg:min-h-0">
                 {cameraError ? (
                     <div className="text-white text-center p-8 max-w-sm">
                         <div className="bg-red-500/20 p-6 rounded-full inline-block mb-6">
@@ -657,7 +689,7 @@ const Scanner: React.FC = () => {
                         {/* Static Overlay Guide */}
                         {!scanResult && scanning && (
                             <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
-                                <div className="w-64 h-64 sm:w-80 sm:h-80 border-2 border-white/40 rounded-3xl relative overflow-hidden backdrop-brightness-150">
+                                <div className="w-56 h-56 sm:w-72 sm:h-72 lg:w-80 lg:h-80 border-2 border-white/40 rounded-[2rem] relative overflow-hidden backdrop-brightness-150">
                                     <div className="absolute inset-0 border-[60px] border-black/40"></div>
                                     <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-indigo-500 -mt-1 -ml-1 rounded-tl-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
                                     <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-indigo-500 -mt-1 -mr-1 rounded-tr-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
@@ -667,7 +699,7 @@ const Scanner: React.FC = () => {
                                     {/* Scan Line Animation - High Tech look */}
                                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent shadow-[0_0_20px_rgba(79,70,229,0.9)] animate-[scan_2.5s_ease-in-out_infinite]"></div>
                                 </div>
-                                <div className="mt-8 bg-black/70 backdrop-blur-md px-6 py-2.5 rounded-full text-white/90 text-sm font-bold border border-white/20 tracking-wide flex items-center gap-2">
+                                <div className="mt-6 bg-black/70 backdrop-blur-md px-5 py-2.5 rounded-full text-white/90 text-sm font-bold border border-white/20 tracking-wide flex items-center gap-2 shadow-lg">
                                     <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
                                     Focusing on QR Code...
                                 </div>
@@ -758,11 +790,11 @@ const Scanner: React.FC = () => {
         </div>
 
         {/* RIGHT/BOTTOM: Recent Scans History */}
-        <div className="lg:w-96 w-full bg-white border-l border-slate-800 lg:h-full flex flex-col z-10 lg:z-auto max-h-[40vh] lg:max-h-full">
+        <div className="hidden lg:flex lg:w-96 w-full bg-white rounded-[28px] border border-slate-200 shadow-[0_12px_30px_rgba(15,23,42,0.08)] lg:rounded-none lg:border-l lg:border-t-0 lg:border-r-0 lg:border-b-0 lg:border-slate-800 lg:h-full flex-col z-10 lg:z-auto max-h-[34vh] lg:max-h-full overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
                     <History size={18} className="text-indigo-600"/> 
-                    Scan History
+                    Recent Scans
                 </h3>
                 <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded-full">{recentScans.length}</span>
             </div>
