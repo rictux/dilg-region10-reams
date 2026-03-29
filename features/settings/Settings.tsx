@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload } from 'lucide-react';
+import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload, Eye, X } from 'lucide-react';
 import { Event, Office } from '../../types/database';
 import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
 import CertificateOfAppearanceCard, {
@@ -12,9 +12,9 @@ import CertificateOfAppearanceCard, {
   getEventDateRows
 } from '../reports/CertificateOfAppearanceTemplate';
 
+const MM_TO_PX = 3.7795275591;
 const CERTIFICATE_PREVIEW_SCALE = 0.36;
-const CERTIFICATE_PREVIEW_WIDTH_PX = 210 * 3.7795275591 * CERTIFICATE_PREVIEW_SCALE;
-const CERTIFICATE_PREVIEW_HEIGHT_PX = 148.5 * 3.7795275591 * CERTIFICATE_PREVIEW_SCALE;
+const CERTIFICATE_MODAL_PREVIEW_SCALE = 0.72;
 const CERTIFICATE_TEMPLATE_OPTIONS: Array<{
   value: CertificateTemplateVariant;
   label: string;
@@ -88,6 +88,7 @@ const Settings: React.FC = () => {
   });
   const [selectedSignatureFile, setSelectedSignatureFile] = useState<File | null>(null);
   const [signaturePreviewUrl, setSignaturePreviewUrl] = useState('');
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
   useEffect(() => {
     if (user?.role === 'Admin') {
@@ -119,6 +120,19 @@ const Settings: React.FC = () => {
       }
     };
   }, [signaturePreviewUrl]);
+
+  useEffect(() => {
+    if (!isPreviewModalOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsPreviewModalOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPreviewModalOpen]);
 
   const fetchOffices = async () => {
     try {
@@ -292,213 +306,306 @@ const Settings: React.FC = () => {
     );
   }
 
+  const selectedOffice = offices.find((office) => office.office_id === selectedOfficeId) || null;
+  const previewSignatory = {
+    name: signatory.name,
+    position: signatory.position,
+    esig_link: signaturePreviewUrl || signatory.esig_link,
+    certificate_template_variant: signatory.certificate_template_variant
+  };
+
+  const renderCertificatePreview = (scale: number) => {
+    const previewWidthPx = 210 * MM_TO_PX * scale;
+    const previewHeightPx = 148.5 * MM_TO_PX * scale;
+
+    return (
+      <div
+        className="mx-auto overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_24px_60px_-32px_rgba(15,23,42,0.35)]"
+        style={{
+          width: `${previewWidthPx}px`,
+          height: `${previewHeightPx}px`
+        }}
+      >
+        <div
+          style={{
+            width: '210mm',
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left'
+          }}
+        >
+          <CertificateOfAppearanceCard
+            event={CERTIFICATE_PREVIEW_EVENT}
+            participantRecord={CERTIFICATE_PREVIEW_PARTICIPANT}
+            signatory={previewSignatory}
+            dateString={CERTIFICATE_PREVIEW_DATE_STRING}
+            eventFoodInclusionMap={CERTIFICATE_PREVIEW_FOOD_INCLUSION_MAP}
+            certificateSerialNumber="LGMED-2026-Mar-24-25-001-01"
+            templateVariant={signatory.certificate_template_variant}
+          />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="h-full min-h-0 flex flex-col">
       <div className="flex-1 min-h-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-800">Certificate Signatories</h2>
-          <p className="text-sm text-slate-500 mt-1">
-            Configure the default signatory and template for Certificates of Appearance for each office.
-          </p>
+        <div className="border-b border-slate-100 p-5 sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">Certificate Signatories</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Configure the default signatory and template for Certificates of Appearance for each office.
+              </p>
+            </div>
+
+            {selectedOfficeId && (
+              <button
+                type="button"
+                onClick={() => setIsPreviewModalOpen(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+              >
+                <Eye className="h-4 w-4" />
+                Open Preview
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="p-6 border-b border-slate-100 bg-slate-50">
-          <label className="block text-sm font-medium text-slate-700 mb-2">Select Office</label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Building2 className="h-5 w-5 text-slate-400" />
+        <div className="border-b border-slate-100 bg-slate-50/80 p-5 sm:p-6">
+          <div className="max-w-md">
+            <label className="mb-2 block text-sm font-medium text-slate-700">Select Office</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <Building2 className="h-5 w-5 text-slate-400" />
+              </div>
+              <select
+                value={selectedOfficeId}
+                onChange={(e) => setSelectedOfficeId(e.target.value ? Number(e.target.value) : '')}
+                className="w-full appearance-none rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              >
+                <option value="" disabled>Select an office...</option>
+                {offices.map((office) => (
+                  <option key={office.office_id} value={office.office_id}>
+                    {office.name} {office.code ? `(${office.code})` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
-            <select
-              value={selectedOfficeId}
-              onChange={(e) => setSelectedOfficeId(e.target.value ? Number(e.target.value) : '')}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all appearance-none bg-white"
-            >
-              <option value="" disabled>Select an office...</option>
-              {offices.map(office => (
-                <option key={office.office_id} value={office.office_id}>
-                  {office.name} {office.code ? `(${office.code})` : ''}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
 
         {selectedOfficeId ? (
           <form onSubmit={handleSave} className="flex-1 min-h-0 flex flex-col">
-            <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6">
-              {message && (
-              <div className={`p-4 rounded-lg flex items-start gap-3 ${
-                message.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
-              }`}>
-                {message.type === 'success' ? (
-                  <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                ) : (
-                  <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-                )}
-                <p className="text-sm font-medium">{message.text}</p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-slate-700">Name</label>
-                <input
-                  type="text"
-                  required
-                  value={signatory.name}
-                  onChange={(e) => setSignatory({ ...signatory, name: e.target.value })}
-                  placeholder="e.g. Corazon S. Vicente"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-slate-700">Position</label>
-                <input
-                  type="text"
-                  required
-                  value={signatory.position}
-                  onChange={(e) => setSignatory({ ...signatory, position: e.target.value })}
-                  placeholder="e.g. Division Chief, LGMED"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                />
-              </div>
-
-              <div className="space-y-4 md:col-span-2">
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">Certificate Template</label>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Choose which Certificate of Appearance layout this office will use for preview, saving, and printing.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    {CERTIFICATE_TEMPLATE_OPTIONS.map((option) => {
-                      const isSelected = signatory.certificate_template_variant === option.value;
-
-                      return (
-                        <label
-                          key={option.value}
-                          className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
-                            isSelected
-                              ? 'border-indigo-300 bg-indigo-50'
-                              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="certificate_template_variant"
-                            value={option.value}
-                            checked={isSelected}
-                            onChange={() =>
-                              setSignatory((prev) => ({
-                                ...prev,
-                                certificate_template_variant: option.value
-                              }))
-                            }
-                            className="mt-1 h-4 w-4 border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                          />
-                          <div>
-                            <p className="text-sm font-semibold text-slate-800">{option.label}</p>
-                            <p className="mt-1 text-xs leading-relaxed text-slate-500">{option.description}</p>
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-slate-700">E-Signature Image (Optional)</label>
-                  <label className="flex items-center justify-center gap-3 w-full px-4 py-4 border border-dashed border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer text-slate-600">
-                    <Upload className="w-5 h-5" />
-                    <span className="text-sm font-medium">
-                      {selectedSignatureFile ? selectedSignatureFile.name : 'Upload signature image'}
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleSignatureChange}
-                      className="hidden"
-                    />
-                  </label>
-                  <p className="text-xs text-slate-500">
-                    Upload the signature image and it will be saved to the `signatory` bucket. PNG with transparent background is recommended.
-                  </p>
-                </div>
-
-                {signaturePreviewUrl && (
-                  <div className="rounded-lg border border-slate-200 bg-white p-4">
-                    <p className="text-sm font-medium text-slate-700 mb-3">
-                      {selectedSignatureFile ? 'Signature Preview' : 'Current E-Signature'}
-                    </p>
-                    <div className="h-28 flex items-center justify-center rounded-lg bg-slate-50">
-                      <img
-                        src={signaturePreviewUrl}
-                        alt="Signatory e-signature"
-                        className="max-h-20 max-w-full object-contain"
-                        referrerPolicy="no-referrer"
-                      />
-                </div>
-              </div>
-              )}
-              </div>
-            </div>
-
-            <div className="space-y-4 border-t border-slate-100 pt-6">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-800">Template Preview</h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  This sample preview uses the exact certificate layout that will be shown in the print page.
-                </p>
-              </div>
-
-              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div
-                  className="mx-auto overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
-                  style={{
-                    width: `${CERTIFICATE_PREVIEW_WIDTH_PX}px`,
-                    height: `${CERTIFICATE_PREVIEW_HEIGHT_PX}px`
-                  }}
-                >
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar p-5 sm:p-6">
+              <div className="space-y-6">
+                {message && (
                   <div
-                    style={{
-                      width: '210mm',
-                      transform: `scale(${CERTIFICATE_PREVIEW_SCALE})`,
-                      transformOrigin: 'top left'
-                    }}
+                    className={`flex items-start gap-3 rounded-xl border p-4 ${
+                      message.type === 'success'
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                        : 'border-red-200 bg-red-50 text-red-800'
+                    }`}
                   >
-                    <CertificateOfAppearanceCard
-                      event={CERTIFICATE_PREVIEW_EVENT}
-                      participantRecord={CERTIFICATE_PREVIEW_PARTICIPANT}
-                      signatory={{
-                        name: signatory.name,
-                        position: signatory.position,
-                        esig_link: signaturePreviewUrl || signatory.esig_link,
-                        certificate_template_variant: signatory.certificate_template_variant
-                      }}
-                      dateString={CERTIFICATE_PREVIEW_DATE_STRING}
-                      eventFoodInclusionMap={CERTIFICATE_PREVIEW_FOOD_INCLUSION_MAP}
-                      certificateSerialNumber="LGMED-2026-Mar-24-25-001-01"
-                      templateVariant={signatory.certificate_template_variant}
-                    />
+                    {message.type === 'success' ? (
+                      <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                    ) : (
+                      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                    )}
+                    <p className="text-sm font-medium">{message.text}</p>
                   </div>
+                )}
+
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_320px]">
+                  <div className="space-y-6">
+                    <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5 sm:p-6">
+                      <div className="mb-5">
+                        <h3 className="text-sm font-semibold text-slate-800">Signatory Details</h3>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Keep the signer information compact and readable. These values appear directly on the certificate.
+                        </p>
+                      </div>
+
+                      <div className="grid gap-4 lg:grid-cols-2">
+                        <div className="max-w-md space-y-2">
+                          <label className="block text-sm font-medium text-slate-700">Name</label>
+                          <input
+                            type="text"
+                            required
+                            value={signatory.name}
+                            onChange={(e) => setSignatory({ ...signatory, name: e.target.value })}
+                            placeholder="e.g. Corazon S. Vicente"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                          />
+                        </div>
+
+                        <div className="max-w-md space-y-2">
+                          <label className="block text-sm font-medium text-slate-700">Position</label>
+                          <input
+                            type="text"
+                            required
+                            value={signatory.position}
+                            onChange={(e) => setSignatory({ ...signatory, position: e.target.value })}
+                            placeholder="e.g. Division Chief, LGMED"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                          />
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+                      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="max-w-2xl">
+                          <h3 className="text-sm font-semibold text-slate-800">Certificate Template</h3>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Choose which Certificate of Appearance layout this office will use for preview, saving, and printing.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsPreviewModalOpen(true)}
+                          className="inline-flex items-center gap-2 self-start rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+                        >
+                          <Eye className="h-4 w-4" />
+                          Preview Layout
+                        </button>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {CERTIFICATE_TEMPLATE_OPTIONS.map((option) => {
+                          const isSelected = signatory.certificate_template_variant === option.value;
+
+                          return (
+                            <label
+                              key={option.value}
+                              className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition-colors ${
+                                isSelected
+                                  ? 'border-indigo-300 bg-indigo-50'
+                                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="certificate_template_variant"
+                                value={option.value}
+                                checked={isSelected}
+                                onChange={() =>
+                                  setSignatory((prev) => ({
+                                    ...prev,
+                                    certificate_template_variant: option.value
+                                  }))
+                                }
+                                className="mt-1 h-4 w-4 border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                              />
+                              <div>
+                                <p className="text-sm font-semibold text-slate-800">{option.label}</p>
+                                <p className="mt-1 text-xs leading-relaxed text-slate-500">{option.description}</p>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  </div>
+
+                  <aside className="space-y-6">
+                    <section className="rounded-2xl border border-slate-200 bg-white p-5">
+                      <div className="mb-4">
+                        <h3 className="text-sm font-semibold text-slate-800">Signature Image</h3>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Upload a transparent PNG for the cleanest printed result.
+                        </p>
+                      </div>
+
+                      <div className="space-y-3">
+                        <label className="flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-slate-600 transition-colors hover:bg-slate-100">
+                          <Upload className="h-5 w-5" />
+                          <span className="text-sm font-medium">
+                            {selectedSignatureFile ? selectedSignatureFile.name : 'Upload signature image'}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleSignatureChange}
+                            className="hidden"
+                          />
+                        </label>
+
+                        <p className="text-xs leading-relaxed text-slate-500">
+                          The file is saved to the `signatory` bucket and used in the certificate preview and print layout.
+                        </p>
+
+                        {signaturePreviewUrl ? (
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="mb-3 text-sm font-medium text-slate-700">
+                              {selectedSignatureFile ? 'Signature Preview' : 'Current E-Signature'}
+                            </p>
+                            <div className="flex h-28 items-center justify-center rounded-lg bg-white">
+                              <img
+                                src={signaturePreviewUrl}
+                                alt="Signatory e-signature"
+                                className="max-h-20 max-w-full object-contain"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-xs text-slate-500">
+                            No signature uploaded yet for this office.
+                          </div>
+                        )}
+                      </div>
+                    </section>
+
+                    <section className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+                      <div className="mb-4">
+                        <h3 className="text-sm font-semibold text-slate-800">Live Preview</h3>
+                        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                          Open a popup preview to check the selected template and signature before saving.
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 bg-white p-4">
+                        <p className="text-sm font-semibold text-slate-800">
+                          {selectedOffice?.name || 'Selected Office'}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {signatory.certificate_template_variant === 'with_serial'
+                            ? 'Serial number is visible in this layout.'
+                            : 'Serial number is hidden in this layout.'}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsPreviewModalOpen(true)}
+                        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Open Certificate Preview
+                      </button>
+                    </section>
+                  </aside>
                 </div>
               </div>
             </div>
 
-            </div>
+            <div className="shrink-0 border-t border-slate-100 bg-white p-5 sm:p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm text-slate-500">
+                  Saving updates the signatory, signature image, and default certificate layout for{' '}
+                  <span className="font-medium text-slate-700">{selectedOffice?.name || 'the selected office'}</span>.
+                </div>
 
-            <div className="shrink-0 p-6 pt-4 border-t border-slate-100 flex justify-end bg-white">
-              <button
-                type="submit"
-                disabled={saving}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Save Changes
-              </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:bg-indigo-400"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Save Changes
+                </button>
+              </div>
             </div>
           </form>
         ) : (
@@ -507,6 +614,42 @@ const Settings: React.FC = () => {
           </div>
         )}
       </div>
+
+      {isPreviewModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+          <button
+            type="button"
+            aria-label="Close certificate preview"
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            onClick={() => setIsPreviewModalOpen(false)}
+          />
+
+          <div className="relative z-10 flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
+              <div>
+                <h3 className="text-base font-semibold text-slate-800">Certificate Preview</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Reviewing {selectedOffice?.name || 'the selected office'} using the active template and signature.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsPreviewModalOpen(false)}
+                className="rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="min-h-0 overflow-auto no-scrollbar bg-slate-100 p-4 sm:p-6">
+              <div className="min-w-fit">
+                {renderCertificatePreview(CERTIFICATE_MODAL_PREVIEW_SCALE)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
