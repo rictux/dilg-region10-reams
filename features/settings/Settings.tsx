@@ -2,7 +2,74 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload } from 'lucide-react';
-import { Office } from '../../types/database';
+import { Event, Office } from '../../types/database';
+import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
+import CertificateOfAppearanceCard, {
+  buildEventDateString,
+  CertificateParticipantRecord,
+  CertificateTemplateVariant,
+  DEFAULT_CERTIFICATE_TEMPLATE_VARIANT,
+  getEventDateRows
+} from '../reports/CertificateOfAppearanceTemplate';
+
+const CERTIFICATE_PREVIEW_SCALE = 0.36;
+const CERTIFICATE_PREVIEW_WIDTH_PX = 210 * 3.7795275591 * CERTIFICATE_PREVIEW_SCALE;
+const CERTIFICATE_PREVIEW_HEIGHT_PX = 148.5 * 3.7795275591 * CERTIFICATE_PREVIEW_SCALE;
+const CERTIFICATE_TEMPLATE_OPTIONS: Array<{
+  value: CertificateTemplateVariant;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'with_serial',
+    label: 'With Serial Number',
+    description: 'Displays the generated certificate serial number in the upper-right corner.'
+  },
+  {
+    value: 'without_serial',
+    label: 'Without Serial Number',
+    description: 'Uses the same certificate layout but hides the serial number.'
+  }
+];
+
+const CERTIFICATE_PREVIEW_EVENT: Event = {
+  event_id: 0,
+  event_name: 'Regional Orientation on Local Governance',
+  venue: 'DILG Region X Training Hall',
+  start_date: '2026-03-24',
+  end_date: '2026-03-25',
+  status: 'Scheduled',
+  registration_open: true,
+  session: 'All_Day',
+  organize_by: null,
+  has_accommodation: true,
+  dates_with_accom: ['2026-03-24'],
+  food_inclusion: [
+    '2026-03-24=am_snacks|lunch|pm_snacks',
+    '2026-03-25=breakfast|lunch'
+  ]
+};
+
+const CERTIFICATE_PREVIEW_PARTICIPANT: CertificateParticipantRecord = {
+  participant: {
+    participant_id: 1,
+    participant_code: 'CERT-PREVIEW-001',
+    full_name: 'Juan Dela Cruz',
+    f_name: 'Juan',
+    l_name: 'Dela Cruz',
+    office: 'City Government of Sample',
+    position: 'Planning Officer'
+  },
+  needs_accommodation: true,
+  date_accommodation: ['2026-03-24'],
+  log_dates: ['2026-03-24', '2026-03-25']
+};
+
+const CERTIFICATE_PREVIEW_DATE_STRING = buildEventDateString(CERTIFICATE_PREVIEW_EVENT);
+const CERTIFICATE_PREVIEW_FOOD_INCLUSION_MAP = parseFoodInclusion(
+  CERTIFICATE_PREVIEW_EVENT.food_inclusion || [],
+  getEventDateRows(CERTIFICATE_PREVIEW_EVENT).map((row) => row.key)
+);
 
 const Settings: React.FC = () => {
   const { user } = useAuth();
@@ -16,7 +83,8 @@ const Settings: React.FC = () => {
   const [signatory, setSignatory] = useState({
     name: '',
     position: '',
-    esig_link: ''
+    esig_link: '',
+    certificate_template_variant: DEFAULT_CERTIFICATE_TEMPLATE_VARIANT as CertificateTemplateVariant
   });
   const [selectedSignatureFile, setSelectedSignatureFile] = useState<File | null>(null);
   const [signaturePreviewUrl, setSignaturePreviewUrl] = useState('');
@@ -33,7 +101,12 @@ const Settings: React.FC = () => {
     if (selectedOfficeId) {
       fetchSignatory(selectedOfficeId);
     } else {
-      setSignatory({ name: '', position: '', esig_link: '' });
+      setSignatory({
+        name: '',
+        position: '',
+        esig_link: '',
+        certificate_template_variant: DEFAULT_CERTIFICATE_TEMPLATE_VARIANT
+      });
       setSelectedSignatureFile(null);
       setSignaturePreviewUrl('');
     }
@@ -85,11 +158,20 @@ const Settings: React.FC = () => {
         setSignatory({
           name: data.name || '',
           position: data.position || '',
-          esig_link: data.esig_link || ''
+          esig_link: data.esig_link || '',
+          certificate_template_variant:
+            data.certificate_template_variant === 'without_serial'
+              ? 'without_serial'
+              : DEFAULT_CERTIFICATE_TEMPLATE_VARIANT
         });
         setSignaturePreviewUrl(data.esig_link || '');
       } else {
-        setSignatory({ name: '', position: '', esig_link: '' });
+        setSignatory({
+          name: '',
+          position: '',
+          esig_link: '',
+          certificate_template_variant: DEFAULT_CERTIFICATE_TEMPLATE_VARIANT
+        });
         setSignaturePreviewUrl('');
       }
     } catch (err) {
@@ -162,7 +244,8 @@ const Settings: React.FC = () => {
           .update({
             name: signatory.name,
             position: signatory.position,
-            esig_link: esigLink
+            esig_link: esigLink,
+            certificate_template_variant: signatory.certificate_template_variant
           })
           .eq('id', existing.id);
           
@@ -174,7 +257,8 @@ const Settings: React.FC = () => {
             office_id: selectedOfficeId,
             name: signatory.name,
             position: signatory.position,
-            esig_link: esigLink
+            esig_link: esigLink,
+            certificate_template_variant: signatory.certificate_template_variant
           });
           
         if (error) throw error;
@@ -183,7 +267,7 @@ const Settings: React.FC = () => {
       setSignatory((prev) => ({ ...prev, esig_link: esigLink }));
       setSelectedSignatureFile(null);
       setSignaturePreviewUrl(esigLink);
-      setMessage({ type: 'success', text: 'Signatory settings saved successfully.' });
+      setMessage({ type: 'success', text: 'Certificate settings saved successfully.' });
     } catch (err: any) {
       console.error('Error saving signatory:', err);
       setMessage({ type: 'error', text: err.message || 'Failed to save settings.' });
@@ -209,16 +293,12 @@ const Settings: React.FC = () => {
   }
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto pr-1 max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-800">Settings</h1>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="h-full min-h-0 flex flex-col">
+      <div className="flex-1 min-h-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
         <div className="p-6 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-800">Certificate Signatories</h2>
           <p className="text-sm text-slate-500 mt-1">
-            Configure the default signatory for Certificates of Appearance for each office.
+            Configure the default signatory and template for Certificates of Appearance for each office.
           </p>
         </div>
 
@@ -244,8 +324,9 @@ const Settings: React.FC = () => {
         </div>
 
         {selectedOfficeId ? (
-          <form onSubmit={handleSave} className="p-6 space-y-6">
-            {message && (
+          <form onSubmit={handleSave} className="flex-1 min-h-0 flex flex-col">
+            <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6">
+              {message && (
               <div className={`p-4 rounded-lg flex items-start gap-3 ${
                 message.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
               }`}>
@@ -284,6 +365,50 @@ const Settings: React.FC = () => {
               </div>
 
               <div className="space-y-4 md:col-span-2">
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Certificate Template</label>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Choose which Certificate of Appearance layout this office will use for preview, saving, and printing.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {CERTIFICATE_TEMPLATE_OPTIONS.map((option) => {
+                      const isSelected = signatory.certificate_template_variant === option.value;
+
+                      return (
+                        <label
+                          key={option.value}
+                          className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
+                            isSelected
+                              ? 'border-indigo-300 bg-indigo-50'
+                              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="certificate_template_variant"
+                            value={option.value}
+                            checked={isSelected}
+                            onChange={() =>
+                              setSignatory((prev) => ({
+                                ...prev,
+                                certificate_template_variant: option.value
+                              }))
+                            }
+                            className="mt-1 h-4 w-4 border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <div>
+                            <p className="text-sm font-semibold text-slate-800">{option.label}</p>
+                            <p className="mt-1 text-xs leading-relaxed text-slate-500">{option.description}</p>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-slate-700">E-Signature Image (Optional)</label>
                   <label className="flex items-center justify-center gap-3 w-full px-4 py-4 border border-dashed border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer text-slate-600">
@@ -315,13 +440,57 @@ const Settings: React.FC = () => {
                         className="max-h-20 max-w-full object-contain"
                         referrerPolicy="no-referrer"
                       />
-                    </div>
-                  </div>
-                )}
+                </div>
+              </div>
+              )}
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-100 flex justify-end">
+            <div className="space-y-4 border-t border-slate-100 pt-6">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">Template Preview</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  This sample preview uses the exact certificate layout that will be shown in the print page.
+                </p>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div
+                  className="mx-auto overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+                  style={{
+                    width: `${CERTIFICATE_PREVIEW_WIDTH_PX}px`,
+                    height: `${CERTIFICATE_PREVIEW_HEIGHT_PX}px`
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '210mm',
+                      transform: `scale(${CERTIFICATE_PREVIEW_SCALE})`,
+                      transformOrigin: 'top left'
+                    }}
+                  >
+                    <CertificateOfAppearanceCard
+                      event={CERTIFICATE_PREVIEW_EVENT}
+                      participantRecord={CERTIFICATE_PREVIEW_PARTICIPANT}
+                      signatory={{
+                        name: signatory.name,
+                        position: signatory.position,
+                        esig_link: signaturePreviewUrl || signatory.esig_link,
+                        certificate_template_variant: signatory.certificate_template_variant
+                      }}
+                      dateString={CERTIFICATE_PREVIEW_DATE_STRING}
+                      eventFoodInclusionMap={CERTIFICATE_PREVIEW_FOOD_INCLUSION_MAP}
+                      certificateSerialNumber="LGMED-2026-Mar-24-25-001-01"
+                      templateVariant={signatory.certificate_template_variant}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            </div>
+
+            <div className="shrink-0 p-6 pt-4 border-t border-slate-100 flex justify-end bg-white">
               <button
                 type="submit"
                 disabled={saving}
@@ -333,7 +502,7 @@ const Settings: React.FC = () => {
             </div>
           </form>
         ) : (
-          <div className="p-12 text-center text-slate-500">
+          <div className="flex-1 flex items-center justify-center p-12 text-center text-slate-500">
             Please select an office to configure its signatory.
           </div>
         )}
