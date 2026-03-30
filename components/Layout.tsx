@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  LayoutGrid, 
+  Home, 
   Calendar, 
   UserCheck, 
   Search, 
@@ -227,6 +227,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </div>
     );
   };
+
+  const SidebarSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div className="space-y-1">
+      {!isSidebarCollapsed && (
+        <div className="px-8 pt-3 pb-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-200/70">
+            {title}
+          </p>
+        </div>
+      )}
+      <div>{children}</div>
+    </div>
+  );
 
   const PasswordModal = () => (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -559,7 +572,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const getPageTitle = () => {
     switch (location.pathname) {
-      case '/dashboard': return 'Dashboard';
+      case '/dashboard': return 'Overview';
       case '/events': return 'Events';
       case '/attendance': return 'Attendance';
       case '/admin/lookup': return 'Name Lookup';
@@ -568,7 +581,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       case '/scan': return 'Scan Mode';
       case '/settings': return 'Settings';
       case '/about': return 'About';
-      default: return 'Dashboard';
+      default: return 'Overview';
     }
   };
 
@@ -593,36 +606,35 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           )}
         </div>
 
-        <nav className="flex-1 space-y-1 pt-6 pb-6 overflow-y-auto overflow-x-hidden no-scrollbar">
-          {hasPermission('VIEW_DASHBOARD') && (
-              <NavItem to="/dashboard" icon={LayoutGrid} label="Dashboard" />
-          )}
-          {hasPermission('MANAGE_EVENTS') && (
-              <NavItem to="/events" icon={Calendar} label="Events" />
-          )}
-          {hasPermission('VIEW_PARTICIPANTS') && (
-              <NavItem to="/attendance" icon={UserCheck} label="Attendance" />
-          )}
+        <nav className="flex-1 space-y-4 pt-6 pb-6 overflow-y-auto overflow-x-hidden no-scrollbar">
+          <SidebarSection title="Menu">
+            {hasPermission('VIEW_DASHBOARD') && (
+                <NavItem to="/dashboard" icon={Home} label="Overview" />
+            )}
+            {hasPermission('MANAGE_EVENTS') && (
+                <NavItem to="/events" icon={Calendar} label="Events" />
+            )}
+            {hasPermission('VIEW_PARTICIPANTS') && (
+                <NavItem to="/attendance" icon={UserCheck} label="Attendance" />
+            )}
+            <NavItem to="/admin/lookup" icon={Search} label="Name Lookup" />
+            {hasPermission('VIEW_REPORTS') && (
+                <NavItem to="/reports" icon={BarChart2} label="Reports" />
+            )}
+            {hasPermission('SCAN_QR') && (
+                <NavItem to="/scan" icon={ScanLine} label="Scan Mode" />
+            )}
+            {hasPermission('MANAGE_USERS') && (
+                <NavItem to="/users" icon={Users} label="Users" />
+            )}
+          </SidebarSection>
 
-          <NavItem to="/admin/lookup" icon={Search} label="Name Lookup" />
-
-          {hasPermission('VIEW_REPORTS') && (
-              <NavItem to="/reports" icon={BarChart2} label="Reports" />
-          )}
-          
-          {hasPermission('MANAGE_USERS') && (
-              <NavItem to="/users" icon={Users} label="Users" />
-          )}
-
-          {hasPermission('SCAN_QR') && (
-              <NavItem to="/scan" icon={ScanLine} label="Scan Mode" />
-          )}
-
-          {user?.role === 'Admin' && (
-              <NavItem to="/settings" icon={Settings} label="Settings" />
-          )}
-
-          <NavItem to="/about" icon={Info} label="About" />
+          <SidebarSection title="System">
+            <NavItem to="/about" icon={Info} label="About" />
+            {user?.role === 'Admin' && (
+                <NavItem to="/settings" icon={Settings} label="Settings" />
+            )}
+          </SidebarSection>
         </nav>
 
         <div className={`app-sidebar-footer p-8 mt-auto text-xs text-indigo-300 space-y-2 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>

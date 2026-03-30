@@ -231,7 +231,7 @@ const Settings: React.FC = () => {
         const filePath = `office-${selectedOfficeId}/esignature-${selectedOfficeId}-${Date.now()}${fileExtension ? `.${fileExtension}` : ''}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('signatory')
+          .from('esig')
           .upload(filePath, selectedSignatureFile, {
             cacheControl: '3600',
             upsert: true,
@@ -241,7 +241,7 @@ const Settings: React.FC = () => {
         if (uploadError) throw uploadError;
 
         const { data: publicUrlData } = supabase.storage
-          .from('signatory')
+          .from('esig')
           .getPublicUrl(filePath);
 
         esigLink = publicUrlData.publicUrl;
@@ -467,7 +467,7 @@ const Settings: React.FC = () => {
                           </label>
 
                           <p className="text-xs leading-relaxed text-slate-500">
-                            The file is saved to the `signatory` bucket and used in the certificate preview and print layout.
+                            The file is saved to the `esig` bucket and used in the certificate preview and print layout.
                           </p>
 
                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">

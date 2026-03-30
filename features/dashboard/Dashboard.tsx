@@ -49,6 +49,7 @@ const Dashboard: React.FC = () => {
   const [stats, setStats] = useState({
     totalEvents: 0,
     activeEvents: 0,
+    upcomingEvents: 0,
     completedEvents: 0
   });
   const [ongoingEvents, setOngoingEvents] = useState<DashboardEvent[]>([]);
@@ -98,9 +99,14 @@ const Dashboard: React.FC = () => {
         if (user?.role !== 'Admin' && user?.office_id) completedQ = completedQ.eq('organize_by', user.office_id);
         const { count: completed } = await completedQ;
 
+        let upcomingCountQ = supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'Scheduled');
+        if (user?.role !== 'Admin' && user?.office_id) upcomingCountQ = upcomingCountQ.eq('organize_by', user.office_id);
+        const { count: upcoming } = await upcomingCountQ;
+
         setStats({
             totalEvents: total || 0,
             activeEvents: active || 0,
+            upcomingEvents: upcoming || 0,
             completedEvents: completed || 0
         });
 
@@ -188,6 +194,8 @@ const Dashboard: React.FC = () => {
 
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
   const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
+  const displayedOngoingEvents = ongoingEvents.slice(0, 3);
+  const displayedUpcomingEvents = upcomingEvents.slice(0, 3);
 
   // Calendar Generation Logic
   const monthStart = startOfMonth(currentDate);
@@ -291,32 +299,33 @@ const Dashboard: React.FC = () => {
   };
 
   const StatCard = ({ icon: Icon, label, value, color }: any) => (
-    <div className={`${color} p-6 rounded-2xl shadow-sm flex items-center justify-between text-white`}>
-      <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
-        <Icon size={28} className="text-white" />
+    <div className={`${color} p-5 rounded-2xl shadow-sm flex items-center justify-between text-white`}>
+      <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+        <Icon size={24} className="text-white" />
       </div>
       <div className="text-right">
-        <p className="text-white/80 text-sm font-medium mb-1">{label}</p>
-        <p className="text-4xl font-bold">{loading ? '...' : value}</p>
+        <p className="text-white/80 text-xs font-medium mb-1 uppercase tracking-[0.14em]">{label}</p>
+        <p className="text-3xl font-bold leading-none">{loading ? '...' : value}</p>
       </div>
     </div>
   );
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto pr-1 space-y-8">
+    <div className="h-full min-h-0 overflow-hidden pr-1 space-y-4">
       {/* Top Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         <StatCard icon={CalendarIcon} label="Total Events" value={stats.totalEvents} color="bg-[#5C3CCE]" />
         <StatCard icon={Briefcase} label="On-Going Events" value={stats.activeEvents} color="bg-[#4099FF]" />
+        <StatCard icon={Clock} label="Upcoming Events" value={stats.upcomingEvents} color="bg-[#F59E0B]" />
         <StatCard icon={Users} label="Completed Events" value={stats.completedEvents} color="bg-[#2ED47A]" />
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8">
+      <div className="flex flex-col lg:flex-row gap-4 h-[calc(100%-112px)] min-h-0">
         {/* Main Column - Calendar */}
-        <div className="w-full lg:w-2/3 flex flex-col gap-8">
+        <div className="w-full lg:w-2/3 flex flex-col gap-4 min-h-0">
           {/* Calendar */}
-          <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200/60 flex flex-col min-h-[500px]">
-            <div className="flex justify-between items-center mb-6">
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col min-h-0 h-full">
+            <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-slate-800">Event Calendar</h3>
                 <div className="flex items-center gap-4">
                     <span className="text-slate-600 font-semibold w-32 text-center">
@@ -334,9 +343,9 @@ const Dashboard: React.FC = () => {
             </div>
 
             <div className="flex-1 flex flex-col relative z-0">
-                <div className="grid grid-cols-7 mb-2">
+                <div className="grid grid-cols-7 mb-1">
                     {weekDays.map(day => (
-                        <div key={day} className="text-center text-xs font-bold text-slate-400 uppercase tracking-wider py-2">
+                        <div key={day} className="text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider py-1.5">
                             {day}
                         </div>
                     ))}
@@ -407,16 +416,16 @@ const Dashboard: React.FC = () => {
                             <div 
                                 key={idx} 
                                 className={`
-                                    min-h-[100px] flex flex-col relative group
+                                    min-h-[82px] flex flex-col relative group
                                     ${isCurrentMonth ? 'bg-white' : 'bg-slate-50/50 text-slate-300'}
                                     ${isTodayDate ? '!bg-indigo-50/30' : ''}
                                     transition-colors hover:bg-slate-50
                                 `}
                                 style={{ zIndex: calendarDays.length - idx }}
                             >
-                                <div className="text-xs font-medium p-2 flex justify-between items-center">
+                                <div className="text-xs font-medium p-1.5 flex justify-between items-center">
                                     <span className={`
-                                        w-7 h-7 flex items-center justify-center rounded-full transition-all
+                                        w-6 h-6 flex items-center justify-center rounded-full transition-all text-[11px]
                                         ${isTodayDate 
                                             ? 'bg-[#4322A7] text-white font-bold shadow-md' 
                                             : hasEvents && isCurrentMonth 
@@ -440,21 +449,21 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Right Column - Event Lists */}
-        <div className="w-full lg:w-1/3 flex flex-col gap-6">
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 flex flex-col gap-8">
+        <div className="w-full lg:w-1/3 flex flex-col gap-4 min-h-0">
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col gap-5 min-h-0 h-full">
             {/* Ongoing Events */}
             <div>
-              <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
                 <Clock className="text-[#4322A7]" size={20} />
                 On-going Events
               </h3>
               {ongoingEvents.length > 0 ? (
-                <div className="space-y-4">
-                  {ongoingEvents.map((event, index) => (
-                    <div key={event.event_id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="mb-3">
-                        <h4 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight mb-2">{event.event_name}</h4>
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-[#4322A7] mb-1.5">
+                <div className="space-y-3">
+                  {displayedOngoingEvents.map((event) => (
+                    <div key={event.event_id} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="mb-2">
+                        <h4 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight mb-1.5">{event.event_name}</h4>
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-[#4322A7] mb-1">
                           <MapPin size={14} className="shrink-0" />
                           <span className="truncate">{event.venue}</span>
                         </div>
@@ -463,7 +472,7 @@ const Dashboard: React.FC = () => {
                           <span>{format(new Date(event.start_date), 'MMM d, yyyy')} - {format(new Date(event.end_date), 'MMM d, yyyy')}</span>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
                         <div className="text-center flex-1 border-r border-slate-200">
                           <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">Registered</p>
                           <p className="font-bold text-sm text-slate-800">{event.registered_count}</p>
@@ -475,10 +484,15 @@ const Dashboard: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                  {ongoingEvents.length > displayedOngoingEvents.length && (
+                    <p className="text-xs text-slate-500 text-right">
+                      +{ongoingEvents.length - displayedOngoingEvents.length} more on-going event(s)
+                    </p>
+                  )}
                 </div>
               ) : (
-                <div className="text-center py-6 text-slate-400 text-sm bg-slate-50 rounded-2xl border border-slate-100">
-                  <Clock className="w-8 h-8 mb-2 mx-auto opacity-20" />
+                <div className="text-center py-5 text-slate-400 text-sm bg-slate-50 rounded-2xl border border-slate-100">
+                  <Clock className="w-7 h-7 mb-2 mx-auto opacity-20" />
                   No on-going events.
                 </div>
               )}
@@ -486,17 +500,17 @@ const Dashboard: React.FC = () => {
 
             {/* Upcoming Events */}
             <div>
-              <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
                 <CalendarIcon className="text-[#4099FF]" size={20} />
                 Upcoming Events
               </h3>
               {upcomingEvents.length > 0 ? (
-                <div className="space-y-4">
-                  {upcomingEvents.map((event, index) => (
-                    <div key={event.event_id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="mb-3">
-                        <h4 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight mb-2">{event.event_name}</h4>
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-[#4099FF] mb-1.5">
+                <div className="space-y-3">
+                  {displayedUpcomingEvents.map((event) => (
+                    <div key={event.event_id} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="mb-2">
+                        <h4 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight mb-1.5">{event.event_name}</h4>
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-[#4099FF] mb-1">
                           <MapPin size={14} className="shrink-0" />
                           <span className="truncate">{event.venue}</span>
                         </div>
@@ -505,7 +519,7 @@ const Dashboard: React.FC = () => {
                           <span>{format(new Date(event.start_date), 'MMM d, yyyy')} - {format(new Date(event.end_date), 'MMM d, yyyy')}</span>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
                         <div className="text-center flex-1 border-r border-slate-200">
                           <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">Registered</p>
                           <p className="font-bold text-sm text-slate-800">{event.registered_count}</p>
@@ -517,10 +531,15 @@ const Dashboard: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                  {upcomingEvents.length > displayedUpcomingEvents.length && (
+                    <p className="text-xs text-slate-500 text-right">
+                      +{upcomingEvents.length - displayedUpcomingEvents.length} more upcoming event(s)
+                    </p>
+                  )}
                 </div>
               ) : (
-                <div className="text-center py-6 text-slate-400 text-sm bg-slate-50 rounded-2xl border border-slate-100">
-                  <CalendarIcon className="w-8 h-8 mb-2 mx-auto opacity-20" />
+                <div className="text-center py-5 text-slate-400 text-sm bg-slate-50 rounded-2xl border border-slate-100">
+                  <CalendarIcon className="w-7 h-7 mb-2 mx-auto opacity-20" />
                   No upcoming events.
                 </div>
               )}

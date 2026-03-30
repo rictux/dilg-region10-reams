@@ -1,109 +1,156 @@
-
 # Event Management Portal
 
-A comprehensive, full-stack web application designed for managing corporate or government events, streamlining participant registration, and tracking attendance via QR codes with offline support.
+A full-stack event and attendance platform for government or institutional workflows. The system supports event administration, participant registration, QR-based attendance, reporting, certificate generation, and office-based signatory configuration.
 
-## 🚀 Key Features
+## Overview
 
-### 📅 Event Management
-*   **CRUD Operations:** Create, update, and manage events with details like venue, date ranges, and status (Scheduled, Ongoing, Completed).
-*   **Registration Controls:** Toggle registration availability and accommodation options.
-*   **Dashboard:** Real-time overview of active events, total participants, and visual calendar view.
+The portal is designed to help teams manage the full event lifecycle:
 
-### 👥 Participant & Registration
-*   **Public Registration:** Public-facing page (`/register/:id`) for attendees to self-register.
-*   **Digital ID:** Auto-generation of unique QR Codes for every participant.
-*   **Badge Printing:** Generate and download printable event badges with QR codes.
-*   **Role Management:** Assign roles (Delegate, Speaker, Secretariat, VIP) to participants.
-*   **Demographics:** Capture extensive data including office/LGU origin, gender, age group, and special needs (PWD/Indigenous People).
+- Create and maintain events
+- Accept public registrations
+- Track attendance with QR scanning
+- Generate official reports and certificates
+- Manage users, offices, and system settings
 
-### 📱 Attendance Tracking (QR Scanner)
-*   **Mobile-First Scanner:** Built-in QR scanner optimized for mobile devices.
-*   **Offline Mode:** Fully functional offline scanning queue. data syncs automatically when the connection is restored.
-*   **Session Tracking:** Support for AM and PM attendance sessions.
-*   **Duplicate Prevention:** Prevents double scanning for the same session.
-*   **Manual Entry:** Fallback option to manually log attendance if QR scanning fails.
+## Main Menu
 
-### 📊 Reports & Analytics
-*   **Real-time Stats:** Live counts of registered vs. present participants.
-*   **Printable Reports:** 
-    *   **Attendance Sheets:** Formatted specifically for government compliance (DILG format).
-    *   **Scan Logs:** Detailed audit trail of every scan timestamp and device.
-*   **Name Lookup:** Public and internal search tools to verify attendance history.
+- `Overview`: summary cards, event status snapshots, and quick system monitoring
+- `Events`: event creation, editing, registration controls, and event-level management
+- `Attendance`: attendance records and participant-related event monitoring
+- `Name Lookup`: search participant attendance and event history
+- `Reports`: attendance sheets, scan logs, and certificate workflows
+- `Scan Mode`: QR attendance scanning with offline queue support
+- `Users`: system account administration
+- `System > About`: in-app system guide and overview
+- `System > Settings`: certificate signatory, signature image, and template configuration per office
 
-### 🛡️ Administration
-*   **Role-Based Access Control (RBAC):**
-    *   **Admin:** Full system access, manage users, and offices.
-    *   **Event Manager:** Manage events, participants, and reports.
-    *   **Scanner:** Restricted access focused solely on the QR scanning interface.
-*   **User Management:** Create and manage system accounts.
-*   **Office Management:** Assign users to specific offices/agencies.
+## Key Features
 
-## 🛠️ Technology Stack
+### Event Management
+
+- Create, update, and manage events with venue, schedules, registration status, and accommodation settings
+- Support single-day and multi-day events
+- Manage event visibility and registration readiness from the admin interface
+- Monitor current activity through the `Overview` dashboard page
+
+### Registration and Participant Data
+
+- Public event registration page for participants
+- QR code generation per participant
+- Capture office, position, contact details, demographics, and accommodation needs
+- Match and reuse existing participant records when appropriate
+
+### Attendance Tracking
+
+- Mobile-friendly QR scanning interface
+- AM and PM attendance session support
+- Duplicate scan prevention
+- Offline queue with sync when connection returns
+- Manual fallback workflows when scanning is not available
+
+### Reports and Certificates
+
+- Attendance sheet printing
+- Scan log printing
+- Certificate of Appearance generation and printing
+- Certificate preview workflows with configurable template variants
+- Office-based signatory name, position, and e-signature configuration
+
+### Administration
+
+- Role-based access control for `Admin`, `EventManager`, and `Scanner`
+- User account management
+- Office reference management
+- Certificate signatory and template settings per office
+
+## Technology Stack
 
 ### Frontend
-*   **Framework:** [React 19](https://react.dev/)
-*   **Language:** [TypeScript](https://www.typescriptlang.org/)
-*   **Build Tool:** [Vite](https://vitejs.dev/)
-*   **Styling:** [Tailwind CSS](https://tailwindcss.com/)
-*   **Routing:** [React Router v7](https://reactrouter.com/)
 
-### Backend & Database
-*   **BaaS:** [Supabase](https://supabase.com/) (PostgreSQL)
-*   **Real-time:** Supabase Realtime (for live dashboard and attendance updates)
+- React 19
+- TypeScript
+- Vite
+- Tailwind CSS
+- React Router v7
+
+### Backend and Database
+
+- Supabase
+- PostgreSQL
+- Supabase Storage
+- Supabase Realtime
 
 ### Key Libraries
-*   **Scanning:** `html5-qrcode`
-*   **QR Generation:** `react-qr-code`
-*   **Icons:** `lucide-react`
-*   **Date Handling:** `date-fns`
-*   **Security:** `bcryptjs` (Client-side hashing)
-*   **Export:** `html-to-image`
 
-## ⚙️ Installation & Setup
+- `html5-qrcode`
+- `react-qr-code`
+- `lucide-react`
+- `date-fns`
+- `bcryptjs`
+- `html-to-image`
 
-1.  **Clone the repository**
-    ```bash
-    git clone <repository-url>
-    cd event-management-portal
-    ```
+## Installation
 
-2.  **Install dependencies**
-    ```bash
-    npm install
-    ```
+1. Clone the repository
 
-3.  **Environment Configuration**
-    Create a `.env` file in the root directory (or use the existing configuration in `lib/supabase.ts` for testing):
-    ```env
-    VITE_SUPABASE_URL=your_supabase_url
-    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-    ```
+```bash
+git clone <repository-url>
+cd event-management-portal
+```
 
-4.  **Run the development server**
-    ```bash
-    npm run dev
-    ```
+2. Install dependencies
 
-## 🗄️ Database Schema Overview
+```bash
+npm install
+```
 
-The application requires the following Supabase tables:
+3. Create environment variables
 
-*   `users`: System administrators and scanners.
-*   `events`: Event details.
-*   `participants`: Global list of people.
-*   `event_participants`: Junction table linking people to specific events with roles.
-*   `attendance_logs`: Time-stamped logs of scans.
-*   `offices`: Organization reference.
-*   `ref_locations`: Geography reference (Provinces/Cities).
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-## 📱 Offline Scanning Workflow
+4. Start the development server
 
-1.  Navigate to the **Scan Mode** page.
-2.  If the device loses internet connection, the UI switches to "Offline Mode".
-3.  Scanned data is stored in the browser's `localStorage`.
-4.  When the internet connection is restored, the app detects the queue and automatically pushes the data to Supabase.
+```bash
+npm run dev
+```
 
-## 📄 License
+## Storage Buckets
 
-This project is open-source and available for modification.
+The current frontend expects these buckets to exist in Supabase Storage:
+
+- `img`: user profile images
+- `esig`: certificate signatory e-signatures
+
+Make sure the correct storage policies are in place for uploads and reads.
+
+## Core Tables
+
+- `users`
+- `events`
+- `participants`
+- `event_participants`
+- `attendance_logs`
+- `offices`
+- `tbl_signatory`
+- `ref_locations`
+
+## Offline Scanning Flow
+
+1. Open `Scan Mode`
+2. Select the event and session
+3. Continue scanning even when offline
+4. The app stores pending scans locally
+5. Once connectivity returns, queued scans are synced to Supabase
+
+## Notes
+
+- Certificate signatories are configured per office in `Settings`
+- Certificate templates currently support serial-visible and serial-hidden variants
+- The About page includes an in-app feature summary and user guide
+
+## License
+
+This project is available for internal adaptation and further development.
