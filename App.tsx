@@ -128,7 +128,7 @@ const App: React.FC = () => {
 
           {/* Settings Route */}
           <Route path="/settings" element={
-            <ProtectedRoute requiredPermission="MANAGE_USERS">
+            <ProtectedRoute requiredPermission="MANAGE_CERTIFICATE_SETTINGS">
               <Layout><Settings /></Layout>
             </ProtectedRoute>
           } />

@@ -537,6 +537,8 @@ const EventsList: React.FC = () => {
   };
 
   const handleDelete = async (e: React.MouseEvent, id: number) => {
+      if (!canDeleteEvents) return;
+
       e.stopPropagation(); // Prevent row click
       setEventDeleteConfirmation('');
       setEventToDelete(id);
@@ -548,7 +550,7 @@ const EventsList: React.FC = () => {
   };
 
   const confirmDeleteEvent = async () => {
-      if (!eventToDelete) return;
+      if (!canDeleteEvents || !eventToDelete) return;
       
       const deletedEventId = eventToDelete;
       setIsDeleting(true);
@@ -1045,6 +1047,7 @@ const EventsList: React.FC = () => {
       }, 0);
   }, [viewingParticipants]);
   const canManageParticipants = hasPermission('MANAGE_PARTICIPANTS');
+  const canDeleteEvents = hasPermission('DELETE_EVENTS');
 
   // Helper for status badges
   const getStatusBadge = (status: string) => {
@@ -1090,6 +1093,7 @@ const EventsList: React.FC = () => {
     cancelled: events.filter((event) => event.status === 'Cancelled').length,
   }), [events]);
   const isAdmin = user?.role === 'Admin';
+  const showEventActionsMenu = isAdmin || canDeleteEvents;
 
   const totalPages = Math.ceil(filteredEvents.length / itemsPerPage);
   const paginatedEvents = useMemo(() => {
@@ -1346,7 +1350,7 @@ const EventsList: React.FC = () => {
                                                 <Share2 size={14} />
                                             </button>
 
-                                            {isAdmin ? (
+                                            {showEventActionsMenu ? (
                                                 <>
                                                     <button 
                                                         onClick={(e) => {
@@ -1378,7 +1382,7 @@ const EventsList: React.FC = () => {
                                                                 >
                                                                     <Edit size={16} /> Edit
                                                                 </button>
-                                                                {hasPermission('DELETE_EVENTS') && (
+                                                                {canDeleteEvents && (
                                                                     <button 
                                                                         onClick={(e) => {
                                                                             setOpenActionMenuId(null);
@@ -1496,7 +1500,7 @@ const EventsList: React.FC = () => {
                               >
                                   <Share2 size={14} />
                               </button>
-                              {isAdmin ? (
+                              {showEventActionsMenu ? (
                                   <div className="relative">
                                       <button
                                           onClick={(e) => {
@@ -1528,7 +1532,7 @@ const EventsList: React.FC = () => {
                                                   >
                                                       <Edit size={16} /> Edit
                                                   </button>
-                                                  {hasPermission('DELETE_EVENTS') && (
+                                                  {canDeleteEvents && (
                                                       <button
                                                           onClick={(e) => {
                                                               setOpenActionMenuId(null);

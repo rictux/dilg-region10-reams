@@ -539,7 +539,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         >
                             <KeyRound size={16} /> Change Password
                         </button>
-                        {user?.role === 'Admin' && (
+                        {hasPermission('MANAGE_CERTIFICATE_SETTINGS') && (
                             <button
                                 onClick={() => {
                                     navigate('/settings');
@@ -631,7 +631,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           <SidebarSection title="System">
             <NavItem to="/about" icon={Info} label="About" />
-            {user?.role === 'Admin' && (
+            {hasPermission('MANAGE_CERTIFICATE_SETTINGS') && (
                 <NavItem to="/settings" icon={Settings} label="Settings" />
             )}
           </SidebarSection>
@@ -705,6 +705,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     >
                         <KeyRound size={16} /> Change Password
                     </button>
+                    {hasPermission('MANAGE_CERTIFICATE_SETTINGS') && (
+                        <button
+                            onClick={() => {
+                                navigate('/settings');
+                                setIsProfileDropdownOpen(false);
+                            }}
+                            className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-indigo-50 hover:text-[#4322A7] transition-colors"
+                        >
+                            <Settings size={16} /> Settings
+                        </button>
+                    )}
                     <button
                         onClick={handleSignOut}
                         className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"

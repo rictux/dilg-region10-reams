@@ -8,7 +8,8 @@ export type Permission =
   | 'MANAGE_PARTICIPANTS' // Add, Edit manual logs
   | 'SCAN_QR'             // Access Scanner
   | 'VIEW_REPORTS'        // Access Reports
-  | 'MANAGE_USERS';       // Create/Delete Users
+  | 'MANAGE_USERS'        // Manage users
+  | 'MANAGE_CERTIFICATE_SETTINGS'; // Manage certificate signatory/template settings
 
 export const PERMISSIONS = {
   VIEW_DASHBOARD: 'VIEW_DASHBOARD' as Permission,
@@ -19,6 +20,7 @@ export const PERMISSIONS = {
   SCAN_QR: 'SCAN_QR' as Permission,
   VIEW_REPORTS: 'VIEW_REPORTS' as Permission,
   MANAGE_USERS: 'MANAGE_USERS' as Permission,
+  MANAGE_CERTIFICATE_SETTINGS: 'MANAGE_CERTIFICATE_SETTINGS' as Permission,
 };
 
 // Default configuration. In a full backend implementation, this could be stored in the DB.
@@ -31,7 +33,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'MANAGE_PARTICIPANTS',
     'SCAN_QR',
     'VIEW_REPORTS',
-    'MANAGE_USERS'
+    'MANAGE_USERS',
+    'MANAGE_CERTIFICATE_SETTINGS'
   ],
   'EventManager': [
     'VIEW_DASHBOARD',
@@ -45,5 +48,16 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   'Scanner': [
     'SCAN_QR'
     // Scanner has no dashboard access by default
+  ],
+  'OfficeManager': [
+    'VIEW_DASHBOARD',
+    'MANAGE_EVENTS',
+    'DELETE_EVENTS',
+    'VIEW_PARTICIPANTS',
+    'MANAGE_PARTICIPANTS',
+    'VIEW_REPORTS',
+    'SCAN_QR',
+    'MANAGE_USERS',
+    'MANAGE_CERTIFICATE_SETTINGS'
   ]
 };

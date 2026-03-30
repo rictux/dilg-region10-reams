@@ -72,6 +72,9 @@ const CERTIFICATE_PREVIEW_FOOD_INCLUSION_MAP = parseFoodInclusion(
 
 const Settings: React.FC = () => {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
+  const isOfficeManager = user?.role === 'OfficeManager';
+  const canManageCertificateSettings = isAdmin || isOfficeManager;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -90,11 +93,19 @@ const Settings: React.FC = () => {
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
   useEffect(() => {
-    if (user?.role === 'Admin') {
+    if (!user) return;
+
+    if (isAdmin) {
       fetchOffices();
-    } else {
-      setLoading(false);
+      return;
     }
+
+    if (isOfficeManager && user.office_id) {
+      fetchManagedOffice(user.office_id);
+      return;
+    }
+
+    setLoading(false);
   }, [user]);
 
   useEffect(() => {
@@ -149,6 +160,30 @@ const Settings: React.FC = () => {
       }
     } catch (err) {
       console.error('Error fetching offices:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchManagedOffice = async (officeId: number) => {
+    try {
+      const { data, error } = await supabase
+        .from('offices')
+        .select('*')
+        .eq('office_id', officeId)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setOffices([data]);
+        setSelectedOfficeId(data.office_id);
+      } else {
+        setOffices([]);
+        setSelectedOfficeId('');
+      }
+    } catch (err) {
+      console.error('Error fetching managed office:', err);
     } finally {
       setLoading(false);
     }
@@ -217,6 +252,11 @@ const Settings: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOfficeId) return;
+
+    if (isOfficeManager && selectedOfficeId !== user?.office_id) {
+      setMessage({ type: 'error', text: 'You can only manage certificate settings for your assigned office.' });
+      return;
+    }
     
     setSaving(true);
     setMessage(null);
@@ -300,10 +340,18 @@ const Settings: React.FC = () => {
     );
   }
 
-  if (user?.role !== 'Admin') {
+  if (!canManageCertificateSettings) {
     return (
       <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200">
-        <p className="text-slate-500">You do not have permission to view this page. Only Administrators can configure signatories.</p>
+        <p className="text-slate-500">You do not have permission to view this page.</p>
+      </div>
+    );
+  }
+
+  if (isOfficeManager && !user?.office_id) {
+    return (
+      <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200">
+        <p className="text-slate-500">Your account does not have an office assignment yet, so certificate settings cannot be managed.</p>
       </div>
     );
   }
@@ -402,6 +450,7 @@ const Settings: React.FC = () => {
                             <select
                               value={selectedOfficeId}
                               onChange={(e) => setSelectedOfficeId(e.target.value ? Number(e.target.value) : '')}
+                              disabled={!isAdmin}
                               className="w-full appearance-none rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                             >
                               <option value="" disabled>Select an office...</option>

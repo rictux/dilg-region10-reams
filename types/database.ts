@@ -1,5 +1,5 @@
 
-export type UserRole = 'Admin' | 'Scanner' | 'EventManager';
+export type UserRole = 'Admin' | 'Scanner' | 'EventManager' | 'OfficeManager';
 
 export interface RefLocation {
   location_id: number;

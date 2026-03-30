@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { User, Office } from '../../types/database';
+import { User, Office, UserRole } from '../../types/database';
 import { Trash2, UserPlus, Shield, CheckCircle, XCircle, Search, Mail, Briefcase, Lock, X, Loader2, AlertCircle, Edit, Building2, Eye, EyeOff } from 'lucide-react';
 import { format } from 'date-fns';
 import bcrypt from 'bcryptjs';
@@ -18,6 +18,8 @@ interface UserWithOffice extends User {
 
 const UserManagement: React.FC = () => {
   const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === 'Admin';
+  const isOfficeManager = currentUser?.role === 'OfficeManager';
   const [activeTab, setActiveTab] = useState<'users' | 'participants'>('users');
   const [users, setUsers] = useState<UserWithOffice[]>([]);
   const [offices, setOffices] = useState<Office[]>([]);
@@ -46,26 +48,40 @@ const UserManagement: React.FC = () => {
     email: '',
     username: '',
     password: '',
-    role: 'Scanner' as 'Admin' | 'Scanner' | 'EventManager',
+    role: 'Scanner' as UserRole,
     position: '',
     status: 'Active' as 'Active' | 'Inactive',
     office_id: null as number | null
   };
   const [formData, setFormData] = useState(initialFormState);
+  const isOfficeManagerEditing = isOfficeManager && editingId !== null;
 
   useEffect(() => {
+    if (!isAdmin) {
+      setActiveTab('users');
+    }
     fetchUsers();
     fetchOffices();
-  }, []);
+  }, [currentUser?.user_id, currentUser?.office_id, currentUser?.role]);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('users')
         .select('*, offices(code, name)')
         .order('created_at', { ascending: false });
+
+      if (isOfficeManager) {
+        if (!currentUser?.office_id) {
+          setUsers([]);
+          return;
+        }
+
+        query = query.eq('office_id', currentUser.office_id);
+      }
       
+      const { data, error } = await query;
       if (error) throw error;
       setUsers(data as UserWithOffice[] || []);
     } catch (err) {
@@ -76,8 +92,38 @@ const UserManagement: React.FC = () => {
   };
 
   const fetchOffices = async () => {
-      const { data } = await supabase.from('offices').select('*').order('name');
+      let query = supabase.from('offices').select('*').order('name');
+
+      if (isOfficeManager) {
+        if (!currentUser?.office_id) {
+          setOffices([]);
+          return;
+        }
+
+        query = query.eq('office_id', currentUser.office_id);
+      }
+
+      const { data } = await query;
       if (data) setOffices(data);
+  };
+
+  const canCreateUsers = isAdmin;
+
+  const canManageUserRecord = (targetUser: UserWithOffice) => {
+    if (isAdmin) return true;
+
+    return Boolean(
+      isOfficeManager &&
+      currentUser?.office_id &&
+      targetUser.office_id === currentUser.office_id &&
+      targetUser.role !== 'Admin'
+    );
+  };
+
+  const canDeleteUserRecord = (targetUser: UserWithOffice) => {
+    if (!isAdmin || !currentUser) return false;
+
+    return targetUser.user_id !== currentUser.user_id && targetUser.role !== 'Admin';
   };
 
   const handleDelete = async (targetUser: UserWithOffice) => {
@@ -116,24 +162,31 @@ const UserManagement: React.FC = () => {
   };
 
   const openCreateModal = () => {
+      if (!canCreateUsers) return;
+
       setEditingId(null);
-      setFormData(initialFormState);
+      setFormData({
+        ...initialFormState,
+        office_id: isOfficeManager ? currentUser?.office_id || null : null
+      });
       setFormError('');
       setShowPassword(false);
       setShowModal(true);
   };
 
-  const openEditModal = (user: UserWithOffice) => {
-      setEditingId(user.user_id);
+  const openEditModal = (targetUser: UserWithOffice) => {
+      if (!canManageUserRecord(targetUser)) return;
+
+      setEditingId(targetUser.user_id);
       setFormData({
-          full_name: user.full_name,
-          email: user.email,
-          username: user.username,
+          full_name: targetUser.full_name,
+          email: targetUser.email,
+          username: targetUser.username,
           password: '',
-          role: user.role,
-          position: user.position || '',
-          status: user.status,
-          office_id: user.office_id || null
+          role: targetUser.role,
+          position: targetUser.position || '',
+          status: targetUser.status,
+          office_id: isOfficeManager ? currentUser?.office_id || null : targetUser.office_id || null
       });
       setFormError('');
       setShowPassword(false);
@@ -146,25 +199,42 @@ const UserManagement: React.FC = () => {
       setFormError('');
 
       try {
-          const { data: existing } = await supabase
-            .from('users')
-            .select('user_id')
-            .eq('username', formData.username)
-            .neq('user_id', editingId || -1) 
-            .single();
-          
-          if (existing) throw new Error("Username already taken.");
+          if (isOfficeManager && !currentUser?.office_id) {
+              throw new Error('Your account does not have an office assignment.');
+          }
+
+          if (isOfficeManager) {
+              if (editingId === null) {
+                  throw new Error('Office Managers can edit users in their office, but cannot create new users.');
+              }
+          }
+
+          if (!isOfficeManagerEditing) {
+              const { data: existing } = await supabase
+                .from('users')
+                .select('user_id')
+                .eq('username', formData.username)
+                .neq('user_id', editingId || -1) 
+                .single();
+              
+              if (existing) throw new Error("Username already taken.");
+          }
 
           if (editingId) {
-              const updates: any = {
-                  full_name: formData.full_name,
-                  email: formData.email,
-                  username: formData.username,
-                  role: formData.role,
-                  position: formData.position,
-                  status: formData.status,
-                  office_id: formData.office_id
-              };
+              const updates: any = isOfficeManagerEditing
+                ? {
+                    email: formData.email,
+                    position: formData.position
+                  }
+                : {
+                    full_name: formData.full_name,
+                    email: formData.email,
+                    username: formData.username,
+                    role: formData.role,
+                    position: formData.position,
+                    status: formData.status,
+                    office_id: formData.office_id
+                  };
 
               if (formData.password) {
                   if (formData.password.length < 4) throw new Error("Password must be at least 4 characters.");
@@ -172,10 +242,18 @@ const UserManagement: React.FC = () => {
                   updates.password_hash = await bcrypt.hash(formData.password, salt);
               }
 
-              const { error } = await supabase
+              let updateQuery = supabase
                   .from('users')
                   .update(updates)
                   .eq('user_id', editingId);
+
+              if (isOfficeManager && currentUser?.office_id) {
+                  updateQuery = updateQuery
+                    .eq('office_id', currentUser.office_id)
+                    .neq('role', 'Admin');
+              }
+
+              const { error } = await updateQuery;
 
               if (error) throw error;
 
@@ -195,7 +273,7 @@ const UserManagement: React.FC = () => {
                   role: formData.role,
                   position: formData.position,
                   status: formData.status,
-                  office_id: formData.office_id
+                  office_id: isOfficeManager ? currentUser?.office_id || null : formData.office_id
               }]);
 
               if (error) throw error;
@@ -214,7 +292,7 @@ const UserManagement: React.FC = () => {
       u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
       u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.offices?.code.toLowerCase().includes(searchTerm.toLowerCase())
+      u.offices?.code?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
@@ -236,20 +314,34 @@ const UserManagement: React.FC = () => {
         >
           System Users
         </button>
-        <button
-          className={`py-3 px-6 font-medium text-sm border-b-2 transition-colors ${
-            activeTab === 'participants'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-          }`}
-          onClick={() => setActiveTab('participants')}
-        >
-          Participants
-        </button>
+        {isAdmin && (
+          <button
+            className={`py-3 px-6 font-medium text-sm border-b-2 transition-colors ${
+              activeTab === 'participants'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            }`}
+            onClick={() => setActiveTab('participants')}
+          >
+            Participants
+          </button>
+        )}
       </div>
 
       {activeTab === 'users' ? (
         <div className="flex-1 min-h-0 flex flex-col gap-6">
+          {isOfficeManager && (
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+              You can edit only the email, position, and password of users assigned to your office. Creating users, deleting users, and changing other account details are restricted.
+            </div>
+          )}
+
+          {isOfficeManager && !currentUser?.office_id && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Your account does not have an office assignment yet, so user management is unavailable.
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -276,12 +368,14 @@ const UserManagement: React.FC = () => {
             </button>
           )}
         </div>
-        <button 
-            onClick={openCreateModal}
-            className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium"
-        >
-            <UserPlus size={20} /> Add User
-        </button>
+        {canCreateUsers && (
+          <button 
+              onClick={openCreateModal}
+              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium"
+          >
+              <UserPlus size={20} /> Add User
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
@@ -331,6 +425,7 @@ const UserManagement: React.FC = () => {
                                               ${user.role === 'Admin' ? 'bg-purple-100 text-purple-700' : ''}
                                               ${user.role === 'Scanner' ? 'bg-orange-100 text-orange-700' : ''}
                                               ${user.role === 'EventManager' ? 'bg-blue-100 text-blue-700' : ''}
+                                              ${user.role === 'OfficeManager' ? 'bg-teal-100 text-teal-700' : ''}
                                           `}>
                                               {user.role === 'Admin' && <Shield size={12} />}
                                               {user.role}
@@ -353,21 +448,26 @@ const UserManagement: React.FC = () => {
                                       <div className="flex items-center justify-end gap-1">
                                           <button
                                               onClick={() => openEditModal(user)}
-                                              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                              title="Edit User"
+                                              disabled={!canManageUserRecord(user)}
+                                              className={`p-2 rounded-lg transition-colors ${
+                                                canManageUserRecord(user)
+                                                  ? 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+                                                  : 'text-slate-300 cursor-not-allowed'
+                                              }`}
+                                              title={canManageUserRecord(user) ? 'Edit User' : 'You cannot edit this user'}
                                           >
                                               <Edit size={18} />
                                           </button>
                                           <button 
                                               onClick={() => handleDelete(user)}
-                                              disabled={user.role === 'Admin' || user.user_id === currentUser?.user_id}
+                                              disabled={!canDeleteUserRecord(user)}
                                               className={`p-2 rounded-lg transition-colors
-                                                  ${(user.role === 'Admin' || user.user_id === currentUser?.user_id) 
+                                                  ${!canDeleteUserRecord(user)
                                                       ? 'text-slate-300 cursor-not-allowed' 
                                                       : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
                                                   }
                                               `}
-                                              title={user.role === 'Admin' ? "Cannot delete Admins" : "Delete User"}
+                                              title={canDeleteUserRecord(user) ? 'Delete User' : 'Deletion is restricted'}
                                           >
                                               <Trash2 size={18} />
                                           </button>
@@ -422,6 +522,7 @@ const UserManagement: React.FC = () => {
                                       ${user.role === 'Admin' ? 'bg-purple-100 text-purple-700' : ''}
                                       ${user.role === 'Scanner' ? 'bg-orange-100 text-orange-700' : ''}
                                       ${user.role === 'EventManager' ? 'bg-blue-100 text-blue-700' : ''}
+                                      ${user.role === 'OfficeManager' ? 'bg-teal-100 text-teal-700' : ''}
                                   `}>
                                       {user.role === 'Admin' && <Shield size={12} />}
                                       {user.role}
@@ -442,15 +543,20 @@ const UserManagement: React.FC = () => {
                           <div className="mt-4 flex gap-2">
                               <button
                                   onClick={() => openEditModal(user)}
-                                  className="flex-1 p-2 text-sm text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                  disabled={!canManageUserRecord(user)}
+                                  className={`flex-1 p-2 text-sm rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                                    canManageUserRecord(user)
+                                      ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                                      : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                                  }`}
                               >
                                   <Edit size={16} /> Edit
                               </button>
                               <button
                                   onClick={() => handleDelete(user)}
-                                  disabled={user.role === 'Admin' || user.user_id === currentUser?.user_id}
+                                  disabled={!canDeleteUserRecord(user)}
                                   className={`flex-1 p-2 text-sm rounded-lg transition-colors flex items-center justify-center gap-2
-                                      ${(user.role === 'Admin' || user.user_id === currentUser?.user_id)
+                                      ${!canDeleteUserRecord(user)
                                           ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
                                           : 'bg-red-50 text-red-700 hover:bg-red-100'
                                       }
@@ -523,29 +629,49 @@ const UserManagement: React.FC = () => {
                     )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="sm:col-span-2">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-                            <input 
-                                required
-                                type="text"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                placeholder="John Doe"
-                                value={formData.full_name}
-                                onChange={e => setFormData({...formData, full_name: e.target.value})}
-                            />
-                        </div>
+                        {isOfficeManagerEditing ? (
+                            <>
+                                <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <p className="text-sm font-semibold text-slate-800">{formData.full_name}</p>
+                                    <div className="mt-2 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
+                                        <p>Username: <span className="font-medium text-slate-700">@{formData.username}</span></p>
+                                        <p>Role: <span className="font-medium text-slate-700">{formData.role}</span></p>
+                                        <p>Status: <span className="font-medium text-slate-700">{formData.status}</span></p>
+                                        <p>
+                                            Office: <span className="font-medium text-slate-700">
+                                                {offices.find((office) => office.office_id === formData.office_id)?.name || 'Unassigned'}
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+                                    <input 
+                                        required
+                                        type="text"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        placeholder="John Doe"
+                                        value={formData.full_name}
+                                        onChange={e => setFormData({...formData, full_name: e.target.value})}
+                                    />
+                                </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
-                            <input 
-                                required
-                                type="text"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                placeholder="johndoe"
-                                value={formData.username}
-                                onChange={e => setFormData({...formData, username: e.target.value})}
-                            />
-                        </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
+                                    <input 
+                                        required
+                                        type="text"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        placeholder="johndoe"
+                                        value={formData.username}
+                                        onChange={e => setFormData({...formData, username: e.target.value})}
+                                    />
+                                </div>
+                            </>
+                        )}
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -570,18 +696,21 @@ const UserManagement: React.FC = () => {
                             </div>
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
-                            <select
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                                value={formData.role}
-                                onChange={e => setFormData({...formData, role: e.target.value as any})}
-                            >
-                                <option value="Scanner">Scanner</option>
-                                <option value="EventManager">EventManager</option>
-                                <option value="Admin">Admin</option>
-                            </select>
-                        </div>
+                        {!isOfficeManagerEditing && (
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
+                                <select
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                    value={formData.role}
+                                    onChange={e => setFormData({...formData, role: e.target.value as any})}
+                                >
+                                    <option value="Scanner">Scanner</option>
+                                    <option value="EventManager">EventManager</option>
+                                    <option value="OfficeManager">OfficeManager</option>
+                                    {isAdmin && <option value="Admin">Admin</option>}
+                                </select>
+                            </div>
+                        )}
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Position</label>
@@ -594,34 +723,39 @@ const UserManagement: React.FC = () => {
                             />
                         </div>
                         
-                        <div className="sm:col-span-2">
-                             <label className="block text-sm font-medium text-slate-700 mb-1">Office Assignment</label>
-                             <div className="relative">
-                                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                <select 
-                                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white appearance-none"
-                                    value={formData.office_id || ''}
-                                    onChange={e => setFormData({...formData, office_id: e.target.value ? Number(e.target.value) : null})}
-                                >
-                                    <option value="">-- No Office Assigned --</option>
-                                    {offices.map(office => (
-                                        <option key={office.office_id} value={office.office_id}>{office.name} ({office.code})</option>
-                                    ))}
-                                </select>
-                             </div>
-                        </div>
+                        {!isOfficeManagerEditing && (
+                            <>
+                                <div className="sm:col-span-2">
+                                     <label className="block text-sm font-medium text-slate-700 mb-1">Office Assignment</label>
+                                     <div className="relative">
+                                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                        <select 
+                                            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white appearance-none"
+                                            value={formData.office_id || ''}
+                                            disabled={isOfficeManager}
+                                            onChange={e => setFormData({...formData, office_id: e.target.value ? Number(e.target.value) : null})}
+                                        >
+                                            <option value="">-- No Office Assigned --</option>
+                                            {offices.map(office => (
+                                                <option key={office.office_id} value={office.office_id}>{office.name} ({office.code})</option>
+                                            ))}
+                                        </select>
+                                     </div>
+                                </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                            <select
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                                value={formData.status}
-                                onChange={e => setFormData({...formData, status: e.target.value as any})}
-                            >
-                                <option value="Active">Active</option>
-                                <option value="Inactive">Inactive</option>
-                            </select>
-                        </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                                    <select
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        value={formData.status}
+                                        onChange={e => setFormData({...formData, status: e.target.value as any})}
+                                    >
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </>
+                        )}
                         
                         <div className="sm:col-span-2">
                              <label className="block text-sm font-medium text-slate-700 mb-1">Email (Optional)</label>
