@@ -531,10 +531,11 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
                 <button
                   type="button"
                   onClick={scannerActive ? closePublicScanner : openPublicScanner}
-                  className="inline-flex w-full sm:w-auto items-center justify-center px-4 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+                  className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors shadow-sm"
                   aria-label={scannerActive ? 'Close camera' : 'Open camera to scan'}
                 >
                   {scannerActive ? <X size={16} /> : <Camera size={16} />}
+                  {!scannerActive && <span>Scan QR</span>}
                 </button>
               </div>
             </div>
