@@ -11,7 +11,6 @@ import {
   AlertCircle,
   Shield,
   ScanLine,
-  RefreshCw,
   Camera,
   X
 } from 'lucide-react';
@@ -173,15 +172,6 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
     }
   };
 
-  const resetPublicScanner = () => {
-    setScannerActive(true);
-    setScannerMessage(null);
-    setScannerError(null);
-    setSelectedParticipant(null);
-    setAttendedEvents([]);
-    setScannerKey((prev) => prev + 1);
-  };
-
   const openPublicScanner = () => {
     setScannerActive(true);
     setScannerMessage(null);
@@ -304,7 +294,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
 
   const contentClass = isInternal
     ? 'w-full h-full min-h-0 flex flex-col gap-6'
-    : 'min-h-screen bg-slate-50 flex flex-col items-center p-4 sm:p-8 w-full';
+    : 'min-h-screen bg-slate-50 flex flex-col items-center w-full px-3 py-5 sm:p-8';
 
   const renderPublicTimeline = () => {
     if (attendedEvents.length === 0) {
@@ -318,30 +308,31 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
     }
 
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 md:p-6">
-        <div className="flex items-center gap-2 mb-6">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 md:p-6">
+        <div className="flex items-center gap-2 mb-4 sm:mb-6">
           <History className="text-indigo-600" size={18} />
           <h4 className="text-base font-bold text-slate-800">Historical View</h4>
         </div>
 
         <div className="relative">
-          <div className="absolute left-[19px] top-1 bottom-1 w-px bg-slate-200"></div>
-          <div className="space-y-5">
+          <div className="absolute left-[15px] top-1 bottom-1 w-px bg-slate-200 sm:left-[19px]"></div>
+          <div className="space-y-4 sm:space-y-5">
             {attendedEvents.map((event) => (
-              <div key={event.event_id} className="relative pl-12">
-                <div className="absolute left-0 top-1 w-10 h-10 rounded-full bg-indigo-100 border-4 border-white shadow-sm flex items-center justify-center">
-                  <Calendar size={16} className="text-indigo-600" />
+              <div key={event.event_id} className="relative pl-10 sm:pl-12">
+                <div className="absolute left-0 top-1.5 w-8 h-8 rounded-full bg-indigo-100 border-4 border-white shadow-sm flex items-center justify-center sm:top-1 sm:w-10 sm:h-10">
+                  <Calendar size={14} className="text-indigo-600 sm:hidden" />
+                  <Calendar size={16} className="hidden text-indigo-600 sm:block" />
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
                   <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                     <div className="space-y-3">
                       <div>
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-[0.18em]">Event</p>
-                        <h5 className="text-lg font-bold text-slate-900 mt-1">{event.event_name}</h5>
+                        <h5 className="text-base sm:text-lg font-bold text-slate-900 mt-1 leading-tight">{event.event_name}</h5>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 text-sm">
                         <div className="flex items-start gap-2 text-slate-600">
                           <Calendar size={16} className="text-slate-400 shrink-0 mt-0.5" />
                           <div>
@@ -360,7 +351,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
                       </div>
                     </div>
 
-                    <div className="flex items-start">
+                    <div className="flex items-start self-start">
                       <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100 whitespace-nowrap">
                         <Shield size={12} />
                         {event.role}
@@ -433,14 +424,16 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
   return (
     <div className={contentClass}>
       {!isInternal && (
-        <div className="w-full max-w-5xl flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 flex-shrink-0">
-              <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-slate-900 leading-tight">DILG Region 10</h1>
-              <p className="text-xs text-indigo-600 font-semibold tracking-wide uppercase">Attendance History Portal</p>
+        <div className="w-full max-w-5xl flex flex-col sm:flex-row items-center justify-between mb-6 sm:mb-8 gap-4">
+          <div className="w-full sm:w-auto rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
+            <div className="flex items-center justify-center sm:justify-start gap-3 sm:gap-4">
+              <div className="w-11 h-11 sm:w-12 sm:h-12 flex-shrink-0">
+                <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" />
+              </div>
+              <div className="text-left">
+                <h1 className="text-lg font-bold text-slate-900 leading-tight">DILG Region 10</h1>
+                <p className="text-[11px] sm:text-xs text-indigo-600 font-semibold tracking-wide uppercase">Attendance History Portal</p>
+              </div>
             </div>
           </div>
           <div className="hidden sm:block text-right">
@@ -450,7 +443,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
         </div>
       )}
 
-      <div className={isInternal ? 'w-full flex-1 min-h-0 flex flex-col gap-6' : 'w-full max-w-5xl space-y-6'}>
+      <div className={isInternal ? 'w-full flex-1 min-h-0 flex flex-col gap-6' : 'w-full max-w-5xl space-y-4 sm:space-y-6'}>
         {isInternal ? (
           <div className="relative" ref={dropdownRef}>
             <div className="text-center mb-4">
@@ -521,38 +514,28 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
             )}
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 md:p-6 space-y-4">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 md:p-6 space-y-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="space-y-2">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-sm font-medium">
                   <ScanLine size={16} />
                   QR Verification
                 </div>
-                <h2 className="text-xl font-bold text-slate-900">Participant Event History</h2>
-                <p className="text-sm text-slate-500 max-w-2xl">
-                  Open the camera only when you want to scan a participant QR code. The main view below focuses on the participant&apos;s historical event record.
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">Participant&apos;s Event History.</h2>
+                <p className="text-sm text-slate-500 max-w-2xl leading-relaxed">
+                  Scan QR to view participant&apos;s event history.
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
                 <button
                   type="button"
                   onClick={scannerActive ? closePublicScanner : openPublicScanner}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+                  className="inline-flex w-full sm:w-auto items-center justify-center px-4 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+                  aria-label={scannerActive ? 'Close camera' : 'Open camera to scan'}
                 >
                   {scannerActive ? <X size={16} /> : <Camera size={16} />}
-                  {scannerActive ? 'Close Camera' : 'Open Camera to Scan'}
                 </button>
-                {!scannerActive && selectedParticipant && (
-                  <button
-                    type="button"
-                    onClick={resetPublicScanner}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 rounded-lg font-medium border border-slate-300 hover:bg-slate-50 transition-colors"
-                  >
-                    <RefreshCw size={16} />
-                    Scan Another QR
-                  </button>
-                )}
               </div>
             </div>
 
@@ -565,19 +548,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
                   </p>
                 </div>
               </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center shrink-0">
-                  <ScanLine size={18} className="text-indigo-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-700">Camera scanner is closed.</p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Open it only when needed so the page stays focused on the participant&apos;s event history.
-                  </p>
-                </div>
-              </div>
-            )}
+            ) : null}
 
             {scannerMessage && !scannerError && (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
@@ -600,21 +571,23 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
               <p className="text-sm font-medium">Retrieving attendance logs...</p>
             </div>
           ) : selectedParticipant ? (
-            <div className={isInternal ? 'animate-in fade-in slide-in-from-bottom-4 duration-500 flex-1 min-h-0 flex flex-col gap-6' : 'animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6'}>
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 md:p-6 shadow-sm flex flex-col sm:flex-row items-center gap-5">
-                <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl font-bold shrink-0">
+            <div className={isInternal ? 'animate-in fade-in slide-in-from-bottom-4 duration-500 flex-1 min-h-0 flex flex-col gap-6' : 'animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4 sm:space-y-6'}>
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 md:p-6 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-xl sm:text-2xl font-bold shrink-0 mx-auto sm:mx-0">
                   {selectedParticipant.full_name.charAt(0)}
                 </div>
-                <div className="text-center sm:text-left flex-1">
+                <div className="text-center sm:text-left flex-1 min-w-0">
                   <p className="text-xs font-bold text-indigo-600 uppercase tracking-[0.2em] mb-2">Participant Record</p>
-                  <h3 className="text-xl font-bold text-slate-900">{selectedParticipant.full_name}</h3>
-                  <div className="flex flex-wrap justify-center sm:justify-start gap-2 mt-2 text-slate-600 text-sm">
-                    <span className="flex items-center gap-1 font-medium">{selectedParticipant.position}</span>
-                    <span className="hidden sm:inline text-slate-300">&bull;</span>
-                    <span className="flex items-center gap-1"><Landmark size={14} className="text-slate-400" /> {selectedParticipant.office}</span>
+                  <h3 className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">{selectedParticipant.full_name}</h3>
+                  <div className="mt-3 space-y-2 text-sm text-slate-600">
+                    <p className="font-medium text-slate-700">{selectedParticipant.position}</p>
+                    <div className="flex items-start justify-center sm:justify-start gap-2">
+                      <Landmark size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                      <span>{selectedParticipant.office}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="bg-slate-50 border border-slate-200 px-5 py-3 rounded-xl text-center min-w-[140px]">
+                <div className="bg-slate-50 border border-slate-200 px-5 py-3 rounded-xl text-center w-full sm:w-auto sm:min-w-[140px]">
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Events Attended</p>
                   <p className="text-2xl font-bold text-indigo-600">{attendedEvents.length}</p>
                 </div>
