@@ -281,6 +281,22 @@ const buildCertificateSerialNumber = (
   ].join('-');
 };
 
+const buildParticipantListName = (participant: CertificateParticipant['participant']) => {
+  const firstName = participant.f_name?.trim() || '';
+  const lastName = participant.l_name?.trim() || '';
+  const suffix = participant.suffix?.trim() || '';
+  const middleInitial = participant.m_initial?.trim().replace(/\./g, '') || '';
+
+  const lastNameSection = [lastName, suffix].filter(Boolean).join(' ').trim();
+  const firstNameSection = [firstName, middleInitial ? `${middleInitial}.` : ''].filter(Boolean).join(' ').trim();
+
+  if (lastNameSection && firstNameSection) {
+    return `${lastNameSection}, ${firstNameSection}`;
+  }
+
+  return lastNameSection || firstNameSection || participant.full_name || 'Unnamed participant';
+};
+
 const CertificateOfAppearancePrint: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
@@ -425,9 +441,12 @@ const CertificateOfAppearancePrint: React.FC = () => {
     const search = participantSearch.trim().toLowerCase();
     if (!search) return participants;
 
-    return participants.filter((record) =>
-      (record.participant.full_name || '').toLowerCase().includes(search)
-    );
+    return participants.filter((record) => {
+      const fullName = (record.participant.full_name || '').toLowerCase();
+      const displayName = buildParticipantListName(record.participant).toLowerCase();
+
+      return fullName.includes(search) || displayName.includes(search);
+    });
   }, [participantSearch, participants]);
 
   useEffect(() => {
@@ -751,7 +770,7 @@ const writeCertificatesToDirectory = async (
                         onClick={() => setSelectedParticipantId(record.participant.participant_id)}
                         className="min-w-0 flex-1 text-left"
                       >
-                        <p className="text-sm font-semibold">{record.participant.full_name}</p>
+                        <p className="text-sm font-semibold">{buildParticipantListName(record.participant)}</p>
                         <p className="mt-1 text-[11px] text-slate-500">{record.participant.office || 'No office indicated'}</p>
                       </button>
                     </div>
