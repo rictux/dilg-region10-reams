@@ -5,6 +5,7 @@ import { Printer, Calendar, ScrollText, Search, ChevronDown, Check, X } from 'lu
 import { Event } from '../../types/database';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 
 const Reports: React.FC = () => {
   const navigate = useNavigate();
@@ -74,8 +75,36 @@ const Reports: React.FC = () => {
     }
   };
 
+  const formatEventDate = (start: string, end: string) => {
+    if (!start) return '';
+
+    try {
+      const startDate = parseISO(start);
+      const endDate = end ? parseISO(end) : startDate;
+
+      if (start === end || !end) {
+        return format(startDate, 'MMM. d, yyyy');
+      }
+
+      if (isSameMonth(startDate, endDate) && isSameYear(startDate, endDate)) {
+        return `${format(startDate, 'MMM. d')}-${format(endDate, 'd, yyyy')}`;
+      }
+
+      if (!isSameMonth(startDate, endDate) && isSameYear(startDate, endDate)) {
+        return `${format(startDate, 'MMM. d')} - ${format(endDate, 'MMM. d, yyyy')}`;
+      }
+
+      return `${format(startDate, 'MMM. d, yyyy')} - ${format(endDate, 'MMM. d, yyyy')}`;
+    } catch {
+      return start;
+    }
+  };
+
+  const getEventDateLabel = (event: Event) => formatEventDate(event.start_date, event.end_date);
+  const getEventDropdownLabel = (event: Event) => `${event.event_name} ${getEventDateLabel(event)}`;
+
   const filteredEvents = events.filter(e => 
-    e.event_name.toLowerCase().includes(searchTerm.toLowerCase())
+    getEventDropdownLabel(e).toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const selectedEvent = events.find(e => e.event_id.toString() === selectedEventId);
@@ -91,13 +120,20 @@ const Reports: React.FC = () => {
                     {/* Custom Searchable Dropdown */}
                     <div className="relative" ref={dropdownRef}>
                         <div 
-                            className="w-full bg-slate-50 border border-slate-300 rounded-lg px-4 py-2.5 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors"
+                            className="w-full bg-slate-50 border border-slate-300 rounded-lg px-4 py-2.5 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors shadow-sm"
                             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                         >
-                            <div className="flex items-center gap-2 overflow-hidden">
-                                <Calendar className="text-slate-400 shrink-0" size={18} />
-                                <span className={`truncate ${!selectedEventId ? 'text-slate-500' : 'text-slate-800'}`}>
-                                    {selectedEvent ? selectedEvent.event_name : "-- Select Event --"}
+                            <div className="flex items-start gap-2 flex-1 overflow-hidden">
+                                <Calendar className="text-slate-400 shrink-0 mt-0.5" size={16} />
+                                <span className={`whitespace-normal break-words text-sm leading-snug ${!selectedEventId ? 'text-slate-500' : 'text-slate-800 font-medium'}`}>
+                                    {selectedEvent ? (
+                                      <>
+                                        <span>{selectedEvent.event_name}</span>
+                                        <span className="block text-xs text-slate-400 italic mt-0.5 font-normal">
+                                          {getEventDateLabel(selectedEvent)}
+                                        </span>
+                                      </>
+                                    ) : "-- Select Event --"}
                                 </span>
                             </div>
                             <div className="flex items-center gap-1 shrink-0 ml-2">
@@ -112,23 +148,23 @@ const Reports: React.FC = () => {
                                         <X size={14} />
                                     </span>
                                 )}
-                                <ChevronDown className={`text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} size={16} />
+                                <ChevronDown className={`text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} size={14} />
                             </div>
                         </div>
 
                         {isDropdownOpen && (
                             <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                                 {/* Search Input */}
-                                <div className="p-2 border-b border-slate-100 bg-slate-50">
+                                <div className="p-2 border-b border-slate-100 bg-slate-50 sticky top-0">
                                     <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
                                         <input
                                             autoFocus
                                             type="text"
                                             placeholder="Search event..."
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="w-full pl-9 pr-14 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                                            className="w-full pl-8 pr-14 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                                             onClick={(e) => e.stopPropagation()}
                                         />
                                         {searchTerm && (
@@ -149,9 +185,10 @@ const Reports: React.FC = () => {
                                 {/* List */}
                                 <div className="max-h-60 overflow-y-auto">
                                     <div 
-                                        className={`px-4 py-2 text-sm cursor-pointer hover:bg-slate-50 transition-colors ${!selectedEventId ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-slate-500'}`}
+                                        className={`px-4 py-2 text-xs cursor-pointer border-b border-slate-50 hover:bg-slate-50 transition-colors ${!selectedEventId ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-slate-500'}`}
                                         onClick={() => {
                                             setSelectedEventId('');
+                                            setSearchTerm('');
                                             setIsDropdownOpen(false);
                                         }}
                                     >
@@ -161,21 +198,25 @@ const Reports: React.FC = () => {
                                         filteredEvents.map(e => (
                                             <div 
                                                 key={e.event_id}
-                                                className={`px-4 py-2.5 text-sm cursor-pointer border-b border-slate-50 last:border-0 hover:bg-indigo-50 transition-colors flex items-center justify-between group
+                                                className={`px-4 py-2 text-xs cursor-pointer border-b border-slate-50 last:border-0 hover:bg-indigo-50 transition-colors flex items-center justify-between group
                                                     ${selectedEventId === e.event_id.toString() ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-700'}
                                                 `}
                                                 onClick={() => {
                                                     setSelectedEventId(e.event_id.toString());
+                                                    setSearchTerm('');
                                                     setIsDropdownOpen(false);
                                                 }}
                                             >
-                                                <span className="truncate pr-2">{e.event_name}</span>
-                                                {selectedEventId === e.event_id.toString() && <Check size={16} className="text-indigo-600 shrink-0" />}
+                                                <div className="overflow-hidden w-full mr-2">
+                                                    <p className="whitespace-normal break-words leading-snug">{e.event_name}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-0.5 italic">{getEventDateLabel(e)}</p>
+                                                </div>
+                                                {selectedEventId === e.event_id.toString() && <Check size={14} className="text-indigo-600 shrink-0" />}
                                             </div>
                                         ))
                                     ) : (
-                                        <div className="px-4 py-8 text-center text-sm text-slate-400">
-                                            No events found matching "{searchTerm}"
+                                        <div className="px-4 py-8 text-center text-xs text-slate-400">
+                                            No events found.
                                         </div>
                                     )}
                                 </div>

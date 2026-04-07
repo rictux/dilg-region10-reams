@@ -14,7 +14,6 @@ import {
   User, 
   MapPin,
   Calendar,
-  Wifi,
   WifiOff,
   CloudUpload
 } from 'lucide-react';
@@ -550,45 +549,37 @@ const Scanner: React.FC = () => {
           isProcessingRef.current = false;
       }, 2000);
   };
-    
+
   return (
-    <div className="h-full w-full flex flex-col gap-2 bg-slate-100 p-2 sm:gap-3 sm:p-4 lg:flex-row lg:gap-0 lg:bg-slate-900 lg:p-0 overflow-hidden">
+    <div className="h-full w-full flex flex-col gap-1.5 bg-slate-100 p-1.5 sm:gap-3 sm:p-4 lg:flex-row lg:gap-0 lg:bg-slate-900 lg:p-0 overflow-hidden">
         
         {/* LEFT/TOP: Controls + Camera Section */}
         <div className="flex-1 flex flex-col overflow-hidden rounded-[28px] border border-slate-900/90 bg-slate-950 shadow-[0_18px_40px_rgba(15,23,42,0.28)] lg:rounded-none lg:border-0 lg:shadow-none">
-            <div className="shrink-0 border-b border-slate-800 bg-slate-950/95 p-2.5 sm:p-4">
-                 <div className="flex flex-col gap-3 max-w-5xl mx-auto">
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="space-y-1 min-w-0">
-                            <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.28em] text-slate-500">Scan Setup</p>
-                            <p className="hidden sm:block text-sm font-medium text-slate-300">Select the event and active session before scanning.</p>
+            <div className="shrink-0 border-b border-slate-800 bg-slate-950/95 p-1.5 sm:p-3">
+                 <div className="flex flex-col gap-1.5 sm:gap-2.5 max-w-5xl mx-auto">
+                    {(!isOnline || offlineQueue.length > 0) && (
+                        <div className="flex justify-end gap-2">
+                            {!isOnline && (
+                                <div className="bg-red-500/20 text-red-400 px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-bold flex items-center gap-1.5 backdrop-blur-md border border-red-500/30">
+                                    <WifiOff size={14} /> Offline Mode
+                                </div>
+                            )}
+                            {offlineQueue.length > 0 && (
+                                 <div className="bg-amber-500/20 text-amber-400 px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-bold flex items-center gap-1.5 backdrop-blur-md border border-amber-500/30 animate-pulse">
+                                    <CloudUpload size={14} /> {offlineQueue.length} Pending
+                                 </div>
+                            )}
                         </div>
-                        <div className="flex flex-wrap items-center justify-end gap-2">
-                        {isOnline ? (
-                            <div className="bg-green-500/20 text-green-400 px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-bold flex items-center gap-1.5 backdrop-blur-md border border-green-500/30">
-                                <Wifi size={14} /> Online
-                            </div>
-                        ) : (
-                            <div className="bg-red-500/20 text-red-400 px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-bold flex items-center gap-1.5 backdrop-blur-md border border-red-500/30">
-                                <WifiOff size={14} /> Offline Mode
-                            </div>
-                        )}
-                        {offlineQueue.length > 0 && (
-                             <div className="bg-amber-500/20 text-amber-400 px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-bold flex items-center gap-1.5 backdrop-blur-md border border-amber-500/30 animate-pulse">
-                                <CloudUpload size={14} /> {offlineQueue.length} Pending
-                             </div>
-                        )}
-                    </div>
-                    </div>
+                    )}
 
-                    <div className="grid gap-2 sm:gap-3 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
-                        <div className="flex-1 w-full rounded-2xl border border-slate-800 bg-slate-900/70 p-1.5 sm:p-2">
-                            <p className="px-2 pb-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Event</p>
+                    <div className="grid gap-1.5 sm:gap-2.5 md:grid-cols-[minmax(0,1fr)_220px] xl:grid-cols-[minmax(0,1fr)_240px] md:items-start">
+                        <div className="flex-1 w-full rounded-2xl border border-slate-800 bg-slate-900/70 p-1 sm:p-1.5">
+                            <p className="px-2 pb-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Event</p>
                             {loadingEvents ? (
                                 <div className="h-11 sm:h-12 bg-slate-800 rounded-xl animate-pulse"></div>
                             ) : (
                                 <div className="relative">
-                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                                     <select 
                                         value={selectedEventId}
                                         onChange={(e) => {
@@ -600,7 +591,7 @@ const Scanner: React.FC = () => {
                                                 setSession(getDefaultSessionForEvent(nextEvent));
                                             }
                                         }}
-                                        className="w-full bg-slate-950 text-white text-sm font-medium rounded-xl pl-10 pr-8 py-2.5 sm:py-3 border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm appearance-none"
+                                        className="w-full bg-slate-950 text-white text-xs sm:text-sm font-medium rounded-xl pl-9 pr-8 py-2 sm:py-2.5 border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm appearance-none"
                                     >
                                         {events.length === 0 ? (
                                             <option value="">No Events Today</option>
@@ -618,15 +609,15 @@ const Scanner: React.FC = () => {
                             )}
                         </div>
                         
-                        <div className="w-full xl:w-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-1.5 sm:p-2 shadow-sm">
-                            <p className="px-2 pb-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Session</p>
+                        <div className="w-full xl:w-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-1 sm:p-1.5 shadow-sm">
+                            <p className="px-2 pb-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Session</p>
                             <div className="grid grid-cols-2 gap-1.5">
                                 <button
                                     type="button"
                                     onClick={() => setSession('AM')}
                                     disabled={!isSessionEnabled('AM')}
                                     aria-pressed={session === 'AM'}
-                                    className={`px-4 py-2.5 sm:py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all border
+                                    className={`px-3 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
                                         ${session === 'AM'
                                             ? 'bg-amber-500/20 border-amber-400/60 text-amber-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
                                             : 'bg-slate-950/60 border-slate-800 text-slate-300'
@@ -636,7 +627,7 @@ const Scanner: React.FC = () => {
                                             : 'opacity-40 cursor-not-allowed text-slate-500'
                                         }`}
                                 >
-                                    <Sun size={18} className="fill-current" />
+                                    <Sun size={16} className="fill-current" />
                                     AM
                                 </button>
                                 <button
@@ -644,7 +635,7 @@ const Scanner: React.FC = () => {
                                     onClick={() => setSession('PM')}
                                     disabled={!isSessionEnabled('PM')}
                                     aria-pressed={session === 'PM'}
-                                    className={`px-4 py-2.5 sm:py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all border
+                                    className={`px-3 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
                                         ${session === 'PM'
                                             ? 'bg-indigo-600/20 border-indigo-500/60 text-indigo-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
                                             : 'bg-slate-950/60 border-slate-800 text-slate-300'
@@ -654,87 +645,82 @@ const Scanner: React.FC = () => {
                                             : 'opacity-40 cursor-not-allowed text-slate-500'
                                         }`}
                                 >
-                                    <Moon size={18} className="fill-current" />
+                                    <Moon size={16} className="fill-current" />
                                     PM
                                 </button>
                             </div>
-                            <p className="px-2 pt-1.5 text-[10px] sm:text-[11px] font-medium text-slate-400 text-center">
-                                {!selectedEvent ? 'Select an event to choose a session.' : `${selectedEvent.session} only event`}
-                            </p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Camera Viewport */}
-            <div className="relative flex min-h-[58vh] flex-1 items-center justify-center overflow-hidden bg-black sm:min-h-[520px] lg:min-h-0">
-                {cameraError ? (
-                    <div className="text-white text-center p-8 max-w-sm">
-                        <div className="bg-red-500/20 p-6 rounded-full inline-block mb-6">
-                            <AlertTriangle size={48} className="text-red-500" />
-                        </div>
-                        <h3 className="text-xl font-bold mb-2">Camera Access Error</h3>
-                        <p className="text-slate-400 mb-6 font-medium text-sm leading-relaxed">{cameraError}</p>
-                        <button 
-                            onClick={() => startScanner()} 
-                            className="bg-white text-black px-8 py-3 rounded-full font-bold hover:bg-slate-200 transition-colors"
-                        >
-                            Retry Camera
-                        </button>
-                    </div>
-                ) : (
-                    <>
-                        <div id={readerId} className="w-full h-full object-cover"></div>
-                        
-                        {/* Static Overlay Guide */}
-                        {!scanResult && scanning && (
-                            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
-                                <div className="w-56 h-56 sm:w-72 sm:h-72 lg:w-80 lg:h-80 border-2 border-white/40 rounded-[2rem] relative overflow-hidden backdrop-brightness-150">
-                                    <div className="absolute inset-0 border-[60px] border-black/40"></div>
-                                    <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-indigo-500 -mt-1 -ml-1 rounded-tl-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
-                                    <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-indigo-500 -mt-1 -mr-1 rounded-tr-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
-                                    <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-indigo-500 -mb-1 -ml-1 rounded-bl-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
-                                    <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-indigo-500 -mb-1 -mr-1 rounded-br-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
-                                    
-                                    {/* Scan Line Animation - High Tech look */}
-                                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent shadow-[0_0_20px_rgba(79,70,229,0.9)] animate-[scan_2.5s_ease-in-out_infinite]"></div>
-                                </div>
-                                <div className="mt-6 bg-black/70 backdrop-blur-md px-5 py-2.5 rounded-full text-white/90 text-sm font-bold border border-white/20 tracking-wide flex items-center gap-2 shadow-lg">
-                                    <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
-                                    Focusing on QR Code...
-                                </div>
+                <div className="relative flex min-h-[78vh] flex-1 items-center justify-center overflow-hidden bg-black sm:min-h-[600px] lg:min-h-0">
+                    {cameraError ? (
+                        <div className="text-white text-center p-8 max-w-sm">
+                            <div className="bg-red-500/20 p-6 rounded-full inline-block mb-6">
+                                <AlertTriangle size={48} className="text-red-500" />
                             </div>
-                        )}
-                        
-                        {!scanResult && !scanning && !loadingEvents && (
-                             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-6 text-center">
-                                {!selectedEventId ? (
-                                    <>
-                                        <Calendar className="w-16 h-16 text-slate-500 mb-4" />
-                                        <h3 className="text-xl font-bold text-slate-300">No Event Selected</h3>
-                                        <p className="text-slate-500 mt-2">Please select an ongoing event to start scanning.</p>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
-                                        <p className="font-medium">Initializing Advanced Scanner...</p>
-                                    </>
-                                )}
-                             </div>
-                        )}
-                    </>
-                )}
-            </div>
+                            <h3 className="text-xl font-bold mb-2">Camera Access Error</h3>
+                            <p className="text-slate-400 mb-6 font-medium text-sm leading-relaxed">{cameraError}</p>
+                            <button 
+                                onClick={() => startScanner()} 
+                                className="bg-white text-black px-8 py-3 rounded-full font-bold hover:bg-slate-200 transition-colors"
+                            >
+                                Retry Camera
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            <div id={readerId} className="w-full h-full object-cover"></div>
+                            
+                            {/* Static Overlay Guide */}
+                            {!scanResult && scanning && (
+                                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                    <div className="relative w-[78vw] h-[78vw] max-w-[360px] max-h-[360px] sm:w-80 sm:h-80 lg:w-80 lg:h-80 border-2 border-white/40 rounded-[2rem] overflow-hidden backdrop-brightness-150">
+                                        <div className="absolute inset-0 border-[60px] border-black/40"></div>
+                                        <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-indigo-500 -mt-1 -ml-1 rounded-tl-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
+                                        <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-indigo-500 -mt-1 -mr-1 rounded-tr-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
+                                        <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-indigo-500 -mb-1 -ml-1 rounded-bl-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
+                                        <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-indigo-500 -mb-1 -mr-1 rounded-br-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
+                                        
+                                        {/* Scan Line Animation - High Tech look */}
+                                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent shadow-[0_0_20px_rgba(79,70,229,0.9)] animate-[scan_2.5s_ease-in-out_infinite]"></div>
+                                        <div className="absolute left-1/2 top-full mt-5 -translate-x-1/2 bg-black/70 backdrop-blur-md px-5 py-2.5 rounded-full text-white/90 text-sm font-bold border border-white/20 tracking-wide flex items-center gap-2 shadow-lg whitespace-nowrap">
+                                            <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
+                                            Focusing on QR Code...
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {!scanResult && !scanning && !loadingEvents && (
+                                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-6 text-center">
+                                    {!selectedEventId ? (
+                                        <>
+                                            <Calendar className="w-16 h-16 text-slate-500 mb-4" />
+                                            <h3 className="text-xl font-bold text-slate-300">No Event Selected</h3>
+                                            <p className="text-slate-500 mt-2">Please select an ongoing event to start scanning.</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
+                                            <p className="font-medium">Initializing Advanced Scanner...</p>
+                                        </>
+                                    )}
+                                 </div>
+                            )}
+                        </>
+                    )}
+                </div>
 
-            {/* Styles for scan animation */}
-            <style>{`
-                @keyframes scan {
-                    0% { transform: translateY(0); opacity: 0; }
-                    10% { opacity: 1; }
-                    90% { opacity: 1; }
-                    100% { transform: translateY(320px); opacity: 0; }
-                }
-            `}</style>
+                <style>{`
+                    @keyframes scan {
+                        0% { transform: translateY(0); opacity: 0; }
+                        10% { opacity: 1; }
+                        90% { opacity: 1; }
+                        100% { transform: translateY(320px); opacity: 0; }
+                    }
+                `}</style>
 
             {/* RESULT OVERLAY */}
             {scanResult && (
