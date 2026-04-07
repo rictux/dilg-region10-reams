@@ -34,6 +34,7 @@ interface OfflineScanItem {
     event_id: number;
     participant_id: number;
     participant_code: string;
+    attendance_date: string;
     scan_time: string; // ISO string
     session: 'AM' | 'PM';
     scanner_device: string;
@@ -87,6 +88,7 @@ const Scanner: React.FC = () => {
 
   // Ref to hold device token
   const deviceTokenRef = useRef(generateDeviceToken());
+  const getDeviceDateString = useCallback((date: Date) => format(date, 'yyyy-MM-dd'), []);
 
   const getDefaultSessionForEvent = (event?: Event): 'AM' | 'PM' => {
     if (!event || event.session === 'All_Day') {
@@ -169,7 +171,13 @@ const Scanner: React.FC = () => {
     const storedQueue = localStorage.getItem('eventpulse_offline_queue');
     if (storedQueue) {
         try {
-            setOfflineQueue(JSON.parse(storedQueue));
+            const parsedQueue = JSON.parse(storedQueue) as Partial<OfflineScanItem>[];
+            setOfflineQueue(
+                parsedQueue.map((item) => ({
+                    ...item,
+                    attendance_date: item.attendance_date ?? getDeviceDateString(new Date(item.scan_time ?? Date.now()))
+                })) as OfflineScanItem[]
+            );
         } catch (e) {
             console.error("Error parsing offline queue", e);
         }
@@ -277,15 +285,15 @@ const Scanner: React.FC = () => {
       setIsSyncing(true);
       const newQueue = [...offlineQueue];
       const item = newQueue[0]; 
+      const attendanceDate = item.attendance_date ?? getDeviceDateString(new Date(item.scan_time));
 
       try {
-            const today = item.scan_time.split('T')[0];
             const { data: existingLog } = await supabase
                 .from('attendance_logs')
                 .select('attendance_id, scan_time')
                 .eq('event_id', item.event_id)
                 .eq('participant_id', item.participant_id)
-                .eq('attendance_date', today)
+                .eq('attendance_date', attendanceDate)
                 .eq('action_session', item.session)
                 .eq('scan_status', 'Valid')
                 .single();
@@ -309,7 +317,7 @@ const Scanner: React.FC = () => {
                     participant_id: item.participant_id,
                     user_id: user?.user_id,
                     scan_status: 'Valid',
-                    attendance_date: today,
+                    attendance_date: attendanceDate,
                     action_session: item.session,
                     scan_time: item.scan_time,
                     remarks: 'Synced from Offline',
@@ -433,7 +441,9 @@ const Scanner: React.FC = () => {
         return;
     }
 
-    const deviceScanTime = new Date().toISOString();
+    const scanMoment = new Date();
+    const deviceScanTime = scanMoment.toISOString();
+    const deviceAttendanceDate = getDeviceDateString(scanMoment);
     const currentSession = sessionRef.current;
 
     if (!isOnline) {
@@ -445,6 +455,7 @@ const Scanner: React.FC = () => {
                 event_id: eventId,
                 participant_id: cachedP.participant_id,
                 participant_code: qrToken,
+                attendance_date: deviceAttendanceDate,
                 scan_time: deviceScanTime,
                 session: currentSession,
                 scanner_device: deviceTokenRef.current + " (Offline)",
@@ -495,18 +506,17 @@ const Scanner: React.FC = () => {
             .single();
 
         if (!regData || regData.registration_status !== 'Registered') {
-            await logScan(eventId, partData.participant_id, 'Invalid', deviceScanTime, currentSession, 'Not Registered');
+            await logScan(eventId, partData.participant_id, 'Invalid', deviceScanTime, deviceAttendanceDate, currentSession, 'Not Registered');
             processScanResult('Invalid', 'Not registered for this event.', participant.name, participant.position);
             return;
         }
 
-        const today = deviceScanTime.split('T')[0];
         const { data: existingLog } = await supabase
             .from('attendance_logs')
             .select('attendance_id')
             .eq('event_id', eventId)
             .eq('participant_id', partData.participant_id)
-            .eq('attendance_date', today)
+            .eq('attendance_date', deviceAttendanceDate)
             .eq('action_session', currentSession)
             .eq('scan_status', 'Valid')
             .single();
@@ -531,7 +541,7 @@ const Scanner: React.FC = () => {
             }
         }
 
-        await logScan(eventId, partData.participant_id, 'Valid', deviceScanTime, currentSession, 'Success');
+        await logScan(eventId, partData.participant_id, 'Valid', deviceScanTime, deviceAttendanceDate, currentSession, 'Success');
         processScanResult('Valid', 'Attendance Recorded', participant.name, participant.position);
 
     } catch (err: any) {
@@ -539,9 +549,8 @@ const Scanner: React.FC = () => {
     }
   };
 
-  const logScan = async (eventId: number, participantId: number, status: 'Valid' | 'Invalid' | 'Duplicate', scanTimeStr: string, scanSession: 'AM' | 'PM', notes?: string) => {
+  const logScan = async (eventId: number, participantId: number, status: 'Valid' | 'Invalid' | 'Duplicate', scanTimeStr: string, attendanceDate: string, scanSession: 'AM' | 'PM', notes?: string) => {
       if (!user) return;
-      const today = scanTimeStr.split('T')[0];
       const dbEventId = eventId === 0 ? null : eventId;
       const dbParticipantId = participantId === 0 ? null : participantId;
 
@@ -550,7 +559,7 @@ const Scanner: React.FC = () => {
           participant_id: dbParticipantId,
           user_id: user.user_id,
           scan_status: status,
-          attendance_date: today,
+          attendance_date: attendanceDate,
           action_session: scanSession,
           remarks: notes,
           scan_time: scanTimeStr,
