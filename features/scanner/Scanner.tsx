@@ -654,7 +654,7 @@ const Scanner: React.FC = () => {
                 </div>
             </div>
 
-                <div className="relative flex min-h-[78vh] flex-1 items-center justify-center overflow-hidden bg-black sm:min-h-[600px] lg:min-h-0">
+                <div className="relative flex min-h-[80svh] flex-1 items-center justify-center overflow-hidden bg-black sm:min-h-[600px] lg:min-h-0">
                     {cameraError ? (
                         <div className="text-white text-center p-8 max-w-sm">
                             <div className="bg-red-500/20 p-6 rounded-full inline-block mb-6">
@@ -671,13 +671,16 @@ const Scanner: React.FC = () => {
                         </div>
                     ) : (
                         <>
-                            <div id={readerId} className="w-full h-full object-cover"></div>
+                            <div
+                                id={readerId}
+                                className="w-full h-full [&>div]:h-full [&>div]:w-full [&_video]:h-full [&_video]:w-full [&_video]:max-w-none [&_video]:object-cover"
+                            ></div>
                             
                             {/* Static Overlay Guide */}
                             {!scanResult && scanning && (
                                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                                    <div className="relative w-[78vw] h-[78vw] max-w-[360px] max-h-[360px] sm:w-80 sm:h-80 lg:w-80 lg:h-80 border-2 border-white/40 rounded-[2rem] overflow-hidden backdrop-brightness-150">
-                                        <div className="absolute inset-0 border-[60px] border-black/40"></div>
+                                    <div className="relative w-[84vw] h-[84vw] max-w-[390px] max-h-[390px] sm:w-[22rem] sm:h-[22rem] lg:w-80 lg:h-80 rounded-[2rem] overflow-hidden backdrop-brightness-150">
+                                        <div className="absolute inset-0 border-[52px] border-black/40"></div>
                                         <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-indigo-500 -mt-1 -ml-1 rounded-tl-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
                                         <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-indigo-500 -mt-1 -mr-1 rounded-tr-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
                                         <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-indigo-500 -mb-1 -ml-1 rounded-bl-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
@@ -685,7 +688,7 @@ const Scanner: React.FC = () => {
                                         
                                         {/* Scan Line Animation - High Tech look */}
                                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent shadow-[0_0_20px_rgba(79,70,229,0.9)] animate-[scan_2.5s_ease-in-out_infinite]"></div>
-                                        <div className="absolute left-1/2 top-full mt-5 -translate-x-1/2 bg-black/70 backdrop-blur-md px-5 py-2.5 rounded-full text-white/90 text-sm font-bold border border-white/20 tracking-wide flex items-center gap-2 shadow-lg whitespace-nowrap">
+                                        <div className="absolute left-1/2 top-full mt-5 -translate-x-1/2 bg-black/75 backdrop-blur-md px-6 py-3 rounded-full text-white text-base sm:text-sm font-bold border border-white/20 tracking-wide flex items-center justify-center gap-2 shadow-lg whitespace-nowrap min-w-[250px] sm:min-w-0">
                                             <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
                                             Focusing on QR Code...
                                         </div>
