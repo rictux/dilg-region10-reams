@@ -69,8 +69,10 @@ const Scanner: React.FC = () => {
 
   // Recent History State
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
+  const [focusBoxSize, setFocusBoxSize] = useState(280);
   
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const cameraViewportRef = useRef<HTMLDivElement | null>(null);
   const readerId = "qr-reader-viewport";
   
   // Ref to hold selectedEventId to avoid restarting scanner on change
@@ -94,6 +96,11 @@ const Scanner: React.FC = () => {
     return event.session;
   };
 
+  const getQrboxSize = useCallback((viewfinderWidth: number, viewfinderHeight: number) => {
+    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+    return Math.floor(minEdge * 0.65);
+  }, []);
+
   const selectedEvent = events.find((event) => event.event_id.toString() === selectedEventId);
   const isSessionEnabled = (sessionOption: 'AM' | 'PM') => {
     if (!selectedEvent) return false;
@@ -107,6 +114,35 @@ const Scanner: React.FC = () => {
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  useEffect(() => {
+    const updateFocusBoxSize = () => {
+      const viewport = cameraViewportRef.current;
+      if (!viewport) return;
+
+      const { clientWidth, clientHeight } = viewport;
+      if (!clientWidth || !clientHeight) return;
+
+      setFocusBoxSize(getQrboxSize(clientWidth, clientHeight));
+    };
+
+    updateFocusBoxSize();
+
+    const viewport = cameraViewportRef.current;
+    if (!viewport || typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateFocusBoxSize);
+      return () => window.removeEventListener('resize', updateFocusBoxSize);
+    }
+
+    const observer = new ResizeObserver(updateFocusBoxSize);
+    observer.observe(viewport);
+    window.addEventListener('resize', updateFocusBoxSize);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateFocusBoxSize);
+    };
+  }, [getQrboxSize]);
 
   useEffect(() => {
     if (!selectedEvent) return;
@@ -348,8 +384,7 @@ const Scanner: React.FC = () => {
             {
                 fps: 20, // Increased FPS for smoother scanning and faster focus reaction
                 qrbox: (viewfinderWidth, viewfinderHeight) => {
-                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                    const qrboxSize = Math.floor(minEdge * 0.65);
+                    const qrboxSize = getQrboxSize(viewfinderWidth, viewfinderHeight);
                     return {
                         width: qrboxSize,
                         height: qrboxSize
@@ -654,7 +689,7 @@ const Scanner: React.FC = () => {
                 </div>
             </div>
 
-                <div className="relative flex min-h-[80svh] flex-1 items-center justify-center overflow-hidden bg-black sm:min-h-[600px] lg:min-h-0">
+                <div ref={cameraViewportRef} className="relative flex min-h-[80svh] flex-1 items-center justify-center overflow-hidden bg-black sm:min-h-[600px] lg:min-h-0">
                     {cameraError ? (
                         <div className="text-white text-center p-8 max-w-sm">
                             <div className="bg-red-500/20 p-6 rounded-full inline-block mb-6">
@@ -678,16 +713,15 @@ const Scanner: React.FC = () => {
                             
                             {/* Static Overlay Guide */}
                             {!scanResult && scanning && (
-                                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                                    <div className="relative w-[84vw] h-[84vw] max-w-[390px] max-h-[390px] sm:w-[22rem] sm:h-[22rem] lg:w-80 lg:h-80 rounded-[2rem] overflow-hidden backdrop-brightness-150">
-                                        <div className="absolute inset-0 border-[52px] border-black/40"></div>
-                                        <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-indigo-500 -mt-1 -ml-1 rounded-tl-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
-                                        <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-indigo-500 -mt-1 -mr-1 rounded-tr-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
-                                        <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-indigo-500 -mb-1 -ml-1 rounded-bl-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
-                                        <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-indigo-500 -mb-1 -mr-1 rounded-br-xl shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
-                                        
-                                        {/* Scan Line Animation - High Tech look */}
-                                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent shadow-[0_0_20px_rgba(79,70,229,0.9)] animate-[scan_2.5s_ease-in-out_infinite]"></div>
+                                <div className="absolute inset-0 pointer-events-none flex items-center justify-center -translate-y-8 sm:-translate-y-6">
+                                    <div
+                                        className="relative"
+                                        style={{ width: `${focusBoxSize}px`, height: `${focusBoxSize}px` }}
+                                    >
+                                        <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-white -mt-1 -ml-1 rounded-tl-xl"></div>
+                                        <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-white -mt-1 -mr-1 rounded-tr-xl"></div>
+                                        <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-white -mb-1 -ml-1 rounded-bl-xl"></div>
+                                        <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-white -mb-1 -mr-1 rounded-br-xl"></div>
                                         <div className="absolute left-1/2 top-full mt-5 -translate-x-1/2 bg-black/75 backdrop-blur-md px-6 py-3 rounded-full text-white text-base sm:text-sm font-bold border border-white/20 tracking-wide flex items-center justify-center gap-2 shadow-lg whitespace-nowrap min-w-[250px] sm:min-w-0">
                                             <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
                                             Focusing on QR Code...
@@ -717,6 +751,10 @@ const Scanner: React.FC = () => {
                 </div>
 
                 <style>{`
+                    #qr-shaded-region {
+                        display: none !important;
+                    }
+
                     @keyframes scan {
                         0% { transform: translateY(0); opacity: 0; }
                         10% { opacity: 1; }
