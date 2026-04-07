@@ -148,8 +148,7 @@ const Dashboard: React.FC = () => {
             .from('events')
             .select('*')
             .gt('start_date', today)
-            .order('start_date', { ascending: true })
-            .limit(5);
+            .order('start_date', { ascending: true });
         
         if (user?.role !== 'Admin' && user?.office_id) upcomingQuery = upcomingQuery.eq('organize_by', user.office_id);
         const { data: upcomingData } = await upcomingQuery;
@@ -194,8 +193,8 @@ const Dashboard: React.FC = () => {
 
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
   const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
-  const displayedOngoingEvents = ongoingEvents.slice(0, 3);
-  const displayedUpcomingEvents = upcomingEvents.slice(0, 3);
+  const mobileDisplayedOngoingEvents = ongoingEvents.slice(0, 3);
+  const mobileDisplayedUpcomingEvents = upcomingEvents.slice(0, 3);
 
   // Calendar Generation Logic
   const monthStart = startOfMonth(currentDate);
@@ -299,32 +298,117 @@ const Dashboard: React.FC = () => {
   };
 
   const StatCard = ({ icon: Icon, label, value, color }: any) => (
-    <div className={`${color} p-5 rounded-2xl shadow-sm flex items-center justify-between text-white`}>
-      <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-        <Icon size={24} className="text-white" />
+    <div className={`${color} p-3 sm:p-5 rounded-2xl shadow-sm flex items-center justify-between text-white min-w-0`}>
+      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+        <Icon size={20} className="text-white sm:w-6 sm:h-6" />
       </div>
-      <div className="text-right">
-        <p className="text-white/80 text-xs font-medium mb-1 uppercase tracking-[0.14em]">{label}</p>
-        <p className="text-3xl font-bold leading-none">{loading ? '...' : value}</p>
+      <div className="text-right min-w-0">
+        <p className="text-white/80 text-[10px] sm:text-xs font-medium mb-1 uppercase tracking-[0.12em] sm:tracking-[0.14em] leading-tight">{label}</p>
+        <p className="text-2xl sm:text-3xl font-bold leading-none">{loading ? '...' : value}</p>
       </div>
     </div>
   );
 
+  const EventSection = ({
+    title,
+    icon: Icon,
+    iconColor,
+    events,
+    displayedEvents,
+    emptyText,
+    accentColor,
+    showPresentCount,
+    scrollable = false,
+    className = ''
+  }: {
+    title: string;
+    icon: any;
+    iconColor: string;
+    events: DashboardEvent[];
+    displayedEvents: DashboardEvent[];
+    emptyText: string;
+    accentColor: string;
+    showPresentCount: boolean;
+    scrollable?: boolean;
+    className?: string;
+  }) => (
+    <div className={`${scrollable ? 'flex min-h-0 flex-1 flex-col' : ''} ${className}`.trim()}>
+      <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
+        <Icon className={iconColor} size={18} />
+        {title}
+      </h3>
+      {events.length > 0 ? (
+        <div className={scrollable ? 'min-h-0 flex-1 overflow-y-auto pr-1' : ''}>
+          <div className="space-y-3">
+            {displayedEvents.map((event) => (
+              <div key={event.event_id} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow">
+                <div className="mb-2">
+                  <h4 className="font-bold text-[13px] sm:text-sm text-slate-800 line-clamp-2 leading-tight mb-1.5">{event.event_name}</h4>
+                  <div className={`flex items-center gap-1.5 text-[11px] sm:text-xs font-medium ${accentColor} mb-1`}>
+                    <MapPin size={13} className="shrink-0 sm:w-3.5 sm:h-3.5" />
+                    <span className="truncate">{event.venue}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-500">
+                    <CalendarIcon size={13} className="shrink-0 sm:w-3.5 sm:h-3.5" />
+                    <span>{format(new Date(event.start_date), 'MMM d, yyyy')} - {format(new Date(event.end_date), 'MMM d, yyyy')}</span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center gap-2 bg-slate-50 px-2.5 py-2 rounded-lg border border-slate-100">
+                  <div className="flex items-center justify-center gap-1.5 flex-1 border-r border-slate-200 pr-2">
+                    <p className="text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-[0.08em] sm:tracking-[0.12em] font-bold">Registered</p>
+                    <p className="font-bold text-[13px] sm:text-sm text-slate-800 leading-none">{event.registered_count}</p>
+                  </div>
+                  <div className="flex items-center justify-center gap-1.5 flex-1 pl-2">
+                    <p className="text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-[0.08em] sm:tracking-[0.12em] font-bold">Present</p>
+                    <p className={`font-bold text-[13px] sm:text-sm leading-none ${accentColor}`}>{showPresentCount ? event.present_count : '-'}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {!scrollable && events.length > displayedEvents.length && (
+              <p className="text-xs text-slate-500 text-right">
+                +{events.length - displayedEvents.length} more {title.toLowerCase().replace(/\s+/g, ' ')}(s)
+              </p>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-5 text-slate-400 text-sm bg-slate-50 rounded-2xl border border-slate-100">
+          <Icon className="w-7 h-7 mb-2 mx-auto opacity-20" />
+          {emptyText}
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div className="h-full min-h-0 overflow-hidden pr-1 space-y-4">
+    <div className="h-full min-h-0 overflow-y-auto lg:overflow-hidden pr-1 space-y-4">
       {/* Top Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         <StatCard icon={CalendarIcon} label="Total Events" value={stats.totalEvents} color="bg-[#5C3CCE]" />
         <StatCard icon={Briefcase} label="On-Going Events" value={stats.activeEvents} color="bg-[#4099FF]" />
         <StatCard icon={Clock} label="Upcoming Events" value={stats.upcomingEvents} color="bg-[#F59E0B]" />
         <StatCard icon={Users} label="Completed Events" value={stats.completedEvents} color="bg-[#2ED47A]" />
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4 h-[calc(100%-112px)] min-h-0">
+      <div className="flex flex-col lg:flex-row gap-4 lg:h-[calc(100%-112px)] lg:min-h-0">
         {/* Main Column - Calendar */}
-        <div className="w-full lg:w-2/3 flex flex-col gap-4 min-h-0">
+        <div className="w-full lg:w-2/3 flex flex-col gap-4 lg:min-h-0">
+          <div className="lg:hidden bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60">
+            <EventSection
+              title="On-Going Events"
+              icon={Clock}
+              iconColor="text-[#4322A7]"
+              events={ongoingEvents}
+              displayedEvents={mobileDisplayedOngoingEvents}
+              emptyText="No on-going events."
+              accentColor="text-[#4322A7]"
+              showPresentCount={true}
+            />
+          </div>
+
           {/* Calendar */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col min-h-0 h-full">
+          <div className="hidden lg:flex bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex-col min-h-0 h-full">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-slate-800">Event Calendar</h3>
                 <div className="flex items-center gap-4">
@@ -449,100 +533,50 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Right Column - Event Lists */}
-        <div className="w-full lg:w-1/3 flex flex-col gap-4 min-h-0">
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col gap-5 min-h-0 h-full">
+        <div className="w-full lg:w-1/3 flex flex-col gap-4 lg:min-h-0">
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col gap-5 lg:grid lg:grid-rows-2 lg:gap-4 lg:min-h-0 lg:h-full lg:overflow-hidden">
             {/* Ongoing Events */}
-            <div>
-              <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-                <Clock className="text-[#4322A7]" size={20} />
-                On-going Events
-              </h3>
-              {ongoingEvents.length > 0 ? (
-                <div className="space-y-3">
-                  {displayedOngoingEvents.map((event) => (
-                    <div key={event.event_id} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="mb-2">
-                        <h4 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight mb-1.5">{event.event_name}</h4>
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-[#4322A7] mb-1">
-                          <MapPin size={14} className="shrink-0" />
-                          <span className="truncate">{event.venue}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                          <CalendarIcon size={14} className="shrink-0" />
-                          <span>{format(new Date(event.start_date), 'MMM d, yyyy')} - {format(new Date(event.end_date), 'MMM d, yyyy')}</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
-                        <div className="text-center flex-1 border-r border-slate-200">
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">Registered</p>
-                          <p className="font-bold text-sm text-slate-800">{event.registered_count}</p>
-                        </div>
-                        <div className="text-center flex-1">
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">Present</p>
-                          <p className="font-bold text-sm text-[#4322A7]">{event.present_count}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {ongoingEvents.length > displayedOngoingEvents.length && (
-                    <p className="text-xs text-slate-500 text-right">
-                      +{ongoingEvents.length - displayedOngoingEvents.length} more on-going event(s)
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-5 text-slate-400 text-sm bg-slate-50 rounded-2xl border border-slate-100">
-                  <Clock className="w-7 h-7 mb-2 mx-auto opacity-20" />
-                  No on-going events.
-                </div>
-              )}
+            <div className="hidden lg:flex lg:min-h-0">
+              <EventSection
+                title="On-Going Events"
+                icon={Clock}
+                iconColor="text-[#4322A7]"
+                events={ongoingEvents}
+                displayedEvents={ongoingEvents}
+                emptyText="No on-going events."
+                accentColor="text-[#4322A7]"
+                showPresentCount={true}
+                scrollable={true}
+                className="flex-1"
+              />
             </div>
 
             {/* Upcoming Events */}
-            <div>
-              <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-                <CalendarIcon className="text-[#4099FF]" size={20} />
-                Upcoming Events
-              </h3>
-              {upcomingEvents.length > 0 ? (
-                <div className="space-y-3">
-                  {displayedUpcomingEvents.map((event) => (
-                    <div key={event.event_id} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="mb-2">
-                        <h4 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight mb-1.5">{event.event_name}</h4>
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-[#4099FF] mb-1">
-                          <MapPin size={14} className="shrink-0" />
-                          <span className="truncate">{event.venue}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                          <CalendarIcon size={14} className="shrink-0" />
-                          <span>{format(new Date(event.start_date), 'MMM d, yyyy')} - {format(new Date(event.end_date), 'MMM d, yyyy')}</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
-                        <div className="text-center flex-1 border-r border-slate-200">
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">Registered</p>
-                          <p className="font-bold text-sm text-slate-800">{event.registered_count}</p>
-                        </div>
-                        <div className="text-center flex-1">
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">Present</p>
-                          <p className="font-bold text-sm text-[#4099FF]">-</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {upcomingEvents.length > displayedUpcomingEvents.length && (
-                    <p className="text-xs text-slate-500 text-right">
-                      +{upcomingEvents.length - displayedUpcomingEvents.length} more upcoming event(s)
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-5 text-slate-400 text-sm bg-slate-50 rounded-2xl border border-slate-100">
-                  <CalendarIcon className="w-7 h-7 mb-2 mx-auto opacity-20" />
-                  No upcoming events.
-                </div>
-              )}
+            <div className="lg:hidden">
+              <EventSection
+                title="Upcoming Events"
+                icon={CalendarIcon}
+                iconColor="text-[#4099FF]"
+                events={upcomingEvents}
+                displayedEvents={mobileDisplayedUpcomingEvents}
+                emptyText="No upcoming events."
+                accentColor="text-[#4099FF]"
+                showPresentCount={false}
+              />
+            </div>
+            <div className="hidden lg:flex lg:min-h-0">
+              <EventSection
+                title="Upcoming Events"
+                icon={CalendarIcon}
+                iconColor="text-[#4099FF]"
+                events={upcomingEvents}
+                displayedEvents={upcomingEvents}
+                emptyText="No upcoming events."
+                accentColor="text-[#4099FF]"
+                showPresentCount={false}
+                scrollable={true}
+                className="flex-1"
+              />
             </div>
           </div>
         </div>
