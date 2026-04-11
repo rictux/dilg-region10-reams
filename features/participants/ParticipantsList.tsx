@@ -947,7 +947,7 @@ const AttendanceList: React.FC = () => {
                         placeholder="Search participants..." 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-56 pl-10 pr-16 py-2.5 lg:py-3 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        className="w-64 pl-10 pr-16 py-2.5 lg:py-3 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                     />
                     {searchQuery && (
                         <button
