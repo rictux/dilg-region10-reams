@@ -1092,6 +1092,10 @@ const EventsList: React.FC = () => {
     completed: events.filter((event) => event.status === 'Completed').length,
     cancelled: events.filter((event) => event.status === 'Cancelled').length,
   }), [events]);
+  const eventPendingDelete = useMemo(
+    () => events.find((event) => event.event_id === eventToDelete) ?? null,
+    [events, eventToDelete]
+  );
   const isAdmin = user?.role === 'Admin';
   const showEventActionsMenu = isAdmin || canDeleteEvents;
 
@@ -2409,6 +2413,12 @@ const EventsList: React.FC = () => {
                     <p className="text-sm text-slate-500 mb-4">
                         Are you sure you want to delete this event? This action cannot be undone and will delete all attendance logs associated with this event.
                     </p>
+                    <div className="w-full mb-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-left">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-red-500 mb-1">Event to delete</p>
+                        <p className="text-sm font-semibold text-red-700 break-words">
+                            {eventPendingDelete?.event_name || 'Selected event'}
+                        </p>
+                    </div>
                     <div className="w-full mb-6 text-left">
                         <label htmlFor="event-delete-confirmation" className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
                             Type "delete" to confirm

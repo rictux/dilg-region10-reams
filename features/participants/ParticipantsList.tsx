@@ -844,8 +844,8 @@ const AttendanceList: React.FC = () => {
   return (
     <div className="attendance-page h-full min-h-0 flex flex-col gap-6">
       <div className="attendance-toolbar bg-slate-50 p-4 lg:p-5 rounded-xl border border-slate-100">
-        <div className="flex flex-col gap-3 w-full lg:flex-row lg:items-center lg:gap-4">
-            <div className="w-full relative lg:w-[38%] lg:min-w-[340px] lg:max-w-[640px]" ref={dropdownRef}>
+        <div className="flex flex-col gap-3 w-full lg:flex-row lg:flex-wrap lg:items-start lg:gap-4 xl:flex-nowrap xl:items-center">
+            <div className="w-full relative lg:flex-1 lg:min-w-[420px] lg:max-w-[760px]" ref={dropdownRef}>
                 <div 
                     className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 lg:py-3 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors shadow-sm"
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -911,8 +911,8 @@ const AttendanceList: React.FC = () => {
             </div>
 
             {eventDays.length > 1 && (
-                <div className="w-full flex bg-white rounded-lg border border-slate-200 p-1 overflow-x-auto no-scrollbar lg:w-auto lg:min-w-[220px] lg:max-w-[260px] lg:flex-none">
-                    <div className="flex w-full min-w-max sm:min-w-0">
+                <div className="w-full bg-white rounded-lg border border-slate-200 p-1 lg:flex-1 lg:min-w-[280px] xl:max-w-[420px]">
+                    <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
                         {eventDays.map((day, idx) => {
                             const dStr = format(day, 'yyyy-MM-dd');
                             const isSelected = selectedDate === dStr;
@@ -920,7 +920,7 @@ const AttendanceList: React.FC = () => {
                                 <button
                                     key={dStr}
                                     onClick={() => setSelectedDate(dStr)}
-                                    className={`flex-1 px-3 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all flex flex-col items-center min-w-[60px] lg:min-w-[72px]
+                                    className={`w-full px-3 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all flex flex-col items-center justify-center
                                         ${isSelected 
                                             ? 'bg-indigo-600 text-white shadow-sm' 
                                             : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
@@ -937,8 +937,8 @@ const AttendanceList: React.FC = () => {
                 </div>
             )}
 
-            <div className="w-full flex items-center gap-3 lg:flex-1 lg:min-w-0 lg:justify-end">
-                <div className="relative flex-1 min-w-0 lg:max-w-[560px]">
+            <div className="w-full flex flex-col gap-3 sm:flex-row sm:items-center lg:ml-auto lg:w-auto">
+                <div className="relative w-full sm:w-60">
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                         <Search size={18} />
                     </div>
@@ -947,7 +947,7 @@ const AttendanceList: React.FC = () => {
                         placeholder="Search participants..." 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-64 pl-10 pr-16 py-2.5 lg:py-3 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        className="w-full pl-10 pr-12 py-2.5 lg:py-3 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                     />
                     {searchQuery && (
                         <button
@@ -960,7 +960,7 @@ const AttendanceList: React.FC = () => {
                     )}
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0 lg:ml-auto">
+                <div className="flex items-center justify-end gap-3 shrink-0">
                     <button 
                         onClick={generateReport}
                         disabled={!selectedEvent || !selectedDate || data.length === 0}
