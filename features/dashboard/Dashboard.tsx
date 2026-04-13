@@ -1,5 +1,6 @@
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
@@ -44,6 +45,12 @@ interface DashboardEvent {
   status?: string;
 }
 
+interface CalendarHoverCard {
+  event: DashboardEvent;
+  left: number;
+  top: number;
+}
+
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState({
@@ -56,7 +63,9 @@ const Dashboard: React.FC = () => {
   const [upcomingEvents, setUpcomingEvents] = useState<DashboardEvent[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<DashboardEvent[]>([]); // Events for the calendar
   const [currentDate, setCurrentDate] = useState(new Date()); // For Calendar Navigation
+  const [hoveredCalendarEvent, setHoveredCalendarEvent] = useState<CalendarHoverCard | null>(null);
   const [loading, setLoading] = useState(true);
+  const hideHoverCardTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -81,6 +90,18 @@ const Dashboard: React.FC = () => {
       supabase.removeChannel(channel);
     };
   }, [user]);
+
+  useEffect(() => {
+    setHoveredCalendarEvent(null);
+  }, [currentDate]);
+
+  useEffect(() => {
+    return () => {
+      if (hideHoverCardTimerRef.current) {
+        window.clearTimeout(hideHoverCardTimerRef.current);
+      }
+    };
+  }, []);
 
   const fetchDashboardData = async () => {
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -167,7 +188,7 @@ const Dashboard: React.FC = () => {
         }));
         setUpcomingEvents(upcomingEventsWithCounts);
 
-        // 4. All Events (For Calendar) - Fetch basic info
+        // 4. All Events (For Calendar)
         let calendarQuery = supabase
             .from('events')
             .select('*')
@@ -176,10 +197,17 @@ const Dashboard: React.FC = () => {
         if (user?.role !== 'Admin' && user?.office_id) calendarQuery = calendarQuery.eq('organize_by', user.office_id);
         const { data: allEventsData } = await calendarQuery;
             
-        // Map to match interface (counts aren't strictly needed for calendar dots but useful if we want to show them)
-        const mappedCalendarEvents = (allEventsData || []).map(e => ({
-            ...e,
-            registered_count: 0 // Placeholder
+        const mappedCalendarEvents = await Promise.all((allEventsData || []).map(async (e) => {
+            const { count: regCount } = await supabase
+                .from('event_participants')
+                .select('*', { count: 'exact', head: true })
+                .eq('event_id', e.event_id)
+                .eq('registration_status', 'Registered');
+
+            return {
+                ...e,
+                registered_count: regCount || 0
+            };
         }));
         setCalendarEvents(mappedCalendarEvents);
 
@@ -295,6 +323,72 @@ const Dashboard: React.FC = () => {
           isStart,
           isEnd
       };
+  };
+
+  const getStatusBadgeClasses = (status?: string) => {
+    if (status === 'Ongoing') return 'bg-green-100 text-green-700 border-green-200';
+    if (status === 'Completed') return 'bg-slate-100 text-slate-600 border-slate-200';
+    if (status === 'Cancelled') return 'bg-red-50 text-red-600 border-red-100';
+    return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+  };
+
+  const formatCalendarEventDateRange = (event: DashboardEvent) => {
+    const start = parseISO(event.start_date);
+    const end = parseISO(event.end_date);
+
+    if (isSameDay(start, end)) {
+      return format(start, 'MMM d, yyyy');
+    }
+
+    return `${format(start, 'MMM d, yyyy')} - ${format(end, 'MMM d, yyyy')}`;
+  };
+
+  const showCalendarEventDetails = (event: DashboardEvent, target: HTMLDivElement) => {
+    const targetRect = target.getBoundingClientRect();
+    const tooltipWidth = 400;
+    const tooltipHeight = 212;
+    const viewportPadding = 16;
+    const gap = 12;
+    const centeredLeft = targetRect.left + (targetRect.width / 2) - (tooltipWidth / 2);
+    const left = Math.min(
+      Math.max(centeredLeft, viewportPadding),
+      Math.max(window.innerWidth - tooltipWidth - viewportPadding, viewportPadding)
+    );
+    const spaceBelow = window.innerHeight - targetRect.bottom;
+    const spaceAbove = targetRect.top;
+    const showAbove = spaceBelow < tooltipHeight + gap && spaceAbove > tooltipHeight + gap;
+    const top = showAbove
+      ? Math.max(targetRect.top - tooltipHeight - gap, viewportPadding)
+      : Math.min(targetRect.bottom + gap, Math.max(window.innerHeight - tooltipHeight - viewportPadding, viewportPadding));
+
+    setHoveredCalendarEvent({
+      event,
+      left,
+      top
+    });
+  };
+
+  const scheduleHideCalendarEventDetails = () => {
+    if (hideHoverCardTimerRef.current) {
+      window.clearTimeout(hideHoverCardTimerRef.current);
+    }
+
+    hideHoverCardTimerRef.current = window.setTimeout(() => {
+      setHoveredCalendarEvent(null);
+      hideHoverCardTimerRef.current = null;
+    }, 100);
+  };
+
+  const cancelHideCalendarEventDetails = () => {
+    if (hideHoverCardTimerRef.current) {
+      window.clearTimeout(hideHoverCardTimerRef.current);
+      hideHoverCardTimerRef.current = null;
+    }
+  };
+
+  const hideCalendarEventDetails = () => {
+    cancelHideCalendarEventDetails();
+    setHoveredCalendarEvent(null);
   };
 
   const StatCard = ({ icon: Icon, label, value, color }: any) => (
@@ -435,7 +529,7 @@ const Dashboard: React.FC = () => {
                     ))}
                 </div>
                 
-                <div className="grid grid-cols-7 auto-rows-fr gap-px bg-slate-100 border border-slate-100 rounded-2xl overflow-hidden flex-1">
+                <div className="relative grid grid-cols-7 auto-rows-fr gap-px bg-slate-100 border border-slate-100 rounded-2xl overflow-hidden flex-1">
                     {calendarDays.map((day, idx) => {
                         const isCurrentMonth = isSameMonth(day, monthStart);
                         const isTodayDate = isToday(day);
@@ -477,8 +571,19 @@ const Dashboard: React.FC = () => {
                                 renderSlots.push(
                                     <div 
                                         key={`${event.event_id}-${day.toISOString()}`} 
-                                        className={`${className} relative`}
+                                        className={`${className} relative focus:outline-none focus:ring-2 focus:ring-indigo-300`}
                                         title={`${event.event_name} (${event.status})`}
+                                        onMouseEnter={(e) => {
+                                          cancelHideCalendarEventDetails();
+                                          showCalendarEventDetails(event, e.currentTarget);
+                                        }}
+                                        onMouseLeave={scheduleHideCalendarEventDetails}
+                                        onFocus={(e) => {
+                                          cancelHideCalendarEventDetails();
+                                          showCalendarEventDetails(event, e.currentTarget);
+                                        }}
+                                        onBlur={hideCalendarEventDetails}
+                                        tabIndex={0}
                                     >
                                         {isDisplayStart && (
                                             <span 
@@ -527,6 +632,7 @@ const Dashboard: React.FC = () => {
                             </div>
                         );
                     })}
+
                 </div>
             </div>
           </div>
@@ -581,6 +687,33 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+      {hoveredCalendarEvent && createPortal(
+        <div
+          className="fixed z-[200] w-[400px] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl"
+          style={{
+            left: hoveredCalendarEvent.left,
+            top: hoveredCalendarEvent.top
+          }}
+          onMouseEnter={cancelHideCalendarEventDetails}
+          onMouseLeave={hideCalendarEventDetails}
+        >
+          <div className="space-y-1.5">
+            <p className="text-[13px] font-semibold leading-5 text-slate-800">
+              {hoveredCalendarEvent.event.event_name}
+            </p>
+            <p className="text-[12px] leading-5 text-slate-600">
+              {hoveredCalendarEvent.event.venue || 'Venue not set'}
+            </p>
+            <p className="text-[12px] leading-5 text-slate-600">
+              {formatCalendarEventDateRange(hoveredCalendarEvent.event)}
+            </p>
+            <p className="text-[12px] font-medium leading-5 text-slate-700">
+              Registered: <span className="font-semibold text-slate-800">{hoveredCalendarEvent.event.registered_count}</span>
+            </p>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
