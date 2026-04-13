@@ -842,8 +842,8 @@ const AttendanceList: React.FC = () => {
   const completeLogsCount = hasMultipleSessions ? data.filter(r => r.amLog && r.pmLog).length : 0;
 
   return (
-    <div className="attendance-page h-full min-h-0 flex flex-col gap-6">
-      <div className="attendance-toolbar bg-slate-50 p-4 lg:p-5 rounded-xl border border-slate-100">
+    <div className="attendance-page h-full min-h-0 flex flex-col gap-2">
+      <div className="attendance-toolbar rounded-xl border border-slate-100 bg-slate-50 px-4 pb-1 pt-0 lg:px-5 lg:pb-2 lg:pt-0">
         <div className="flex flex-col gap-3 w-full lg:flex-row lg:flex-wrap lg:items-start lg:gap-4 xl:flex-nowrap xl:items-center">
             <div className="w-full relative lg:flex-1 lg:min-w-[420px] lg:max-w-[760px]" ref={dropdownRef}>
                 <div 
@@ -937,8 +937,8 @@ const AttendanceList: React.FC = () => {
                 </div>
             )}
 
-            <div className="w-full flex flex-col gap-3 sm:flex-row sm:items-center lg:ml-auto lg:w-auto">
-                <div className="relative w-full sm:w-60">
+            <div className="w-full grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 sm:flex sm:w-auto sm:items-center sm:gap-3 lg:ml-auto">
+                <div className="relative min-w-0 w-full sm:w-60 lg:w-72">
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                         <Search size={18} />
                     </div>
@@ -947,7 +947,7 @@ const AttendanceList: React.FC = () => {
                         placeholder="Search participants..." 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-12 py-2.5 lg:py-3 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        className="w-full min-w-0 pl-10 pr-12 py-2.5 text-sm lg:py-3 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                     />
                     {searchQuery && (
                         <button
@@ -960,17 +960,17 @@ const AttendanceList: React.FC = () => {
                     )}
                 </div>
 
-                <div className="flex items-center justify-end gap-3 shrink-0">
+                <div className="contents sm:flex sm:w-auto sm:items-center sm:justify-end sm:gap-3 shrink-0">
                     <button 
                         onClick={generateReport}
                         disabled={!selectedEvent || !selectedDate || data.length === 0}
                         type="button"
                         aria-label="Export attendance"
                         title="Export attendance"
-                        className="h-11 w-11 sm:h-auto sm:w-auto shrink-0 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium px-0 sm:px-4 lg:px-5 py-2.5 lg:py-3"
+                        className="h-11 shrink-0 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium px-3 sm:px-4 lg:px-5 py-2.5 lg:py-3"
                     >
-                        <Download size={20} />
-                        <span className="hidden sm:inline">Export</span>
+                        <Download size={18} />
+                        <span className="text-sm">Export</span>
                     </button>
                     <button 
                         onClick={() => setShowAddParticipantModal(true)}
@@ -978,10 +978,10 @@ const AttendanceList: React.FC = () => {
                         type="button"
                         aria-label="Add participant"
                         title="Add participant"
-                        className="h-11 w-11 sm:h-auto sm:w-auto shrink-0 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium px-0 sm:px-4 lg:px-5 py-2.5 lg:py-3"
+                        className="h-11 shrink-0 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium px-3 sm:px-4 lg:px-5 py-2.5 lg:py-3"
                     >
-                        <UserPlus size={20} />
-                        <span className="hidden sm:inline">Add</span>
+                        <UserPlus size={18} />
+                        <span className="text-sm">Add</span>
                     </button>
                 </div>
             </div>
@@ -1199,18 +1199,15 @@ const AttendanceList: React.FC = () => {
                         )}
                     </div>
                 ) : (
-                    filteredData.map((row, index) => (
+                    filteredData.map((row) => (
                         <div
                             key={row.participant.participant_id}
                             onClick={() => handleRowClick(row.participant)}
                             className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:scale-[0.99] transition-transform"
                         >
                             <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                    <p className="text-xs text-slate-400 font-mono mb-1">#{index + 1}</p>
+                                <div className="min-w-0 flex-1">
                                     <h3 className="font-semibold text-slate-800 leading-tight">{row.participant.full_name}</h3>
-                                    <p className="text-sm text-slate-600 mt-1">{row.participant.position || 'No position'}</p>
-                                    <p className="text-sm text-slate-500 mt-1">{row.participant.office || 'No office'}</p>
                                 </div>
                                 <button
                                     onClick={(e) => openManualModal(e, row.participant)}
@@ -1221,23 +1218,23 @@ const AttendanceList: React.FC = () => {
                                 </button>
                             </div>
 
-                            <div className={`mt-4 grid gap-3 ${hasMultipleSessions ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                            <div className={`mt-3 grid gap-2 ${hasMultipleSessions ? 'grid-cols-2' : 'grid-cols-1'}`}>
                                 {visibleSessions.map((session) => {
                                     const sessionLog = session === 'AM' ? row.amLog : row.pmLog;
-                                    const badgeClassName = session === 'AM'
-                                        ? 'inline-flex bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold'
-                                        : 'inline-flex bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold';
+                                    const valueClassName = session === 'AM'
+                                        ? 'text-green-700'
+                                        : 'text-indigo-700';
 
                                     return (
-                                        <div key={session} className="rounded-lg bg-slate-50 border border-slate-200 p-3">
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">{session} Time</p>
-                                            {sessionLog ? (
-                                                <span className={badgeClassName}>
-                                                    {formatLogTime(sessionLog.time)}
+                                        <div key={session} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    {session} Time
                                                 </span>
-                                            ) : (
-                                                <span className="text-slate-300 text-sm">-</span>
-                                            )}
+                                                <span className={`text-sm font-semibold ${sessionLog ? valueClassName : 'text-slate-300'}`}>
+                                                    {sessionLog ? formatLogTime(sessionLog.time) : '-'}
+                                                </span>
+                                            </div>
                                         </div>
                                     );
                                 })}

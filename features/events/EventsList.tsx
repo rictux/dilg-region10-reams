@@ -153,6 +153,7 @@ const EventsList: React.FC = () => {
   const [eventDeleteConfirmation, setEventDeleteConfirmation] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null);
+  const [actionMenuDirection, setActionMenuDirection] = useState<'up' | 'down'>('down');
   
   // Form State
   const initialFormState = {
@@ -1098,6 +1099,40 @@ const EventsList: React.FC = () => {
   );
   const isAdmin = user?.role === 'Admin';
   const showEventActionsMenu = isAdmin || canDeleteEvents;
+  const actionMenuPlacementClass = actionMenuDirection === 'up'
+    ? 'bottom-full mb-2 origin-bottom-right'
+    : 'top-full mt-2 origin-top-right';
+
+  const toggleActionMenu = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    eventId: number,
+    preferredDirection?: 'up' | 'down'
+  ) => {
+    e.stopPropagation();
+
+    if (openActionMenuId === eventId) {
+      setOpenActionMenuId(null);
+      return;
+    }
+
+    if (preferredDirection) {
+      setActionMenuDirection(preferredDirection);
+      setOpenActionMenuId(eventId);
+      return;
+    }
+
+    const viewportPadding = 16;
+    const menuItemCount = canDeleteEvents ? 2 : 1;
+    const estimatedMenuHeight = (menuItemCount * 44) + 16;
+    const triggerRect = e.currentTarget.getBoundingClientRect();
+    const spaceAbove = triggerRect.top - viewportPadding;
+    const spaceBelow = window.innerHeight - triggerRect.bottom - viewportPadding;
+
+    setActionMenuDirection(
+      spaceBelow >= estimatedMenuHeight || spaceBelow >= spaceAbove ? 'down' : 'up'
+    );
+    setOpenActionMenuId(eventId);
+  };
 
   const totalPages = Math.ceil(filteredEvents.length / itemsPerPage);
   const paginatedEvents = useMemo(() => {
@@ -1304,7 +1339,10 @@ const EventsList: React.FC = () => {
                           ))
                       ) : (
                           <>
-                              {paginatedEvents.map((event) => (
+                              {paginatedEvents.map((event, index) => {
+                                  const forceMenuUp = index >= Math.max(paginatedEvents.length - 2, 0);
+
+                                  return (
                                   <tr 
                                       key={event.event_id} 
                                       onClick={() => handleRowClick(event)}
@@ -1357,10 +1395,7 @@ const EventsList: React.FC = () => {
                                             {showEventActionsMenu ? (
                                                 <>
                                                     <button 
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setOpenActionMenuId(openActionMenuId === event.event_id ? null : event.event_id);
-                                                        }}
+                                                        onClick={(e) => toggleActionMenu(e, event.event_id, forceMenuUp ? 'up' : undefined)}
                                                         className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                                                         title="Actions"
                                                     >
@@ -1376,7 +1411,7 @@ const EventsList: React.FC = () => {
                                                                     setOpenActionMenuId(null);
                                                                 }}
                                                             />
-                                                            <div className="absolute right-0 top-full mt-2 w-36 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                                                            <div className={`absolute right-0 w-36 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100 ${actionMenuPlacementClass}`}>
                                                                 <button 
                                                                     onClick={(e) => {
                                                                         setOpenActionMenuId(null);
@@ -1414,7 +1449,8 @@ const EventsList: React.FC = () => {
                                           </div>
                                       </td>
                                   </tr>
-                              ))}
+                                  );
+                              })}
                               {filteredEvents.length === 0 && (
                                   <tr>
                                       <td colSpan={5} className="text-center py-12 text-slate-400 bg-slate-50/50">
@@ -1454,7 +1490,8 @@ const EventsList: React.FC = () => {
                       </div>
                   </div>
               ) : (
-                  paginatedEvents.map((event) => (
+                  paginatedEvents.map((event) => {
+                      return (
                       <div
                           key={event.event_id}
                           onClick={() => handleRowClick(event)}
@@ -1492,81 +1529,49 @@ const EventsList: React.FC = () => {
                               </div>
                           </div>
 
-                          <div className="mt-4 flex items-center gap-2">
+                          <div className="mt-4 flex flex-wrap items-center gap-2">
                               <button
                                   onClick={(e) => {
                                       e.stopPropagation();
                                       openShareModal(e, event);
                                   }}
-                                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors"
+                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
                                   title="Share"
                                   aria-label="Share"
                               >
                                   <Share2 size={14} />
+                                  <span>Share</span>
                               </button>
-                              {showEventActionsMenu ? (
-                                  <div className="relative">
-                                      <button
-                                          onClick={(e) => {
-                                              e.stopPropagation();
-                                              setOpenActionMenuId(openActionMenuId === event.event_id ? null : event.event_id);
-                                          }}
-                                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-colors"
-                                          title="Actions"
-                                          aria-label="Actions"
-                                      >
-                                          <MoreVertical size={14} />
-                                      </button>
-                                      {openActionMenuId === event.event_id && (
-                                          <>
-                                              <div
-                                                  className="fixed inset-0 z-10"
-                                                  onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      setOpenActionMenuId(null);
-                                                  }}
-                                              />
-                                              <div className="absolute right-0 top-full mt-2 w-full min-w-[140px] bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
-                                                  <button
-                                                      onClick={(e) => {
-                                                          setOpenActionMenuId(null);
-                                                          openEditModal(e, event);
-                                                      }}
-                                                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors text-left"
-                                                  >
-                                                      <Edit size={16} /> Edit
-                                                  </button>
-                                                  {canDeleteEvents && (
-                                                      <button
-                                                          onClick={(e) => {
-                                                              setOpenActionMenuId(null);
-                                                              handleDelete(e, event.event_id);
-                                                          }}
-                                                          className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                                                      >
-                                                          <Trash2 size={16} /> Delete
-                                                      </button>
-                                                  )}
-                                              </div>
-                                          </>
-                                      )}
-                                  </div>
-                              ) : (
+                              <button
+                                  onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditModal(e, event);
+                                  }}
+                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
+                                  title="Edit"
+                                  aria-label="Edit"
+                              >
+                                  <Edit size={14} />
+                                  <span>Edit</span>
+                              </button>
+                              {canDeleteEvents && (
                                   <button
                                       onClick={(e) => {
                                           e.stopPropagation();
-                                          openEditModal(e, event);
+                                          handleDelete(e, event.event_id);
                                       }}
-                                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
-                                      title="Edit"
-                                      aria-label="Edit"
+                                      className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
+                                      title="Delete"
+                                      aria-label="Delete"
                                   >
-                                      <Edit size={14} />
+                                      <Trash2 size={14} />
+                                      <span>Delete</span>
                                   </button>
                               )}
                           </div>
                       </div>
-                  ))
+                      );
+                  })
               )}
           </div>
           
