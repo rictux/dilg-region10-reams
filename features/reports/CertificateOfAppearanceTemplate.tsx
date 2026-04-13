@@ -176,14 +176,21 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
       : isDenseLayout
         ? 'text-[11px] leading-snug mb-2 px-3'
         : 'text-[12px] leading-snug mb-3 px-4';
+  const supportingTextClass = isUltraCompactLayout
+    ? 'text-[10px] leading-tight mb-0.5 px-1'
+    : isCompactLayout
+      ? 'text-[10px] leading-tight mb-0.5 px-2'
+      : isDenseLayout
+        ? 'text-[11px] leading-snug mb-1 px-3'
+        : 'text-[12px] leading-snug mb-1.5 px-4';
   const tableAreaClass = 'flex min-h-0 flex-1 flex-col';
   const preTableSpacerClass = isUltraCompactLayout
-    ? 'min-h-[0.5mm] flex-[0.06]'
+    ? 'min-h-0'
     : isCompactLayout
-      ? 'min-h-[1mm] flex-[0.14]'
+      ? 'min-h-0'
       : isDenseLayout
-        ? 'min-h-[2mm] flex-[0.26]'
-        : 'min-h-[4mm] flex-[0.42]';
+        ? 'min-h-0'
+        : 'min-h-0';
   const postTableSpacerClass = isUltraCompactLayout
     ? 'min-h-[0.5mm] flex-[0.04]'
     : isCompactLayout
@@ -293,7 +300,7 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
           <span>held on {dateString}, at {event.venue}.</span>
         </div>
 
-        <div className={`${bodyTextClass} text-justify font-serif`}>
+        <div className={`${supportingTextClass} text-justify font-serif`}>
           <span className={paragraphIndentClass}>It is further certified that during the stay of the above-mentioned individual, this office provided the following:</span>
         </div>
 
