@@ -70,6 +70,18 @@ const CERTIFICATE_PREVIEW_FOOD_INCLUSION_MAP = parseFoodInclusion(
   getEventDateRows(CERTIFICATE_PREVIEW_EVENT).map((row) => row.key)
 );
 
+const createEmptySignatoryState = () => ({
+  name: '',
+  position: '',
+  esig_link: '',
+  header: '',
+  sub_header: '',
+  address: '',
+  website: '',
+  post_nominals: '',
+  certificate_template_variant: DEFAULT_CERTIFICATE_TEMPLATE_VARIANT as CertificateTemplateVariant
+});
+
 const Settings: React.FC = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'Admin';
@@ -82,12 +94,7 @@ const Settings: React.FC = () => {
   const [offices, setOffices] = useState<Office[]>([]);
   const [selectedOfficeId, setSelectedOfficeId] = useState<number | ''>('');
   
-  const [signatory, setSignatory] = useState({
-    name: '',
-    position: '',
-    esig_link: '',
-    certificate_template_variant: DEFAULT_CERTIFICATE_TEMPLATE_VARIANT as CertificateTemplateVariant
-  });
+  const [signatory, setSignatory] = useState(createEmptySignatoryState);
   const [selectedSignatureFile, setSelectedSignatureFile] = useState<File | null>(null);
   const [signaturePreviewUrl, setSignaturePreviewUrl] = useState('');
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
@@ -112,12 +119,7 @@ const Settings: React.FC = () => {
     if (selectedOfficeId) {
       fetchSignatory(selectedOfficeId);
     } else {
-      setSignatory({
-        name: '',
-        position: '',
-        esig_link: '',
-        certificate_template_variant: DEFAULT_CERTIFICATE_TEMPLATE_VARIANT
-      });
+      setSignatory(createEmptySignatoryState());
       setSelectedSignatureFile(null);
       setSignaturePreviewUrl('');
       setIsPreviewModalOpen(false);
@@ -208,6 +210,11 @@ const Settings: React.FC = () => {
           name: data.name || '',
           position: data.position || '',
           esig_link: data.esig_link || '',
+          header: data.header || '',
+          sub_header: data.sub_header || '',
+          address: data.address || '',
+          website: data.website || '',
+          post_nominals: data.post_nominals || '',
           certificate_template_variant:
             data.certificate_template_variant === 'without_serial'
               ? 'without_serial'
@@ -216,12 +223,7 @@ const Settings: React.FC = () => {
         setSignaturePreviewUrl(data.esig_link || '');
         setIsPreviewModalOpen(false);
       } else {
-        setSignatory({
-          name: '',
-          position: '',
-          esig_link: '',
-          certificate_template_variant: DEFAULT_CERTIFICATE_TEMPLATE_VARIANT
-        });
+        setSignatory(createEmptySignatoryState());
         setSignaturePreviewUrl('');
         setIsPreviewModalOpen(false);
       }
@@ -301,6 +303,11 @@ const Settings: React.FC = () => {
             name: signatory.name,
             position: signatory.position,
             esig_link: esigLink,
+            header: signatory.header.trim() || null,
+            sub_header: signatory.sub_header.trim() || null,
+            address: signatory.address.trim() || null,
+            website: signatory.website.trim() || null,
+            post_nominals: signatory.post_nominals.trim() || null,
             certificate_template_variant: signatory.certificate_template_variant
           })
           .eq('id', existing.id);
@@ -314,6 +321,11 @@ const Settings: React.FC = () => {
             name: signatory.name,
             position: signatory.position,
             esig_link: esigLink,
+            header: signatory.header.trim() || null,
+            sub_header: signatory.sub_header.trim() || null,
+            address: signatory.address.trim() || null,
+            website: signatory.website.trim() || null,
+            post_nominals: signatory.post_nominals.trim() || null,
             certificate_template_variant: signatory.certificate_template_variant
           });
           
@@ -361,8 +373,19 @@ const Settings: React.FC = () => {
     name: signatory.name,
     position: signatory.position,
     esig_link: signaturePreviewUrl || signatory.esig_link,
+    header: signatory.header,
+    sub_header: signatory.sub_header,
+    address: signatory.address,
+    website: signatory.website,
+    post_nominals: signatory.post_nominals,
     certificate_template_variant: signatory.certificate_template_variant
   };
+  const selectedTemplateOption =
+    CERTIFICATE_TEMPLATE_OPTIONS.find((option) => option.value === signatory.certificate_template_variant) ||
+    CERTIFICATE_TEMPLATE_OPTIONS[0];
+  const signatoryDisplayName = [signatory.name.trim(), signatory.post_nominals.trim()]
+    .filter(Boolean)
+    .join(signatory.post_nominals.trim() ? ', ' : '');
 
   const renderCertificatePreview = (scale: number) => {
     const previewWidthPx = 210 * MM_TO_PX * scale;
@@ -410,7 +433,7 @@ const Settings: React.FC = () => {
         </div>
 
         <form onSubmit={handleSave} className="flex-1 min-h-0 flex flex-col">
-          <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar p-5 sm:p-6">
+          <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6">
             <div className="space-y-6">
               {message && (
                 <div
@@ -429,135 +452,227 @@ const Settings: React.FC = () => {
                 </div>
               )}
 
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(460px,0.9fr)]">
-                <section className="space-y-4">
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
+                <section className="space-y-5">
                   <section className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5 lg:p-6">
-                    <div className="mb-5">
-                      <h3 className="text-sm font-semibold text-slate-800">Signatory Setup</h3>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Update the office, signer details, and e-signature in one place so the signature stays visible while editing.
-                      </p>
+                    <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-800">Office and Signatory</h3>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Manage the signer identity that appears at the bottom of the Certificate of Appearance.
+                        </p>
+                      </div>
+                      {selectedOffice && (
+                        <div className="inline-flex w-fit items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+                          {selectedOffice.name}
+                        </div>
+                      )}
                     </div>
 
-                    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <label className="block text-sm font-medium text-slate-700">Select Office</label>
-                          <div className="relative">
-                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                              <Building2 className="h-5 w-5 text-slate-400" />
-                            </div>
-                            <select
-                              value={selectedOfficeId}
-                              onChange={(e) => setSelectedOfficeId(e.target.value ? Number(e.target.value) : '')}
-                              disabled={!isAdmin}
-                              className="w-full appearance-none rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                            >
-                              <option value="" disabled>Select an office...</option>
-                              {offices.map((office) => (
-                                <option key={office.office_id} value={office.office_id}>
-                                  {office.name} {office.code ? `(${office.code})` : ''}
-                                </option>
-                              ))}
-                            </select>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700">Select Office</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <Building2 className="h-5 w-5 text-slate-400" />
                           </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="block text-sm font-medium text-slate-700">Name</label>
-                          <input
-                            type="text"
-                            required
-                            disabled={!selectedOfficeId}
-                            value={signatory.name}
-                            onChange={(e) => setSignatory({ ...signatory, name: e.target.value })}
-                            placeholder="e.g. Corazon S. Vicente"
-                            className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="block text-sm font-medium text-slate-700">Position</label>
-                          <input
-                            type="text"
-                            required
-                            disabled={!selectedOfficeId}
-                            value={signatory.position}
-                            onChange={(e) => setSignatory({ ...signatory, position: e.target.value })}
-                            placeholder="e.g. Division Chief, LGMED"
-                            className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
-                          />
+                          <select
+                            value={selectedOfficeId}
+                            onChange={(e) => setSelectedOfficeId(e.target.value ? Number(e.target.value) : '')}
+                            disabled={!isAdmin}
+                            className="w-full appearance-none rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                          >
+                            <option value="" disabled>Select an office...</option>
+                            {offices.map((office) => (
+                              <option key={office.office_id} value={office.office_id}>
+                                {office.name} {office.code ? `(${office.code})` : ''}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-                        <div className="mb-3">
-                          <h3 className="text-sm font-semibold text-slate-800">Signature Image</h3>
-                          <p className="mt-1 text-xs text-slate-500">
-                            Upload a transparent PNG for the cleanest printed result.
-                          </p>
-                        </div>
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-slate-700">Name</label>
+                        <input
+                          type="text"
+                          required
+                          disabled={!selectedOfficeId}
+                          value={signatory.name}
+                          onChange={(e) => setSignatory({ ...signatory, name: e.target.value })}
+                          placeholder="e.g. Bruce A. Colao"
+                          className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                        />
+                      </div>
 
-                        <div className="space-y-3">
-                          <label className={`flex w-full items-center justify-center gap-3 rounded-xl border border-dashed border-slate-300 px-4 py-4 text-slate-600 transition-colors ${
-                            selectedOfficeId ? 'cursor-pointer bg-slate-50 hover:bg-slate-100' : 'cursor-not-allowed bg-slate-100'
-                          }`}>
-                            <Upload className="h-5 w-5" />
-                            <span className="text-sm font-medium">
-                              {selectedSignatureFile ? selectedSignatureFile.name : 'Upload signature image'}
-                            </span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={handleSignatureChange}
-                              disabled={!selectedOfficeId}
-                              className="hidden"
-                            />
-                          </label>
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-slate-700">Post Nominals</label>
+                        <input
+                          type="text"
+                          disabled={!selectedOfficeId}
+                          value={signatory.post_nominals}
+                          onChange={(e) => setSignatory({ ...signatory, post_nominals: e.target.value })}
+                          placeholder="e.g. CESO V"
+                          className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                        />
+                      </div>
 
-                          <p className="text-xs leading-relaxed text-slate-500">
-                            The file is saved to the `esig` bucket and used in the certificate preview and print layout.
-                          </p>
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700">Position</label>
+                        <input
+                          type="text"
+                          required
+                          disabled={!selectedOfficeId}
+                          value={signatory.position}
+                          onChange={(e) => setSignatory({ ...signatory, position: e.target.value })}
+                          placeholder="e.g. Regional Director"
+                          className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                        />
+                      </div>
+                    </div>
 
-                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="mb-2 text-sm font-medium text-slate-700">
-                              {signaturePreviewUrl
-                                ? selectedSignatureFile
-                                  ? 'Signature Preview'
-                                  : 'Current E-Signature'
-                                : 'Signature Preview'}
-                            </p>
-                            <div className="flex h-40 items-center justify-center rounded-lg bg-white px-4">
-                              {signaturePreviewUrl ? (
-                                <img
-                                  src={signaturePreviewUrl}
-                                  alt="Signatory e-signature"
-                                  className="max-h-28 max-w-full object-contain"
-                                  referrerPolicy="no-referrer"
-                                />
-                              ) : (
-                                <p className="text-center text-xs text-slate-500">
-                                  Upload a signature to see it here.
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                    <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Name Preview</p>
+                      <p className="mt-2 text-sm text-slate-700">
+                        <span className="font-semibold uppercase">{signatory.name.trim() || 'CORAZON C. VICENTE'}</span>
+                        {signatory.post_nominals.trim() && (
+                          <span className="italic font-normal normal-case">, {signatory.post_nominals.trim()}</span>
+                        )}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Post nominals will be italicized and not bold on the certificate.
+                      </p>
+                    </div>
+                  </section>
+
+                  <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 lg:p-6">
+                    <div className="mb-5">
+                      <h3 className="text-sm font-semibold text-slate-800">Certificate Header Content</h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Control the lines shown above the certificate title for this office.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-slate-700">Header</label>
+                        <input
+                          type="text"
+                          disabled={!selectedOfficeId}
+                          value={signatory.header}
+                          onChange={(e) => setSignatory({ ...signatory, header: e.target.value })}
+                          placeholder="e.g. REGION X - NORTHERN MINDANAO"
+                          className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                        />
+                        <p className="text-xs text-slate-500">
+                          Shown below "DEPARTMENT OF THE INTERIOR AND LOCAL GOVERNMENT".
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-slate-700">Sub Header</label>
+                        <input
+                          type="text"
+                          disabled={!selectedOfficeId}
+                          value={signatory.sub_header}
+                          onChange={(e) => setSignatory({ ...signatory, sub_header: e.target.value })}
+                          placeholder="Optional line above Certificate of Appearance"
+                          className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                        />
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700">Address</label>
+                        <input
+                          type="text"
+                          disabled={!selectedOfficeId}
+                          value={signatory.address}
+                          onChange={(e) => setSignatory({ ...signatory, address: e.target.value })}
+                          placeholder="e.g. Km 3 Fr. W.F. Masterson Avenue, Upper Carmen, Cagayan de Oro City"
+                          className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                        />
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700">Website</label>
+                        <input
+                          type="text"
+                          disabled={!selectedOfficeId}
+                          value={signatory.website}
+                          onChange={(e) => setSignatory({ ...signatory, website: e.target.value })}
+                          placeholder="e.g. www.region10.dilg.gov.ph"
+                          className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                        />
                       </div>
                     </div>
                   </section>
                 </section>
 
-                <section className="space-y-4">
+                <section className="space-y-5">
+                  <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                    <div className="mb-4">
+                      <h3 className="text-sm font-semibold text-slate-800">Signature Image</h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Upload a transparent PNG for the cleanest printed result.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className={`flex w-full items-center justify-center gap-3 rounded-xl border border-dashed border-slate-300 px-4 py-4 text-slate-600 transition-colors ${
+                        selectedOfficeId ? 'cursor-pointer bg-slate-50 hover:bg-slate-100' : 'cursor-not-allowed bg-slate-100'
+                      }`}>
+                        <Upload className="h-5 w-5" />
+                        <span className="text-sm font-medium">
+                          {selectedSignatureFile ? selectedSignatureFile.name : 'Upload signature image'}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleSignatureChange}
+                          disabled={!selectedOfficeId}
+                          className="hidden"
+                        />
+                      </label>
+
+                      <p className="text-xs leading-relaxed text-slate-500">
+                        The file is saved to the `esig` bucket and used in preview, download, and print.
+                      </p>
+
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <p className="mb-2 text-sm font-medium text-slate-700">
+                          {signaturePreviewUrl
+                            ? selectedSignatureFile
+                              ? 'Signature Preview'
+                              : 'Current E-Signature'
+                            : 'Signature Preview'}
+                        </p>
+                        <div className="flex h-40 items-center justify-center rounded-lg bg-white px-4">
+                          {signaturePreviewUrl ? (
+                            <img
+                              src={signaturePreviewUrl}
+                              alt="Signatory e-signature"
+                              className="max-h-28 max-w-full object-contain"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <p className="text-center text-xs text-slate-500">
+                              Upload a signature to see it here.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
                   <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
                     <div className="mb-4">
                       <h3 className="text-sm font-semibold text-slate-800">Template Selection</h3>
                       <p className="mt-1 text-xs text-slate-500">
-                        Choose which Certificate of Appearance layout this office will use for preview, saving, and printing.
+                        Choose which Certificate of Appearance layout this office uses for preview, saving, and printing.
                       </p>
                     </div>
 
-                    <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-3">
                       {CERTIFICATE_TEMPLATE_OPTIONS.map((option) => {
                         const isSelected = signatory.certificate_template_variant === option.value;
 
@@ -597,16 +712,31 @@ const Settings: React.FC = () => {
                     <div className="mb-4">
                       <h3 className="text-sm font-semibold text-slate-800">Preview Template</h3>
                       <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                        Open the certificate preview in a modal so the settings content stays compact.
+                        Review how this office configuration will appear before saving or printing.
                       </p>
                     </div>
 
-                    <div className="rounded-xl border border-slate-200 bg-white p-4">
-                      <div className="mb-4">
+                    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+                      <div className="space-y-1">
                         <p className="text-sm font-semibold text-slate-800">
                           {selectedOffice?.name || 'Selected Office'}
                         </p>
+                        <p className="text-xs text-slate-500">
+                          {selectedTemplateOption.label}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-slate-50 px-3 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Certificate Snapshot
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-slate-800">
+                          {signatoryDisplayName || 'No signatory name yet'}
+                        </p>
                         <p className="mt-1 text-xs text-slate-500">
+                          {signatory.position || 'No position entered'}
+                        </p>
+                        <p className="mt-2 text-xs text-slate-500">
                           {signatory.certificate_template_variant === 'with_serial'
                             ? 'Serial number is visible in this layout.'
                             : 'Serial number is hidden in this layout.'}
@@ -617,7 +747,7 @@ const Settings: React.FC = () => {
                         type="button"
                         onClick={() => setIsPreviewModalOpen(true)}
                         disabled={!selectedOfficeId}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:bg-indigo-400"
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:bg-indigo-400"
                       >
                         <Eye className="h-4 w-4" />
                         Show Template Preview

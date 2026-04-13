@@ -18,6 +18,11 @@ export type CertificateSignatory = {
   name: string;
   position: string;
   esig_link: string;
+  header?: string | null;
+  sub_header?: string | null;
+  address?: string | null;
+  website?: string | null;
+  post_nominals?: string | null;
   certificate_template_variant?: CertificateTemplateVariant | null;
 } | null;
 
@@ -89,16 +94,18 @@ const getParticipantDateRows = (selectedEvent: Event, participantRecord: Certifi
   return getEventDateRows(selectedEvent).filter((row) => logDateSet.has(row.key));
 };
 
-const getCertificateLayoutMode = (rowCount: number): CertificateLayoutMode => {
-  if (rowCount >= 7) return 'ultraCompact';
-  if (rowCount >= 5) return 'compact';
-  if (rowCount >= 4) return 'dense';
+const getCertificateLayoutMode = (tableRowCount: number): CertificateLayoutMode => {
+  if (tableRowCount >= 7) return 'ultraCompact';
+  if (tableRowCount >= 6) return 'compact';
+  if (tableRowCount >= 5) return 'dense';
   return 'default';
 };
 
 const formatFoodInclusion = (meals: string[]) => {
   return meals.length > 0 ? meals.join(', ') : '-';
 };
+
+const DEFAULT_CERTIFICATE_HEADER = 'REGION X - NORTHERN MINDANAO';
 
 const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
   event,
@@ -111,20 +118,27 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
   showDivider = false
 }) => {
   const participantDateRows = getParticipantDateRows(event, participantRecord);
-  const layoutMode = getCertificateLayoutMode(participantDateRows.length);
+  const tableRowCount = participantDateRows.length + 1;
+  const layoutMode = getCertificateLayoutMode(tableRowCount);
   const isDenseLayout = layoutMode !== 'default';
   const isCompactLayout = layoutMode === 'compact' || layoutMode === 'ultraCompact';
   const isUltraCompactLayout = layoutMode === 'ultraCompact';
   const eventAccommodationDates = new Set(getEventAccommodationDates(event));
   const selectedTemplateVariant = resolveCertificateTemplateVariant(templateVariant ?? signatory?.certificate_template_variant);
   const shouldShowSerialNumber = selectedTemplateVariant === 'with_serial' && !!certificateSerialNumber;
+  const certificateHeader = signatory?.header?.trim() || DEFAULT_CERTIFICATE_HEADER;
+  const certificateSubHeader = signatory?.sub_header?.trim() || '';
+  const certificateAddress = signatory?.address?.trim() || '';
+  const certificateWebsite = signatory?.website?.trim() || '';
+  const signatoryName = signatory?.name?.trim() || 'CORAZON S. VICENTE';
+  const signatoryPostNominals = signatory?.post_nominals?.trim() || '';
   const cardPaddingClass = isUltraCompactLayout
     ? 'px-5 pt-2 pb-3'
     : isCompactLayout
-      ? 'px-6 pt-2.5 pb-4'
+      ? 'px-6 pt-2.5 pb-3.5'
       : isDenseLayout
-        ? 'px-7 pt-3 pb-5'
-        : 'px-8 pt-4 pb-6';
+        ? 'px-7 pt-3 pb-4.5'
+        : 'px-8 pt-4 pb-5';
   const serialTextClass = isUltraCompactLayout ? 'text-[8px]' : isCompactLayout ? 'text-[9px]' : isDenseLayout ? 'text-[10px]' : 'text-[11px]';
   const qrWrapperClass = isUltraCompactLayout ? 'bottom-0.5' : isDenseLayout ? 'bottom-1' : 'bottom-0';
   const qrSize = isUltraCompactLayout ? 32 : isCompactLayout ? 38 : isDenseLayout ? 42 : 48;
@@ -141,6 +155,13 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
   const bagongPilipinasLogoClass = isUltraCompactLayout ? 'h-8 max-w-[40px]' : isCompactLayout ? 'h-10 max-w-[48px]' : isDenseLayout ? 'h-12 max-w-[58px]' : 'h-14 max-w-[68px]';
   const headerSmallTextClass = isUltraCompactLayout ? 'text-[8px]' : isCompactLayout ? 'text-[9px]' : isDenseLayout ? 'text-[10px]' : 'text-[11px]';
   const headerMediumTextClass = isUltraCompactLayout ? 'text-[9px]' : isCompactLayout ? 'text-[10px]' : isDenseLayout ? 'text-[11px]' : 'text-[12px]';
+  const subHeaderClass = isUltraCompactLayout
+    ? 'text-[10px] mt-1 mb-0.5'
+    : isCompactLayout
+      ? 'text-[11px] mt-1.5 mb-0.5'
+      : isDenseLayout
+        ? 'text-[12px] mt-2 mb-1'
+        : 'text-[13px] mt-2.5 mb-1';
   const titleClass = isUltraCompactLayout
     ? 'text-[13px] mb-0.5 tracking-[0.24em]'
     : isCompactLayout
@@ -155,6 +176,21 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
       : isDenseLayout
         ? 'text-[11px] leading-snug mb-2 px-3'
         : 'text-[12px] leading-snug mb-3 px-4';
+  const tableAreaClass = 'flex min-h-0 flex-1 flex-col';
+  const preTableSpacerClass = isUltraCompactLayout
+    ? 'min-h-[0.5mm] flex-[0.06]'
+    : isCompactLayout
+      ? 'min-h-[1mm] flex-[0.14]'
+      : isDenseLayout
+        ? 'min-h-[2mm] flex-[0.26]'
+        : 'min-h-[4mm] flex-[0.42]';
+  const postTableSpacerClass = isUltraCompactLayout
+    ? 'min-h-[0.5mm] flex-[0.04]'
+    : isCompactLayout
+      ? 'min-h-[1mm] flex-[0.08]'
+      : isDenseLayout
+        ? 'min-h-[1.5mm] flex-[0.14]'
+        : 'min-h-[3mm] flex-[0.24]';
   const paragraphIndentClass = isUltraCompactLayout ? 'ml-4' : 'ml-8';
   const participantNameClass = isUltraCompactLayout
     ? 'inline-block border-b border-black font-bold px-1.5 mx-1 min-w-[160px] text-center'
@@ -162,7 +198,7 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
   const officeClass = isUltraCompactLayout
     ? 'inline-block border-b border-black font-bold px-1.5 mx-1 min-w-[120px] text-center'
     : 'inline-block border-b border-black font-bold px-2 mx-1 min-w-[150px] text-center';
-  const tableWrapperClass = isUltraCompactLayout ? 'mb-1' : isCompactLayout ? 'mb-1.5' : isDenseLayout ? 'mb-2' : 'mb-3';
+  const tableWrapperClass = isUltraCompactLayout ? '' : isCompactLayout ? '' : isDenseLayout ? '' : '';
   const tableClass = isUltraCompactLayout
     ? 'w-[92%] text-[8px]'
     : isCompactLayout
@@ -175,7 +211,7 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
   const tableCellPaddingClass = isUltraCompactLayout ? 'px-1.5' : 'px-2';
   const tableHeaderPaddingClass = isUltraCompactLayout ? 'py-0.5' : 'py-1';
   const tableBodyPaddingClass = isUltraCompactLayout ? 'py-px' : isCompactLayout ? 'py-0.5' : 'py-1';
-  const bottomSectionClass = isUltraCompactLayout ? 'pt-1 gap-1.5' : isCompactLayout ? 'pt-1.5 gap-2' : isDenseLayout ? 'pt-2 gap-2.5' : 'pt-3 gap-3';
+  const bottomSectionClass = isUltraCompactLayout ? 'pt-0.5 gap-1' : isCompactLayout ? 'pt-0.5 gap-1.5' : isDenseLayout ? 'pt-1 gap-2' : 'pt-1.5 gap-2';
   const signatoryWrapperClass = isUltraCompactLayout ? 'pt-0' : isCompactLayout ? 'pt-0.5' : isDenseLayout ? 'pt-1' : 'pt-1.5';
   const signatureImageClass = isUltraCompactLayout ? 'bottom-4 h-10' : isCompactLayout ? 'bottom-5 h-12' : isDenseLayout ? 'bottom-5 h-14' : 'bottom-6 h-16';
   const signatoryNameClass = isUltraCompactLayout ? 'text-[11px]' : isCompactLayout ? 'text-[12px]' : 'text-[14px]';
@@ -224,10 +260,20 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
           </div>
           <p className={`${headerSmallTextClass} font-serif leading-tight`}>Republic of the Philippines</p>
           <p className={`${headerMediumTextClass} font-bold font-serif leading-tight`}>DEPARTMENT OF THE INTERIOR AND LOCAL GOVERNMENT</p>
-          <p className={`${headerMediumTextClass} font-bold font-serif leading-tight`}>REGION X - NORTHERN MINDANAO</p>
-          <p className={`${headerSmallTextClass} font-serif leading-tight`}>Km 3 Fr. W.F. Masterson Avenue, Upper Carmen, Cagayan de Oro City</p>
-          <p className={`${headerSmallTextClass} font-serif text-blue-600 underline leading-tight`}>www.region10.dilg.gov.ph</p>
+          <p className={`${headerMediumTextClass} font-bold font-serif leading-tight`}>{certificateHeader}</p>
+          {certificateAddress && (
+            <p className={`${headerSmallTextClass} font-serif leading-tight`}>{certificateAddress}</p>
+          )}
+          {certificateWebsite && (
+            <p className={`${headerSmallTextClass} font-serif text-blue-600 underline leading-tight`}>{certificateWebsite}</p>
+          )}
         </div>
+
+        {certificateSubHeader && (
+          <p className={`${subHeaderClass} text-center font-serif font-bold uppercase tracking-[0.08em] text-slate-800`}>
+            {certificateSubHeader}
+          </p>
+        )}
 
         <h2 className={`${titleClass} font-bold text-center font-serif`}>
           CERTIFICATE OF APPEARANCE
@@ -251,47 +297,53 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
           <span className={paragraphIndentClass}>It is further certified that during the stay of the above-mentioned individual, this office provided the following:</span>
         </div>
 
-        <div className={`flex justify-center ${tableWrapperClass}`}>
-          <table className={`${tableClass} border-collapse border border-black font-serif leading-tight table-fixed`}>
-            <thead>
-              <tr>
-                <th className={`${dateColumnWidthClass} border border-black ${tableCellPaddingClass} ${tableHeaderPaddingClass} text-center font-bold`}>Date</th>
-                <th className={`border border-black ${tableCellPaddingClass} ${tableHeaderPaddingClass} text-center font-bold`}>Food Inclusion</th>
-                {participantRecord.needs_accommodation && (
-                  <th className={`${accommodationColumnWidthClass} border border-black ${tableCellPaddingClass} ${tableHeaderPaddingClass} text-center font-bold`}>Accommodation</th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {participantDateRows.map((dateRow) => {
-                const hasAccommodationOnDate =
-                  participantRecord.needs_accommodation &&
-                  participantRecord.date_accommodation
-                    .filter((date) => eventAccommodationDates.has(date))
-                    .includes(dateRow.key);
-                const mealsForDate = eventFoodInclusionMap[dateRow.key] || [];
+        <div className={tableAreaClass}>
+          <div className={preTableSpacerClass} />
 
-                return (
-                  <tr key={`${participantRecord.participant.participant_id}-${dateRow.key}`}>
-                    <td className={`${tableBodyPaddingClass} border border-black ${tableCellPaddingClass} text-center align-top`}>
-                      {dateRow.label}
-                    </td>
-                    <td className={`${tableBodyPaddingClass} border border-black ${tableCellPaddingClass} text-center align-top`}>
-                      {formatFoodInclusion(mealsForDate)}
-                    </td>
-                    {participantRecord.needs_accommodation && (
+          <div className={`flex justify-center ${tableWrapperClass}`}>
+            <table className={`${tableClass} border-collapse border border-black font-serif leading-tight table-fixed`}>
+              <thead>
+                <tr>
+                  <th className={`${dateColumnWidthClass} border border-black ${tableCellPaddingClass} ${tableHeaderPaddingClass} text-center font-bold`}>Date</th>
+                  <th className={`border border-black ${tableCellPaddingClass} ${tableHeaderPaddingClass} text-center font-bold`}>Food Inclusion</th>
+                  {participantRecord.needs_accommodation && (
+                    <th className={`${accommodationColumnWidthClass} border border-black ${tableCellPaddingClass} ${tableHeaderPaddingClass} text-center font-bold`}>Accommodation</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {participantDateRows.map((dateRow) => {
+                  const hasAccommodationOnDate =
+                    participantRecord.needs_accommodation &&
+                    participantRecord.date_accommodation
+                      .filter((date) => eventAccommodationDates.has(date))
+                      .includes(dateRow.key);
+                  const mealsForDate = eventFoodInclusionMap[dateRow.key] || [];
+
+                  return (
+                    <tr key={`${participantRecord.participant.participant_id}-${dateRow.key}`}>
                       <td className={`${tableBodyPaddingClass} border border-black ${tableCellPaddingClass} text-center align-top`}>
-                        {hasAccommodationOnDate ? 'Provided' : '-'}
+                        {dateRow.label}
                       </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      <td className={`${tableBodyPaddingClass} border border-black ${tableCellPaddingClass} text-center align-top`}>
+                        {formatFoodInclusion(mealsForDate)}
+                      </td>
+                      {participantRecord.needs_accommodation && (
+                        <td className={`${tableBodyPaddingClass} border border-black ${tableCellPaddingClass} text-center align-top`}>
+                          {hasAccommodationOnDate ? 'Provided' : '-'}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className={postTableSpacerClass} />
         </div>
 
-        <div className={`mt-auto flex flex-col items-center text-center font-serif ${bottomSectionClass}`}>
+        <div className={`shrink-0 flex flex-col items-center text-center font-serif ${bottomSectionClass}`}>
           <div className={`flex flex-col items-center ${signatoryWrapperClass}`}>
             <div className="relative inline-block">
               {signatory?.esig_link && (
@@ -302,12 +354,17 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
                   referrerPolicy="no-referrer"
                 />
               )}
-              <p className={`${signatoryNameClass} font-bold uppercase relative z-10`}>{signatory?.name || 'CORAZON S. VICENTE'}</p>
+              <p className={`${signatoryNameClass} relative z-10`}>
+                <span className="font-bold uppercase">{signatoryName}</span>
+                {signatoryPostNominals && (
+                  <span className="ml-1 font-normal normal-case italic">, {signatoryPostNominals}</span>
+                )}
+              </p>
               <p className={`${signatoryPositionClass} relative z-10`}>{signatory?.position || 'Division Chief, LGMED'}</p>
             </div>
           </div>
 
-          <div className={`${footerClass} text-center text-slate-800 leading-tight`}>
+          <div className={`${footerClass} shrink-0 text-center text-slate-800 leading-tight`}>
             <img
               src="/assets/intensity.png"
               alt="Intensity tagline"
