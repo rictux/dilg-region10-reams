@@ -874,17 +874,17 @@ const AttendanceList: React.FC = () => {
   const completeLogsCount = hasMultipleSessions ? data.filter(r => r.amLog && r.pmLog).length : 0;
 
   return (
-    <div className="attendance-page h-full min-h-0 flex flex-col gap-2">
-      <div className="attendance-toolbar rounded-xl border border-slate-100 bg-slate-50 px-4 pb-1 pt-0 lg:px-5 lg:pb-2 lg:pt-0">
-        <div className="flex flex-col gap-3 w-full lg:flex-row lg:flex-wrap lg:items-start lg:gap-4 xl:flex-nowrap xl:items-center">
-            <div className="w-full relative lg:flex-1 lg:min-w-[420px] lg:max-w-[760px]" ref={dropdownRef}>
+    <div className="attendance-page h-auto min-h-0 flex flex-col gap-1.5 sm:gap-2 lg:h-full lg:gap-3">
+      <div className="attendance-toolbar rounded-xl border border-slate-100 bg-slate-50 p-0">
+        <div className="flex w-full flex-col gap-3 sm:gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3 xl:flex-nowrap xl:gap-4">
+            <div className="relative w-full sm:mx-auto sm:max-w-[32rem] lg:mx-0 lg:max-w-[32rem] lg:flex-[1.25] xl:max-w-[36rem]" ref={dropdownRef}>
                 <div 
-                    className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 lg:py-3 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors shadow-sm"
+                    className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 shadow-sm transition-colors hover:border-indigo-400 sm:px-4 sm:py-2.5 lg:py-3"
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
                     <div className="flex items-start gap-2 flex-1">
                         <Calendar className="text-slate-400 shrink-0 mt-0.5 lg:mt-0" size={16} />
-                        <span className={`whitespace-normal break-words text-xs leading-snug lg:text-sm ${!selectedEvent ? 'text-slate-500' : 'text-slate-800 font-medium'}`}>
+                        <span className={`whitespace-normal break-words text-[11px] leading-snug sm:text-xs lg:text-sm ${!selectedEvent ? 'text-slate-500' : 'text-slate-800 font-medium'}`}>
                             {selectedEvent ? selectedEvent.event_name : "-- Select Event --"}
                         </span>
                     </div>
@@ -892,7 +892,7 @@ const AttendanceList: React.FC = () => {
                 </div>
 
                 {isDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                    <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl animate-in fade-in zoom-in-95 duration-100">
                         <div className="p-2 border-b border-slate-100 bg-slate-50 sticky top-0">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
@@ -943,8 +943,8 @@ const AttendanceList: React.FC = () => {
             </div>
 
             {eventDays.length > 1 && (
-                <div className="w-full bg-white rounded-lg border border-slate-200 p-1 lg:flex-1 lg:min-w-[280px] xl:max-w-[420px]">
-                    <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
+                <div className="w-full rounded-lg border border-slate-200 bg-white p-0.5 sm:mx-auto sm:max-w-[32rem] lg:mx-0 lg:max-w-[26rem] lg:flex-1 xl:max-w-[30rem]">
+                    <div className="grid grid-cols-5 gap-0.5 sm:grid-cols-5 md:grid-cols-5 lg:grid-cols-3 xl:grid-cols-4">
                         {eventDays.map((day, idx) => {
                             const dStr = format(day, 'yyyy-MM-dd');
                             const isSelected = selectedDate === dStr;
@@ -952,14 +952,14 @@ const AttendanceList: React.FC = () => {
                                 <button
                                     key={dStr}
                                     onClick={() => setSelectedDate(dStr)}
-                                    className={`w-full px-3 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all flex flex-col items-center justify-center
+                                    className={`flex w-full min-w-0 flex-col items-center justify-center rounded-md px-0.5 py-1 text-[8px] font-bold leading-tight whitespace-nowrap transition-all sm:px-0.5 sm:py-1 sm:text-[8px] md:px-1 md:py-1 md:text-[9px] lg:px-3 lg:py-1.5 lg:text-xs
                                         ${isSelected 
                                             ? 'bg-indigo-600 text-white shadow-sm' 
                                             : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
                                         }`}
                                 >
                                     <span>Day {idx + 1}</span>
-                                    <span className={`text-[9px] font-normal ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>
+                                    <span className={`text-[6px] font-normal sm:text-[6px] md:text-[7px] lg:text-[9px] ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>
                                         {format(day, 'MMM d')}
                                     </span>
                                 </button>
@@ -969,8 +969,8 @@ const AttendanceList: React.FC = () => {
                 </div>
             )}
 
-            <div className="w-full grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 sm:flex sm:w-auto sm:items-center sm:gap-3 lg:ml-auto">
-                <div className="relative min-w-0 w-full sm:w-60 lg:w-72">
+            <div className="mx-auto grid w-full max-w-[32rem] grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 sm:max-w-[32rem] md:max-w-[40rem] lg:ml-auto lg:mx-0 lg:w-[24rem] lg:max-w-none xl:w-[28rem]">
+                <div className="relative min-w-0 w-full">
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                         <Search size={18} />
                     </div>
@@ -979,7 +979,7 @@ const AttendanceList: React.FC = () => {
                         placeholder="Search participants..." 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full min-w-0 pl-10 pr-12 py-2.5 text-sm lg:py-3 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        className="w-full min-w-0 rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-12 text-xs font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 sm:py-2.5 sm:text-sm lg:py-3"
                     />
                     {searchQuery && (
                         <button
@@ -992,17 +992,17 @@ const AttendanceList: React.FC = () => {
                     )}
                 </div>
 
-                <div className="contents sm:flex sm:w-auto sm:items-center sm:justify-end sm:gap-3 shrink-0">
+                <div className="grid grid-cols-2 gap-2 sm:contents shrink-0">
                     <button 
                         onClick={generateReport}
                         disabled={!selectedEvent || !selectedDate || data.length === 0}
                         type="button"
                         aria-label="Export attendance"
                         title="Export attendance"
-                        className="h-11 shrink-0 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium px-3 sm:px-4 lg:px-5 py-2.5 lg:py-3"
+                        className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:h-11 sm:w-11 lg:h-11 lg:w-auto lg:gap-2 lg:px-4 xl:px-5"
                     >
-                        <Download size={18} />
-                        <span className="text-sm">Export</span>
+                        <Download size={16} />
+                        <span className="hidden lg:inline text-sm">Export</span>
                     </button>
                     <button 
                         onClick={() => setShowAddParticipantModal(true)}
@@ -1010,10 +1010,10 @@ const AttendanceList: React.FC = () => {
                         type="button"
                         aria-label="Add participant"
                         title="Add participant"
-                        className="h-11 shrink-0 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium px-3 sm:px-4 lg:px-5 py-2.5 lg:py-3"
+                        className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:h-11 sm:w-11 lg:h-11 lg:w-auto lg:gap-2 lg:px-4 xl:px-5"
                     >
-                        <UserPlus size={18} />
-                        <span className="text-sm">Add</span>
+                        <UserPlus size={16} />
+                        <span className="hidden lg:inline text-sm">Add</span>
                     </button>
                 </div>
             </div>
@@ -1022,94 +1022,100 @@ const AttendanceList: React.FC = () => {
 
       {/* Stats Cards as Filters */}
       <div className="attendance-stats w-full">
-        <div className={`grid gap-2 sm:gap-3 lg:gap-4 w-full ${hasMultipleSessions ? 'grid-cols-5' : 'grid-cols-3'}`}>
+          <div
+            className={`grid w-full gap-1 sm:gap-3 lg:gap-4 ${
+              hasMultipleSessions
+                ? 'grid-cols-5 xl:[grid-template-columns:repeat(5,minmax(0,1fr))]'
+                : 'sm:[grid-template-columns:repeat(3,minmax(0,1fr))]'
+            }`}
+          >
           <button 
             onClick={() => setFilter('Show All')}
-            className={`attendance-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`attendance-stat-card min-w-0 min-h-[52px] sm:min-h-[72px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                 ${filter === 'Show All' ? 'ring-2 ring-slate-400 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-slate-300'}
                 bg-white
             `}
           >
               <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">Total</p>
-                  <div className={`p-1 rounded-lg ${filter === 'Show All' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-600'}`}>
-                    <Users size={12} className="sm:h-3.5 sm:w-3.5" />
+                  <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">Total</p>
+                  <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Show All' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-600'}`}>
+                    <Users size={10} className="sm:h-3.5 sm:w-3.5" />
                   </div>
               </div>
-              <p className="attendance-stat-value text-sm sm:text-base font-bold text-slate-800">{totalParticipants}</p>
+              <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-slate-800">{totalParticipants}</p>
           </button>
 
           <button 
             onClick={() => setFilter('Present')}
-            className={`attendance-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`attendance-stat-card min-w-0 min-h-[52px] sm:min-h-[72px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                 ${filter === 'Present' ? 'ring-2 ring-green-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-green-200'}
                 bg-white
             `}
           >
               <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">Present</p>
-                  <div className={`p-1 rounded-lg ${filter === 'Present' ? 'bg-green-200 text-green-700' : 'bg-green-100 text-green-600'}`}>
-                    <UserCheck size={12} className="sm:h-3.5 sm:w-3.5" />
+                  <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">Present</p>
+                  <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Present' ? 'bg-green-200 text-green-700' : 'bg-green-100 text-green-600'}`}>
+                    <UserCheck size={10} className="sm:h-3.5 sm:w-3.5" />
                   </div>
               </div>
-              <p className="attendance-stat-value text-sm sm:text-base font-bold text-green-600">{presentCount}</p>
+              <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-green-600">{presentCount}</p>
           </button>
 
           <button 
             onClick={() => setFilter('No Logs')}
-            className={`attendance-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`attendance-stat-card min-w-0 min-h-[52px] sm:min-h-[72px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                 ${filter === 'No Logs' ? 'ring-2 ring-red-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-red-200'}
                 bg-white
             `}
           >
               <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
+                  <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
                     <span className="sm:hidden">Absent</span>
                     <span className="hidden sm:inline">Not Present</span>
                   </p>
-                  <div className={`p-1 rounded-lg ${filter === 'No Logs' ? 'bg-red-200 text-red-700' : 'bg-red-100 text-red-600'}`}>
-                    <UserX size={12} className="sm:h-3.5 sm:w-3.5" />
+                  <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'No Logs' ? 'bg-red-200 text-red-700' : 'bg-red-100 text-red-600'}`}>
+                    <UserX size={10} className="sm:h-3.5 sm:w-3.5" />
                   </div>
               </div>
-              <p className="attendance-stat-value text-sm sm:text-base font-bold text-red-600">{notPresentCount}</p>
+              <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-red-600">{notPresentCount}</p>
           </button>
 
           {hasMultipleSessions && (
             <button 
               onClick={() => setFilter('No PM')}
-              className={`attendance-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+              className={`attendance-stat-card min-w-0 min-h-[52px] sm:min-h-[72px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                   ${filter === 'No PM' ? 'ring-2 ring-amber-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-amber-200'}
                   bg-white
               `}
             >
                 <div className="flex justify-between items-start mb-0.5 w-full">
-                    <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">No PM</p>
-                    <div className={`p-1 rounded-lg ${filter === 'No PM' ? 'bg-amber-200 text-amber-700' : 'bg-amber-100 text-amber-600'}`}>
-                      <AlertCircle size={12} className="sm:h-3.5 sm:w-3.5" />
+                    <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">No PM</p>
+                    <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'No PM' ? 'bg-amber-200 text-amber-700' : 'bg-amber-100 text-amber-600'}`}>
+                      <AlertCircle size={10} className="sm:h-3.5 sm:w-3.5" />
                     </div>
                 </div>
-                <p className="attendance-stat-value text-sm sm:text-base font-bold text-amber-600">{noPmCount}</p>
+                <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-amber-600">{noPmCount}</p>
             </button>
           )}
 
           {hasMultipleSessions && (
             <button 
               onClick={() => setFilter('Complete Logs')}
-              className={`attendance-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+              className={`attendance-stat-card min-w-0 min-h-[52px] sm:min-h-[72px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                   ${filter === 'Complete Logs' ? 'ring-2 ring-indigo-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-indigo-200'}
                   bg-white
               `}
             >
                 <div className="flex justify-between items-start mb-0.5 w-full">
-                    <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">Complete</p>
-                    <div className={`p-1 rounded-lg ${filter === 'Complete Logs' ? 'bg-indigo-200 text-indigo-700' : 'bg-indigo-100 text-indigo-600'}`}>
-                      <CheckCircle size={12} className="sm:h-3.5 sm:w-3.5" />
+                    <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">Complete</p>
+                    <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Complete Logs' ? 'bg-indigo-200 text-indigo-700' : 'bg-indigo-100 text-indigo-600'}`}>
+                      <CheckCircle size={10} className="sm:h-3.5 sm:w-3.5" />
                     </div>
                 </div>
-                <p className="attendance-stat-value text-sm sm:text-base font-bold text-indigo-600">{completeLogsCount}</p>
+                <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-indigo-600">{completeLogsCount}</p>
             </button>
           )}
-        </div>
+          </div>
       </div>
 
       {loading && data.length === 0 ? (
@@ -1117,10 +1123,10 @@ const AttendanceList: React.FC = () => {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
         </div>
       ) : (
-        <div className="attendance-table bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div className="attendance-table bg-white rounded-xl shadow-sm border border-slate-100 overflow-visible lg:overflow-hidden flex-none lg:flex-1 min-h-0 flex flex-col">
             {/* Active Filter Indicator in Table Header */}
             {filter !== 'Show All' && (
-                <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2 text-sm text-slate-600">
+                <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 sm:px-5 lg:px-6">
                     <Filter size={14} />
                     <span>Filtering by: <span className="font-bold text-slate-800">{filter}</span></span>
                     <button 
@@ -1132,7 +1138,7 @@ const AttendanceList: React.FC = () => {
                 </div>
             )}
             
-            <div className="hidden md:block flex-1 min-h-0 overflow-auto">
+            <div className="hidden lg:block flex-1 min-h-0 overflow-auto">
                 <table className="datatable w-full table-fixed text-[13px] lg:text-sm text-left">
                     <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                         <tr>
@@ -1218,7 +1224,7 @@ const AttendanceList: React.FC = () => {
                 </table>
             </div>
 
-            <div className="md:hidden flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+            <div className="overflow-visible p-3 sm:p-4 lg:hidden">
                 {filteredData.length === 0 ? (
                     <div className="text-center py-12 text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100">
                         {events.length === 0 ? (
@@ -1231,48 +1237,52 @@ const AttendanceList: React.FC = () => {
                         )}
                     </div>
                 ) : (
-                    filteredData.map((row) => (
-                        <div
-                            key={row.participant.participant_id}
-                            onClick={() => handleRowClick(row.participant)}
-                            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:scale-[0.99] transition-transform"
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0 flex-1">
-                                    <h3 className="font-semibold text-slate-800 leading-tight">{row.participant.full_name}</h3>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                        {filteredData.map((row) => (
+                            <div
+                                key={row.participant.participant_id}
+                                onClick={() => handleRowClick(row.participant)}
+                                className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm active:scale-[0.99] transition-transform sm:p-4"
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                        <h3 className="text-[13px] font-semibold leading-tight text-slate-800 sm:text-sm">
+                                            {row.participant.full_name}
+                                        </h3>
+                                    </div>
+                                    <button
+                                        onClick={(e) => openManualModal(e, row.participant)}
+                                        className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                                        title="Manual Log Entry"
+                                    >
+                                        <PlusCircle size={18} />
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={(e) => openManualModal(e, row.participant)}
-                                    className="shrink-0 p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                    title="Manual Log Entry"
-                                >
-                                    <PlusCircle size={18} />
-                                </button>
-                            </div>
 
-                            <div className={`mt-3 grid gap-2 ${hasMultipleSessions ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                                {visibleSessions.map((session) => {
-                                    const sessionLog = session === 'AM' ? row.amLog : row.pmLog;
-                                    const valueClassName = session === 'AM'
-                                        ? 'text-green-700'
-                                        : 'text-indigo-700';
+                                <div className={`mt-2.5 grid gap-2 ${hasMultipleSessions ? 'grid-cols-2' : 'grid-cols-1'} sm:mt-3`}>
+                                    {visibleSessions.map((session) => {
+                                        const sessionLog = session === 'AM' ? row.amLog : row.pmLog;
+                                        const valueClassName = session === 'AM'
+                                            ? 'text-green-700'
+                                            : 'text-indigo-700';
 
-                                    return (
-                                        <div key={session} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                    {session} Time
-                                                </span>
-                                                <span className={`text-sm font-semibold ${sessionLog ? valueClassName : 'text-slate-300'}`}>
-                                                    {sessionLog ? formatLogTime(sessionLog.time) : '-'}
-                                                </span>
+                                        return (
+                                            <div key={session} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                        {session} Time
+                                                    </span>
+                                                    <span className={`text-sm font-semibold ${sessionLog ? valueClassName : 'text-slate-300'}`}>
+                                                        {sessionLog ? formatLogTime(sessionLog.time) : '-'}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
-                    ))
+                        ))}
+                    </div>
                 )}
             </div>
         </div>

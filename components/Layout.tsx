@@ -62,6 +62,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [showConfirmPw, setShowConfirmPw] = useState(false);
 
   const showSidebar = hasPermission('VIEW_DASHBOARD');
+  const shouldCollapseSidebarContent = isSidebarCollapsed && !isMobileMenuOpen;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -209,7 +210,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               ? 'text-slate-800 font-semibold' 
               : 'text-indigo-100 hover:text-white'
           }`}
-          title={isSidebarCollapsed ? label : undefined}
+          title={shouldCollapseSidebarContent ? label : undefined}
           aria-current={isActive ? 'page' : undefined}
         >
           <div className="flex items-center gap-4">
@@ -219,7 +220,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               className={`shrink-0 transition-colors ${isActive ? 'text-[#4322A7]' : 'text-indigo-200 group-hover:text-white'}`} 
               aria-hidden="true" 
             />
-            {!isSidebarCollapsed && (
+            {!shouldCollapseSidebarContent && (
               <span className="app-nav-label text-[15px] tracking-wide truncate">{label}</span>
             )}
           </div>
@@ -230,7 +231,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const SidebarSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div className="space-y-1">
-      {!isSidebarCollapsed && (
+      {!shouldCollapseSidebarContent && (
         <div className="px-8 pt-3 pb-1">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-200/70">
             {title}
@@ -597,11 +598,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         rounded-tr-3xl rounded-br-3xl md:rounded-r-3xl
         flex flex-col overflow-hidden
       `}>
-        <div className={`app-sidebar-header p-8 flex items-center gap-3 ${isSidebarCollapsed ? 'justify-center px-4' : ''}`}>
+        <div className={`app-sidebar-header p-8 flex items-center gap-3 ${shouldCollapseSidebarContent ? 'justify-center px-4' : ''}`}>
           <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0 overflow-hidden p-1">
             <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" />
           </div>
-          {!isSidebarCollapsed && (
+          {!shouldCollapseSidebarContent && (
             <h1 className="app-sidebar-title text-2xl font-bold text-white tracking-wide whitespace-nowrap">Admin Portal</h1>
           )}
         </div>
@@ -637,7 +638,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </SidebarSection>
         </nav>
 
-        <div className={`app-sidebar-footer p-8 mt-auto text-xs text-indigo-300 space-y-2 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
+        <div className={`app-sidebar-footer p-8 mt-auto text-xs text-indigo-300 space-y-2 ${shouldCollapseSidebarContent ? 'hidden' : 'block'}`}>
           <p className="font-medium text-indigo-200">Regional Event & Attendance Management System</p>
           <p>© 2026 All Rights Reserved</p>
           <p>Created by: RICTU X</p>

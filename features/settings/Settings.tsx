@@ -13,7 +13,49 @@ import CertificateOfAppearanceCard, {
 } from '../reports/CertificateOfAppearanceTemplate';
 
 const MM_TO_PX = 3.7795275591;
-const CERTIFICATE_MODAL_PREVIEW_SCALE = 0.72;
+const CERTIFICATE_BASE_WIDTH_PX = 210 * MM_TO_PX;
+const CERTIFICATE_BASE_HEIGHT_PX = 148.5 * MM_TO_PX;
+
+const getCertificatePreviewModalLayout = (viewportWidth: number, viewportHeight: number) => {
+  let baseScale = 1;
+  let modalMaxWidth = Math.min(viewportWidth - 24, 960);
+  let horizontalPadding = 24;
+  let verticalChrome = 160;
+
+  if (viewportWidth < 640) {
+    baseScale = 0.5;
+    modalMaxWidth = viewportWidth - 12;
+    horizontalPadding = 12;
+    verticalChrome = 136;
+  } else if (viewportWidth < 1024) {
+    baseScale = 0.72;
+    modalMaxWidth = Math.min(viewportWidth - 24, 720);
+    horizontalPadding = 20;
+    verticalChrome = 148;
+  } else if (viewportWidth < 1280) {
+    baseScale = 0.9;
+    modalMaxWidth = Math.min(viewportWidth - 48, 860);
+    horizontalPadding = 24;
+    verticalChrome = 156;
+  } else {
+    baseScale = 1.04;
+    modalMaxWidth = Math.min(viewportWidth - 64, 980);
+    horizontalPadding = 28;
+    verticalChrome = 168;
+  }
+
+  const availableWidth = Math.max(modalMaxWidth - horizontalPadding * 2, 240);
+  const availableHeight = Math.max(viewportHeight - verticalChrome, 220);
+  const fitScale = Math.min(
+    availableWidth / CERTIFICATE_BASE_WIDTH_PX,
+    availableHeight / CERTIFICATE_BASE_HEIGHT_PX
+  );
+
+  return {
+    scale: Math.min(baseScale, fitScale),
+    modalMaxWidth
+  };
+};
 const CERTIFICATE_TEMPLATE_OPTIONS: Array<{
   value: CertificateTemplateVariant;
   label: string;
@@ -99,6 +141,10 @@ const Settings: React.FC = () => {
   const [selectedSignatureFile, setSelectedSignatureFile] = useState<File | null>(null);
   const [signaturePreviewUrl, setSignaturePreviewUrl] = useState('');
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [previewViewport, setPreviewViewport] = useState(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1440,
+    height: typeof window !== 'undefined' ? window.innerHeight : 900
+  }));
 
   useEffect(() => {
     if (!user) return;
@@ -146,6 +192,22 @@ const Settings: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPreviewModalOpen]);
+
+  useEffect(() => {
+    if (!isPreviewModalOpen) return;
+
+    const updatePreviewViewport = () => {
+      setPreviewViewport({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+
+    updatePreviewViewport();
+    window.addEventListener('resize', updatePreviewViewport);
+
+    return () => window.removeEventListener('resize', updatePreviewViewport);
   }, [isPreviewModalOpen]);
 
   const fetchOffices = async () => {
@@ -391,10 +453,14 @@ const Settings: React.FC = () => {
   const signatoryDisplayName = [signatory.name.trim(), signatory.post_nominals.trim()]
     .filter(Boolean)
     .join(signatory.post_nominals.trim() ? ', ' : '');
+  const certificatePreviewModalLayout = getCertificatePreviewModalLayout(
+    previewViewport.width,
+    previewViewport.height
+  );
 
   const renderCertificatePreview = (scale: number) => {
-    const previewWidthPx = 210 * MM_TO_PX * scale;
-    const previewHeightPx = 148.5 * MM_TO_PX * scale;
+    const previewWidthPx = CERTIFICATE_BASE_WIDTH_PX * scale;
+    const previewHeightPx = CERTIFICATE_BASE_HEIGHT_PX * scale;
 
     return (
       <div
@@ -800,7 +866,7 @@ const Settings: React.FC = () => {
       </div>
 
       {isPreviewModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-3 lg:p-4">
           <button
             type="button"
             aria-label="Close certificate preview"
@@ -808,11 +874,14 @@ const Settings: React.FC = () => {
             onClick={() => setIsPreviewModalOpen(false)}
           />
 
-          <div className="relative z-10 flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
+          <div
+            className="relative z-10 flex max-h-[96vh] w-full flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl sm:rounded-[28px]"
+            style={{ maxWidth: `${certificatePreviewModalLayout.modalMaxWidth}px` }}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-3 py-3 sm:px-4 lg:px-5">
               <div>
-                <h3 className="text-base font-semibold text-slate-800">Certificate Preview</h3>
-                <p className="mt-1 text-sm text-slate-500">
+                <h3 className="text-sm font-semibold text-slate-800 sm:text-base">Certificate Preview</h3>
+                <p className="mt-1 text-xs text-slate-500 sm:text-sm">
                   Reviewing {selectedOffice?.name || 'the selected office'} using the active template and signature.
                 </p>
               </div>
@@ -826,9 +895,9 @@ const Settings: React.FC = () => {
               </button>
             </div>
 
-            <div className="min-h-0 overflow-auto no-scrollbar bg-slate-100 p-4 sm:p-6">
-              <div className="min-w-fit">
-                {renderCertificatePreview(CERTIFICATE_MODAL_PREVIEW_SCALE)}
+            <div className="min-h-0 overflow-auto no-scrollbar bg-slate-100 p-2 sm:p-3 lg:p-4">
+              <div className="min-w-fit mx-auto">
+                {renderCertificatePreview(certificatePreviewModalLayout.scale)}
               </div>
             </div>
           </div>
