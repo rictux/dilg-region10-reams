@@ -22,6 +22,7 @@ export type CertificateSignatory = {
   sub_header?: string | null;
   address?: string | null;
   website?: string | null;
+  footer?: string | null;
   post_nominals?: string | null;
   certificate_template_variant?: CertificateTemplateVariant | null;
 } | null;
@@ -130,6 +131,7 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
   const certificateSubHeader = signatory?.sub_header?.trim() || '';
   const certificateAddress = signatory?.address?.trim() || '';
   const certificateWebsite = signatory?.website?.trim() || '';
+  const certificateFooter = signatory?.footer?.trim() || '';
   const signatoryName = signatory?.name?.trim() || 'CORAZON S. VICENTE';
   const signatoryPostNominals = signatory?.post_nominals?.trim() || '';
   const cardPaddingClass = isUltraCompactLayout
@@ -381,7 +383,7 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
               }}
             />
             <p className="italic font-bold">"Matino, Mahusay at Maasahan"</p>
-            <p>T: (088) 859-4181 E: records.dilg10@gmail.com FB: www.facebook.com/DILGX</p>
+            <p>{certificateFooter}</p>
           </div>
         </div>
       </div>

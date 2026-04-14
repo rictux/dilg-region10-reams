@@ -44,7 +44,11 @@ const Reports: React.FC = () => {
   }, [selectedEventId]);
 
   const fetchEvents = async () => {
-    let query = supabase.from('events').select('*').order('start_date', { ascending: false });
+    let query = supabase
+      .from('events')
+      .select('*')
+      .in('status', ['Ongoing', 'Completed'])
+      .order('start_date', { ascending: false });
 
     // Filter events by office for non-admins
     if (user?.role !== 'Admin' && user?.office_id) {
@@ -108,6 +112,12 @@ const Reports: React.FC = () => {
   );
 
   const selectedEvent = events.find(e => e.event_id.toString() === selectedEventId);
+
+  useEffect(() => {
+    if (selectedEventId && !selectedEvent) {
+      setSelectedEventId('');
+    }
+  }, [selectedEvent, selectedEventId]);
 
   return (
     <div className="h-full min-h-0 overflow-y-auto pr-1 space-y-8">
@@ -183,7 +193,7 @@ const Reports: React.FC = () => {
                                 </div>
 
                                 {/* List */}
-                                <div className="max-h-60 overflow-y-auto">
+                                <div className="max-h-[32rem] overflow-y-auto">
                                     <div 
                                         className={`px-4 py-2 text-xs cursor-pointer border-b border-slate-50 hover:bg-slate-50 transition-colors ${!selectedEventId ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-slate-500'}`}
                                         onClick={() => {

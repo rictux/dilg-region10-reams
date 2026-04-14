@@ -98,6 +98,13 @@ const formatAccommodationDateLabel = (value: string) => {
   }
 };
 
+const EVENT_STATUS_SORT_ORDER: Record<string, number> = {
+  Ongoing: 0,
+  Scheduled: 1,
+  Completed: 2,
+  Cancelled: 3
+};
+
 const EventsList: React.FC = () => {
   const { user, hasPermission } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
@@ -1083,7 +1090,24 @@ const EventsList: React.FC = () => {
         e.venue.toLowerCase().includes(lower)
       );
     }
-    return result;
+    return [...result].sort((a, b) => {
+      const statusPriorityDiff =
+        (EVENT_STATUS_SORT_ORDER[a.status] ?? Number.MAX_SAFE_INTEGER) -
+        (EVENT_STATUS_SORT_ORDER[b.status] ?? Number.MAX_SAFE_INTEGER);
+
+      if (statusPriorityDiff !== 0) {
+        return statusPriorityDiff;
+      }
+
+      const startDateA = new Date(a.start_date).getTime();
+      const startDateB = new Date(b.start_date).getTime();
+
+      if (!Number.isNaN(startDateA) && !Number.isNaN(startDateB) && startDateA !== startDateB) {
+        return startDateA - startDateB;
+      }
+
+      return a.event_name.localeCompare(b.event_name);
+    });
   }, [events, searchTerm, statusFilter]);
 
   const eventSummary = useMemo(() => ({

@@ -78,6 +78,7 @@ const createEmptySignatoryState = () => ({
   sub_header: '',
   address: '',
   website: '',
+  footer: '',
   post_nominals: '',
   certificate_template_variant: DEFAULT_CERTIFICATE_TEMPLATE_VARIANT as CertificateTemplateVariant
 });
@@ -214,6 +215,7 @@ const Settings: React.FC = () => {
           sub_header: data.sub_header || '',
           address: data.address || '',
           website: data.website || '',
+          footer: data.footer || '',
           post_nominals: data.post_nominals || '',
           certificate_template_variant:
             data.certificate_template_variant === 'without_serial'
@@ -307,6 +309,7 @@ const Settings: React.FC = () => {
             sub_header: signatory.sub_header.trim() || null,
             address: signatory.address.trim() || null,
             website: signatory.website.trim() || null,
+            footer: signatory.footer.trim() || null,
             post_nominals: signatory.post_nominals.trim() || null,
             certificate_template_variant: signatory.certificate_template_variant
           })
@@ -325,6 +328,7 @@ const Settings: React.FC = () => {
             sub_header: signatory.sub_header.trim() || null,
             address: signatory.address.trim() || null,
             website: signatory.website.trim() || null,
+            footer: signatory.footer.trim() || null,
             post_nominals: signatory.post_nominals.trim() || null,
             certificate_template_variant: signatory.certificate_template_variant
           });
@@ -377,6 +381,7 @@ const Settings: React.FC = () => {
     sub_header: signatory.sub_header,
     address: signatory.address,
     website: signatory.website,
+    footer: signatory.footer,
     post_nominals: signatory.post_nominals,
     certificate_template_variant: signatory.certificate_template_variant
   };
@@ -603,6 +608,21 @@ const Settings: React.FC = () => {
                           placeholder="e.g. www.region10.dilg.gov.ph"
                           className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
                         />
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700">Footer</label>
+                        <textarea
+                          rows={3}
+                          disabled={!selectedOfficeId}
+                          value={signatory.footer}
+                          onChange={(e) => setSignatory({ ...signatory, footer: e.target.value })}
+                          placeholder="e.g. T: (088) 859-4181 E: records.dilg10@gmail.com FB: www.facebook.com/DILGX"
+                          className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                        />
+                        <p className="text-xs text-slate-500">
+                          Replaces the existing contact line under the quote on the certificate when provided.
+                        </p>
                       </div>
                     </div>
                   </section>

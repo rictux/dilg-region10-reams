@@ -17,6 +17,11 @@ interface AttendanceRow {
     pmLog?: { time: string, status: string };
 }
 
+const ATTENDANCE_EVENT_STATUS_SORT_ORDER: Record<string, number> = {
+    Ongoing: 0,
+    Completed: 1
+};
+
 const AttendanceList: React.FC = () => {
   const { user } = useAuth();
   const [data, setData] = useState<AttendanceRow[]>([]);
@@ -145,7 +150,11 @@ const AttendanceList: React.FC = () => {
   // Fetch Events
   useEffect(() => {
     const fetchAllEvents = async () => {
-        let query = supabase.from('events').select('*').order('start_date', { ascending: false });
+        let query = supabase
+            .from('events')
+            .select('*')
+            .in('status', ['Ongoing', 'Completed'])
+            .order('start_date', { ascending: false });
 
         // Filter events by office for non-admins
         if (user?.role !== 'Admin' && user?.office_id) {
@@ -154,11 +163,34 @@ const AttendanceList: React.FC = () => {
 
         const { data } = await query;
         if (data && data.length > 0) {
-            setEvents(data);
-            const defaultEvent = data.find((event) => event.status === 'Ongoing') || data[0];
+            const sortedEvents = [...data].sort((a, b) => {
+                const statusPriorityDiff =
+                    (ATTENDANCE_EVENT_STATUS_SORT_ORDER[a.status] ?? Number.MAX_SAFE_INTEGER) -
+                    (ATTENDANCE_EVENT_STATUS_SORT_ORDER[b.status] ?? Number.MAX_SAFE_INTEGER);
+
+                if (statusPriorityDiff !== 0) {
+                    return statusPriorityDiff;
+                }
+
+                const startDateA = new Date(a.start_date).getTime();
+                const startDateB = new Date(b.start_date).getTime();
+
+                if (!Number.isNaN(startDateA) && !Number.isNaN(startDateB) && startDateA !== startDateB) {
+                    return startDateB - startDateA;
+                }
+
+                return a.event_name.localeCompare(b.event_name);
+            });
+
+            setEvents(sortedEvents);
+            const defaultEvent = sortedEvents.find((event) => event.status === 'Ongoing') || sortedEvents[0];
             handleEventSelect(defaultEvent);
         } else {
             setEvents([]);
+            setSelectedEventId(null);
+            setSelectedEvent(null);
+            setSelectedDate('');
+            setEventDays([]);
             setLoading(false);
         }
     };
@@ -883,7 +915,7 @@ const AttendanceList: React.FC = () => {
                                 )}
                             </div>
                         </div>
-                        <div className="max-h-60 overflow-y-auto">
+                        <div className="max-h-[30rem] overflow-y-auto">
                             {filteredEvents.length > 0 ? (
                                 filteredEvents.map(e => (
                                     <div 
