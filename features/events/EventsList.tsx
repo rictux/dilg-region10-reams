@@ -2692,7 +2692,7 @@ const EventsList: React.FC = () => {
                                 </div>
                                 <input
                                     disabled={!hasEventCode}
-                                    maxLength={6}
+                                    maxLength={12}
                                     className={`block w-full pl-10 pr-3 py-2.5 border rounded-lg sm:text-sm transition-all ${
                                         hasEventCode
                                           ? 'border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500'
