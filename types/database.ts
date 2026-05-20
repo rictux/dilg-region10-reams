@@ -78,6 +78,8 @@ export interface EventParticipant {
   accept_photo_video?: boolean | null;
   store_to_db?: boolean | null;
   date_accommodation?: string[] | null;
+  ca_serial_no?: number | null;
+  ca_issued_at?: string | null;
 }
 
 export interface AttendanceLog {

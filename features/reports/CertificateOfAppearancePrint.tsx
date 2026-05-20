@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Event } from '../../types/database';
-import { ArrowLeft, Download, Loader2, Printer, Search } from 'lucide-react';
+import { ArrowLeft, Download, Hash, Info, Loader2, Printer, Search } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { toBlob, toPng } from 'html-to-image';
@@ -14,7 +14,12 @@ import CertificateOfAppearanceCard, {
   getEventDateRows
 } from './CertificateOfAppearanceTemplate';
 
-type CertificateParticipant = CertificateParticipantRecord;
+type CertificateParticipant = CertificateParticipantRecord & {
+  ca_serial_no: number | null;
+  role: 'Delegate' | 'Speaker' | 'Secretariat' | 'Guest' | 'VIP';
+};
+
+const isDelegateRole = (role: CertificateParticipant['role']) => role === 'Delegate';
 
 type DirectoryFileWriter = {
   write: (data: Blob) => Promise<void>;
@@ -303,7 +308,12 @@ const CertificateOfAppearancePrint: React.FC = () => {
   const { user } = useAuth();
   const previewRef = useRef<HTMLDivElement | null>(null);
   const batchPreviewRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const previewWrapperRef = useRef<HTMLDivElement | null>(null);
 
+  const A4_WIDTH_PX = (210 / 25.4) * 96;
+  const CERT_HEIGHT_PX = (148.5 / 25.4) * 96;
+
+  const [previewScale, setPreviewScale] = useState(1);
   const [event, setEvent] = useState<Event | null>(null);
   const [participants, setParticipants] = useState<CertificateParticipant[]>([]);
   const [signatory, setSignatory] = useState<CertificateSignatory>(null);
@@ -312,6 +322,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
   const [participantSearch, setParticipantSearch] = useState('');
   const [selectedParticipantId, setSelectedParticipantId] = useState<number | null>(null);
   const [isSavingCertificate, setIsSavingCertificate] = useState(false);
+  const [isGeneratingSerials, setIsGeneratingSerials] = useState(false);
   const [selectedDownloadIds, setSelectedDownloadIds] = useState<number[]>([]);
 
   useEffect(() => {
@@ -319,6 +330,22 @@ const CertificateOfAppearancePrint: React.FC = () => {
       fetchData(parseInt(eventId, 10));
     }
   }, [eventId, user]);
+
+  useEffect(() => {
+    const wrapper = previewWrapperRef.current;
+    if (!wrapper) return;
+
+    const update = () => {
+      const width = wrapper.getBoundingClientRect().width;
+      if (width <= 0) return;
+      setPreviewScale(Math.min(1, width / A4_WIDTH_PX));
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(wrapper);
+    return () => observer.disconnect();
+  }, [A4_WIDTH_PX, selectedParticipantId, participants.length]);
 
   useEffect(() => {
     if (participants.length === 0) {
@@ -409,6 +436,8 @@ const CertificateOfAppearancePrint: React.FC = () => {
           participant_id,
           needs_accommodation,
           date_accommodation,
+          ca_serial_no,
+          role,
           participants (*)
         `)
         .eq('event_id', id)
@@ -420,7 +449,9 @@ const CertificateOfAppearancePrint: React.FC = () => {
           participant: Array.isArray(record.participants) ? (record.participants[0] || null) : record.participants,
           needs_accommodation: !!record.needs_accommodation,
           date_accommodation: (record.date_accommodation || []).filter(Boolean),
-          log_dates: Array.from(logDatesByParticipant.get(record.participant_id) || []).sort()
+          log_dates: Array.from(logDatesByParticipant.get(record.participant_id) || []).sort(),
+          ca_serial_no: record.ca_serial_no ?? null,
+          role: (record.role as CertificateParticipant['role']) || 'Delegate'
         }))
         .filter((record): record is CertificateParticipant => !!record.participant)
         .sort((a, b) => {
@@ -441,13 +472,28 @@ const CertificateOfAppearancePrint: React.FC = () => {
     const search = participantSearch.trim().toLowerCase();
     if (!search) return participants;
 
-    return participants.filter((record) => {
+    return participants.filter((record: CertificateParticipant) => {
       const fullName = (record.participant.full_name || '').toLowerCase();
       const displayName = buildParticipantListName(record.participant).toLowerCase();
 
       return fullName.includes(search) || displayName.includes(search);
     });
   }, [participantSearch, participants]);
+
+  const groupedParticipants = useMemo(() => {
+    const delegates: CertificateParticipant[] = [];
+    const others: CertificateParticipant[] = [];
+
+    filteredParticipants.forEach((record: CertificateParticipant) => {
+      if (isDelegateRole(record.role)) {
+        delegates.push(record);
+      } else {
+        others.push(record);
+      }
+    });
+
+    return { delegates, others };
+  }, [filteredParticipants]);
 
   useEffect(() => {
     if (filteredParticipants.length === 0) return;
@@ -498,16 +544,70 @@ const CertificateOfAppearancePrint: React.FC = () => {
     return chunks;
   }, [printParticipants]);
 
-  const participantOrderById = useMemo(() => {
-    const orderMap = new Map<number, number>();
-    participants.forEach((record, index) => {
-      orderMap.set(record.participant.participant_id, index + 1);
+  const requiresReferenceCode = useMemo(() => !!event?.event_serial?.trim(), [event]);
+
+  const serialByParticipantId = useMemo(() => {
+    const serialMap = new Map<number, number>();
+    participants.forEach((record) => {
+      if (record.ca_serial_no != null) {
+        serialMap.set(record.participant.participant_id, record.ca_serial_no);
+      }
     });
-    return orderMap;
+    return serialMap;
   }, [participants]);
 
-  const handlePrint = () => {
+  const resolveCertificateSerial = (participantRecord: CertificateParticipant) => {
+    const storedSerial = serialByParticipantId.get(participantRecord.participant.participant_id);
+    if (!event || !storedSerial) return null;
+    return buildCertificateSerialNumber(event, officeCode, storedSerial);
+  };
+
+  const pendingSerialAssignments = useMemo<number[]>(() => {
+    if (!requiresReferenceCode) return [];
+    return selectedDownloadParticipants
+      .filter((record: CertificateParticipant) => record.ca_serial_no == null)
+      .map((record: CertificateParticipant) => record.participant.participant_id);
+  }, [requiresReferenceCode, selectedDownloadParticipants]);
+
+  const assignPendingSerials = async () => {
+    if (!eventId || pendingSerialAssignments.length === 0) return true;
+
+    try {
+      const { error } = await supabase.rpc('assign_ca_serials', {
+        p_event_id: parseInt(eventId, 10),
+        p_participant_ids: pendingSerialAssignments
+      });
+
+      if (error) throw error;
+
+      await fetchData(parseInt(eventId, 10));
+      return true;
+    } catch (error: any) {
+      console.error('Error assigning CA reference numbers', error);
+      const detail = error?.message || error?.details || error?.hint || 'Unknown error';
+      alert(`Unable to assign reference numbers: ${detail}`);
+      return false;
+    }
+  };
+
+  const handleGenerateSerials = async () => {
+    if (pendingSerialAssignments.length === 0) return;
+    setIsGeneratingSerials(true);
+    try {
+      await assignPendingSerials();
+    } finally {
+      setIsGeneratingSerials(false);
+    }
+  };
+
+  const handlePrint = async () => {
     if (printParticipants.length === 0) return;
+
+    if (requiresReferenceCode && pendingSerialAssignments.length > 0) {
+      const assigned = await assignPendingSerials();
+      if (!assigned) return;
+    }
+
     window.print();
   };
 
@@ -547,6 +647,11 @@ const writeCertificatesToDirectory = async (
 
     setIsSavingCertificate(true);
     try {
+      if (requiresReferenceCode && pendingSerialAssignments.length > 0) {
+        const assigned = await assignPendingSerials();
+        if (!assigned) return;
+      }
+
       if (selectedDownloadParticipants.length > 0) {
         const filesToSave: Array<{ fileName: string; blob: Blob }> = [];
         const batchPixelRatio = getBatchCertificatePixelRatio();
@@ -640,59 +745,122 @@ const writeCertificatesToDirectory = async (
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-slate-100 print:block print:min-h-screen print:h-auto print:overflow-visible print:bg-white">
       <div className="print:hidden w-full border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate('/reports')}
-                className="rounded-full p-2 transition-colors hover:bg-slate-100"
-              >
-                <ArrowLeft size={20} className="text-slate-600" />
-              </button>
-              <div>
-                <h1 className="text-lg font-bold text-slate-800">Certificate of Appearance</h1>
-                <p className="text-sm text-slate-500">
-                  {event.event_name} • {participants.length} participant{participants.length === 1 ? '' : 's'} with attendance logs
-                </p>
+        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/reports')}
+              className="shrink-0 rounded-full p-2 transition-colors hover:bg-slate-100"
+              title="Back to Reports"
+            >
+              <ArrowLeft size={18} className="text-slate-600" />
+            </button>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <h1 className="text-base font-bold text-slate-800 whitespace-nowrap">
+                  Certificate of Appearance
+                </h1>
+                <span className="hidden text-slate-300 sm:inline">·</span>
+                <span className="truncate text-sm text-slate-600" title={event.event_name}>
+                  {event.event_name}
+                </span>
               </div>
+              <p className="text-[11px] text-slate-500">
+                {participants.length} participant{participants.length === 1 ? '' : 's'} with attendance logs
+              </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="hidden shrink-0 items-center gap-2 md:flex">
+              {requiresReferenceCode && (
+                <button
+                  onClick={handleGenerateSerials}
+                  disabled={pendingSerialAssignments.length === 0 || isGeneratingSerials}
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Hash size={14} />
+                  {isGeneratingSerials ? 'Assigning...' : 'Assign Reference'}
+                  {pendingSerialAssignments.length > 0 && !isGeneratingSerials && (
+                    <span className="rounded-full bg-emerald-200 px-1.5 text-[10px] font-bold leading-4">
+                      {pendingSerialAssignments.length}
+                    </span>
+                  )}
+                </button>
+              )}
               <button
                 onClick={handleSaveCertificate}
                 disabled={(!selectedParticipant && selectedDownloadParticipants.length === 0) || isSavingCertificate}
-                className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Download size={16} />
-                {isSavingCertificate ? 'Saving...' : 'Save Certificate'}
+                <Download size={14} />
+                {isSavingCertificate ? 'Saving...' : 'Save'}
               </button>
               <button
                 onClick={handlePrint}
                 disabled={printParticipants.length === 0}
-                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                <Printer size={16} />
-                Print Certificates
+                <Printer size={14} />
+                Print
               </button>
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            Preview mode shows one certificate at a time. Printing still arranges certificates in pairs, with two certificates on each A4 page.
+          {/* Mobile-only button row (below md breakpoint) */}
+          <div className="mt-3 flex flex-wrap items-center gap-2 md:hidden">
+            {requiresReferenceCode && (
+              <button
+                onClick={handleGenerateSerials}
+                disabled={pendingSerialAssignments.length === 0 || isGeneratingSerials}
+                className="inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Hash size={14} />
+                {isGeneratingSerials ? 'Assigning...' : 'Assign Reference'}
+                {pendingSerialAssignments.length > 0 && !isGeneratingSerials && (
+                  <span className="rounded-full bg-emerald-200 px-1.5 text-[10px] font-bold leading-4">
+                    {pendingSerialAssignments.length}
+                  </span>
+                )}
+              </button>
+            )}
+            <button
+              onClick={handleSaveCertificate}
+              disabled={(!selectedParticipant && selectedDownloadParticipants.length === 0) || isSavingCertificate}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Download size={14} />
+              {isSavingCertificate ? 'Saving...' : 'Save'}
+            </button>
+            <button
+              onClick={handlePrint}
+              disabled={printParticipants.length === 0}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              <Printer size={14} />
+              Print
+            </button>
           </div>
+
+          {requiresReferenceCode && (
+            <div className="mt-2.5 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              <Info size={14} className="mt-0.5 shrink-0" />
+              <span>
+                This event uses reference coding. Tick participant(s) and click{' '}
+                <span className="font-semibold">Assign Reference</span> before saving or printing.
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="print:hidden mx-auto grid w-full max-w-7xl flex-1 min-h-0 gap-6 overflow-hidden px-4 py-6 sm:px-6 lg:grid-cols-[320px_minmax(0,1fr)] lg:px-8">
+      <div className="print:hidden mx-auto grid w-full max-w-[1600px] flex-1 min-h-0 gap-6 overflow-hidden px-4 py-6 sm:px-6 lg:grid-cols-[520px_minmax(0,1fr)] lg:px-8">
         <aside className="flex min-h-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-4">
-            <label className="mb-2 block text-sm font-medium text-slate-700">Search Participant</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="text"
                 value={participantSearch}
-                onChange={(e) => setParticipantSearch(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setParticipantSearch(e.target.value)}
                 placeholder="Type participant name..."
                 className="w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-14 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
@@ -739,40 +907,82 @@ const writeCertificatesToDirectory = async (
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
             {filteredParticipants.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
                 No participant matched your search.
               </div>
             ) : (
-              filteredParticipants.map((record) => {
-                const isSelected = selectedParticipant?.participant.participant_id === record.participant.participant_id;
-                const isMarkedForDownload = selectedDownloadIds.includes(record.participant.participant_id);
+              ([
+                {
+                  label: 'Guests, Speakers, Secretariat & VIP',
+                  records: groupedParticipants.others,
+                  labelClass: 'text-violet-700',
+                  countClass: 'bg-violet-100 text-violet-700',
+                  barClass: 'bg-violet-500'
+                },
+                {
+                  label: 'Delegates',
+                  records: groupedParticipants.delegates,
+                  labelClass: 'text-sky-700',
+                  countClass: 'bg-sky-100 text-sky-700',
+                  barClass: 'bg-sky-500'
+                }
+              ] as const).map((group) => {
+                if (group.records.length === 0) return null;
 
                 return (
-                  <div
-                    key={record.participant.participant_id}
-                    className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${
-                      isSelected
-                        ? 'border-indigo-200 bg-indigo-50 text-indigo-900'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        checked={isMarkedForDownload}
-                        onChange={() => toggleDownloadSelection(record.participant.participant_id)}
-                        className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setSelectedParticipantId(record.participant.participant_id)}
-                        className="min-w-0 flex-1 text-left"
-                      >
-                        <p className="text-sm font-semibold">{buildParticipantListName(record.participant)}</p>
-                        <p className="mt-1 text-[11px] text-slate-500">{record.participant.office || 'No office indicated'}</p>
-                      </button>
+                  <div key={group.label} className="space-y-2">
+                    <div className={`flex items-center justify-between gap-2 px-1 text-[11px] font-semibold uppercase tracking-wide ${group.labelClass}`}>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className={`inline-block h-3 w-1 rounded-full ${group.barClass}`} />
+                        <span className="truncate">{group.label}</span>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] ${group.countClass}`}>
+                        {group.records.length}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {group.records.map((record: CertificateParticipant) => {
+                        const isSelected = selectedParticipant?.participant.participant_id === record.participant.participant_id;
+                        const isMarkedForDownload = selectedDownloadIds.includes(record.participant.participant_id);
+
+                        return (
+                          <div
+                            key={record.participant.participant_id}
+                            className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                              isSelected
+                                ? 'border-indigo-200 bg-indigo-50 text-indigo-900'
+                                : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="flex items-start gap-2">
+                              <input
+                                type="checkbox"
+                                checked={isMarkedForDownload}
+                                onChange={() => toggleDownloadSelection(record.participant.participant_id)}
+                                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setSelectedParticipantId(record.participant.participant_id)}
+                                className="min-w-0 flex-1 text-left"
+                              >
+                                <div className="flex items-start justify-between gap-1.5">
+                                  <p className="truncate text-xs font-semibold">{buildParticipantListName(record.participant)}</p>
+                                  {requiresReferenceCode && record.ca_serial_no != null && (
+                                    <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">
+                                      #{String(record.ca_serial_no).padStart(2, '0')}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="mt-0.5 truncate text-[10px] text-slate-500">{record.participant.office || 'No office indicated'}</p>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -790,20 +1000,30 @@ const writeCertificatesToDirectory = async (
               </div>
 
               <div className="preview-scroll-area min-h-0 flex-1 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm sm:p-4">
-                <div className="mx-auto w-fit overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md">
-                  <div ref={previewRef} className="w-[210mm] bg-white">
-                    <CertificateOfAppearanceCard
-                      event={event}
-                      participantRecord={selectedParticipant}
-                      signatory={signatory}
-                      dateString={dateString}
-                      eventFoodInclusionMap={eventFoodInclusionMap}
-                      certificateSerialNumber={buildCertificateSerialNumber(
-                        event,
-                        officeCode,
-                        participantOrderById.get(selectedParticipant.participant.participant_id) || 1
-                      )}
-                    />
+                <div ref={previewWrapperRef} className="mx-auto" style={{ maxWidth: A4_WIDTH_PX }}>
+                  <div
+                    className="mx-auto overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md"
+                    style={{
+                      width: A4_WIDTH_PX * previewScale,
+                      height: CERT_HEIGHT_PX * previewScale
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: A4_WIDTH_PX,
+                        transform: `scale(${previewScale})`,
+                        transformOrigin: 'top left'
+                      }}
+                    >
+                      <CertificateOfAppearanceCard
+                        event={event}
+                        participantRecord={selectedParticipant}
+                        signatory={signatory}
+                        dateString={dateString}
+                        eventFoodInclusionMap={eventFoodInclusionMap}
+                        certificateSerialNumber={resolveCertificateSerial(selectedParticipant)}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -830,11 +1050,7 @@ const writeCertificatesToDirectory = async (
                 signatory={signatory}
                 dateString={dateString}
                 eventFoodInclusionMap={eventFoodInclusionMap}
-                certificateSerialNumber={buildCertificateSerialNumber(
-                  event,
-                  officeCode,
-                  participantOrderById.get(participantRecord.participant.participant_id) || 1
-                )}
+                certificateSerialNumber={resolveCertificateSerial(participantRecord)}
                 showDivider={index === 0}
               />
             ))}
@@ -843,6 +1059,18 @@ const writeCertificatesToDirectory = async (
       </div>
 
       <div className="pointer-events-none fixed left-[-10000px] top-0 z-[-1] print:hidden">
+        {selectedParticipant && (
+          <div ref={previewRef} className="mb-4 w-[210mm] bg-white">
+            <CertificateOfAppearanceCard
+              event={event}
+              participantRecord={selectedParticipant}
+              signatory={signatory}
+              dateString={dateString}
+              eventFoodInclusionMap={eventFoodInclusionMap}
+              certificateSerialNumber={resolveCertificateSerial(selectedParticipant)}
+            />
+          </div>
+        )}
         {selectedDownloadParticipants.map((participantRecord) => (
           <div
             key={`download-${participantRecord.participant.participant_id}`}
@@ -857,11 +1085,7 @@ const writeCertificatesToDirectory = async (
               signatory={signatory}
               dateString={dateString}
               eventFoodInclusionMap={eventFoodInclusionMap}
-              certificateSerialNumber={buildCertificateSerialNumber(
-                event,
-                officeCode,
-                participantOrderById.get(participantRecord.participant.participant_id) || 1
-              )}
+              certificateSerialNumber={resolveCertificateSerial(participantRecord)}
             />
           </div>
         ))}

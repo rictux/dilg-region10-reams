@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS events (
     venue TEXT NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL, -- Can be same as start_date
+    event_serial TEXT,
     status TEXT NOT NULL DEFAULT 'Scheduled' CHECK (status IN ('Scheduled', 'Ongoing', 'Completed', 'Cancelled')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     organize_by BIGINT REFERENCES offices(office_id) ON DELETE SET NULL,
@@ -79,8 +80,63 @@ CREATE TABLE IF NOT EXISTS event_participants (
     accept_photo_video BOOLEAN NOT NULL DEFAULT FALSE,
     store_to_db BOOLEAN NOT NULL DEFAULT FALSE,
     date_accommodation DATE[],
+    ca_serial_no INT NULL,
+    ca_issued_at TIMESTAMP WITH TIME ZONE NULL,
     UNIQUE(event_id, participant_id)
 );
+
+-- Ensure CA serial numbers are unique per event (skips NULL rows that haven't been issued yet).
+CREATE UNIQUE INDEX IF NOT EXISTS event_participants_ca_serial_unique
+    ON event_participants(event_id, ca_serial_no)
+    WHERE ca_serial_no IS NOT NULL;
+
+-- Assigns the next sequential CA serial numbers to the given participants for an event.
+-- Skips participants that already have a serial. Refuses to assign when the event has no event_serial.
+-- Uses a transaction-level advisory lock keyed by event_id to make concurrent calls safe.
+CREATE OR REPLACE FUNCTION assign_ca_serials(
+    p_event_id BIGINT,
+    p_participant_ids BIGINT[]
+)
+RETURNS TABLE(out_participant_id BIGINT, out_ca_serial_no INT) AS $$
+DECLARE
+    v_event_serial TEXT;
+    v_next_no INT;
+    v_participant_id BIGINT;
+BEGIN
+    SELECT event_serial INTO v_event_serial FROM events WHERE event_id = p_event_id;
+
+    IF v_event_serial IS NULL OR btrim(v_event_serial) = '' THEN
+        RAISE EXCEPTION 'Event % does not use reference coding', p_event_id
+            USING ERRCODE = 'check_violation';
+    END IF;
+
+    PERFORM pg_advisory_xact_lock(p_event_id);
+
+    SELECT COALESCE(MAX(ep.ca_serial_no), 0) INTO v_next_no
+    FROM event_participants ep
+    WHERE ep.event_id = p_event_id;
+
+    FOREACH v_participant_id IN ARRAY p_participant_ids LOOP
+        UPDATE event_participants ep
+        SET ca_serial_no = v_next_no + 1,
+            ca_issued_at = NOW()
+        WHERE ep.event_id = p_event_id
+          AND ep.participant_id = v_participant_id
+          AND ep.ca_serial_no IS NULL;
+
+        IF FOUND THEN
+            v_next_no := v_next_no + 1;
+        END IF;
+    END LOOP;
+
+    RETURN QUERY
+    SELECT ep.participant_id::BIGINT, ep.ca_serial_no::INT
+    FROM event_participants ep
+    WHERE ep.event_id = p_event_id
+      AND ep.participant_id = ANY(p_participant_ids);
+END;
+$$ LANGUAGE plpgsql;
+
 
 CREATE OR REPLACE FUNCTION events_set_status_from_dates()
 RETURNS TRIGGER AS $$
