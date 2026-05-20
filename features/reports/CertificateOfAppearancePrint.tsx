@@ -5,7 +5,7 @@ import { Event } from '../../types/database';
 import { ArrowLeft, Download, Hash, Info, Loader2, Printer, Search } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
-import { toBlob, toPng } from 'html-to-image';
+import { toBlob, toJpeg, toPng } from 'html-to-image';
 import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
 import CertificateOfAppearanceCard, {
   buildEventDateString,
@@ -49,29 +49,64 @@ const sanitizeFileName = (value: string) => {
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-const renderCertificateBlob = async (node: HTMLElement, pixelRatio: number) => {
-  const blob = await toBlob(node, {
+const renderCertificateBlob = async (
+  node: HTMLElement,
+  pixelRatio: number,
+  format: 'png' | 'jpeg' = 'png'
+) => {
+  const baseOptions = {
     cacheBust: true,
     backgroundColor: '#ffffff',
-    pixelRatio
+    pixelRatio,
+    ...(format === 'jpeg' ? { quality: 0.92 } : {})
+  };
+
+  const blob = await toBlob(node, {
+    ...baseOptions,
+    type: format === 'jpeg' ? 'image/jpeg' : 'image/png'
   });
 
   if (blob) return blob;
 
-  const dataUrl = await toPng(node, {
-    cacheBust: true,
-    backgroundColor: '#ffffff',
-    pixelRatio
-  });
+  const dataUrl = format === 'jpeg'
+    ? await toJpeg(node, baseOptions)
+    : await toPng(node, baseOptions);
 
   const response = await fetch(dataUrl);
   return response.blob();
 };
 
-const getBatchCertificatePixelRatio = () => {
-  const devicePixelRatio = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-  return Math.min(devicePixelRatio, 1.5);
+const BATCH_RENDER_SIZE = 20;
+const BATCH_PIXEL_RATIO = 1;
+const BATCH_OUTPUT_FORMAT: 'jpeg' = 'jpeg';
+
+const preloadCertificateAssets = async (extraUrls: Array<string | null | undefined>) => {
+  const urls = [
+    '/assets/dilg_logo.png',
+    '/assets/bagong_pilipinas_logo.png',
+    '/assets/intensity.png',
+    ...extraUrls
+  ].filter((url): url is string => !!url);
+
+  await Promise.all(
+    urls.map(
+      (url) =>
+        new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+          img.src = url;
+        })
+    )
+  );
 };
+
+const waitForNextPaint = () =>
+  new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
 
 const ZIP_UTF8_FLAG = 0x0800;
 const ZIP_STORE_METHOD = 0;
@@ -239,8 +274,10 @@ const getWindowWithDirectoryPicker = () =>
 
 const canPickDirectory = () => typeof getWindowWithDirectoryPicker().showDirectoryPicker === 'function';
 
-const buildCertificateFileName = (fullName: string | null | undefined) =>
-  `${sanitizeFileName(fullName || 'Certificate')}_Certificate_of_Appearance.png`;
+const buildCertificateFileName = (
+  fullName: string | null | undefined,
+  extension: 'png' | 'jpg' = 'png'
+) => `${sanitizeFileName(fullName || 'Certificate')}_Certificate_of_Appearance.${extension}`;
 
 const buildCertificateArchiveFileName = (event: Event) =>
   `${sanitizeFileName(event.event_name || 'Certificates')}_Certificates.zip`;
@@ -324,6 +361,12 @@ const CertificateOfAppearancePrint: React.FC = () => {
   const [isSavingCertificate, setIsSavingCertificate] = useState(false);
   const [isGeneratingSerials, setIsGeneratingSerials] = useState(false);
   const [selectedDownloadIds, setSelectedDownloadIds] = useState<number[]>([]);
+  const [renderingParticipantIds, setRenderingParticipantIds] = useState<number[]>([]);
+  const [saveProgress, setSaveProgress] = useState<{ done: number; total: number } | null>(null);
+  const [printQueue, setPrintQueue] = useState<CertificateParticipant[]>([]);
+  const [printPhase, setPrintPhase] = useState<'idle' | 'generating' | 'opening'>('idle');
+  const [printProgress, setPrintProgress] = useState<{ done: number; total: number } | null>(null);
+  const isPreparingPrint = printPhase !== 'idle';
 
   useEffect(() => {
     if (eventId && user) {
@@ -536,13 +579,13 @@ const CertificateOfAppearancePrint: React.FC = () => {
     );
   }, [event]);
 
-  const chunkedPrintParticipants = useMemo(() => {
+  const chunkedPrintQueue = useMemo(() => {
     const chunks: CertificateParticipant[][] = [];
-    for (let i = 0; i < printParticipants.length; i += 2) {
-      chunks.push(printParticipants.slice(i, i + 2));
+    for (let i = 0; i < printQueue.length; i += 2) {
+      chunks.push(printQueue.slice(i, i + 2));
     }
     return chunks;
-  }, [printParticipants]);
+  }, [printQueue]);
 
   const requiresReferenceCode = useMemo(() => !!event?.event_serial?.trim(), [event]);
 
@@ -608,8 +651,43 @@ const CertificateOfAppearancePrint: React.FC = () => {
       if (!assigned) return;
     }
 
-    window.print();
+    setPrintPhase('generating');
+    setPrintProgress({ done: 0, total: printParticipants.length });
+
+    try {
+      await preloadCertificateAssets([signatory?.esig_link]);
+
+      for (let i = 0; i < printParticipants.length; i += BATCH_RENDER_SIZE) {
+        const nextSlice = printParticipants.slice(
+          0,
+          Math.min(i + BATCH_RENDER_SIZE, printParticipants.length)
+        );
+        setPrintQueue(nextSlice);
+        await waitForNextPaint();
+        setPrintProgress({ done: nextSlice.length, total: printParticipants.length });
+      }
+
+      setPrintPhase('opening');
+      setPrintProgress(null);
+      await waitForNextPaint();
+      await wait(50);
+      window.print();
+    } catch (error) {
+      console.error('Error preparing print job', error);
+      alert('Unable to prepare the print preview right now.');
+    } finally {
+      setPrintPhase('idle');
+      setPrintProgress(null);
+    }
   };
+
+  useEffect(() => {
+    const handleAfterPrint = () => {
+      setPrintQueue([]);
+    };
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => window.removeEventListener('afterprint', handleAfterPrint);
+  }, []);
 
   const triggerDownload = async (blob: Blob, fileName: string) => {
     const objectUrl = URL.createObjectURL(blob);
@@ -654,17 +732,35 @@ const writeCertificatesToDirectory = async (
 
       if (selectedDownloadParticipants.length > 0) {
         const filesToSave: Array<{ fileName: string; blob: Blob }> = [];
-        const batchPixelRatio = getBatchCertificatePixelRatio();
 
-        for (const participantRecord of selectedDownloadParticipants) {
-          const node = batchPreviewRefs.current[participantRecord.participant.participant_id];
-          if (!node) continue;
+        await preloadCertificateAssets([signatory?.esig_link]);
+        setSaveProgress({ done: 0, total: selectedDownloadParticipants.length });
 
-          filesToSave.push({
-            fileName: buildCertificateFileName(participantRecord.participant.full_name),
-            blob: await renderCertificateBlob(node, batchPixelRatio)
+        for (let i = 0; i < selectedDownloadParticipants.length; i += BATCH_RENDER_SIZE) {
+          const batch = selectedDownloadParticipants.slice(i, i + BATCH_RENDER_SIZE);
+          const batchIds = batch.map((record: CertificateParticipant) => record.participant.participant_id);
+
+          setRenderingParticipantIds(batchIds);
+          await waitForNextPaint();
+
+          for (const participantRecord of batch) {
+            const node = batchPreviewRefs.current[participantRecord.participant.participant_id];
+            if (!node) continue;
+
+            filesToSave.push({
+              fileName: buildCertificateFileName(participantRecord.participant.full_name, 'jpg'),
+              blob: await renderCertificateBlob(node, BATCH_PIXEL_RATIO, BATCH_OUTPUT_FORMAT)
+            });
+
+            setSaveProgress({ done: filesToSave.length, total: selectedDownloadParticipants.length });
+          }
+
+          batchIds.forEach((id: number) => {
+            delete batchPreviewRefs.current[id];
           });
         }
+
+        setRenderingParticipantIds([]);
 
         if (filesToSave.length === 0) return;
 
@@ -704,6 +800,8 @@ const writeCertificatesToDirectory = async (
       alert('Unable to save the certificate right now.');
     } finally {
       setIsSavingCertificate(false);
+      setRenderingParticipantIds([]);
+      setSaveProgress(null);
     }
   };
 
@@ -792,15 +890,25 @@ const writeCertificatesToDirectory = async (
                 className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Download size={14} />
-                {isSavingCertificate ? 'Saving...' : 'Save'}
+                {isSavingCertificate
+                  ? saveProgress
+                    ? `Saving ${saveProgress.done}/${saveProgress.total}...`
+                    : 'Saving...'
+                  : 'Save'}
               </button>
               <button
                 onClick={handlePrint}
-                disabled={printParticipants.length === 0}
+                disabled={printParticipants.length === 0 || isPreparingPrint}
                 className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 <Printer size={14} />
-                Print
+                {printPhase === 'opening'
+                  ? 'Opening print preview...'
+                  : printPhase === 'generating'
+                    ? printProgress
+                      ? `Generating ${printProgress.done}/${printProgress.total}...`
+                      : 'Generating...'
+                    : 'Print'}
               </button>
             </div>
           </div>
@@ -828,15 +936,25 @@ const writeCertificatesToDirectory = async (
               className="inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Download size={14} />
-              {isSavingCertificate ? 'Saving...' : 'Save'}
+              {isSavingCertificate
+                ? saveProgress
+                  ? `Saving ${saveProgress.done}/${saveProgress.total}...`
+                  : 'Saving...'
+                : 'Save'}
             </button>
             <button
               onClick={handlePrint}
-              disabled={printParticipants.length === 0}
+              disabled={printParticipants.length === 0 || isPreparingPrint}
               className="inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               <Printer size={14} />
-              Print
+              {printPhase === 'opening'
+                ? 'Opening print preview...'
+                : printPhase === 'generating'
+                  ? printProgress
+                    ? `Generating ${printProgress.done}/${printProgress.total}...`
+                    : 'Generating...'
+                  : 'Print'}
             </button>
           </div>
 
@@ -1037,10 +1155,10 @@ const writeCertificatesToDirectory = async (
       </div>
 
       <div className="hidden print:flex print:w-full print:flex-col print:items-center">
-        {chunkedPrintParticipants.map((pair, pageIndex) => (
+        {chunkedPrintQueue.map((pair: CertificateParticipant[], pageIndex: number) => (
           <div
             key={pageIndex}
-            className={`${pageIndex < chunkedPrintParticipants.length - 1 ? 'page-break-after-always ' : ''}relative flex h-[297mm] w-[210mm] flex-col overflow-hidden bg-white`}
+            className={`${pageIndex < chunkedPrintQueue.length - 1 ? 'page-break-after-always ' : ''}relative flex h-[297mm] w-[210mm] flex-col overflow-hidden bg-white`}
           >
             {pair.map((participantRecord, index) => (
               <CertificateOfAppearanceCard
@@ -1071,24 +1189,28 @@ const writeCertificatesToDirectory = async (
             />
           </div>
         )}
-        {selectedDownloadParticipants.map((participantRecord) => (
-          <div
-            key={`download-${participantRecord.participant.participant_id}`}
-            ref={(node) => {
-              batchPreviewRefs.current[participantRecord.participant.participant_id] = node;
-            }}
-            className="mb-4 w-[210mm] bg-white"
-          >
-            <CertificateOfAppearanceCard
-              event={event}
-              participantRecord={participantRecord}
-              signatory={signatory}
-              dateString={dateString}
-              eventFoodInclusionMap={eventFoodInclusionMap}
-              certificateSerialNumber={resolveCertificateSerial(participantRecord)}
-            />
-          </div>
-        ))}
+        {participants
+          .filter((record: CertificateParticipant) =>
+            renderingParticipantIds.includes(record.participant.participant_id)
+          )
+          .map((participantRecord: CertificateParticipant) => (
+            <div
+              key={`download-${participantRecord.participant.participant_id}`}
+              ref={(node: HTMLDivElement | null) => {
+                batchPreviewRefs.current[participantRecord.participant.participant_id] = node;
+              }}
+              className="mb-4 w-[210mm] bg-white"
+            >
+              <CertificateOfAppearanceCard
+                event={event}
+                participantRecord={participantRecord}
+                signatory={signatory}
+                dateString={dateString}
+                eventFoodInclusionMap={eventFoodInclusionMap}
+                certificateSerialNumber={resolveCertificateSerial(participantRecord)}
+              />
+            </div>
+          ))}
       </div>
 
       <style>{`

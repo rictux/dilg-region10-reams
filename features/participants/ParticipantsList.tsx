@@ -79,8 +79,8 @@ const AttendanceList: React.FC = () => {
       accommodation_pax: 0,
       date_accommodation: [] as string[],
       participant_id: null as number | null,
-      accept_photo_video: false,
-      store_to_db: false
+      accept_photo_video: true,
+      store_to_db: true
   });
   const [suggestions, setSuggestions] = useState<Participant[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -830,8 +830,8 @@ const AttendanceList: React.FC = () => {
               accommodation_pax: 0,
               date_accommodation: [],
               participant_id: null,
-              accept_photo_video: false,
-              store_to_db: false
+              accept_photo_video: true,
+              store_to_db: true
           });
           setSuggestions([]);
           // fetchAttendance will be triggered by supabase real-time channel

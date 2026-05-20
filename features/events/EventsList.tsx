@@ -72,8 +72,8 @@ const createEmptyParticipantForm = (): ParticipantFormData => ({
   accommodation_pax: 0,
   date_accommodation: [],
   participant_id: null,
-  accept_photo_video: false,
-  store_to_db: false
+  accept_photo_video: true,
+  store_to_db: true
 });
 
 const getDateRangeOptions = (start?: string | null, end?: string | null) => {
