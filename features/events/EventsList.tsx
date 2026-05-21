@@ -1194,7 +1194,7 @@ const EventsList: React.FC = () => {
       const startDateB = new Date(b.start_date).getTime();
 
       if (!Number.isNaN(startDateA) && !Number.isNaN(startDateB) && startDateA !== startDateB) {
-        return startDateA - startDateB;
+        return a.status === 'Completed' ? startDateB - startDateA : startDateA - startDateB;
       }
 
       return a.event_name.localeCompare(b.event_name);
