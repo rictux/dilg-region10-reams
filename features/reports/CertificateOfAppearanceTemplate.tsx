@@ -226,6 +226,7 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
   const signatoryNameClass = isUltraCompactLayout ? 'text-[11px]' : isCompactLayout ? 'text-[12px]' : 'text-[14px]';
   const signatoryPositionClass = isUltraCompactLayout ? 'text-[10px]' : isCompactLayout ? 'text-[11px]' : isDenseLayout ? 'text-[12px]' : 'text-[13px]';
   const footerClass = isUltraCompactLayout ? 'text-[6px]' : isCompactLayout ? 'text-[7px]' : isDenseLayout ? 'text-[8px]' : 'text-[9px]';
+  const disclaimerClass = isUltraCompactLayout ? 'text-[5px]' : isCompactLayout ? 'text-[6px]' : isDenseLayout ? 'text-[7px]' : 'text-[8px]';
   const footerImageClass = isUltraCompactLayout ? 'mb-0.5 h-3.5' : isCompactLayout ? 'mb-0.5 h-5' : isDenseLayout ? 'mb-0.5 h-6' : 'mb-1 h-7';
 
   return (
@@ -299,7 +300,7 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
           </span>
           <span>attended the</span>
           <span className="font-bold mx-1">{event.event_name}</span>
-          <span>held on {dateString}, at {event.venue}.</span>
+          <span>at {event.venue}.</span>
         </div>
 
         <div className={`${supportingTextClass} text-justify font-serif`}>
@@ -385,6 +386,9 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
             <p className="italic font-bold">"Matino, Mahusay at Maasahan"</p>
             <p>{certificateFooter}</p>
           </div>
+          <p className={`${disclaimerClass} w-full mt-1 italic text-slate-500 text-left leading-tight`}>
+            This document is system-generated and digitally signed. It does not require a wet signature or the Department's official stamp to be considered valid.
+          </p>
         </div>
       </div>
 

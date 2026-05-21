@@ -275,9 +275,30 @@ const getWindowWithDirectoryPicker = () =>
 const canPickDirectory = () => typeof getWindowWithDirectoryPicker().showDirectoryPicker === 'function';
 
 const buildCertificateFileName = (
-  fullName: string | null | undefined,
+  participant: {
+    f_name?: string | null;
+    l_name?: string | null;
+    m_initial?: string | null;
+    suffix?: string | null;
+    full_name?: string | null;
+  },
   extension: 'png' | 'jpg' = 'png'
-) => `${sanitizeFileName(fullName || 'Certificate')}_Certificate_of_Appearance.${extension}`;
+) => {
+  const parts = [
+    participant.l_name,
+    participant.suffix,
+    participant.f_name,
+    participant.m_initial?.replace(/\./g, '')
+  ]
+    .map((part) => sanitizeFileName(part || ''))
+    .filter(Boolean);
+
+  const baseName = parts.length > 0
+    ? parts.join('_')
+    : sanitizeFileName(participant.full_name || 'Certificate');
+
+  return `${baseName}_CA.${extension}`;
+};
 
 const buildCertificateArchiveFileName = (event: Event) =>
   `${sanitizeFileName(event.event_name || 'Certificates')}_Certificates.zip`;
@@ -748,7 +769,7 @@ const writeCertificatesToDirectory = async (
             if (!node) continue;
 
             filesToSave.push({
-              fileName: buildCertificateFileName(participantRecord.participant.full_name, 'jpg'),
+              fileName: buildCertificateFileName(participantRecord.participant, 'jpg'),
               blob: await renderCertificateBlob(node, BATCH_PIXEL_RATIO, BATCH_OUTPUT_FORMAT)
             });
 
@@ -788,7 +809,7 @@ const writeCertificatesToDirectory = async (
       } else if (previewRef.current && selectedParticipant) {
         await triggerDownload(
           await renderCertificateBlob(previewRef.current, 2),
-          buildCertificateFileName(selectedParticipant.participant.full_name)
+          buildCertificateFileName(selectedParticipant.participant)
         );
       }
     } catch (error) {
