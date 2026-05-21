@@ -50,6 +50,12 @@ const EventRegistration: React.FC = () => {
   const [showQrScanner, setShowQrScanner] = useState(false);
   const [showMatchPrompt, setShowMatchPrompt] = useState(false);
   const [potentialMatches, setPotentialMatches] = useState<ParticipantMatch[]>([]);
+  const [inlineMatches, setInlineMatches] = useState<ParticipantMatch[]>([]);
+  const [inlineMatchDismissed, setInlineMatchDismissed] = useState(false);
+  const [inlineLookupLoading, setInlineLookupLoading] = useState(false);
+  const [applyingExistingRecord, setApplyingExistingRecord] = useState(false);
+  const [revealEmail, setRevealEmail] = useState(false);
+  const [revealMobile, setRevealMobile] = useState(false);
   
   // Ref for saving image
   const ticketRef = useRef<HTMLDivElement>(null);
@@ -186,13 +192,20 @@ const EventRegistration: React.FC = () => {
     if (!value) return '';
     const [localPart, domain] = value.split('@');
     if (!localPart || !domain) return value;
-    return `${localPart.charAt(0)}***@${domain}`;
+    if (localPart.length <= 3) {
+      return `${localPart.charAt(0)}***${localPart.slice(-Math.min(2, Math.max(localPart.length - 1, 0)))}@${domain}`;
+    }
+    const stars = '*'.repeat(Math.max(localPart.length - 3, 3));
+    return `${localPart.charAt(0)}${stars}${localPart.slice(-2)}@${domain}`;
   };
 
   const maskMobile = (value?: string | null) => {
     if (!value) return '';
-    if (value.length <= 4) return `${value.slice(0, 1)}***`;
-    return `${value.slice(0, 2)}${'*'.repeat(Math.max(value.length - 4, 3))}${value.slice(-2)}`;
+    if (value.length <= 5) {
+      return `${value.slice(0, 1)}***${value.slice(-Math.min(3, Math.max(value.length - 1, 0)))}`;
+    }
+    const stars = '*'.repeat(Math.max(value.length - 5, 3));
+    return `${value.slice(0, 2)}${stars}${value.slice(-3)}`;
   };
 
   const getParticipantDisplayName = (match: ParticipantMatch) => {
@@ -348,6 +361,101 @@ const EventRegistration: React.FC = () => {
     );
 
     return attachParticipationCounts(baseMatches);
+  };
+
+  useEffect(() => {
+    const f = formData.f_name.trim();
+    const l = formData.l_name.trim();
+
+    if (formData.participant_code) {
+      setInlineMatches([]);
+      return;
+    }
+
+    if (!f || !l) {
+      setInlineMatches([]);
+      return;
+    }
+
+    setInlineMatchDismissed(false);
+
+    const handle = setTimeout(async () => {
+      setInlineLookupLoading(true);
+      try {
+        const matches = await findPotentialNameMatches();
+        setInlineMatches(matches);
+      } catch (err) {
+        console.error('Name lookup failed', err);
+      } finally {
+        setInlineLookupLoading(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(handle);
+  }, [formData.f_name, formData.l_name, formData.participant_code]);
+
+  const dismissInlineMatch = () => {
+    setInlineMatches([]);
+    setInlineMatchDismissed(true);
+  };
+
+  const applyExistingRecord = async (match: ParticipantMatch) => {
+    setApplyingExistingRecord(true);
+    try {
+      const { data, error } = await supabase
+        .from('participants')
+        .select('*')
+        .eq('participant_id', match.participant_id)
+        .single();
+
+      if (error || !data) {
+        toast.error('Failed to load record. Please try again.');
+        return;
+      }
+
+      setFormData((prev: typeof formData) => ({
+        ...prev,
+        f_name: data.f_name || '',
+        l_name: data.l_name || '',
+        m_initial: data.m_initial || '',
+        suffix: data.suffix || '',
+        full_name: data.full_name || '',
+        email: data.email || '',
+        gender: data.gender || 'Male',
+        position: data.position || '',
+        office: data.office || '',
+        mobile_no: data.mobile_no || '',
+        age_group: data.age_group || '18-24',
+        pwd: data.pwd || 'No',
+        indigenous_people: data.indigenous_people || 'No',
+        location_id: data.location_id,
+        participant_code: data.participant_code || ''
+      }));
+
+      if (data.location_id) {
+        const loc = locations.find((l: RefLocation) => l.location_id === data.location_id);
+        if (loc) {
+          setAffiliationType('LGU');
+          setSelectedProvince(loc.province_huc);
+          setSelectedCity(loc.city_mun || '');
+        } else {
+          setAffiliationType('Office');
+        }
+      } else {
+        setAffiliationType('Office');
+      }
+
+      setInlineMatches([]);
+      setInlineMatchDismissed(true);
+      setRevealEmail(false);
+      setRevealMobile(false);
+      toast.success('Existing record loaded. Review your details and complete registration.');
+    } catch (err) {
+      console.error('Failed to apply existing record', err);
+      toast.error('Failed to load record. Please try again.');
+    } finally {
+      setApplyingExistingRecord(false);
+    }
   };
 
   const processRegistration = async (options?: { existingUser?: ParticipantMatch | null; skipPotentialMatch?: boolean }) => {
@@ -537,6 +645,8 @@ const EventRegistration: React.FC = () => {
         } else {
           setAffiliationType('Office');
         }
+        setRevealEmail(false);
+        setRevealMobile(false);
         setError(null);
       }
     } catch (err: any) {
@@ -548,7 +658,8 @@ const EventRegistration: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await processRegistration();
+    const skipPotentialMatch = inlineMatchDismissed || inlineMatches.length > 0;
+    await processRegistration({ skipPotentialMatch });
   };
 
   const handleDownload = async () => {
@@ -753,16 +864,6 @@ const EventRegistration: React.FC = () => {
                     <div className="space-y-4">
                         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b pb-2 mb-4">Personal Information</h3>
                         
-                        {formData.participant_code && (
-                            <div className="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center gap-3">
-                                <CheckCircle className="text-indigo-600" size={20} />
-                                <div>
-                                    <p className="text-xs text-indigo-600 font-semibold uppercase">Scanned Participant Code</p>
-                                    <p className="text-sm font-medium text-slate-800">{formData.participant_code}</p>
-                                </div>
-                            </div>
-                        )}
-
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="relative">
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">First Name</label>
@@ -798,6 +899,67 @@ const EventRegistration: React.FC = () => {
                             </div>
                         </div>
 
+                        {inlineLookupLoading && inlineMatches.length === 0 && !inlineMatchDismissed && (
+                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                                <Loader2 size={14} className="animate-spin" />
+                                Checking for existing records...
+                            </div>
+                        )}
+
+                        {inlineMatches.length > 0 && !inlineMatchDismissed && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="flex items-start gap-3">
+                                    <Info className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
+                                    <div className="flex-1">
+                                        <p className="text-sm font-bold text-amber-900">
+                                            {inlineMatches.length === 1
+                                                ? 'We found an existing record matching your name'
+                                                : `We found ${inlineMatches.length} existing records matching your name`}
+                                        </p>
+                                        <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                                            Selecting an existing record will autofill the rest of the form. Sensitive details are partially hidden for your privacy.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 space-y-3">
+                                    {inlineMatches.map((match) => (
+                                        <div key={match.participant_id} className="bg-white border border-amber-200 rounded-lg p-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                                            <div className="flex-1 min-w-0 space-y-1">
+                                                <p className="text-sm font-bold text-slate-900">{getParticipantDisplayName(match)}</p>
+                                                <p className="text-xs text-slate-500">
+                                                    Past events: <span className="font-medium text-slate-700">{match.participatedEventsCount ?? 0}</span>
+                                                    {match.position && <> · {match.position}</>}
+                                                </p>
+                                                {match.office && <p className="text-xs text-slate-500 truncate">{match.office}</p>}
+                                                {match.email && <p className="text-xs text-slate-500 font-mono">{maskEmail(match.email)}</p>}
+                                                {match.mobile_no && <p className="text-xs text-slate-500 font-mono">{maskMobile(match.mobile_no)}</p>}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => applyExistingRecord(match)}
+                                                disabled={applyingExistingRecord}
+                                                className="whitespace-nowrap bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                            >
+                                                {applyingExistingRecord && <Loader2 size={14} className="animate-spin" />}
+                                                Use this record
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="mt-3 flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={dismissInlineMatch}
+                                        className="text-xs font-medium text-amber-800 hover:text-amber-900 underline underline-offset-2"
+                                    >
+                                        Not me, continue with new registration
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Middle Initial</label>
@@ -829,27 +991,53 @@ const EventRegistration: React.FC = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address</label>
                                 <div className="relative">
                                     <Mail className="absolute left-3 top-3 text-slate-400" size={18} />
-                                    <input 
-                                         type="email"
-                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                                    <input
+                                         type={!!formData.participant_code && !!formData.email && !revealEmail ? 'text' : 'email'}
+                                        className={`w-full pl-10 ${!!formData.participant_code && !!formData.email && !revealEmail ? 'pr-16 bg-slate-50 text-slate-500 font-mono cursor-not-allowed' : 'pr-4'} py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all`}
                                         placeholder="juandelacruz@gmail.com"
-                                        value={formData.email}
+                                        value={!!formData.participant_code && !!formData.email && !revealEmail ? maskEmail(formData.email) : formData.email}
                                         onChange={e => setFormData({...formData, email: e.target.value})}
+                                        readOnly={!!formData.participant_code && !!formData.email && !revealEmail}
                                     />
+                                    {!!formData.participant_code && !!formData.email && !revealEmail && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setRevealEmail(true);
+                                                setFormData({ ...formData, email: '' });
+                                            }}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                                        >
+                                            Edit
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                              <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Mobile No.</label>
                                 <div className="relative">
                                     <Phone className="absolute left-3 top-3 text-slate-400" size={18} />
-                                    <input 
-                                        type="tel"
-                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                                    <input
+                                        type={!!formData.participant_code && !!formData.mobile_no && !revealMobile ? 'text' : 'tel'}
+                                        className={`w-full pl-10 ${!!formData.participant_code && !!formData.mobile_no && !revealMobile ? 'pr-16 bg-slate-50 text-slate-500 font-mono cursor-not-allowed' : 'pr-4'} py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all`}
                                         placeholder="09123456789"
-                                        value={formData.mobile_no}
+                                        value={!!formData.participant_code && !!formData.mobile_no && !revealMobile ? maskMobile(formData.mobile_no) : formData.mobile_no}
                                         onChange={e => setFormData({...formData, mobile_no: e.target.value.replace(/[^0-9]/g, '')})}
                                         maxLength={11}
+                                        readOnly={!!formData.participant_code && !!formData.mobile_no && !revealMobile}
                                     />
+                                    {!!formData.participant_code && !!formData.mobile_no && !revealMobile && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setRevealMobile(true);
+                                                setFormData({ ...formData, mobile_no: '' });
+                                            }}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                                        >
+                                            Edit
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
