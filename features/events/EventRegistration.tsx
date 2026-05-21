@@ -182,6 +182,13 @@ const EventRegistration: React.FC = () => {
     return str.toLowerCase().replace(/(^|\s)\S/g, l => l.toUpperCase());
   };
 
+  const formatSuffix = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (/^[ivx]+$/i.test(trimmed)) return trimmed.toUpperCase();
+    return toProperCase(trimmed);
+  };
+
   const normalizeNamePart = (value: string) => value.trim().toLowerCase();
   const closeMatchPrompt = () => {
     setShowMatchPrompt(false);
@@ -526,7 +533,7 @@ const EventRegistration: React.FC = () => {
             f_name: toProperCase(formData.f_name.trim()),
             l_name: toProperCase(formData.l_name.trim()),
             m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim().toUpperCase(),
-            suffix: formData.suffix.trim() === '' ? null : toProperCase(formData.suffix.trim()),
+            suffix: formData.suffix.trim() === '' ? null : formatSuffix(formData.suffix.trim()),
             email: finalEmail,
             gender: formData.gender,
             position: formData.position,
@@ -550,7 +557,7 @@ const EventRegistration: React.FC = () => {
             f_name: toProperCase(formData.f_name.trim()),
             l_name: toProperCase(formData.l_name.trim()),
             m_initial: formData.m_initial.trim() === '' ? null : formData.m_initial.trim().toUpperCase(),
-            suffix: formData.suffix.trim() === '' ? null : toProperCase(formData.suffix.trim()),
+            suffix: formData.suffix.trim() === '' ? null : formatSuffix(formData.suffix.trim()),
             email: finalEmail,
             mobile_no: finalMobile,
             gender: formData.gender,
@@ -981,7 +988,7 @@ const EventRegistration: React.FC = () => {
                                     placeholder="e.g. Jr (if none leave blank)"
                                     value={formData.suffix}
                                     onChange={e => setFormData({...formData, suffix: e.target.value})}
-                                    onBlur={e => setFormData({...formData, suffix: toProperCase(e.target.value)})}
+                                    onBlur={e => setFormData({...formData, suffix: formatSuffix(e.target.value)})}
                                 />
                             </div>
                         </div>

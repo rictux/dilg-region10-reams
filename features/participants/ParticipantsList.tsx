@@ -631,6 +631,13 @@ const AttendanceList: React.FC = () => {
     return str.toLowerCase().replace(/(^|\s)\S/g, l => l.toUpperCase());
   };
 
+  const formatSuffix = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (/^[ivx]+$/i.test(trimmed)) return trimmed.toUpperCase();
+    return toProperCase(trimmed);
+  };
+
   const handleAddParticipant = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!selectedEvent) return;
@@ -715,7 +722,7 @@ const AttendanceList: React.FC = () => {
                 f_name: toProperCase(newParticipant.f_name.trim()),
                 l_name: toProperCase(newParticipant.l_name.trim()),
                 m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
+                suffix: newParticipant.suffix.trim() === '' ? null : formatSuffix(newParticipant.suffix.trim()),
                 email: newParticipant.email || null,
                 office: finalOfficeName,
                 location_id: finalLocationId,
@@ -741,7 +748,7 @@ const AttendanceList: React.FC = () => {
                         f_name: toProperCase(newParticipant.f_name.trim()),
                         l_name: toProperCase(newParticipant.l_name.trim()),
                         m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                        suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
+                        suffix: newParticipant.suffix.trim() === '' ? null : formatSuffix(newParticipant.suffix.trim()),
                         office: finalOfficeName,
                         location_id: finalLocationId,
                         mobile_no: newParticipant.mobile_no || null,
@@ -759,7 +766,7 @@ const AttendanceList: React.FC = () => {
                         f_name: toProperCase(newParticipant.f_name.trim()),
                         l_name: toProperCase(newParticipant.l_name.trim()),
                         m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                        suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
+                        suffix: newParticipant.suffix.trim() === '' ? null : formatSuffix(newParticipant.suffix.trim()),
                         email: newParticipant.email,
                         office: finalOfficeName,
                         location_id: finalLocationId,
@@ -782,7 +789,7 @@ const AttendanceList: React.FC = () => {
                     f_name: toProperCase(newParticipant.f_name.trim()),
                     l_name: toProperCase(newParticipant.l_name.trim()),
                     m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                    suffix: newParticipant.suffix.trim() === '' ? null : toProperCase(newParticipant.suffix.trim()),
+                    suffix: newParticipant.suffix.trim() === '' ? null : formatSuffix(newParticipant.suffix.trim()),
                     email: null,
                     office: finalOfficeName,
                     location_id: finalLocationId,
@@ -1383,7 +1390,7 @@ const AttendanceList: React.FC = () => {
                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                 value={newParticipant.suffix}
                                 onChange={e => setNewParticipant({...newParticipant, suffix: e.target.value})}
-                                onBlur={e => setNewParticipant({...newParticipant, suffix: toProperCase(e.target.value)})}
+                                onBlur={e => setNewParticipant({...newParticipant, suffix: formatSuffix(e.target.value)})}
                             />
                         </div>
                     </div>
