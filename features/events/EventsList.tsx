@@ -2,9 +2,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event, Participant, Office } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Home, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Home, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
+import ExcelJS from 'exceljs';
+import { toast } from 'sonner';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -150,6 +152,7 @@ const EventsList: React.FC = () => {
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [copied, setCopied] = useState(false);
   const [participantSearchTerm, setParticipantSearchTerm] = useState('');
+  const [accommodationFilter, setAccommodationFilter] = useState<'all' | 'with'>('all');
   
   // Role Editing State
   const [editingRole, setEditingRole] = useState<{ participantId: number; role: string } | null>(null);
@@ -180,6 +183,7 @@ const EventsList: React.FC = () => {
   const [formData, setFormData] = useState<Partial<Event>>(initialFormState);
   const [foodInclusionByDate, setFoodInclusionByDate] = useState<EventFoodInclusionMap>({});
   const [hasEventCode, setHasEventCode] = useState(false);
+  const [showEventCodeInfo, setShowEventCodeInfo] = useState(false);
 
   useEffect(() => {
     fetchEvents();
@@ -540,7 +544,7 @@ const EventsList: React.FC = () => {
           setFoodInclusionByDate({});
           fetchEvents(); 
       } else {
-        alert("Error saving event: " + error.message);
+        toast.error("Error saving event: " + error.message);
       }
   };
 
@@ -575,7 +579,7 @@ const EventsList: React.FC = () => {
           }
           closeDeleteEventModal();
       } catch (err: any) {
-          alert("Error deleting event: " + err.message);
+          toast.error("Error deleting event: " + err.message);
       } finally {
           setIsDeleting(false);
       }
@@ -608,6 +612,7 @@ const EventsList: React.FC = () => {
       setShowParticipantsModal(false);
       setParticipantModalView('list');
       setParticipantSearchTerm('');
+      setAccommodationFilter('all');
       setEditingRole(null);
       resetParticipantForm();
   };
@@ -637,7 +642,7 @@ const EventsList: React.FC = () => {
           fetchEventParticipants(selectedEvent.event_id);
           setParticipantToDelete(null); // Close modal
       } catch (err: any) {
-          alert("Error removing participant: " + err.message);
+          toast.error("Error removing participant: " + err.message);
       } finally {
           setIsDeleting(false);
       }
@@ -658,7 +663,7 @@ const EventsList: React.FC = () => {
           setEditingRole(null);
           // fetchEventParticipants triggered by subscription
       } catch (err: any) {
-          alert("Error updating role: " + err.message);
+          toast.error("Error updating role: " + err.message);
       }
   };
 
@@ -751,7 +756,7 @@ const EventsList: React.FC = () => {
 
       if (affiliationType === 'LGU') {
           if (!selectedProvince) {
-              alert("Please select a Province/HUC for LGU.");
+              toast.error("Please select a Province/HUC for LGU.");
               return null;
           }
           
@@ -761,7 +766,7 @@ const EventsList: React.FC = () => {
                   finalLocationId = loc.location_id;
                   finalOfficeName = `LGU ${selectedCity}, ${selectedProvince}`;
               } else {
-                  alert("Selected location is invalid.");
+                  toast.error("Selected location is invalid.");
                   return null;
               }
           } else {
@@ -776,23 +781,29 @@ const EventsList: React.FC = () => {
               }
           }
       } else if (!newParticipant.office.trim()) {
-          alert("Please enter your Office / Agency name.");
+          toast.error("Please enter your Office / Agency name.");
           return null;
       }
 
       const trimmedEmail = newParticipant.email.trim();
       if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-          alert("Please enter a valid email address.");
+          toast.error("Please enter a valid email address.");
           return null;
       }
 
       if (newParticipant.mobile_no && !/^[0-9]{10,11}$/.test(newParticipant.mobile_no)) {
-          alert("Please enter a valid mobile number (10 or 11 digits).");
+          toast.error("Please enter a valid mobile number (10 or 11 digits).");
+          return null;
+      }
+
+      const suffixTrimmed = newParticipant.suffix.trim().toLowerCase();
+      if (suffixTrimmed && ['none', 'n/a', 'na'].includes(suffixTrimmed)) {
+          toast.error("Not a valid Suffix.");
           return null;
       }
 
       if (selectedEvent.has_accommodation && newParticipant.needs_accommodation && newParticipant.accommodation_pax < 1) {
-          alert("Please specify at least 1 pax for accommodation.");
+          toast.error("Please specify at least 1 pax for accommodation.");
           return null;
       }
 
@@ -807,7 +818,7 @@ const EventsList: React.FC = () => {
         : [];
 
       if (selectedEvent.has_accommodation && newParticipant.needs_accommodation && normalizedAccommodationDates.length === 0) {
-          alert("Please select at least one accommodation date.");
+          toast.error("Please select at least one accommodation date.");
           return null;
       }
 
@@ -975,7 +986,7 @@ const EventsList: React.FC = () => {
           fetchEventParticipants(selectedEvent.event_id);
 
       } catch (err: any) {
-          alert("Error adding participant: " + err.message);
+          toast.error("Error adding participant: " + err.message);
       } finally {
           setIsAddingParticipant(false);
       }
@@ -1010,7 +1021,7 @@ const EventsList: React.FC = () => {
           resetParticipantForm();
           fetchEventParticipants(selectedEvent.event_id);
       } catch (err: any) {
-          alert("Error updating participant: " + err.message);
+          toast.error("Error updating participant: " + err.message);
       } finally {
           setIsAddingParticipant(false);
       }
@@ -1029,16 +1040,89 @@ const EventsList: React.FC = () => {
       setTimeout(() => setCopied(false), 2000);
   };
 
+  const exportParticipantsToExcel = async () => {
+      if (!selectedEvent || viewingParticipants.length === 0) return;
+
+      const sorted = [...viewingParticipants].sort((a, b) => {
+          const aTime = a.registered_at ? new Date(a.registered_at).getTime() : Number.POSITIVE_INFINITY;
+          const bTime = b.registered_at ? new Date(b.registered_at).getTime() : Number.POSITIVE_INFINITY;
+          return aTime - bTime;
+      });
+
+      const rows = sorted.map((record) => [
+          record.participants?.full_name || '',
+          record.participants?.gender || '',
+          record.participants?.office || '',
+          record.participants?.age_group || '',
+          record.participants?.mobile_no || '',
+          record.participants?.email || '',
+          record.role || 'Delegate',
+          record.needs_accommodation ? 'Yes' : 'No'
+      ]);
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Participants');
+
+      worksheet.addTable({
+          name: 'Participants',
+          ref: 'A1',
+          headerRow: true,
+          totalsRow: false,
+          style: {
+              theme: 'TableStyleMedium2',
+              showRowStripes: true
+          },
+          columns: [
+              { name: 'Participant Name', filterButton: true },
+              { name: 'Gender', filterButton: true },
+              { name: 'Office', filterButton: true },
+              { name: 'Age Group', filterButton: true },
+              { name: 'Mobile No', filterButton: true },
+              { name: 'Email', filterButton: true },
+              { name: 'Role', filterButton: true },
+              { name: 'Accommodation', filterButton: true }
+          ],
+          rows
+      });
+
+      [32, 10, 34, 12, 14, 30, 14, 14].forEach((w, idx) => {
+          worksheet.getColumn(idx + 1).width = w;
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const safeName = (selectedEvent.event_name || 'Event').replace(/[\\/:*?"<>|]/g, '_');
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Participants_${safeName}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+  };
+
   // Filtered Participants
   const filteredParticipants = useMemo(() => {
-    if (!participantSearchTerm.trim()) return viewingParticipants;
-    const lower = participantSearchTerm.toLowerCase();
-    return viewingParticipants.filter(p => 
-      p.participants?.full_name?.toLowerCase().includes(lower) ||
-      p.participants?.email?.toLowerCase().includes(lower) ||
-      p.participants?.office?.toLowerCase().includes(lower)
-    );
-  }, [viewingParticipants, participantSearchTerm]);
+    const lower = participantSearchTerm.trim().toLowerCase();
+    let matched = lower
+      ? viewingParticipants.filter(p =>
+          p.participants?.full_name?.toLowerCase().includes(lower) ||
+          p.participants?.email?.toLowerCase().includes(lower) ||
+          p.participants?.office?.toLowerCase().includes(lower)
+        )
+      : viewingParticipants;
+
+    if (accommodationFilter === 'with') {
+      matched = matched.filter(p => p.needs_accommodation);
+    }
+
+    return [...matched].sort((a, b) => {
+      const aTime = a.registered_at ? new Date(a.registered_at).getTime() : Number.POSITIVE_INFINITY;
+      const bTime = b.registered_at ? new Date(b.registered_at).getTime() : Number.POSITIVE_INFINITY;
+      return aTime - bTime;
+    });
+  }, [viewingParticipants, participantSearchTerm, accommodationFilter]);
 
   // Grouping Logic
   const specialRoles = ['Speaker', 'Secretariat', 'VIP', 'Guest'];
@@ -1698,7 +1782,7 @@ const EventsList: React.FC = () => {
       {showParticipantsModal && selectedEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeParticipantsModal}></div>
-            <div className={`bg-white rounded-xl shadow-2xl w-full ${participantModalView === 'list' ? 'max-w-6xl' : 'max-w-3xl'} h-[85vh] sm:h-[80vh] flex flex-col relative z-10 animate-in zoom-in-95 duration-200`}>
+            <div className={`bg-white rounded-xl shadow-2xl w-full ${participantModalView === 'list' ? 'max-w-[95vw] lg:max-w-screen-2xl' : 'max-w-3xl'} ${participantModalView === 'list' ? 'h-[92vh]' : 'h-[85vh] sm:h-[80vh]'} flex flex-col relative z-10 animate-in zoom-in-95 duration-200`}>
                 {/* Header */}
                 <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start bg-slate-50/50 rounded-t-xl shrink-0">
                     <div className="min-w-0 flex-1">
@@ -1726,15 +1810,46 @@ const EventsList: React.FC = () => {
                             </p>
                         )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
-                        {participantModalView === 'list' && (
-                            <div className="relative flex-1 min-w-[210px] sm:min-w-0 sm:w-48">
+                    <div className="flex items-center gap-2 w-full sm:w-auto sm:justify-end">
+                        {participantModalView !== 'list' && (
+                            <button
+                                onClick={() => { setParticipantModalView('list'); resetParticipantForm(); }}
+                                className="w-full sm:w-auto bg-slate-100 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors shadow-sm"
+                            >
+                                <ArrowRight size={16} className="rotate-180" /> Return to List
+                            </button>
+                        )}
+                        <button onClick={closeParticipantsModal} className="ml-auto sm:ml-0 text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
+                            <X size={24} />
+                        </button>
+                    </div>
+                </div>
+
+                {participantModalView === 'list' && (
+                    <div className="px-4 sm:px-6 py-3 border-b border-slate-100 bg-white shrink-0">
+                        <div className="flex items-center justify-end gap-2">
+                            {selectedEvent?.has_accommodation && (
+                                <button
+                                    type="button"
+                                    onClick={() => setAccommodationFilter(accommodationFilter === 'with' ? 'all' : 'with')}
+                                    aria-pressed={accommodationFilter === 'with'}
+                                    title="Show only participants needing accommodation"
+                                    className={`mr-auto shrink-0 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 border transition-colors shadow-sm ${
+                                        accommodationFilter === 'with'
+                                            ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700'
+                                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <Home size={16} /> Has Accommodation
+                                </button>
+                            )}
+                            <div className="relative w-full max-w-xs">
                                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                                     <Search size={16} />
                                 </div>
-                                <input 
-                                    type="text" 
-                                    placeholder="Search participant..." 
+                                <input
+                                    type="text"
+                                    placeholder="Search participant..."
                                     value={participantSearchTerm}
                                     onChange={(e) => setParticipantSearchTerm(e.target.value)}
                                     className="w-full pl-9 pr-14 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
@@ -1749,29 +1864,25 @@ const EventsList: React.FC = () => {
                                     </button>
                                 )}
                             </div>
-                        )}
-                        {participantModalView === 'list' ? (
-                            canManageParticipants && (
-                                <button 
+                            {canManageParticipants && (
+                                <button
                                     onClick={openAddParticipantView}
                                     className="shrink-0 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-sm"
                                 >
                                     <UserPlus size={16} /> Add
                                 </button>
-                            )
-                        ) : (
-                            <button 
-                                onClick={() => { setParticipantModalView('list'); resetParticipantForm(); }}
-                                className="w-full sm:w-auto bg-slate-100 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors shadow-sm"
+                            )}
+                            <button
+                                onClick={exportParticipantsToExcel}
+                                disabled={viewingParticipants.length === 0}
+                                type="button"
+                                className="shrink-0 bg-emerald-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-emerald-700 transition-colors shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
                             >
-                                <ArrowRight size={16} className="rotate-180" /> Return to List
+                                <Download size={16} /> Export
                             </button>
-                        )}
-                        <button onClick={closeParticipantsModal} className="ml-auto sm:ml-0 text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
-                            <X size={24} />
-                        </button>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Content */}
                 <div className="flex-1 overflow-auto p-0">
@@ -1788,7 +1899,7 @@ const EventsList: React.FC = () => {
                                     <th className="px-4 sm:px-6 py-4">Participant Name</th>
                                     <th className="px-4 sm:px-6 py-4">Role</th>
                                     <th className="hidden md:table-cell px-6 py-4">Office</th>
-                                    <th className="hidden md:table-cell px-6 py-4">Status</th>
+                                    <th className="hidden md:table-cell px-6 py-4">Date Registered</th>
                                     {canManageParticipants && <th className="px-4 sm:px-6 py-4 text-right">Action</th>}
                                 </tr>
                             </thead>
@@ -1860,12 +1971,8 @@ const EventsList: React.FC = () => {
                                                     )}
                                                 </td>
                                                 <td className="hidden md:table-cell px-6 py-3 text-slate-600">{record.participants?.office}</td>
-                                                <td className="hidden md:table-cell px-6 py-3">
-                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold
-                                                        ${record.registration_status === 'Registered' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}
-                                                    `}>
-                                                        {record.registration_status}
-                                                    </span>
+                                                <td className="hidden md:table-cell px-6 py-3 text-slate-600">
+                                                    {record.registered_at ? format(parseISO(record.registered_at), 'MMM d, yyyy h:mm a') : '—'}
                                                 </td>
                                                 {canManageParticipants && (
                                                     <td className="px-4 sm:px-6 py-3 text-right">
@@ -1960,12 +2067,8 @@ const EventsList: React.FC = () => {
                                                     )}
                                                 </td>
                                                 <td className="hidden md:table-cell px-6 py-3 text-slate-600">{record.participants?.office}</td>
-                                                <td className="hidden md:table-cell px-6 py-3">
-                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold
-                                                        ${record.registration_status === 'Registered' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}
-                                                    `}>
-                                                        {record.registration_status}
-                                                    </span>
+                                                <td className="hidden md:table-cell px-6 py-3 text-slate-600">
+                                                    {record.registered_at ? format(parseISO(record.registered_at), 'MMM d, yyyy h:mm a') : '—'}
                                                 </td>
                                                 {canManageParticipants && (
                                                     <td className="px-4 sm:px-6 py-3 text-right">
@@ -2004,8 +2107,11 @@ const EventsList: React.FC = () => {
                         </table>
                     )) : (
                         <div className="p-6 max-w-2xl mx-auto w-full">
-                            <form onSubmit={participantModalView === 'edit' ? handleUpdateParticipantDetails : handleAddParticipant} className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
+                            <form onSubmit={participantModalView === 'edit' ? handleUpdateParticipantDetails : handleAddParticipant} className="space-y-10">
+                                {/* SECTION: Personal Information */}
+                                <div className="space-y-6">
+                                    <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 pb-2">Personal Information</h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="relative">
                                         <label className="block text-sm font-medium text-slate-700 mb-1">First Name</label>
                                         <input 
@@ -2054,7 +2160,7 @@ const EventsList: React.FC = () => {
                                         />
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Middle Initial</label>
                                         <input 
@@ -2077,51 +2183,46 @@ const EventsList: React.FC = () => {
                                             onBlur={e => setNewParticipant({...newParticipant, suffix: toProperCase(e.target.value)})}
                                         />
                                     </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Email (Optional)</label>
-                                    <input 
-                                        type="email"
-                                        placeholder="email@example.com"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        value={newParticipant.email}
-                                        onChange={e => setNewParticipant({...newParticipant, email: e.target.value})}
-                                        pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
-                                        title="Please enter a valid email address"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Mobile No.</label>
-                                    <input 
-                                        type="tel"
-                                        placeholder="09123456789"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        value={newParticipant.mobile_no}
-                                        onChange={e => {
-                                            const val = e.target.value.replace(/\D/g, '');
-                                            if (val.length <= 11) {
-                                                setNewParticipant({...newParticipant, mobile_no: val});
-                                            }
-                                        }}
-                                        pattern="[0-9]{10,11}"
-                                        title="Mobile number must be 10 or 11 digits"
-                                    />
+                                    </div>
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
-                                    <select 
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                        value={newParticipant.gender}
-                                        onChange={e => setNewParticipant({...newParticipant, gender: e.target.value})}
-                                    >
-                                        <option value="Male">Male</option>
-                                        <option value="Female">Female</option>
-                                    </select>
-                                </div>
+                                {/* SECTION: Contact & Professional */}
+                                <div className="space-y-6">
+                                    <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 pb-2">Contact & Professional</h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+                                            <input 
+                                                type="email"
+                                                placeholder="email@example.com"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                                value={newParticipant.email}
+                                                onChange={e => setNewParticipant({...newParticipant, email: e.target.value})}
+                                                pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
+                                                title="Please enter a valid email address"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Mobile No.</label>
+                                            <input 
+                                                type="tel"
+                                                placeholder="09123456789"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                                value={newParticipant.mobile_no}
+                                                onChange={e => {
+                                                    const val = e.target.value.replace(/\D/g, '');
+                                                    if (val.length <= 11) {
+                                                        setNewParticipant({...newParticipant, mobile_no: val});
+                                                    }
+                                                }}
+                                                pattern="[0-9]{10,11}"
+                                                title="Mobile number must be 10 or 11 digits"
+                                            />
+                                        </div>
+                                    </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Position</label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Position / Job Title</label>
                                     <input 
                                         type="text"
                                         placeholder="e.g. Regional Director, Administrative Officer"
@@ -2131,7 +2232,7 @@ const EventsList: React.FC = () => {
                                     />
                                 </div>
                                 
-                                <div className="pt-2">
+                                    <div className="pt-1">
                                      <label className="block text-sm font-medium text-slate-700 mb-2">Affiliation Type</label>
                                      <div className="flex gap-4 mb-4">
                                         <label className={`flex-1 cursor-pointer border rounded-lg p-2.5 flex items-center gap-2 transition-all ${affiliationType === 'Office' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
@@ -2209,55 +2310,72 @@ const EventsList: React.FC = () => {
                                         </div>
                                      )}
                                 </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
-                                        <select 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                            value={newParticipant.role}
-                                            onChange={e => setNewParticipant({...newParticipant, role: e.target.value})}
-                                        >
-                                            <option value="Delegate">Delegate</option>
-                                            <option value="Speaker">Speaker</option>
-                                            <option value="Secretariat">Secretariat</option>
-                                            <option value="Guest">Guest</option>
-                                            <option value="VIP">VIP</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Age Group</label>
-                                        <select 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                            value={newParticipant.age_group}
-                                            onChange={e => setNewParticipant({...newParticipant, age_group: e.target.value})}
-                                        >
-                                            <option value="18-24">18-24</option>
-                                            <option value="25-34">25-34</option>
-                                            <option value="35-44">35-44</option>
-                                            <option value="45-54">45-54</option>
-                                            <option value="55-64">55-64</option>
-                                            <option value="65+">65+</option>
-                                        </select>
-                                    </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">PWD</label>
-                                        <select 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                            value={newParticipant.pwd}
-                                            onChange={e => setNewParticipant({...newParticipant, pwd: e.target.value})}
-                                        >
-                                            <option value="No">No</option>
-                                            <option value="Yes">Yes</option>
-                                        </select>
+                                {/* SECTION: Event Options & Demographics */}
+                                <div className="space-y-6">
+                                    <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 pb-2">Event & Demographics</h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Event Role</label>
+                                            <select 
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                                value={newParticipant.role}
+                                                onChange={e => setNewParticipant({...newParticipant, role: e.target.value})}
+                                            >
+                                                <option value="Delegate">Delegate</option>
+                                                <option value="Speaker">Speaker</option>
+                                                <option value="Secretariat">Secretariat</option>
+                                                <option value="Guest">Guest</option>
+                                                <option value="VIP">VIP</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
+                                            <select 
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                                value={newParticipant.gender}
+                                                onChange={e => setNewParticipant({...newParticipant, gender: e.target.value})}
+                                            >
+                                                <option value="Male">Male</option>
+                                                <option value="Female">Female</option>
+                                            </select>
+                                        </div>
                                     </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Age Group</label>
+                                            <select 
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                                value={newParticipant.age_group}
+                                                onChange={e => setNewParticipant({...newParticipant, age_group: e.target.value})}
+                                            >
+                                                <option value="18-24">18-24</option>
+                                                <option value="25-34">25-34</option>
+                                                <option value="35-44">35-44</option>
+                                                <option value="45-54">45-54</option>
+                                                <option value="55-64">55-64</option>
+                                                <option value="65+">65+</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">PWD</label>
+                                            <select 
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                                value={newParticipant.pwd}
+                                                onChange={e => setNewParticipant({...newParticipant, pwd: e.target.value})}
+                                            >
+                                                <option value="No">No</option>
+                                                <option value="Yes">Yes</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Indigenous People</label>
                                         <select 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
                                             value={newParticipant.indigenous_people}
                                             onChange={e => setNewParticipant({...newParticipant, indigenous_people: e.target.value})}
                                         >
@@ -2484,6 +2602,34 @@ const EventsList: React.FC = () => {
 
 
 
+      {showEventCodeInfo && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={() => setShowEventCodeInfo(false)}></div>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl relative z-10 animate-in zoom-in-95 duration-200 overflow-hidden">
+                <div className="flex justify-between items-center px-5 py-4 border-b border-slate-100">
+                    <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                        <Info size={18} className="text-indigo-600" />
+                        Event Code Reference
+                    </h3>
+                    <button
+                        type="button"
+                        onClick={() => setShowEventCodeInfo(false)}
+                        className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-100 rounded-full transition-colors"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+                <div className="p-5 bg-slate-50">
+                    <img
+                        src="/assets/Reference_Number_CA_Sample.png"
+                        alt="Reference Number CA Sample"
+                        className="w-full h-auto rounded-lg border border-slate-200 shadow-sm"
+                    />
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* Create/Edit Event Modal */}
       {showEventModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
@@ -2526,7 +2672,7 @@ const EventsList: React.FC = () => {
                     <input 
                       required 
                       className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all" 
-                      placeholder="e.g. Annual Tech Conference 2024"
+                      placeholder="e.g. Trainings on Crisis Management for LGUs (Batch 1)"
                       value={formData.event_name} 
                       onChange={e => setFormData({...formData, event_name: e.target.value})} 
                     />
@@ -2544,7 +2690,7 @@ const EventsList: React.FC = () => {
                       <input 
                         required 
                         className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all" 
-                        placeholder="e.g. Grand Convention Center, Hall A"
+                        placeholder="e.g. Apple Tree Resort and Hotel, Taboc, Opol, Misamis Oriental"
                         value={formData.venue} 
                         onChange={e => setFormData({...formData, venue: e.target.value})} 
                       />
@@ -2685,6 +2831,15 @@ const EventsList: React.FC = () => {
                                 />
                                 <span className="text-sm font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">Event Code</span>
                             </label>
+                            <button
+                                type="button"
+                                onClick={() => setShowEventCodeInfo(true)}
+                                aria-label="View Event Code reference"
+                                title="View Event Code reference"
+                                className="text-slate-400 hover:text-indigo-600 transition-colors p-1 rounded-full hover:bg-indigo-50"
+                            >
+                                <Info size={16} />
+                            </button>
 
                             <div className="relative group w-[360px] max-w-full">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

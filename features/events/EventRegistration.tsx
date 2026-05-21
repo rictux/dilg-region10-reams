@@ -7,6 +7,7 @@ import QRCode from 'react-qr-code';
 import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock, Landmark, Download, Info } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import { toPng } from 'html-to-image';
+import { toast } from 'sonner';
 import QrScanner from './QrScanner';
 
 type ParticipantMatch = Pick<Participant, 'participant_id' | 'participant_code'> & Partial<Pick<Participant, 'full_name' | 'f_name' | 'l_name' | 'm_initial' | 'suffix' | 'email' | 'mobile_no' | 'office' | 'position'>> & {
@@ -309,6 +310,12 @@ const EventRegistration: React.FC = () => {
       return null;
     }
 
+    const suffixTrimmed = formData.suffix.trim().toLowerCase();
+    if (suffixTrimmed && ['none', 'n/a', 'na'].includes(suffixTrimmed)) {
+      setError("Not a valid Suffix.");
+      return null;
+    }
+
     return {
       finalLocationId,
       finalOfficeName,
@@ -556,7 +563,7 @@ const EventRegistration: React.FC = () => {
         link.click();
     } catch (err) {
         console.error("Failed to save image", err);
-        alert("Failed to save image. Please screenshot instead.");
+        toast.error("Failed to save image. Please screenshot instead.");
     } finally {
         setIsDownloading(false);
     }

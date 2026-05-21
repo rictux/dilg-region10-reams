@@ -7,6 +7,7 @@ import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2
 import QRCode from 'react-qr-code';
 import { format, parseISO, eachDayOfInterval, isSameMonth, isSameYear } from 'date-fns';
 import { toPng } from 'html-to-image';
+import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
 interface AttendanceRow {
@@ -557,7 +558,7 @@ const AttendanceList: React.FC = () => {
               link.click();
           } catch (err) {
               console.error('Error generating badge image:', err);
-              alert('Failed to save badge image.');
+              toast.error('Failed to save badge image.');
           }
       }
   };
@@ -649,7 +650,7 @@ const AttendanceList: React.FC = () => {
 
       if (affiliationType === 'LGU') {
           if (!selectedProvince) {
-              alert("Please select a Province/HUC for LGU.");
+              toast.error("Please select a Province/HUC for LGU.");
               return;
           }
           
@@ -659,7 +660,7 @@ const AttendanceList: React.FC = () => {
                   finalLocationId = loc.location_id;
                   finalOfficeName = `LGU ${selectedCity}, ${selectedProvince}`;
               } else {
-                  alert("Selected location is invalid.");
+                  toast.error("Selected location is invalid.");
                   return;
               }
           } else {
@@ -675,23 +676,29 @@ const AttendanceList: React.FC = () => {
           }
       } else {
           if (!newParticipant.office.trim()) {
-              alert("Please enter your Office / Agency name.");
+              toast.error("Please enter your Office / Agency name.");
               return;
           }
       }
 
       if (newParticipant.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newParticipant.email)) {
-          alert("Please enter a valid email address.");
+          toast.error("Please enter a valid email address.");
           return;
       }
 
       if (newParticipant.mobile_no && !/^[0-9]{10,11}$/.test(newParticipant.mobile_no)) {
-          alert("Please enter a valid mobile number (10 or 11 digits).");
+          toast.error("Please enter a valid mobile number (10 or 11 digits).");
+          return;
+      }
+
+      const suffixTrimmed = newParticipant.suffix.trim().toLowerCase();
+      if (suffixTrimmed && ['none', 'n/a', 'na'].includes(suffixTrimmed)) {
+          toast.error("Not a valid Suffix.");
           return;
       }
 
       if (selectedEvent.has_accommodation && newParticipant.needs_accommodation && normalizedAccommodationDates.length === 0) {
-          alert("Please select at least one accommodation date.");
+          toast.error("Please select at least one accommodation date.");
           return;
       }
 
@@ -837,7 +844,7 @@ const AttendanceList: React.FC = () => {
           // fetchAttendance will be triggered by supabase real-time channel
 
       } catch (err: any) {
-          alert("Error adding participant: " + err.message);
+          toast.error("Error adding participant: " + err.message);
       } finally {
           setIsAddingParticipant(false);
       }
@@ -1302,9 +1309,11 @@ const AttendanceList: React.FC = () => {
                         <X size={24} />
                     </button>
                 </div>
-                
                 <div className="max-w-2xl mx-auto w-full">
-                    <form onSubmit={handleAddParticipant} className="space-y-4">
+                    <form onSubmit={handleAddParticipant} className="space-y-10">
+                        {/* SECTION: Personal Information */}
+                        <div className="space-y-6">
+                            <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 pb-2">Personal Information</h4>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="relative">
                             <label className="block text-sm font-medium text-slate-700 mb-1">First Name</label>
@@ -1378,60 +1387,55 @@ const AttendanceList: React.FC = () => {
                             />
                         </div>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Email (Optional)</label>
-                        <input 
-                            type="email"
-                            placeholder="email@example.com"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                            value={newParticipant.email}
-                            onChange={e => setNewParticipant({...newParticipant, email: e.target.value})}
-                            pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
-                            title="Please enter a valid email address"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Mobile No.</label>
-                        <input 
-                            type="tel"
-                            placeholder="09123456789"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                            value={newParticipant.mobile_no}
-                            onChange={e => {
-                                const val = e.target.value.replace(/\D/g, '');
-                                if (val.length <= 11) {
-                                    setNewParticipant({...newParticipant, mobile_no: val});
-                                }
-                            }}
-                            pattern="[0-9]{10,11}"
-                            title="Mobile number must be 10 or 11 digits"
-                        />
-                    </div>
+                        </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
-                        <select 
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                            value={newParticipant.gender}
-                            onChange={e => setNewParticipant({...newParticipant, gender: e.target.value})}
-                        >
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                        </select>
-                    </div>
+                        {/* SECTION: Contact & Professional */}
+                        <div className="space-y-6">
+                            <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 pb-2">Contact & Professional</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+                                    <input 
+                                        type="email"
+                                        placeholder="email@example.com"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        value={newParticipant.email}
+                                        onChange={e => setNewParticipant({...newParticipant, email: e.target.value})}
+                                        pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
+                                        title="Please enter a valid email address"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Mobile No.</label>
+                                    <input 
+                                        type="tel"
+                                        placeholder="09123456789"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        value={newParticipant.mobile_no}
+                                        onChange={e => {
+                                            const val = e.target.value.replace(/\D/g, '');
+                                            if (val.length <= 11) {
+                                                setNewParticipant({...newParticipant, mobile_no: val});
+                                            }
+                                        }}
+                                        pattern="[0-9]{10,11}"
+                                        title="Mobile number must be 10 or 11 digits"
+                                    />
+                                </div>
+                            </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Position</label>
-                        <input 
-                            type="text"
-                            placeholder="e.g. Regional Director, Administrative Officer"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                            value={newParticipant.position}
-                            onChange={e => setNewParticipant({...newParticipant, position: e.target.value})}
-                        />
-                    </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Position / Job Title</label>
+                                <input 
+                                    type="text"
+                                    placeholder="e.g. Regional Director, Administrative Officer"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                    value={newParticipant.position}
+                                    onChange={e => setNewParticipant({...newParticipant, position: e.target.value})}
+                                />
+                            </div>
                     
-                    <div className="pt-2">
+                            <div className="pt-1">
                          <label className="block text-sm font-medium text-slate-700 mb-2">Affiliation Type</label>
                          <div className="flex gap-4 mb-4">
                             <label className={`flex-1 cursor-pointer border rounded-lg p-2.5 flex items-center gap-2 transition-all ${affiliationType === 'Office' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
@@ -1509,63 +1513,80 @@ const AttendanceList: React.FC = () => {
                             </div>
                          )}
                     </div>
+                        </div>
                     
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Age Group</label>
-                            <select
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                                value={newParticipant.age_group}
-                                onChange={e => setNewParticipant({...newParticipant, age_group: e.target.value})}
-                            >
-                                <option value="18-24">18-24</option>
-                                <option value="25-34">25-34</option>
-                                <option value="35-44">35-44</option>
-                                <option value="45-54">45-54</option>
-                                <option value="55-65">55-65</option>
-                                <option value="65+">65+</option>
-                            </select>
+                        {/* SECTION: Event Options & Demographics */}
+                        <div className="space-y-6">
+                            <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 pb-2">Event & Demographics</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Event Role</label>
+                                    <select
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        value={newParticipant.role}
+                                        onChange={e => setNewParticipant({...newParticipant, role: e.target.value as any})}
+                                    >
+                                        <option value="Delegate">Delegate</option>
+                                        <option value="Speaker">Speaker</option>
+                                        <option value="Secretariat">Secretariat</option>
+                                        <option value="Guest">Guest</option>
+                                        <option value="VIP">VIP</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
+                                    <select 
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        value={newParticipant.gender}
+                                        onChange={e => setNewParticipant({...newParticipant, gender: e.target.value})}
+                                    >
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Age Group</label>
+                                    <select
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        value={newParticipant.age_group}
+                                        onChange={e => setNewParticipant({...newParticipant, age_group: e.target.value})}
+                                    >
+                                        <option value="18-24">18-24</option>
+                                        <option value="25-34">25-34</option>
+                                        <option value="35-44">35-44</option>
+                                        <option value="45-54">45-54</option>
+                                        <option value="55-65">55-65</option>
+                                        <option value="65+">65+</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">PWD</label>
+                                    <select
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        value={newParticipant.pwd}
+                                        onChange={e => setNewParticipant({...newParticipant, pwd: e.target.value})}
+                                    >
+                                        <option value="No">No</option>
+                                        <option value="Yes">Yes</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Indigenous People</label>
+                                <select
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                    value={newParticipant.indigenous_people}
+                                    onChange={e => setNewParticipant({...newParticipant, indigenous_people: e.target.value})}
+                                >
+                                    <option value="No">No</option>
+                                    <option value="Yes">Yes</option>
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
-                             <select
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                                value={newParticipant.role}
-                                onChange={e => setNewParticipant({...newParticipant, role: e.target.value as any})}
-                            >
-                                <option value="Delegate">Delegate</option>
-                                <option value="Speaker">Speaker</option>
-                                <option value="Secretariat">Secretariat</option>
-                                <option value="Guest">Guest</option>
-                                <option value="VIP">VIP</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">PWD</label>
-                            <select
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                                value={newParticipant.pwd}
-                                onChange={e => setNewParticipant({...newParticipant, pwd: e.target.value})}
-                            >
-                                <option value="No">No</option>
-                                <option value="Yes">Yes</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Indigenous People</label>
-                            <select
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
-                                value={newParticipant.indigenous_people}
-                                onChange={e => setNewParticipant({...newParticipant, indigenous_people: e.target.value})}
-                            >
-                                <option value="No">No</option>
-                                <option value="Yes">Yes</option>
-                            </select>
-                        </div>
-                    </div>
 
                     {selectedEvent?.has_accommodation && (
                         <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
