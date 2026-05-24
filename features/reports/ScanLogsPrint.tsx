@@ -39,6 +39,9 @@ const ScanLogsPrint: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (eventId) {
+        sessionStorage.setItem('reports_selected_event_id', eventId);
+    }
     fetchLogs();
   }, [eventId]);
 
@@ -85,7 +88,7 @@ const ScanLogsPrint: React.FC = () => {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 print:bg-white">
         {/* Navigation / Controls (Hidden on Print) */}
         <div className="fixed top-0 left-0 right-0 bg-white border-b border-slate-200 p-4 shadow-sm z-50 flex justify-between items-center no-print">
-            <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium">
+            <button onClick={() => navigate('/reports')} className="flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium">
                 <ArrowLeft size={20} /> Back
             </button>
             <div className="flex items-center gap-3">

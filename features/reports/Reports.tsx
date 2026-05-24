@@ -63,18 +63,21 @@ const Reports: React.FC = () => {
   };
 
   const handlePrintScanLogs = () => {
+    sessionStorage.setItem('reports_selected_event_id', selectedEventId);
     const url = selectedEventId ? `/print-scan-logs/${selectedEventId}` : '/print-scan-logs';
     navigate(url);
   };
 
   const handlePrintAttendance = () => {
     if (selectedEventId) {
+        sessionStorage.setItem('reports_selected_event_id', selectedEventId);
         navigate(`/print-attendance/${selectedEventId}`);
     }
   };
 
   const handlePrintCertificate = () => {
     if (selectedEventId) {
+        sessionStorage.setItem('reports_selected_event_id', selectedEventId);
         navigate(`/print-certificate/${selectedEventId}`);
     }
   };
@@ -114,10 +117,10 @@ const Reports: React.FC = () => {
   const selectedEvent = events.find(e => e.event_id.toString() === selectedEventId);
 
   useEffect(() => {
-    if (selectedEventId && !selectedEvent) {
+    if (!loading && selectedEventId && !selectedEvent) {
       setSelectedEventId('');
     }
-  }, [selectedEvent, selectedEventId]);
+  }, [loading, selectedEvent, selectedEventId]);
 
   return (
     <div className="h-full min-h-0 overflow-y-auto pr-1 space-y-8">

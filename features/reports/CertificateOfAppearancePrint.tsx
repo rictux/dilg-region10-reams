@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Event } from '../../types/database';
-import { ArrowLeft, Download, Hash, Info, Loader2, Printer, Search } from 'lucide-react';
+import { ArrowLeft, Download, FileSpreadsheet, Hash, Info, Loader2, Printer, Search } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { toBlob, toJpeg, toPng } from 'html-to-image';
+import * as XLSX from 'xlsx';
 import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
 import CertificateOfAppearanceCard, {
   buildEventDateString,
@@ -391,6 +392,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
   useEffect(() => {
     if (eventId && user) {
+      sessionStorage.setItem('reports_selected_event_id', eventId);
       fetchData(parseInt(eventId, 10));
     }
   }, [eventId, user]);
@@ -626,6 +628,14 @@ const CertificateOfAppearancePrint: React.FC = () => {
     return buildCertificateSerialNumber(event, officeCode, storedSerial);
   };
 
+  const issuedSerialParticipants = useMemo(
+    () =>
+      participants
+        .filter((record: CertificateParticipant) => record.ca_serial_no != null)
+        .sort((a, b) => (a.ca_serial_no || 0) - (b.ca_serial_no || 0)),
+    [participants]
+  );
+
   const pendingSerialAssignments = useMemo<number[]>(() => {
     if (!requiresReferenceCode) return [];
     return selectedDownloadParticipants
@@ -662,6 +672,43 @@ const CertificateOfAppearancePrint: React.FC = () => {
     } finally {
       setIsGeneratingSerials(false);
     }
+  };
+
+  const buildExportParticipantName = (participant: CertificateParticipant['participant']) => {
+    const lastName = participant.l_name?.trim() || '';
+    const suffix = participant.suffix?.trim() || '';
+    const firstName = participant.f_name?.trim() || '';
+    const middleName = participant.m_initial?.trim() || '';
+    const lastNameSection = [lastName, suffix].filter(Boolean).join(' ');
+    const firstNameSection = [firstName, middleName].filter(Boolean).join(' ');
+
+    if (lastNameSection && firstNameSection) return `${lastNameSection}, ${firstNameSection}`;
+    return lastNameSection || firstNameSection || participant.full_name || 'Unnamed participant';
+  };
+
+  const handleExportSerials = () => {
+    if (!event || issuedSerialParticipants.length === 0) return;
+
+    const rows = issuedSerialParticipants.map((record: CertificateParticipant) => ({
+      'Participant Name': buildExportParticipantName(record.participant),
+      Gender: record.participant.gender || '',
+      Position: record.participant.position || '',
+      Office: record.participant.office || '',
+      'Serial Number': resolveCertificateSerial(record) || String(record.ca_serial_no).padStart(2, '0')
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet['!cols'] = [
+      { wch: 34 },
+      { wch: 12 },
+      { wch: 28 },
+      { wch: 36 },
+      { wch: 34 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'CA Serials');
+    XLSX.writeFile(workbook, `${sanitizeFileName(event.event_name || 'Event')}_CA_Serials.xlsx`);
   };
 
   const handlePrint = async () => {
@@ -931,6 +978,15 @@ const writeCertificatesToDirectory = async (
                       : 'Generating...'
                     : 'Print'}
               </button>
+              {requiresReferenceCode && issuedSerialParticipants.length > 0 && (
+                <button
+                  onClick={handleExportSerials}
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-800 transition-colors hover:bg-sky-100"
+                >
+                  <FileSpreadsheet size={14} />
+                  Export
+                </button>
+              )}
             </div>
           </div>
 
@@ -977,6 +1033,15 @@ const writeCertificatesToDirectory = async (
                     : 'Generating...'
                   : 'Print'}
             </button>
+            {requiresReferenceCode && issuedSerialParticipants.length > 0 && (
+              <button
+                onClick={handleExportSerials}
+                className="inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-800 transition-colors hover:bg-sky-100"
+              >
+                <FileSpreadsheet size={14} />
+                Export
+              </button>
+            )}
           </div>
 
           {requiresReferenceCode && (
