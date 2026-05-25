@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Participant, Event } from '../../types/database';
-import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Home, ChevronDown, Check, UserPlus, Building, Landmark, Download } from 'lucide-react';
+import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Bed, ChevronDown, Check, UserPlus, Building, Landmark, Download } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { format, parseISO, eachDayOfInterval, isSameMonth, isSameYear } from 'date-fns';
 import { toPng } from 'html-to-image';
@@ -1215,11 +1215,11 @@ const AttendanceList: React.FC = () => {
                       <span className="sm:hidden">Accom</span>
                       <span className="hidden sm:inline">Accommodation</span>
                     </p>
-                    <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Accommodation' ? 'bg-sky-200 text-sky-700' : 'bg-sky-100 text-sky-600'}`}>
-                      <Home size={10} className="sm:h-3.5 sm:w-3.5" />
+                    <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Accommodation' ? 'bg-purple-100 text-[#9333ea]' : 'bg-purple-50 text-[#9333ea]'}`}>
+                      <Bed size={10} className="sm:h-3.5 sm:w-3.5" />
                     </div>
                 </div>
-                <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-sky-600">{accommodationCount}</p>
+                <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-[#9333ea]">{accommodationCount}</p>
             </button>
           )}
           </div>
@@ -1307,8 +1307,15 @@ const AttendanceList: React.FC = () => {
                                 </td>
                                 <td className="px-5 py-4 lg:px-6 lg:py-5 text-slate-500 font-mono text-xs lg:text-sm">{index + 1}</td>
                                 <td className="px-5 py-4 lg:px-6 lg:py-5 font-medium text-slate-800 group-hover:text-indigo-600">
-                                    <div className="whitespace-normal break-words leading-snug">
-                                        {row.participant.full_name}
+                                    <div className="flex items-start gap-1.5 whitespace-normal break-words leading-snug">
+                                        <span>{row.participant.full_name}</span>
+                                        {row.needs_accommodation && (
+                                            <Bed
+                                                size={13}
+                                                className="mt-0.5 shrink-0 text-[#9333ea]"
+                                                aria-label="Needs accommodation"
+                                            />
+                                        )}
                                     </div>
                                 </td>
                                 <td className="px-5 py-4 lg:px-6 lg:py-5 text-slate-600">
@@ -1398,8 +1405,15 @@ const AttendanceList: React.FC = () => {
                                         aria-label={`Select ${row.participant.full_name}`}
                                     />
                                     <div className="min-w-0 flex-1">
-                                        <h3 className="text-[13px] font-semibold leading-tight text-slate-800 sm:text-sm">
-                                            {row.participant.full_name}
+                                        <h3 className="flex items-start gap-1.5 text-[13px] font-semibold leading-tight text-slate-800 sm:text-sm">
+                                            <span className="min-w-0 break-words">{row.participant.full_name}</span>
+                                            {row.needs_accommodation && (
+                                                <Bed
+                                                    size={13}
+                                                    className="mt-0.5 shrink-0 text-[#9333ea]"
+                                                    aria-label="Needs accommodation"
+                                                />
+                                            )}
                                         </h3>
                                     </div>
                                     <button
