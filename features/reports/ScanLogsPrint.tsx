@@ -5,7 +5,6 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { Event } from '../../types/database';
 
 interface ScanLog {
     attendance_id: number;
@@ -82,6 +81,18 @@ const ScanLogsPrint: React.FC = () => {
       return format(d, 'yyyy-MM-dd hh:mm:ss a');
   };
 
+  const wrapTextByLength = (text: string | undefined | null, maxLength = 70, maxLines = 2) => {
+      if (!text) return '-';
+      const chunks = text.match(new RegExp(`.{1,${maxLength}}`, 'g')) || [text];
+      const visibleLines = chunks.slice(0, maxLines);
+
+      if (chunks.length > maxLines) {
+          visibleLines[maxLines - 1] = `${visibleLines[maxLines - 1].slice(0, Math.max(0, maxLength - 3))}...`;
+      }
+
+      return visibleLines.join('\n');
+  };
+
   if (loading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin text-blue-600" /></div>;
 
   return (
@@ -126,10 +137,13 @@ const ScanLogsPrint: React.FC = () => {
                     font-size: 7px; /* Decrease text to fit in paper */
                     width: 100%;
                     border-collapse: collapse;
+                    table-layout: fixed;
                 }
                 th {
                     padding: 2px 4px;
                     border: 1px solid #000;
+                    font-size: 12px !important;
+                    line-height: 16px !important;
                     white-space: nowrap; /* Don't wrap */
                     background-color: #f1f5f9 !important;
                     font-weight: bold;
@@ -139,6 +153,14 @@ const ScanLogsPrint: React.FC = () => {
                     padding: 2px 4px;
                     border: none; /* Keep previous style preference */
                     white-space: nowrap; /* Don't wrap */
+                    overflow-wrap: anywhere;
+                }
+                .print-wrap {
+                    white-space: normal !important;
+                    word-break: break-word;
+                }
+                .print-scroll {
+                    overflow: visible !important;
                 }
                 /* Add faint row lines for readability in dense print */
                 tr {
@@ -168,21 +190,32 @@ const ScanLogsPrint: React.FC = () => {
         <div className="pt-24 pb-10 px-4 md:px-8 print:p-0 print:m-0 min-h-screen w-full print-container">
             
             <div className="bg-white shadow-lg rounded-xl overflow-hidden border border-slate-200 print:shadow-none print:border-none print:rounded-none">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto print-scroll">
                     <table className="w-full text-left border-collapse">
+                        <colgroup>
+                            <col className="w-[4%]" />
+                            <col className="w-[10%]" />
+                            <col className="w-[6%]" />
+                            <col className="w-[25%]" />
+                            <col className="w-[6%]" />
+                            <col className="w-[13%]" />
+                            <col className="w-[12%]" />
+                            <col className="w-[7%]" />
+                            <col className="w-[10%]" />
+                            <col className="w-[7%]" />
+                        </colgroup>
                         <thead className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-black text-slate-700">
                             <tr>
                                 <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">#</th>
                                 <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Scan Time</th>
                                 <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 text-center">Session</th>
-                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Event Name</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 print-wrap">Event Name</th>
                                 <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Code</th>
-                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Participant Name</th>
-                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 text-center">Gender</th>
-                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Email / Mobile</th>
-                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Office</th>
-                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Scanned By</th>
-                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Remarks</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 print-wrap">Participant Name / Gender</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 print-wrap">Email / Mobile</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 print-wrap">Office</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 print-wrap">Scanned By</th>
+                                <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 print-wrap">Remarks</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-slate-100 print:divide-y-0">
@@ -193,41 +226,43 @@ const ScanLogsPrint: React.FC = () => {
                                     <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 text-center whitespace-nowrap">
                                         {log.action_session}
                                     </td>
-                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap">
-                                        {log.events?.event_name || '-'}
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap print-wrap">
+                                        <span className="whitespace-pre-line">{wrapTextByLength(log.events?.event_name)}</span>
                                     </td>
                                     <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 font-mono text-center whitespace-nowrap">
                                         {log.participants?.participant_code || '-'}
                                     </td>
-                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap">
-                                        {log.participants?.full_name || '-'}
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap print-wrap">
+                                        <div className="flex flex-col">
+                                            <span>{log.participants?.full_name || '-'}</span>
+                                            <span className="text-[10px] print:text-[6px] text-slate-400 print:text-black">
+                                                {log.participants?.gender ? log.participants.gender.charAt(0).toUpperCase() + log.participants.gender.slice(1) : '-'}
+                                            </span>
+                                        </div>
                                     </td>
-                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 text-center whitespace-nowrap">
-                                        {log.participants?.gender ? log.participants.gender.charAt(0).toUpperCase() + log.participants.gender.slice(1) : '-'}
-                                    </td>
-                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap">
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap print-wrap">
                                         <div className="flex flex-col">
                                             <span>{log.participants?.email || ''}</span>
                                             {log.participants?.mobile_no && <span className="text-[10px] print:text-[6px] text-slate-400 print:text-black">{log.participants.mobile_no}</span>}
                                         </div>
                                     </td>
-                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap">
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap print-wrap">
                                         {log.participants?.office || '-'}
                                     </td>
-                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap">
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap print-wrap">
                                         <div className="flex flex-col">
                                             <span>{log.users?.full_name || 'System'}</span>
                                             {log.users?.email && <span className="text-[10px] print:text-[6px] text-slate-400 print:text-black">{log.users.email}</span>}
                                         </div>
                                     </td>
-                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 italic text-slate-500 print:text-black whitespace-nowrap">
+                                    <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 italic text-slate-500 print:text-black whitespace-nowrap print-wrap">
                                         {log.remarks || ''}
                                     </td>
                                 </tr>
                             ))}
                             {logs.length === 0 && (
                                 <tr>
-                                    <td colSpan={11} className="px-4 py-8 text-center text-slate-400 italic">
+                                    <td colSpan={10} className="px-4 py-8 text-center text-slate-400 italic">
                                         No scan records found.
                                     </td>
                                 </tr>
