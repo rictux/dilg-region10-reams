@@ -379,6 +379,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
   const [officeCode, setOfficeCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [participantSearch, setParticipantSearch] = useState('');
+  const [showMissingSerialOnly, setShowMissingSerialOnly] = useState(false);
   const [selectedParticipantId, setSelectedParticipantId] = useState<number | null>(null);
   const [isSavingCertificate, setIsSavingCertificate] = useState(false);
   const [isGeneratingSerials, setIsGeneratingSerials] = useState(false);
@@ -536,15 +537,24 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
   const filteredParticipants = useMemo(() => {
     const search = participantSearch.trim().toLowerCase();
-    if (!search) return participants;
+    const serialFilteredParticipants = showMissingSerialOnly
+      ? participants.filter((record: CertificateParticipant) => record.ca_serial_no == null)
+      : participants;
 
-    return participants.filter((record: CertificateParticipant) => {
+    if (!search) return serialFilteredParticipants;
+
+    return serialFilteredParticipants.filter((record: CertificateParticipant) => {
       const fullName = (record.participant.full_name || '').toLowerCase();
       const displayName = buildParticipantListName(record.participant).toLowerCase();
 
       return fullName.includes(search) || displayName.includes(search);
     });
-  }, [participantSearch, participants]);
+  }, [participantSearch, participants, showMissingSerialOnly]);
+
+  const missingSerialCount = useMemo(
+    () => participants.filter((record: CertificateParticipant) => record.ca_serial_no == null).length,
+    [participants]
+  );
 
   const groupedParticipants = useMemo(() => {
     const delegates: CertificateParticipant[] = [];
@@ -1086,11 +1096,34 @@ const writeCertificatesToDirectory = async (
           </div>
 
           <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-            <div className="flex items-center justify-between gap-2 text-[11px]">
-              <div className="font-medium text-slate-500">
-                {selectedDownloadParticipants.length} Selected
-              </div>
-              <div className="flex gap-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+              {requiresReferenceCode && (
+                <button
+                  type="button"
+                  onClick={() => setShowMissingSerialOnly((current) => !current)}
+                  className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    showMissingSerialOnly
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <Hash size={12} />
+                  No Serial Number
+                  <span
+                    className={`rounded-full px-1.5 text-[10px] font-bold leading-4 ${
+                      showMissingSerialOnly
+                        ? 'bg-emerald-200 text-emerald-800'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {missingSerialCount}
+                  </span>
+                </button>
+              )}
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <span className="px-1 text-[11px] font-medium text-slate-500">
+                  {selectedDownloadParticipants.length} Selected
+                </span>
                 <button
                   type="button"
                   onClick={handleSelectAll}
@@ -1114,7 +1147,7 @@ const writeCertificatesToDirectory = async (
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
             {filteredParticipants.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
-                No participant matched your search.
+                No participant matched your filters.
               </div>
             ) : (
               ([
