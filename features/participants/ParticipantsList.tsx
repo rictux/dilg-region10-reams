@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Participant, Event } from '../../types/database';
-import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Home, ChevronDown, Check, Filter, UserPlus, Building, Landmark, Download } from 'lucide-react';
+import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Home, ChevronDown, Check, UserPlus, Building, Landmark, Download } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { format, parseISO, eachDayOfInterval, isSameMonth, isSameYear } from 'date-fns';
 import { toPng } from 'html-to-image';
@@ -57,6 +57,10 @@ const AttendanceList: React.FC = () => {
   const [manualError, setManualError] = useState<string | null>(null);
   const [showManualBlockedModal, setShowManualBlockedModal] = useState(false);
   const [manualBlockedMessage, setManualBlockedMessage] = useState('');
+  const [selectedManualIds, setSelectedManualIds] = useState<number[]>([]);
+  const [showBulkManualModal, setShowBulkManualModal] = useState(false);
+  const [savingBulkManual, setSavingBulkManual] = useState(false);
+  const [bulkManualError, setBulkManualError] = useState<string | null>(null);
 
   // Add Participant State
   const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
@@ -229,6 +233,7 @@ const AttendanceList: React.FC = () => {
   useEffect(() => {
     if (selectedEventId && selectedDate) {
       fetchAttendance(selectedEventId, selectedDate);
+      setSelectedManualIds([]);
 
       const channel = supabase
         .channel(`participants_data_${selectedEventId}`)
@@ -262,6 +267,10 @@ const AttendanceList: React.FC = () => {
       if (event.session !== 'All_Day' && (filter === 'No PM' || filter === 'Complete Logs')) {
           setFilter('Show All');
       }
+      if (!event.has_accommodation && filter === 'Accommodation') {
+          setFilter('Show All');
+      }
+      setSelectedManualIds([]);
       
       const start = parseISO(event.start_date);
       const end = event.end_date ? parseISO(event.end_date) : start;
@@ -376,10 +385,14 @@ const AttendanceList: React.FC = () => {
         case 'Present': return isPresent;
         case 'No PM': return hasMultipleSessions && hasAM && !hasPM;
         case 'Complete Logs': return hasMultipleSessions && hasAM && hasPM;
+        case 'Accommodation': return !!row.needs_accommodation;
         case 'Show All':
         default: return true;
     }
   });
+  const filteredManualIds = filteredData.map(row => row.participant.participant_id);
+  const allFilteredSelected = filteredManualIds.length > 0 && filteredManualIds.every(id => selectedManualIds.includes(id));
+  const selectedManualRows = data.filter(row => selectedManualIds.includes(row.participant.participant_id));
 
   const handleRowClick = (p: Participant) => {
     setSelectedParticipant(p);
@@ -439,15 +452,103 @@ const AttendanceList: React.FC = () => {
       XLSX.writeFile(workbook, `Attendance_Report_${selectedEvent.title || selectedEvent.event_name}_${selectedDate}.xlsx`);
   };
 
-  const openManualModal = (e: React.MouseEvent, p: Participant) => {
-      e.stopPropagation();
-      
+  const isSelectedDateInFuture = () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const eventDate = new Date(selectedDate);
       eventDate.setHours(0, 0, 0, 0);
+
+      return eventDate > today;
+  };
+
+  const toggleManualSelection = (participantId: number) => {
+      setSelectedManualIds(prev =>
+          prev.includes(participantId)
+              ? prev.filter(id => id !== participantId)
+              : [...prev, participantId]
+      );
+  };
+
+  const toggleAllFilteredManualSelection = () => {
+      setSelectedManualIds(prev => {
+          if (allFilteredSelected) {
+              return prev.filter(id => !filteredManualIds.includes(id));
+          }
+
+          return Array.from(new Set([...prev, ...filteredManualIds]));
+      });
+  };
+
+  const openBulkManualModal = () => {
+      if (selectedManualIds.length === 0) return;
+
+      if (isSelectedDateInFuture()) {
+          setManualBlockedMessage(
+              'Manual attendance is not available yet because the selected event date has not started.'
+          );
+          setShowManualBlockedModal(true);
+          return;
+      }
+
+      setBulkManualError(null);
+      setManualForm({
+          date: selectedDate || format(new Date(), 'yyyy-MM-dd'),
+          time: format(new Date(), 'HH:mm'),
+          session: getDefaultSessionForEvent(selectedEvent),
+          status: 'Valid'
+      });
+      setShowBulkManualModal(true);
+  };
+
+  const saveManualAttendance = async (participantId: number, remarksLabel: string) => {
+      if (!selectedEventId || !user) return;
+
+      const localDate = new Date(`${manualForm.date}T${manualForm.time}:00`);
+      const scanTimeStr = localDate.toISOString();
+      const { data: existingLog } = await supabase
+          .from('attendance_logs')
+          .select('attendance_id')
+          .eq('event_id', selectedEventId)
+          .eq('participant_id', participantId)
+          .eq('attendance_date', manualForm.date)
+          .eq('action_session', manualForm.session)
+          .eq('scan_status', 'Valid')
+          .maybeSingle();
+
+      if (existingLog) {
+          const { error: updateError } = await supabase
+              .from('attendance_logs')
+              .update({
+                  scan_time: scanTimeStr,
+                  scan_status: manualForm.status,
+                  remarks: `${remarksLabel} (Updated ${manualForm.session})`,
+                  user_id: user.user_id
+              })
+              .eq('attendance_id', existingLog.attendance_id);
+
+          if (updateError) throw updateError;
+          return;
+      }
+
+      const { error: insertError } = await supabase.from('attendance_logs').insert({
+          event_id: selectedEventId,
+          participant_id: participantId,
+          user_id: user.user_id,
+          attendance_date: manualForm.date,
+          scan_time: scanTimeStr,
+          action_session: manualForm.session,
+          scan_status: manualForm.status,
+          remarks: remarksLabel,
+          scanner_device: 'Manual Input'
+      });
+
+      if (insertError) throw insertError;
+  };
+
+  const openManualModal = (e: React.MouseEvent, p: Participant) => {
+      e.stopPropagation();
       
-      if (eventDate > today) {
+      if (isSelectedDateInFuture()) {
           setManualBlockedMessage(
               'Manual attendance is not available yet because the selected event date has not started.'
           );
@@ -472,63 +573,7 @@ const AttendanceList: React.FC = () => {
       setSavingManual(true);
       setManualError(null);
       try {
-          const localDate = new Date(`${manualForm.date}T${manualForm.time}:00`);
-          const scanTimeStr = localDate.toISOString();
-          
-          if (manualForm.session === 'PM') {
-              // For PM, check if entry exists to have "latest time out"
-              const { data: existingPM } = await supabase
-                .from('attendance_logs')
-                .select('attendance_id')
-                .eq('event_id', selectedEventId)
-                .eq('participant_id', manualParticipant.participant_id)
-                .eq('attendance_date', manualForm.date)
-                .eq('action_session', 'PM')
-                .eq('scan_status', 'Valid')
-                .maybeSingle();
-
-              if (existingPM) {
-                  // Update existing PM entry
-                  const { error: updateError } = await supabase
-                    .from('attendance_logs')
-                    .update({
-                        scan_time: scanTimeStr,
-                        scan_status: manualForm.status,
-                        remarks: 'Manual Entry (Updated PM)',
-                        user_id: user.user_id
-                    })
-                    .eq('attendance_id', existingPM.attendance_id);
-                  if (updateError) throw updateError;
-              } else {
-                  // Insert new PM entry
-                  const { error: insertError } = await supabase.from('attendance_logs').insert({
-                    event_id: selectedEventId,
-                    participant_id: manualParticipant.participant_id,
-                    user_id: user.user_id,
-                    attendance_date: manualForm.date,
-                    scan_time: scanTimeStr,
-                    action_session: manualForm.session,
-                    scan_status: manualForm.status,
-                    remarks: 'Manual Entry (PM)',
-                    scanner_device: 'Manual Input'
-                  });
-                  if (insertError) throw insertError;
-              }
-          } else {
-              // AM Session - Insert (Standard manual log)
-              const { error: insertError } = await supabase.from('attendance_logs').insert({
-                  event_id: selectedEventId,
-                  participant_id: manualParticipant.participant_id,
-                  user_id: user.user_id,
-                  attendance_date: manualForm.date,
-                  scan_time: scanTimeStr,
-                  action_session: manualForm.session,
-                  scan_status: manualForm.status,
-                  remarks: 'Manual Entry',
-                  scanner_device: 'Manual Input'
-              });
-              if (insertError) throw insertError;
-          }
+          await saveManualAttendance(manualParticipant.participant_id, `Manual Entry (${manualForm.session})`);
 
           setShowManualModal(false);
           // fetchAttendance will be triggered by supabase real-time channel
@@ -540,6 +585,28 @@ const AttendanceList: React.FC = () => {
           }
       } finally {
           setSavingManual(false);
+      }
+  };
+
+  const handleBulkManualSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedEventId || !user || selectedManualIds.length === 0) return;
+
+      setSavingBulkManual(true);
+      setBulkManualError(null);
+
+      try {
+          for (const participantId of selectedManualIds) {
+              await saveManualAttendance(participantId, `Bulk Manual Entry (${manualForm.session})`);
+          }
+
+          setShowBulkManualModal(false);
+          setSelectedManualIds([]);
+          toast.success(`Manual ${manualForm.session} attendance logged for ${selectedManualIds.length} participant${selectedManualIds.length === 1 ? '' : 's'}.`);
+      } catch (err: any) {
+          setBulkManualError(err.message || 'An error occurred while saving bulk attendance.');
+      } finally {
+          setSavingBulkManual(false);
       }
   };
 
@@ -886,6 +953,15 @@ const AttendanceList: React.FC = () => {
   const notPresentCount = data.filter(r => !visibleSessions.some(session => session === 'AM' ? !!r.amLog : !!r.pmLog)).length;
   const noPmCount = hasMultipleSessions ? data.filter(r => r.amLog && !r.pmLog).length : 0;
   const completeLogsCount = hasMultipleSessions ? data.filter(r => r.amLog && r.pmLog).length : 0;
+  const hasAccommodationFilter = !!selectedEvent?.has_accommodation;
+  const accommodationCount = hasAccommodationFilter ? data.filter(r => r.needs_accommodation).length : 0;
+  const statsGridClassName = hasMultipleSessions
+      ? hasAccommodationFilter
+          ? 'grid-cols-6 xl:[grid-template-columns:repeat(6,minmax(0,1fr))]'
+          : 'grid-cols-5 xl:[grid-template-columns:repeat(5,minmax(0,1fr))]'
+      : hasAccommodationFilter
+          ? 'grid-cols-4 sm:[grid-template-columns:repeat(4,minmax(0,1fr))]'
+          : 'sm:[grid-template-columns:repeat(3,minmax(0,1fr))]';
 
   return (
     <div className="attendance-page h-auto min-h-0 flex flex-col gap-1.5 sm:gap-2 lg:h-full lg:gap-3">
@@ -1037,11 +1113,7 @@ const AttendanceList: React.FC = () => {
       {/* Stats Cards as Filters */}
       <div className="attendance-stats w-full">
           <div
-            className={`grid w-full gap-1 sm:gap-3 lg:gap-4 ${
-              hasMultipleSessions
-                ? 'grid-cols-5 xl:[grid-template-columns:repeat(5,minmax(0,1fr))]'
-                : 'sm:[grid-template-columns:repeat(3,minmax(0,1fr))]'
-            }`}
+            className={`grid w-full gap-1 sm:gap-3 lg:gap-4 ${statsGridClassName}`}
           >
           <button 
             onClick={() => setFilter('Show All')}
@@ -1129,6 +1201,27 @@ const AttendanceList: React.FC = () => {
                 <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-indigo-600">{completeLogsCount}</p>
             </button>
           )}
+
+          {hasAccommodationFilter && (
+            <button
+              onClick={() => setFilter('Accommodation')}
+              className={`attendance-stat-card min-w-0 min-h-[52px] sm:min-h-[72px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+                  ${filter === 'Accommodation' ? 'ring-2 ring-sky-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-sky-200'}
+                  bg-white
+              `}
+            >
+                <div className="flex justify-between items-start mb-0.5 w-full">
+                    <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
+                      <span className="sm:hidden">Accom</span>
+                      <span className="hidden sm:inline">Accommodation</span>
+                    </p>
+                    <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Accommodation' ? 'bg-sky-200 text-sky-700' : 'bg-sky-100 text-sky-600'}`}>
+                      <Home size={10} className="sm:h-3.5 sm:w-3.5" />
+                    </div>
+                </div>
+                <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-sky-600">{accommodationCount}</p>
+            </button>
+          )}
           </div>
       </div>
 
@@ -1138,24 +1231,52 @@ const AttendanceList: React.FC = () => {
         </div>
       ) : (
         <div className="attendance-table bg-white rounded-xl shadow-sm border border-slate-100 overflow-visible lg:overflow-hidden flex-none lg:flex-1 min-h-0 flex flex-col">
-            {/* Active Filter Indicator in Table Header */}
-            {filter !== 'Show All' && (
-                <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 sm:px-5 lg:px-6">
-                    <Filter size={14} />
-                    <span>Filtering by: <span className="font-bold text-slate-800">{filter}</span></span>
-                    <button 
-                        onClick={() => setFilter('Show All')}
-                        className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+            <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 lg:px-6">
+                <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
+                    <input
+                        type="checkbox"
+                        checked={allFilteredSelected}
+                        disabled={filteredManualIds.length === 0}
+                        onChange={toggleAllFilteredManualSelection}
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+                    />
+                    Select visible
+                </label>
+                <div className="flex items-center gap-2">
+                    {filter !== 'Show All' && (
+                        <button
+                            type="button"
+                            onClick={() => setFilter('Show All')}
+                            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-200 hover:text-indigo-700"
+                        >
+                            Clear Filter
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={openBulkManualModal}
+                        disabled={selectedManualIds.length === 0}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
-                        Clear Filter
+                        <Clock size={14} />
+                        Bulk Manual ({selectedManualIds.length})
                     </button>
                 </div>
-            )}
+            </div>
             
             <div className="hidden lg:block flex-1 min-h-0 overflow-auto">
                 <table className="datatable w-full table-fixed text-[13px] lg:text-sm text-left">
                     <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                         <tr>
+                            <th className="px-5 py-4 lg:px-6 lg:py-5 w-14 bg-slate-50 text-center">
+                                <input
+                                    type="checkbox"
+                                    checked={allFilteredSelected}
+                                    disabled={filteredManualIds.length === 0}
+                                    onChange={toggleAllFilteredManualSelection}
+                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+                                />
+                            </th>
                             <th className="px-5 py-4 lg:px-6 lg:py-5 w-14 bg-slate-50">#</th>
                             <th className="px-5 py-4 lg:px-6 lg:py-5 w-[28%] bg-slate-50">Name</th>
                             <th className="px-5 py-4 lg:px-6 lg:py-5 w-[18%] bg-slate-50">Position</th>
@@ -1175,6 +1296,15 @@ const AttendanceList: React.FC = () => {
                                 onClick={() => handleRowClick(row.participant)}
                                 className="hover:bg-slate-50 cursor-pointer transition-colors group"
                             >
+                                <td className="px-5 py-4 lg:px-6 lg:py-5 text-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedManualIds.includes(row.participant.participant_id)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={() => toggleManualSelection(row.participant.participant_id)}
+                                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                </td>
                                 <td className="px-5 py-4 lg:px-6 lg:py-5 text-slate-500 font-mono text-xs lg:text-sm">{index + 1}</td>
                                 <td className="px-5 py-4 lg:px-6 lg:py-5 font-medium text-slate-800 group-hover:text-indigo-600">
                                     <div className="whitespace-normal break-words leading-snug">
@@ -1222,7 +1352,7 @@ const AttendanceList: React.FC = () => {
                         ))}
                         {filteredData.length === 0 && (
                             <tr>
-                                <td colSpan={5 + visibleSessions.length} className="text-center py-12 text-slate-400">
+                                <td colSpan={6 + visibleSessions.length} className="text-center py-12 text-slate-400">
                                     {events.length === 0 ? (
                                         <div className="flex flex-col items-center">
                                             <Calendar className="w-10 h-10 mb-2 opacity-20" />
@@ -1259,6 +1389,14 @@ const AttendanceList: React.FC = () => {
                                 className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm active:scale-[0.99] transition-transform sm:p-4"
                             >
                                 <div className="flex items-start justify-between gap-3">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedManualIds.includes(row.participant.participant_id)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={() => toggleManualSelection(row.participant.participant_id)}
+                                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        aria-label={`Select ${row.participant.full_name}`}
+                                    />
                                     <div className="min-w-0 flex-1">
                                         <h3 className="text-[13px] font-semibold leading-tight text-slate-800 sm:text-sm">
                                             {row.participant.full_name}
@@ -1767,6 +1905,81 @@ const AttendanceList: React.FC = () => {
                     <button type="submit" disabled={savingManual} className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-all shadow-md flex justify-center items-center gap-2 mt-4">
                         {savingManual ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                         Log Attendance
+                    </button>
+                </form>
+            </div>
+          </div>
+      )}
+
+      {showBulkManualModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowBulkManualModal(false)}></div>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
+                    <h3 className="font-semibold flex items-center gap-2">
+                        <Clock size={20} /> Bulk Manual Attendance
+                    </h3>
+                    <button onClick={() => setShowBulkManualModal(false)} className="text-indigo-100 hover:text-white p-1 hover:bg-white/20 rounded-full transition">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleBulkManualSubmit} className="p-6 space-y-4">
+                    {bulkManualError && (
+                        <div className="bg-red-50 text-red-600 p-3 rounded-lg border border-red-100 flex items-start gap-2 text-sm">
+                            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                            <p>{bulkManualError}</p>
+                        </div>
+                    )}
+                    <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                        <p className="text-xs text-indigo-500 uppercase font-bold tracking-wider mb-1">Selected Participants</p>
+                        <p className="font-bold text-slate-800">{selectedManualRows.length} participant{selectedManualRows.length === 1 ? '' : 's'}</p>
+                        <div className="mt-2 max-h-24 overflow-y-auto text-xs text-slate-600">
+                            {selectedManualRows.slice(0, 6).map(row => (
+                                <p key={row.participant.participant_id} className="truncate">{row.participant.full_name}</p>
+                            ))}
+                            {selectedManualRows.length > 6 && (
+                                <p className="font-semibold text-slate-500">+{selectedManualRows.length - 6} more</p>
+                            )}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                            <input
+                                type="date"
+                                required
+                                value={manualForm.date}
+                                disabled
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-100 text-slate-500 cursor-not-allowed"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Time</label>
+                            <input type="time" required value={manualForm.time} onChange={e => setManualForm({...manualForm, time: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none" />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Session</label>
+                            <select value={manualForm.session} onChange={e => setManualForm({...manualForm, session: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
+                                {visibleSessions.map((session) => (
+                                    <option key={session} value={session}>{session}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                            <select value={manualForm.status} onChange={e => setManualForm({...manualForm, status: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
+                                <option value="Valid">Valid</option>
+                                <option value="Late">Late</option>
+                                <option value="Excuse">Excuse</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" disabled={savingBulkManual || selectedManualRows.length === 0} className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-all shadow-md flex justify-center items-center gap-2 mt-4 disabled:cursor-not-allowed disabled:bg-slate-300">
+                        {savingBulkManual ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                        Log {manualForm.session} Attendance
                     </button>
                 </form>
             </div>
