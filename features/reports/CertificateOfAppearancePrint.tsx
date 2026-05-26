@@ -5,7 +5,7 @@ import { Event } from '../../types/database';
 import { ArrowLeft, Download, FileSpreadsheet, Hash, Info, Loader2, Printer, Search } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
-import { toBlob, toJpeg, toPng } from 'html-to-image';
+import { toJpeg } from 'html-to-image';
 import * as XLSX from 'xlsx';
 import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
 import CertificateOfAppearanceCard, {
@@ -50,28 +50,13 @@ const sanitizeFileName = (value: string) => {
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-const renderCertificateBlob = async (
-  node: HTMLElement,
-  pixelRatio: number,
-  format: 'png' | 'jpeg' = 'png'
-) => {
-  const baseOptions = {
+const renderCertificateJpegBlob = async (node: HTMLElement, pixelRatio: number) => {
+  const dataUrl = await toJpeg(node, {
     cacheBust: true,
     backgroundColor: '#ffffff',
     pixelRatio,
-    ...(format === 'jpeg' ? { quality: 0.92 } : {})
-  };
-
-  const blob = await toBlob(node, {
-    ...baseOptions,
-    type: format === 'jpeg' ? 'image/jpeg' : 'image/png'
+    quality: 0.92
   });
-
-  if (blob) return blob;
-
-  const dataUrl = format === 'jpeg'
-    ? await toJpeg(node, baseOptions)
-    : await toPng(node, baseOptions);
 
   const response = await fetch(dataUrl);
   return response.blob();
@@ -79,7 +64,10 @@ const renderCertificateBlob = async (
 
 const BATCH_RENDER_SIZE = 20;
 const BATCH_PIXEL_RATIO = 1;
-const BATCH_OUTPUT_FORMAT: 'jpeg' = 'jpeg';
+const CERT_WIDTH_PX = (210 / 25.4) * 96;
+const CERT_HEIGHT_PX = (148.5 / 25.4) * 96;
+const PDF_A5_LANDSCAPE_WIDTH_PT = 595.28;
+const PDF_A5_LANDSCAPE_HEIGHT_PT = 419.53;
 
 const preloadCertificateAssets = async (extraUrls: Array<string | null | undefined>) => {
   const urls = [
@@ -268,6 +256,92 @@ const createZipBlob = async (files: Array<{ fileName: string; blob: Blob }>) => 
   });
 };
 
+const appendAscii = (chunks: Uint8Array[], value: string) => {
+  chunks.push(new TextEncoder().encode(value));
+};
+
+const getJpegDimensions = (bytes: Uint8Array) => {
+  let offset = 2;
+
+  while (offset < bytes.length) {
+    if (bytes[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+
+    const marker = bytes[offset + 1];
+    const length = (bytes[offset + 2] << 8) + bytes[offset + 3];
+
+    if (marker >= 0xc0 && marker <= 0xc3) {
+      return {
+        height: (bytes[offset + 5] << 8) + bytes[offset + 6],
+        width: (bytes[offset + 7] << 8) + bytes[offset + 8]
+      };
+    }
+
+    offset += 2 + length;
+  }
+
+  return {
+    width: Math.round(CERT_WIDTH_PX * BATCH_PIXEL_RATIO),
+    height: Math.round(CERT_HEIGHT_PX * BATCH_PIXEL_RATIO)
+  };
+};
+
+const createPdfBlobFromJpeg = async (jpegBlob: Blob) => {
+  const imageBytes = new Uint8Array(await jpegBlob.arrayBuffer());
+  const imageDimensions = getJpegDimensions(imageBytes);
+  const pageWidth = PDF_A5_LANDSCAPE_WIDTH_PT;
+  const pageHeight = PDF_A5_LANDSCAPE_HEIGHT_PT;
+  const content = `q\n${pageWidth} 0 0 ${pageHeight} 0 0 cm\n/Im0 Do\nQ\n`;
+  const objects: Uint8Array[] = [
+    new TextEncoder().encode('<< /Type /Catalog /Pages 2 0 R >>'),
+    new TextEncoder().encode('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'),
+    new TextEncoder().encode(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>`
+    ),
+    new TextEncoder().encode(`<< /Length ${content.length} >>\nstream\n${content}endstream`),
+    combineUint8Arrays([
+      new TextEncoder().encode(
+        `<< /Type /XObject /Subtype /Image /Width ${imageDimensions.width} /Height ${imageDimensions.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageBytes.length} >>\nstream\n`
+      ),
+      imageBytes,
+      new TextEncoder().encode('\nendstream')
+    ])
+  ];
+
+  const chunks: Uint8Array[] = [];
+  const offsets: number[] = [];
+  let currentOffset = 0;
+
+  const push = (chunk: Uint8Array) => {
+    chunks.push(chunk);
+    currentOffset += chunk.length;
+  };
+
+  push(new TextEncoder().encode('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n'));
+
+  objects.forEach((object, index) => {
+    offsets.push(currentOffset);
+    push(new TextEncoder().encode(`${index + 1} 0 obj\n`));
+    push(object);
+    push(new TextEncoder().encode('\nendobj\n'));
+  });
+
+  const xrefOffset = currentOffset;
+  appendAscii(chunks, `xref\n0 ${objects.length + 1}\n`);
+  appendAscii(chunks, '0000000000 65535 f \n');
+  offsets.forEach((offset) => {
+    appendAscii(chunks, `${String(offset).padStart(10, '0')} 00000 n \n`);
+  });
+  appendAscii(
+    chunks,
+    `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`
+  );
+
+  return new Blob(chunks, { type: 'application/pdf' });
+};
+
 const getWindowWithDirectoryPicker = () =>
   window as Window & {
     showDirectoryPicker?: () => Promise<DirectoryPickerHandle>;
@@ -283,7 +357,7 @@ const buildCertificateFileName = (
     suffix?: string | null;
     full_name?: string | null;
   },
-  extension: 'png' | 'jpg' = 'png'
+  extension: 'png' | 'jpg' | 'pdf' = 'pdf'
 ) => {
   const parts = [
     participant.l_name,
@@ -369,8 +443,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
   const batchPreviewRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const previewWrapperRef = useRef<HTMLDivElement | null>(null);
 
-  const A4_WIDTH_PX = (210 / 25.4) * 96;
-  const CERT_HEIGHT_PX = (148.5 / 25.4) * 96;
+  const A4_WIDTH_PX = CERT_WIDTH_PX;
 
   const [previewScale, setPreviewScale] = useState(1);
   const [event, setEvent] = useState<Event | null>(null);
@@ -825,9 +898,10 @@ const writeCertificatesToDirectory = async (
             const node = batchPreviewRefs.current[participantRecord.participant.participant_id];
             if (!node) continue;
 
+            const jpegBlob = await renderCertificateJpegBlob(node, BATCH_PIXEL_RATIO);
             filesToSave.push({
-              fileName: buildCertificateFileName(participantRecord.participant, 'jpg'),
-              blob: await renderCertificateBlob(node, BATCH_PIXEL_RATIO, BATCH_OUTPUT_FORMAT)
+              fileName: buildCertificateFileName(participantRecord.participant, 'pdf'),
+              blob: await createPdfBlobFromJpeg(jpegBlob)
             });
 
             setSaveProgress({ done: filesToSave.length, total: selectedDownloadParticipants.length });
@@ -864,8 +938,9 @@ const writeCertificatesToDirectory = async (
           await wait(350);
         }
       } else if (previewRef.current && selectedParticipant) {
+        const jpegBlob = await renderCertificateJpegBlob(previewRef.current, BATCH_PIXEL_RATIO);
         await triggerDownload(
-          await renderCertificateBlob(previewRef.current, 2),
+          await createPdfBlobFromJpeg(jpegBlob),
           buildCertificateFileName(selectedParticipant.participant)
         );
       }

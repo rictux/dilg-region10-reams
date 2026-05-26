@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload, Eye, X } from 'lucide-react';
+import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload, Eye, X, Trash2 } from 'lucide-react';
 import { Event, Office } from '../../types/database';
 import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
 import CertificateOfAppearanceCard, {
@@ -296,6 +296,17 @@ const Settings: React.FC = () => {
     setSelectedSignatureFile(file);
     setSignaturePreviewUrl(URL.createObjectURL(file));
     e.target.value = '';
+  };
+
+  const handleRemoveSignature = () => {
+    if (signaturePreviewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(signaturePreviewUrl);
+    }
+
+    setMessage(null);
+    setSelectedSignatureFile(null);
+    setSignaturePreviewUrl('');
+    setSignatory((prev) => ({ ...prev, esig_link: '' }));
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -609,21 +620,33 @@ const Settings: React.FC = () => {
                   </div>
 
                   <div className="space-y-2.5">
-                    <label className={`flex w-full items-center justify-center gap-3 rounded-lg border border-dashed border-slate-300 px-4 py-2.5 text-slate-600 transition-colors ${
-                      selectedOfficeId ? 'cursor-pointer bg-slate-50 hover:bg-slate-100' : 'cursor-not-allowed bg-slate-100'
-                    }`}>
-                      <Upload className="h-4 w-4" />
-                      <span className="truncate text-sm font-medium">
-                        {selectedSignatureFile ? selectedSignatureFile.name : 'Upload signature image'}
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleSignatureChange}
-                        disabled={!selectedOfficeId}
-                        className="hidden"
-                      />
-                    </label>
+                    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                      <label className={`flex w-full items-center justify-center gap-3 rounded-lg border border-dashed border-slate-300 px-4 py-2.5 text-slate-600 transition-colors ${
+                        selectedOfficeId ? 'cursor-pointer bg-slate-50 hover:bg-slate-100' : 'cursor-not-allowed bg-slate-100'
+                      }`}>
+                        <Upload className="h-4 w-4" />
+                        <span className="truncate text-sm font-medium">
+                          {selectedSignatureFile ? selectedSignatureFile.name : 'Upload signature image'}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleSignatureChange}
+                          disabled={!selectedOfficeId}
+                          className="hidden"
+                        />
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={handleRemoveSignature}
+                        disabled={!selectedOfficeId || (!signaturePreviewUrl && !signatory.esig_link && !selectedSignatureFile)}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sm:hidden lg:inline">Remove Signature</span>
+                      </button>
+                    </div>
 
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
                       <p className="mb-2 text-xs font-medium text-slate-700">
