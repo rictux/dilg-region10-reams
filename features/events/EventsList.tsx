@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event, Participant, Office } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Home, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import ExcelJS from 'exceljs';
@@ -1477,7 +1477,7 @@ const EventsList: React.FC = () => {
                                           <div className="flex gap-2 mt-1.5 justify-start">
                                             {event.has_accommodation && (
                                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
-                                                    <Home size={10} className="mr-1" /> Accommodation
+                                                    <Bed size={10} className="mr-1" /> Accommodation
                                                 </span>
                                             )}
                                             {!event.registration_open && (
@@ -1624,7 +1624,7 @@ const EventsList: React.FC = () => {
                                   <div className="flex flex-wrap gap-2 mt-2">
                                       {event.has_accommodation && (
                                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
-                                              <Home size={10} className="mr-1" /> Accommodation
+                                              <Bed size={10} className="mr-1" /> Accommodation
                                           </span>
                                       )}
                                       {!event.registration_open && (
@@ -1853,7 +1853,7 @@ const EventsList: React.FC = () => {
                                             : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                                     }`}
                                 >
-                                    <Home size={16} /> Has Accommodation
+                                    <Bed size={16} /> Has Accommodation
                                 </button>
                             )}
                             <div className="relative w-full max-w-xs">
@@ -1979,7 +1979,7 @@ const EventsList: React.FC = () => {
                                                     )}
                                                     {record.needs_accommodation && (
                                                         <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded flex items-center w-fit gap-1 mt-0.5">
-                                                            <Home size={8} /> Stay ({Math.max(1, record.accommodation_pax || 1)} pax)
+                                                            <Bed size={8} /> Stay ({Math.max(1, record.accommodation_pax || 1)} pax)
                                                         </span>
                                                     )}
                                                 </td>
@@ -2075,7 +2075,7 @@ const EventsList: React.FC = () => {
                                                     )}
                                                     {record.needs_accommodation && (
                                                         <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded flex items-center w-fit gap-1 mt-0.5">
-                                                            <Home size={8} /> Stay ({Math.max(1, record.accommodation_pax || 1)} pax)
+                                                            <Bed size={8} /> Stay ({Math.max(1, record.accommodation_pax || 1)} pax)
                                                         </span>
                                                     )}
                                                 </td>
