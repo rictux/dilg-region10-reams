@@ -23,25 +23,6 @@ type CertificateParticipant = CertificateParticipantRecord & {
 
 const isDelegateRole = (role: CertificateParticipant['role']) => role === 'Delegate';
 
-type DirectoryFileWriter = {
-  write: (data: Blob) => Promise<void>;
-  close: () => Promise<void>;
-};
-
-type DirectoryFileHandle = {
-  createWritable: () => Promise<DirectoryFileWriter>;
-};
-
-type DirectoryPickerHandle = {
-  getFileHandle: (
-    name: string,
-    options?: {
-      create?: boolean;
-    }
-  ) => Promise<DirectoryFileHandle>;
-};
-
-
 const sanitizeFileName = (value: string) => {
   return value
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '')
@@ -342,13 +323,6 @@ const createPdfBlobFromJpeg = async (jpegBlob: Blob) => {
 
   return new Blob(chunks, { type: 'application/pdf' });
 };
-
-const getWindowWithDirectoryPicker = () =>
-  window as Window & {
-    showDirectoryPicker?: () => Promise<DirectoryPickerHandle>;
-  };
-
-const canPickDirectory = () => typeof getWindowWithDirectoryPicker().showDirectoryPicker === 'function';
 
 const buildCertificateFileName = (
   participant: {
@@ -860,20 +834,6 @@ const CertificateOfAppearancePrint: React.FC = () => {
     URL.revokeObjectURL(objectUrl);
   };
 
-const writeCertificatesToDirectory = async (
-  directoryHandle: DirectoryPickerHandle,
-  files: Array<{ fileName: string; blob: Blob }>
-) => {
-  const normalizedFiles = getUniqueCertificateFiles(files);
-
-  for (const file of normalizedFiles) {
-    const fileHandle = await directoryHandle.getFileHandle(file.fileName, { create: true });
-    const writable = await fileHandle.createWritable();
-    await writable.write(file.blob);
-    await writable.close();
-    }
-  };
-
   const handleSaveCertificate = async () => {
     if (selectedDownloadParticipants.length === 0 && (!previewRef.current || !selectedParticipant)) return;
 
@@ -919,15 +879,6 @@ const writeCertificatesToDirectory = async (
 
         if (filesToSave.length === 0) return;
 
-        if (canPickDirectory()) {
-          const directoryHandle = await getWindowWithDirectoryPicker().showDirectoryPicker?.();
-
-          if (directoryHandle) {
-            await writeCertificatesToDirectory(directoryHandle, filesToSave);
-            return;
-          }
-        }
-
         if (filesToSave.length > 1) {
           await triggerDownload(
             await createZipBlob(filesToSave),
@@ -936,10 +887,8 @@ const writeCertificatesToDirectory = async (
           return;
         }
 
-        for (const file of getUniqueCertificateFiles(filesToSave)) {
-          await triggerDownload(file.blob, file.fileName);
-          await wait(350);
-        }
+        const [singleFile] = getUniqueCertificateFiles(filesToSave);
+        await triggerDownload(singleFile.blob, singleFile.fileName);
       } else if (previewRef.current && selectedParticipant) {
         const jpegBlob = await renderCertificateJpegBlob(previewRef.current, BATCH_PIXEL_RATIO);
         await triggerDownload(
