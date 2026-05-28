@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Event } from '../../types/database';
-import { ArrowLeft, Download, Hash, Info, Loader2, Printer, Search } from 'lucide-react';
+import { ArrowLeft, Download, FileSpreadsheet, Hash, Info, Loader2, Printer, Search } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
-import { toBlob, toJpeg, toPng } from 'html-to-image';
+import { toJpeg } from 'html-to-image';
+import * as XLSX from 'xlsx';
 import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
 import CertificateOfAppearanceCard, {
   buildEventDateString,
@@ -50,28 +51,13 @@ const sanitizeFileName = (value: string) => {
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-const renderCertificateBlob = async (
-  node: HTMLElement,
-  pixelRatio: number,
-  format: 'png' | 'jpeg' = 'png'
-) => {
-  const baseOptions = {
+const renderCertificateJpegBlob = async (node: HTMLElement, pixelRatio: number) => {
+  const dataUrl = await toJpeg(node, {
     cacheBust: true,
     backgroundColor: '#ffffff',
     pixelRatio,
-    ...(format === 'jpeg' ? { quality: 0.92 } : {})
-  };
-
-  const blob = await toBlob(node, {
-    ...baseOptions,
-    type: format === 'jpeg' ? 'image/jpeg' : 'image/png'
+    quality: 0.92
   });
-
-  if (blob) return blob;
-
-  const dataUrl = format === 'jpeg'
-    ? await toJpeg(node, baseOptions)
-    : await toPng(node, baseOptions);
 
   const response = await fetch(dataUrl);
   return response.blob();
@@ -79,7 +65,10 @@ const renderCertificateBlob = async (
 
 const BATCH_RENDER_SIZE = 20;
 const BATCH_PIXEL_RATIO = 1;
-const BATCH_OUTPUT_FORMAT: 'jpeg' = 'jpeg';
+const CERT_WIDTH_PX = (210 / 25.4) * 96;
+const CERT_HEIGHT_PX = (148.5 / 25.4) * 96;
+const PDF_A5_LANDSCAPE_WIDTH_PT = 595.28;
+const PDF_A5_LANDSCAPE_HEIGHT_PT = 419.53;
 
 const preloadCertificateAssets = async (extraUrls: Array<string | null | undefined>) => {
   const urls = [
@@ -268,6 +257,92 @@ const createZipBlob = async (files: Array<{ fileName: string; blob: Blob }>) => 
   });
 };
 
+const appendAscii = (chunks: Uint8Array[], value: string) => {
+  chunks.push(new TextEncoder().encode(value));
+};
+
+const getJpegDimensions = (bytes: Uint8Array) => {
+  let offset = 2;
+
+  while (offset < bytes.length) {
+    if (bytes[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+
+    const marker = bytes[offset + 1];
+    const length = (bytes[offset + 2] << 8) + bytes[offset + 3];
+
+    if (marker >= 0xc0 && marker <= 0xc3) {
+      return {
+        height: (bytes[offset + 5] << 8) + bytes[offset + 6],
+        width: (bytes[offset + 7] << 8) + bytes[offset + 8]
+      };
+    }
+
+    offset += 2 + length;
+  }
+
+  return {
+    width: Math.round(CERT_WIDTH_PX * BATCH_PIXEL_RATIO),
+    height: Math.round(CERT_HEIGHT_PX * BATCH_PIXEL_RATIO)
+  };
+};
+
+const createPdfBlobFromJpeg = async (jpegBlob: Blob) => {
+  const imageBytes = new Uint8Array(await jpegBlob.arrayBuffer());
+  const imageDimensions = getJpegDimensions(imageBytes);
+  const pageWidth = PDF_A5_LANDSCAPE_WIDTH_PT;
+  const pageHeight = PDF_A5_LANDSCAPE_HEIGHT_PT;
+  const content = `q\n${pageWidth} 0 0 ${pageHeight} 0 0 cm\n/Im0 Do\nQ\n`;
+  const objects: Uint8Array[] = [
+    new TextEncoder().encode('<< /Type /Catalog /Pages 2 0 R >>'),
+    new TextEncoder().encode('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'),
+    new TextEncoder().encode(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>`
+    ),
+    new TextEncoder().encode(`<< /Length ${content.length} >>\nstream\n${content}endstream`),
+    combineUint8Arrays([
+      new TextEncoder().encode(
+        `<< /Type /XObject /Subtype /Image /Width ${imageDimensions.width} /Height ${imageDimensions.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageBytes.length} >>\nstream\n`
+      ),
+      imageBytes,
+      new TextEncoder().encode('\nendstream')
+    ])
+  ];
+
+  const chunks: Uint8Array[] = [];
+  const offsets: number[] = [];
+  let currentOffset = 0;
+
+  const push = (chunk: Uint8Array) => {
+    chunks.push(chunk);
+    currentOffset += chunk.length;
+  };
+
+  push(new TextEncoder().encode('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n'));
+
+  objects.forEach((object, index) => {
+    offsets.push(currentOffset);
+    push(new TextEncoder().encode(`${index + 1} 0 obj\n`));
+    push(object);
+    push(new TextEncoder().encode('\nendobj\n'));
+  });
+
+  const xrefOffset = currentOffset;
+  appendAscii(chunks, `xref\n0 ${objects.length + 1}\n`);
+  appendAscii(chunks, '0000000000 65535 f \n');
+  offsets.forEach((offset) => {
+    appendAscii(chunks, `${String(offset).padStart(10, '0')} 00000 n \n`);
+  });
+  appendAscii(
+    chunks,
+    `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`
+  );
+
+  return new Blob(chunks, { type: 'application/pdf' });
+};
+
 const getWindowWithDirectoryPicker = () =>
   window as Window & {
     showDirectoryPicker?: () => Promise<DirectoryPickerHandle>;
@@ -283,7 +358,7 @@ const buildCertificateFileName = (
     suffix?: string | null;
     full_name?: string | null;
   },
-  extension: 'png' | 'jpg' = 'png'
+  extension: 'png' | 'jpg' | 'pdf' = 'pdf'
 ) => {
   const parts = [
     participant.l_name,
@@ -369,8 +444,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
   const batchPreviewRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const previewWrapperRef = useRef<HTMLDivElement | null>(null);
 
-  const A4_WIDTH_PX = (210 / 25.4) * 96;
-  const CERT_HEIGHT_PX = (148.5 / 25.4) * 96;
+  const A4_WIDTH_PX = CERT_WIDTH_PX;
 
   const [previewScale, setPreviewScale] = useState(1);
   const [event, setEvent] = useState<Event | null>(null);
@@ -379,6 +453,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
   const [officeCode, setOfficeCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [participantSearch, setParticipantSearch] = useState('');
+  const [showMissingSerialOnly, setShowMissingSerialOnly] = useState(false);
   const [selectedParticipantId, setSelectedParticipantId] = useState<number | null>(null);
   const [isSavingCertificate, setIsSavingCertificate] = useState(false);
   const [isGeneratingSerials, setIsGeneratingSerials] = useState(false);
@@ -392,6 +467,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
   useEffect(() => {
     if (eventId && user) {
+      sessionStorage.setItem('reports_selected_event_id', eventId);
       fetchData(parseInt(eventId, 10));
     }
   }, [eventId, user]);
@@ -537,15 +613,24 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
   const filteredParticipants = useMemo(() => {
     const search = participantSearch.trim().toLowerCase();
-    if (!search) return participants;
+    const serialFilteredParticipants = showMissingSerialOnly
+      ? participants.filter((record: CertificateParticipant) => record.ca_serial_no == null)
+      : participants;
 
-    return participants.filter((record: CertificateParticipant) => {
+    if (!search) return serialFilteredParticipants;
+
+    return serialFilteredParticipants.filter((record: CertificateParticipant) => {
       const fullName = (record.participant.full_name || '').toLowerCase();
       const displayName = buildParticipantListName(record.participant).toLowerCase();
 
       return fullName.includes(search) || displayName.includes(search);
     });
-  }, [participantSearch, participants]);
+  }, [participantSearch, participants, showMissingSerialOnly]);
+
+  const missingSerialCount = useMemo(
+    () => participants.filter((record: CertificateParticipant) => record.ca_serial_no == null).length,
+    [participants]
+  );
 
   const groupedParticipants = useMemo(() => {
     const delegates: CertificateParticipant[] = [];
@@ -629,6 +714,14 @@ const CertificateOfAppearancePrint: React.FC = () => {
     return buildCertificateSerialNumber(event, officeCode, storedSerial);
   };
 
+  const issuedSerialParticipants = useMemo(
+    () =>
+      participants
+        .filter((record: CertificateParticipant) => record.ca_serial_no != null)
+        .sort((a, b) => (a.ca_serial_no || 0) - (b.ca_serial_no || 0)),
+    [participants]
+  );
+
   const pendingSerialAssignments = useMemo<number[]>(() => {
     if (!requiresReferenceCode) return [];
     return selectedDownloadParticipants
@@ -665,6 +758,43 @@ const CertificateOfAppearancePrint: React.FC = () => {
     } finally {
       setIsGeneratingSerials(false);
     }
+  };
+
+  const buildExportParticipantName = (participant: CertificateParticipant['participant']) => {
+    const lastName = participant.l_name?.trim() || '';
+    const suffix = participant.suffix?.trim() || '';
+    const firstName = participant.f_name?.trim() || '';
+    const middleName = participant.m_initial?.trim() || '';
+    const lastNameSection = [lastName, suffix].filter(Boolean).join(' ');
+    const firstNameSection = [firstName, middleName].filter(Boolean).join(' ');
+
+    if (lastNameSection && firstNameSection) return `${lastNameSection}, ${firstNameSection}`;
+    return lastNameSection || firstNameSection || participant.full_name || 'Unnamed participant';
+  };
+
+  const handleExportSerials = () => {
+    if (!event || issuedSerialParticipants.length === 0) return;
+
+    const rows = issuedSerialParticipants.map((record: CertificateParticipant) => ({
+      'Participant Name': buildExportParticipantName(record.participant),
+      Gender: record.participant.gender || '',
+      Position: record.participant.position || '',
+      Office: record.participant.office || '',
+      'Serial Number': resolveCertificateSerial(record) || String(record.ca_serial_no).padStart(2, '0')
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet['!cols'] = [
+      { wch: 34 },
+      { wch: 12 },
+      { wch: 28 },
+      { wch: 36 },
+      { wch: 34 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'CA Serials');
+    XLSX.writeFile(workbook, `${sanitizeFileName(event.event_name || 'Event')}_CA_Serials.xlsx`);
   };
 
   const handlePrint = async () => {
@@ -771,9 +901,10 @@ const writeCertificatesToDirectory = async (
             const node = batchPreviewRefs.current[participantRecord.participant.participant_id];
             if (!node) continue;
 
+            const jpegBlob = await renderCertificateJpegBlob(node, BATCH_PIXEL_RATIO);
             filesToSave.push({
-              fileName: buildCertificateFileName(participantRecord.participant, 'jpg'),
-              blob: await renderCertificateBlob(node, BATCH_PIXEL_RATIO, BATCH_OUTPUT_FORMAT)
+              fileName: buildCertificateFileName(participantRecord.participant, 'pdf'),
+              blob: await createPdfBlobFromJpeg(jpegBlob)
             });
 
             setSaveProgress({ done: filesToSave.length, total: selectedDownloadParticipants.length });
@@ -810,8 +941,9 @@ const writeCertificatesToDirectory = async (
           await wait(350);
         }
       } else if (previewRef.current && selectedParticipant) {
+        const jpegBlob = await renderCertificateJpegBlob(previewRef.current, BATCH_PIXEL_RATIO);
         await triggerDownload(
-          await renderCertificateBlob(previewRef.current, 2),
+          await createPdfBlobFromJpeg(jpegBlob),
           buildCertificateFileName(selectedParticipant.participant)
         );
       }
@@ -934,6 +1066,15 @@ const writeCertificatesToDirectory = async (
                       : 'Generating...'
                     : 'Print'}
               </button>
+              {requiresReferenceCode && issuedSerialParticipants.length > 0 && (
+                <button
+                  onClick={handleExportSerials}
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-800 transition-colors hover:bg-sky-100"
+                >
+                  <FileSpreadsheet size={14} />
+                  Export
+                </button>
+              )}
             </div>
           </div>
 
@@ -980,6 +1121,15 @@ const writeCertificatesToDirectory = async (
                     : 'Generating...'
                   : 'Print'}
             </button>
+            {requiresReferenceCode && issuedSerialParticipants.length > 0 && (
+              <button
+                onClick={handleExportSerials}
+                className="inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-800 transition-colors hover:bg-sky-100"
+              >
+                <FileSpreadsheet size={14} />
+                Export
+              </button>
+            )}
           </div>
 
           {requiresReferenceCode && (
@@ -1024,11 +1174,34 @@ const writeCertificatesToDirectory = async (
           </div>
 
           <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-            <div className="flex items-center justify-between gap-2 text-[11px]">
-              <div className="font-medium text-slate-500">
-                {selectedDownloadParticipants.length} Selected
-              </div>
-              <div className="flex gap-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+              {requiresReferenceCode && (
+                <button
+                  type="button"
+                  onClick={() => setShowMissingSerialOnly((current) => !current)}
+                  className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    showMissingSerialOnly
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <Hash size={12} />
+                  No Serial Number
+                  <span
+                    className={`rounded-full px-1.5 text-[10px] font-bold leading-4 ${
+                      showMissingSerialOnly
+                        ? 'bg-emerald-200 text-emerald-800'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {missingSerialCount}
+                  </span>
+                </button>
+              )}
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <span className="px-1 text-[11px] font-medium text-slate-500">
+                  {selectedDownloadParticipants.length} Selected
+                </span>
                 <button
                   type="button"
                   onClick={handleSelectAll}
@@ -1052,7 +1225,7 @@ const writeCertificatesToDirectory = async (
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
             {filteredParticipants.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
-                No participant matched your search.
+                No participant matched your filters.
               </div>
             ) : (
               ([

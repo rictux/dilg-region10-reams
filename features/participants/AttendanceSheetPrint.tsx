@@ -39,6 +39,7 @@ const AttendanceSheetPrint: React.FC = () => {
 
   useEffect(() => {
     if (eventId) {
+        sessionStorage.setItem('reports_selected_event_id', eventId);
         fetchData(parseInt(eventId));
     }
   }, [eventId]);
@@ -131,7 +132,7 @@ const AttendanceSheetPrint: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 p-8 font-serif print:p-0 print:bg-white">
         <div className="max-w-[297mm] mx-auto mb-8 flex justify-between no-print">
-            <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium">
+            <button onClick={() => navigate('/reports')} className="flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium">
                 <ArrowLeft size={20} /> Back to Portal
             </button>
             <div className="flex items-center gap-4">
