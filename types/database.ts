@@ -80,6 +80,7 @@ export interface EventParticipant {
   date_accommodation?: string[] | null;
   ca_serial_no?: number | null;
   ca_issued_at?: string | null;
+  need_ca?: boolean | null;
 }
 
 export interface AttendanceLog {

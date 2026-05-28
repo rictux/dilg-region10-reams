@@ -17,6 +17,7 @@ import CertificateOfAppearanceCard, {
 type CertificateParticipant = CertificateParticipantRecord & {
   ca_serial_no: number | null;
   role: 'Delegate' | 'Speaker' | 'Secretariat' | 'Guest' | 'VIP';
+  need_ca: boolean | null;
 };
 
 const isDelegateRole = (role: CertificateParticipant['role']) => role === 'Delegate';
@@ -502,6 +503,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
           date_accommodation,
           ca_serial_no,
           role,
+          need_ca,
           participants (*)
         `)
         .eq('event_id', id)
@@ -515,7 +517,8 @@ const CertificateOfAppearancePrint: React.FC = () => {
           date_accommodation: (record.date_accommodation || []).filter(Boolean),
           log_dates: Array.from(logDatesByParticipant.get(record.participant_id) || []).sort(),
           ca_serial_no: record.ca_serial_no ?? null,
-          role: (record.role as CertificateParticipant['role']) || 'Delegate'
+          role: (record.role as CertificateParticipant['role']) || 'Delegate',
+          need_ca: record.need_ca ?? null
         }))
         .filter((record): record is CertificateParticipant => !!record.participant)
         .sort((a, b) => {
@@ -1110,11 +1113,18 @@ const writeCertificatesToDirectory = async (
                               >
                                 <div className="flex items-start justify-between gap-1.5">
                                   <p className="truncate text-xs font-semibold">{buildParticipantListName(record.participant)}</p>
-                                  {requiresReferenceCode && record.ca_serial_no != null && (
-                                    <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">
-                                      #{String(record.ca_serial_no).padStart(2, '0')}
-                                    </span>
-                                  )}
+                                  <div className="flex shrink-0 items-center gap-1">
+                                    {record.need_ca && (
+                                      <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700" title="Participant requested a Certificate of Appearance">
+                                        Wants CA
+                                      </span>
+                                    )}
+                                    {requiresReferenceCode && record.ca_serial_no != null && (
+                                      <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">
+                                        #{String(record.ca_serial_no).padStart(2, '0')}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                                 <p className="mt-0.5 truncate text-[10px] text-slate-500">{record.participant.office || 'No office indicated'}</p>
                               </button>
@@ -1134,7 +1144,14 @@ const writeCertificatesToDirectory = async (
           {selectedParticipant ? (
             <>
               <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <p className="text-sm font-semibold text-slate-800">{selectedParticipant.participant.full_name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-slate-800">{selectedParticipant.participant.full_name}</p>
+                  {selectedParticipant.need_ca && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                      Wants CA
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-slate-500">{selectedParticipant.participant.office || 'No office indicated'}</p>
               </div>
 

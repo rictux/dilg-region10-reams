@@ -111,6 +111,7 @@ const EventRegistration: React.FC = () => {
     location_id: null as number | null,
     accept_photo_video: false,
     store_to_db: false,
+    need_ca: false,
     participant_code: ''
   });
 
@@ -588,7 +589,8 @@ const EventRegistration: React.FC = () => {
           accommodation_pax: formData.needs_accommodation ? formData.accommodation_pax : 0,
           date_accommodation: formData.needs_accommodation && event.has_accommodation ? normalizedAccommodationDates : null,
           accept_photo_video: formData.accept_photo_video,
-          store_to_db: formData.store_to_db
+          store_to_db: formData.store_to_db,
+          need_ca: formData.need_ca
         });
 
       if (regError) {
@@ -1295,6 +1297,48 @@ const EventRegistration: React.FC = () => {
                              )}
                         </div>
                     )}
+
+                    {/* SECTION: Certificate of Appearance */}
+                    <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100 space-y-4">
+                        <h3 className="text-sm font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-2">
+                            <Briefcase size={16}/> Certificate of Appearance
+                        </h3>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-800 mb-3 leading-snug">
+                                Do you need a Certificate of Appearance (CA) for this event?
+                            </label>
+                            <div className="flex gap-6">
+                                <label className="flex items-center gap-2 cursor-pointer group">
+                                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${formData.need_ca ? 'border-emerald-600 bg-emerald-600' : 'border-slate-400 bg-white'}`}>
+                                        {formData.need_ca && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                                    </div>
+                                    <input
+                                        type="radio"
+                                        name="need_ca"
+                                        className="hidden"
+                                        checked={formData.need_ca}
+                                        onChange={() => setFormData({ ...formData, need_ca: true })}
+                                    />
+                                    <span className="text-sm font-medium text-slate-700 group-hover:text-emerald-700">Yes</span>
+                                </label>
+
+                                <label className="flex items-center gap-2 cursor-pointer group">
+                                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${!formData.need_ca ? 'border-emerald-600 bg-emerald-600' : 'border-slate-400 bg-white'}`}>
+                                        {!formData.need_ca && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                                    </div>
+                                    <input
+                                        type="radio"
+                                        name="need_ca"
+                                        className="hidden"
+                                        checked={!formData.need_ca}
+                                        onChange={() => setFormData({ ...formData, need_ca: false })}
+                                    />
+                                    <span className="text-sm font-medium text-slate-700 group-hover:text-emerald-700">No</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
 
                     {/* Data Privacy Consent */}
                     <div className="flex flex-col gap-3 bg-slate-50 p-4 rounded-lg border border-slate-100 mt-4">

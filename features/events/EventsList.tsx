@@ -39,6 +39,7 @@ type ParticipantFormData = {
   participant_id?: number | null;
   accept_photo_video: boolean;
   store_to_db: boolean;
+  need_ca: boolean;
 };
 
 type ParticipantModalRecord = {
@@ -51,6 +52,7 @@ type ParticipantModalRecord = {
   accommodation_pax: number;
   accept_photo_video: boolean;
   store_to_db: boolean;
+  need_ca: boolean;
   date_accommodation: string[] | null;
   participants: Participant | null;
 };
@@ -75,7 +77,8 @@ const createEmptyParticipantForm = (): ParticipantFormData => ({
   date_accommodation: [],
   participant_id: null,
   accept_photo_video: true,
-  store_to_db: true
+  store_to_db: true,
+  need_ca: false
 });
 
 const getDateRangeOptions = (start?: string | null, end?: string | null) => {
@@ -278,6 +281,7 @@ const EventsList: React.FC = () => {
             accommodation_pax,
             accept_photo_video,
             store_to_db,
+            need_ca,
             date_accommodation,
             participants (
                 participant_id,
@@ -851,6 +855,7 @@ const EventsList: React.FC = () => {
               accommodation_pax: selectedEvent.has_accommodation && newParticipant.needs_accommodation ? Math.max(1, newParticipant.accommodation_pax) : 0,
               accept_photo_video: newParticipant.accept_photo_video,
               store_to_db: newParticipant.store_to_db,
+              need_ca: newParticipant.need_ca,
               date_accommodation: selectedEvent.has_accommodation && newParticipant.needs_accommodation ? normalizedAccommodationDates : null
           }
       };
@@ -911,7 +916,8 @@ const EventsList: React.FC = () => {
           date_accommodation: defaultAccommodationDates,
           participant_id: participant.participant_id,
           accept_photo_video: !!record.accept_photo_video,
-          store_to_db: !!record.store_to_db
+          store_to_db: !!record.store_to_db,
+          need_ca: !!record.need_ca
       });
       setParticipantModalView('edit');
   };
@@ -2439,6 +2445,19 @@ const EventsList: React.FC = () => {
                                         )}
                                     </div>
                                 )}
+
+                                {/* Certificate of Appearance */}
+                                <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                                            checked={newParticipant.need_ca}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewParticipant({ ...newParticipant, need_ca: e.target.checked })}
+                                        />
+                                        <span className="text-sm font-medium text-slate-700">Needs Certificate of Appearance (CA)</span>
+                                    </label>
+                                </div>
 
                                 {/* Data Privacy Consent */}
                                 <div className="flex flex-col gap-3 bg-slate-50 p-4 rounded-lg border border-slate-100 mt-4">

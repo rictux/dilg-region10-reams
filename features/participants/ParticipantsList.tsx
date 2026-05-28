@@ -81,7 +81,8 @@ const AttendanceList: React.FC = () => {
       date_accommodation: [] as string[],
       participant_id: null as number | null,
       accept_photo_video: true,
-      store_to_db: true
+      store_to_db: true,
+      need_ca: false
   });
   const [suggestions, setSuggestions] = useState<Participant[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -818,7 +819,8 @@ const AttendanceList: React.FC = () => {
                 accommodation_pax: newParticipant.needs_accommodation ? Math.max(1, newParticipant.accommodation_pax) : 0,
                 date_accommodation: selectedEvent.has_accommodation && newParticipant.needs_accommodation ? normalizedAccommodationDates : null,
                 accept_photo_video: newParticipant.accept_photo_video,
-                store_to_db: newParticipant.store_to_db
+                store_to_db: newParticipant.store_to_db,
+                need_ca: newParticipant.need_ca
             });
 
           if (regError && regError.code !== '23505') throw regError;
@@ -845,7 +847,8 @@ const AttendanceList: React.FC = () => {
               date_accommodation: [],
               participant_id: null,
               accept_photo_video: true,
-              store_to_db: true
+              store_to_db: true,
+              need_ca: false
           });
           setSuggestions([]);
           // fetchAttendance will be triggered by supabase real-time channel
@@ -1654,10 +1657,23 @@ const AttendanceList: React.FC = () => {
                         </div>
                     )}
 
+                    {/* Certificate of Appearance */}
+                    <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                                checked={newParticipant.need_ca}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewParticipant({ ...newParticipant, need_ca: e.target.checked })}
+                            />
+                            <span className="text-sm font-medium text-slate-700">Needs Certificate of Appearance (CA)</span>
+                        </label>
+                    </div>
+
                     {/* Data Privacy Consent */}
                     <div className="flex flex-col gap-3 bg-slate-50 p-4 rounded-lg border border-slate-100 mt-4">
-                       
-                        
+
+
                         <div className="text-xs font-bold text-slate-700 mt-2">Consent:</div>
                         
                         <div className="flex items-start gap-3">
