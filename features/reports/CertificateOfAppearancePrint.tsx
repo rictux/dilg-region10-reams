@@ -32,20 +32,22 @@ const sanitizeFileName = (value: string) => {
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-const renderCertificateJpegBlob = async (node: HTMLElement, pixelRatio: number) => {
+const renderCertificateJpegBlob = async (node: HTMLElement, pixelRatio: number, quality: number) => {
   const dataUrl = await toJpeg(node, {
     cacheBust: true,
     backgroundColor: '#ffffff',
     pixelRatio,
-    quality: 0.92
+    quality
   });
 
   const response = await fetch(dataUrl);
   return response.blob();
 };
 
-const BATCH_RENDER_SIZE = 20;
-const BATCH_PIXEL_RATIO = 1;
+const BATCH_RENDER_SIZE = 10;
+const CERTIFICATE_EXPORT_DPI = 300;
+const CERTIFICATE_EXPORT_PIXEL_RATIO = CERTIFICATE_EXPORT_DPI / 96;
+const CERTIFICATE_EXPORT_JPEG_QUALITY = 0.98;
 const CERT_WIDTH_PX = (210 / 25.4) * 96;
 const CERT_HEIGHT_PX = (148.5 / 25.4) * 96;
 const PDF_A5_LANDSCAPE_WIDTH_PT = 595.28;
@@ -265,8 +267,8 @@ const getJpegDimensions = (bytes: Uint8Array) => {
   }
 
   return {
-    width: Math.round(CERT_WIDTH_PX * BATCH_PIXEL_RATIO),
-    height: Math.round(CERT_HEIGHT_PX * BATCH_PIXEL_RATIO)
+    width: Math.round(CERT_WIDTH_PX * CERTIFICATE_EXPORT_PIXEL_RATIO),
+    height: Math.round(CERT_HEIGHT_PX * CERTIFICATE_EXPORT_PIXEL_RATIO)
   };
 };
 
@@ -861,7 +863,11 @@ const CertificateOfAppearancePrint: React.FC = () => {
             const node = batchPreviewRefs.current[participantRecord.participant.participant_id];
             if (!node) continue;
 
-            const jpegBlob = await renderCertificateJpegBlob(node, BATCH_PIXEL_RATIO);
+            const jpegBlob = await renderCertificateJpegBlob(
+              node,
+              CERTIFICATE_EXPORT_PIXEL_RATIO,
+              CERTIFICATE_EXPORT_JPEG_QUALITY
+            );
             filesToSave.push({
               fileName: buildCertificateFileName(participantRecord.participant, 'pdf'),
               blob: await createPdfBlobFromJpeg(jpegBlob)
@@ -890,7 +896,11 @@ const CertificateOfAppearancePrint: React.FC = () => {
         const [singleFile] = getUniqueCertificateFiles(filesToSave);
         await triggerDownload(singleFile.blob, singleFile.fileName);
       } else if (previewRef.current && selectedParticipant) {
-        const jpegBlob = await renderCertificateJpegBlob(previewRef.current, BATCH_PIXEL_RATIO);
+        const jpegBlob = await renderCertificateJpegBlob(
+          previewRef.current,
+          CERTIFICATE_EXPORT_PIXEL_RATIO,
+          CERTIFICATE_EXPORT_JPEG_QUALITY
+        );
         await triggerDownload(
           await createPdfBlobFromJpeg(jpegBlob),
           buildCertificateFileName(selectedParticipant.participant)
