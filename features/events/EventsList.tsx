@@ -190,6 +190,10 @@ const EventsList: React.FC = () => {
   const [foodInclusionByDate, setFoodInclusionByDate] = useState<EventFoodInclusionMap>({});
   const [hasEventCode, setHasEventCode] = useState(false);
   const [showEventCodeInfo, setShowEventCodeInfo] = useState(false);
+  const [venueSuggestions, setVenueSuggestions] = useState<string[]>([]);
+  const [showVenueSuggestions, setShowVenueSuggestions] = useState(false);
+  const [loadingVenueSuggestions, setLoadingVenueSuggestions] = useState(false);
+  const venueInputFocusedRef = React.useRef(false);
 
   useEffect(() => {
     if (!isAdmin && eventView === 'deleted') {
@@ -239,6 +243,73 @@ const EventsList: React.FC = () => {
         };
     }
   }, [showParticipantsModal, selectedEvent]);
+
+  useEffect(() => {
+    if (!showEventModal) {
+        venueInputFocusedRef.current = false;
+        setVenueSuggestions([]);
+        setShowVenueSuggestions(false);
+        setLoadingVenueSuggestions(false);
+        return;
+    }
+
+    const searchValue = (formData.venue || '').trim();
+
+    if (searchValue.length < 2) {
+        setVenueSuggestions([]);
+        setShowVenueSuggestions(false);
+        setLoadingVenueSuggestions(false);
+        return;
+    }
+
+    let cancelled = false;
+    setLoadingVenueSuggestions(true);
+
+    const timer = window.setTimeout(async () => {
+        let query = supabase
+          .from('events')
+          .select('venue')
+          .ilike('venue', `%${searchValue}%`)
+          .not('venue', 'is', null)
+          .is('deleted_at', null)
+          .order('venue', { ascending: true })
+          .limit(12);
+
+        if (!isAdmin && user?.office_id) {
+            query = query.eq('organize_by', user.office_id);
+        }
+
+        const { data, error } = await query;
+
+        if (cancelled) return;
+
+        if (error) {
+            setVenueSuggestions([]);
+            setShowVenueSuggestions(false);
+            setLoadingVenueSuggestions(false);
+            return;
+        }
+
+        const normalizedSearch = searchValue.toLowerCase();
+        const uniqueVenues = Array.from(
+          new Map(
+            (data || [])
+              .map((record) => record.venue?.trim())
+              .filter((venue): venue is string => !!venue && venue.toLowerCase() !== normalizedSearch)
+              .map((venue) => [venue.toLowerCase(), venue])
+          ).values()
+        ).slice(0, 5);
+
+        setVenueSuggestions(uniqueVenues);
+        setShowVenueSuggestions(venueInputFocusedRef.current && uniqueVenues.length > 0);
+        setLoadingVenueSuggestions(false);
+    }, 300);
+
+    return () => {
+        cancelled = true;
+        window.clearTimeout(timer);
+    };
+  }, [formData.venue, showEventModal, isAdmin, user?.office_id]);
 
   const fetchLocations = async () => {
     const { data } = await supabase
@@ -480,6 +551,9 @@ const EventsList: React.FC = () => {
       });
       setHasEventCode(false);
       setFoodInclusionByDate({});
+      setVenueSuggestions([]);
+      setShowVenueSuggestions(false);
+      setLoadingVenueSuggestions(false);
       setShowEventModal(true);
   };
 
@@ -507,6 +581,9 @@ const EventsList: React.FC = () => {
           getDateRangeOptions(event.start_date, event.end_date)
         )
       );
+      setVenueSuggestions([]);
+      setShowVenueSuggestions(false);
+      setLoadingVenueSuggestions(false);
       setShowEventModal(true);
   };
 
@@ -560,10 +637,21 @@ const EventsList: React.FC = () => {
           setFormData(initialFormState);
           setHasEventCode(false);
           setFoodInclusionByDate({});
+          setVenueSuggestions([]);
+          setShowVenueSuggestions(false);
+          setLoadingVenueSuggestions(false);
           fetchEvents(); 
       } else {
         toast.error("Error saving event: " + error.message);
       }
+  };
+
+  const selectVenueSuggestion = (venue: string) => {
+      setFormData((prev) => ({ ...prev, venue }));
+      setVenueSuggestions([]);
+      setShowVenueSuggestions(false);
+      setLoadingVenueSuggestions(false);
+      venueInputFocusedRef.current = false;
   };
 
   const handleDelete = async (e: React.MouseEvent, id: number) => {
@@ -2913,16 +3001,70 @@ const EventsList: React.FC = () => {
                   <div className={user?.role === 'Admin' ? '' : 'lg:col-span-2'}>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Venue Location</label>
                     <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <MapPin className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <MapPin className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                        </div>
+                        <input 
+                          required 
+                          className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all" 
+                          placeholder="e.g. Apple Tree Resort and Hotel, Taboc, Opol, Misamis Oriental"
+                          value={formData.venue} 
+                          onChange={e => {
+                              setFormData({...formData, venue: e.target.value});
+                              setShowVenueSuggestions(e.target.value.trim().length >= 2 && venueSuggestions.length > 0);
+                          }}
+                          onFocus={() => {
+                              venueInputFocusedRef.current = true;
+                              if (venueSuggestions.length > 0 || loadingVenueSuggestions) {
+                                  setShowVenueSuggestions(true);
+                              }
+                          }}
+                          onBlur={() => {
+                              venueInputFocusedRef.current = false;
+                              window.setTimeout(() => setShowVenueSuggestions(false), 150);
+                          }}
+                          onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                  setShowVenueSuggestions(false);
+                              }
+                          }}
+                          autoComplete="off"
+                          aria-autocomplete="list"
+                          aria-expanded={showVenueSuggestions}
+                          aria-controls="venue-suggestions"
+                        />
                       </div>
-                      <input 
-                        required 
-                        className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all" 
-                        placeholder="e.g. Apple Tree Resort and Hotel, Taboc, Opol, Misamis Oriental"
-                        value={formData.venue} 
-                        onChange={e => setFormData({...formData, venue: e.target.value})} 
-                      />
+                      {showVenueSuggestions && (loadingVenueSuggestions || venueSuggestions.length > 0) && (
+                        <div
+                          id="venue-suggestions"
+                          role="listbox"
+                          className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl animate-in fade-in zoom-in-95 duration-100"
+                        >
+                          {loadingVenueSuggestions && venueSuggestions.length === 0 ? (
+                            <div className="flex items-center gap-2 px-4 py-3 text-sm text-slate-500">
+                              <Loader2 size={14} className="animate-spin text-indigo-500" />
+                              Searching venues...
+                            </div>
+                          ) : (
+                            venueSuggestions.map((venue) => (
+                              <button
+                                key={venue}
+                                type="button"
+                                role="option"
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    selectVenueSuggestion(venue);
+                                }}
+                                className="flex w-full items-start gap-2 px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-700 focus:bg-indigo-50 focus:text-indigo-700 focus:outline-none"
+                              >
+                                <MapPin size={15} className="mt-0.5 shrink-0 text-slate-400" />
+                                <span className="min-w-0 break-words">{venue}</span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
