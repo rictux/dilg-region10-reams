@@ -25,6 +25,9 @@ const UserManagement: React.FC = () => {
   const [offices, setOffices] = useState<Office[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [officeFilter, setOfficeFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | UserRole>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'Active' | 'Inactive'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
   
@@ -288,12 +291,22 @@ const UserManagement: React.FC = () => {
       }
   };
 
-  const filteredUsers = users.filter(u => 
-      u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.offices?.code?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter(u => {
+      const normalizedSearch = searchTerm.trim().toLowerCase();
+      const matchesSearch = !normalizedSearch ||
+        u.full_name.toLowerCase().includes(normalizedSearch) ||
+        u.username.toLowerCase().includes(normalizedSearch) ||
+        u.role.toLowerCase().includes(normalizedSearch) ||
+        Boolean(u.offices?.code?.toLowerCase().includes(normalizedSearch)) ||
+        Boolean(u.offices?.name?.toLowerCase().includes(normalizedSearch));
+      const matchesOffice =
+        officeFilter === 'all' ||
+        (officeFilter === 'unassigned' ? !u.office_id : u.office_id === Number(officeFilter));
+      const matchesRole = roleFilter === 'all' || u.role === roleFilter;
+      const matchesStatus = statusFilter === 'all' || u.status === statusFilter;
+
+      return matchesSearch && matchesOffice && matchesRole && matchesStatus;
+  });
 
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const paginatedUsers = filteredUsers.slice(
@@ -342,41 +355,97 @@ const UserManagement: React.FC = () => {
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search users..." 
-            value={searchTerm}
-            onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-            }}
-            className="w-full pl-10 pr-16 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchTerm('');
-                setCurrentPage(1);
-              }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-        {canCreateUsers && (
-          <button 
-              onClick={openCreateModal}
-              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors font-medium"
-          >
-              <UserPlus size={20} /> Add User
-          </button>
-        )}
-      </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[35%_minmax(260px,1fr)_minmax(200px,240px)_minmax(190px,230px)_auto]">
+              <div className="relative min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input
+                  type="text"
+                  placeholder="Search users..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                  }}
+                  className="w-full pl-10 pr-16 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setCurrentPage(1);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="relative min-w-0">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+                <select
+                  value={officeFilter}
+                  onChange={(e) => {
+                    setOfficeFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full appearance-none rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-8 text-sm text-slate-700 shadow-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  aria-label="Filter users by office"
+                >
+                  <option value="all">All offices</option>
+                  {offices.map(office => (
+                    <option key={office.office_id} value={office.office_id}>
+                      {office.code} - {office.name}
+                    </option>
+                  ))}
+                  {!isOfficeManager && <option value="unassigned">Unassigned</option>}
+                </select>
+              </div>
+              <div className="relative min-w-0">
+                <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+                <select
+                  value={roleFilter}
+                  onChange={(e) => {
+                    setRoleFilter(e.target.value as 'all' | UserRole);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full appearance-none rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-8 text-sm text-slate-700 shadow-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  aria-label="Filter users by role"
+                >
+                  <option value="all">All roles</option>
+                  <option value="Admin">Admin</option>
+                  <option value="EventManager">EventManager</option>
+                  <option value="OfficeManager">OfficeManager</option>
+                  <option value="Scanner">Scanner</option>
+                </select>
+              </div>
+              <div className="relative min-w-0">
+                <CheckCircle className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value as 'all' | 'Active' | 'Inactive');
+                    setCurrentPage(1);
+                  }}
+                  className="w-full appearance-none rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-8 text-sm text-slate-700 shadow-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  aria-label="Filter users by status"
+                >
+                  <option value="all">All statuses</option>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+              {canCreateUsers && (
+                <button
+                    onClick={openCreateModal}
+                    className="flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 md:w-auto"
+                >
+                    <UserPlus size={20} /> Add User
+                </button>
+              )}
+            </div>
+          </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
           <div className="hidden md:block flex-1 min-h-0 overflow-auto">

@@ -47,8 +47,24 @@ CREATE TABLE IF NOT EXISTS events (
     session TEXT NOT NULL DEFAULT 'All_Day' CHECK (session IN ('AM', 'PM', 'All_Day')),
     days_accommodation SMALLINT,
     dates_with_accom DATE[],
-    food_inclusion TEXT[]
+    food_inclusion TEXT[],
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by BIGINT REFERENCES users(user_id) ON DELETE SET NULL,
+    delete_reason TEXT
 );
+
+ALTER TABLE events
+    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS deleted_by BIGINT REFERENCES users(user_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS delete_reason TEXT;
+
+CREATE INDEX IF NOT EXISTS events_active_idx
+    ON events(start_date DESC)
+    WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS events_deleted_idx
+    ON events(deleted_at DESC)
+    WHERE deleted_at IS NOT NULL;
 
 -- 5. Participants Table
 CREATE TABLE IF NOT EXISTS participants (
@@ -141,6 +157,10 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION events_set_status_from_dates()
 RETURNS TRIGGER AS $$
 BEGIN
+    IF NEW.deleted_at IS NOT NULL THEN
+        RETURN NEW;
+    END IF;
+
     IF NEW.status = 'Cancelled' THEN
         RETURN NEW;
     END IF;

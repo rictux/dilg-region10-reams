@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event, Participant, Office } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import ExcelJS from 'exceljs';
@@ -112,11 +112,13 @@ const EVENT_STATUS_SORT_ORDER: Record<string, number> = {
 
 const EventsList: React.FC = () => {
   const { user, hasPermission } = useAuth();
+  const isAdmin = user?.role === 'Admin';
   const [events, setEvents] = useState<Event[]>([]);
   const [offices, setOffices] = useState<Office[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [eventView, setEventView] = useState<'active' | 'deleted'>('active');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const navigate = useNavigate();
@@ -167,6 +169,7 @@ const EventsList: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null);
   const [actionMenuDirection, setActionMenuDirection] = useState<'up' | 'down'>('down');
+  const [actionMenuPosition, setActionMenuPosition] = useState<{ top: number; left: number } | null>(null);
   
   // Form State
   const initialFormState = {
@@ -189,6 +192,11 @@ const EventsList: React.FC = () => {
   const [showEventCodeInfo, setShowEventCodeInfo] = useState(false);
 
   useEffect(() => {
+    if (!isAdmin && eventView === 'deleted') {
+      setEventView('active');
+      return;
+    }
+
     fetchEvents();
     fetchLocations();
     if (user?.role === 'Admin') {
@@ -205,7 +213,7 @@ const EventsList: React.FC = () => {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [user]);
+  }, [user, eventView]);
 
   // Realtime updates for the Participants Modal
   useEffect(() => {
@@ -245,10 +253,16 @@ const EventsList: React.FC = () => {
   };
 
   const fetchEvents = async () => {
-    // Only set loading on initial load to avoid UI flicker
-    if (events.length === 0) setLoading(true);
+    setLoading(true);
     
-    let query = supabase.from('events').select('*').order('start_date', { ascending: false });
+    let query = supabase
+      .from('events')
+      .select('*')
+      .order(eventView === 'deleted' ? 'deleted_at' : 'start_date', { ascending: false });
+
+    query = eventView === 'deleted'
+      ? query.not('deleted_at', 'is', null)
+      : query.is('deleted_at', null);
 
     // Display only the event with same office_id of the login user IF NOT ADMIN
     // If the user has an office assigned, filter events organized by that office
@@ -571,7 +585,20 @@ const EventsList: React.FC = () => {
       const deletedEventId = eventToDelete;
       setIsDeleting(true);
       try {
-          const { error } = await supabase.from('events').delete().eq('event_id', deletedEventId);
+          const { error } = eventView === 'deleted' && isAdmin
+            ? await supabase
+                .from('events')
+                .delete()
+                .eq('event_id', deletedEventId)
+                .not('deleted_at', 'is', null)
+            : await supabase
+                .from('events')
+                .update({
+                    deleted_at: new Date().toISOString(),
+                    deleted_by: user?.user_id ?? null
+                })
+                .eq('event_id', deletedEventId)
+                .is('deleted_at', null);
           if (error) throw error;
 
           setEvents((prevEvents) => prevEvents.filter((event) => event.event_id !== deletedEventId));
@@ -582,8 +609,37 @@ const EventsList: React.FC = () => {
               setShowShareModal(false);
           }
           closeDeleteEventModal();
+          toast.success(eventView === 'deleted' && isAdmin ? 'Event permanently deleted.' : 'Event moved to Deleted Events.');
       } catch (err: any) {
           toast.error("Error deleting event: " + err.message);
+      } finally {
+          setIsDeleting(false);
+      }
+  };
+
+  const handleRestoreEvent = async (e: React.MouseEvent, eventId: number) => {
+      if (!isAdmin) return;
+
+      e.stopPropagation();
+      setIsDeleting(true);
+      try {
+          const { error } = await supabase
+            .from('events')
+            .update({
+                deleted_at: null,
+                deleted_by: null,
+                delete_reason: null
+            })
+            .eq('event_id', eventId)
+            .not('deleted_at', 'is', null);
+
+          if (error) throw error;
+
+          setEvents((prevEvents) => prevEvents.filter((event) => event.event_id !== eventId));
+          setOpenActionMenuId(null);
+          toast.success('Event restored.');
+      } catch (err: any) {
+          toast.error("Error restoring event: " + err.message);
       } finally {
           setIsDeleting(false);
       }
@@ -1218,11 +1274,10 @@ const EventsList: React.FC = () => {
     () => events.find((event) => event.event_id === eventToDelete) ?? null,
     [events, eventToDelete]
   );
-  const isAdmin = user?.role === 'Admin';
   const showEventActionsMenu = isAdmin || canDeleteEvents;
   const actionMenuPlacementClass = actionMenuDirection === 'up'
-    ? 'bottom-full mb-2 origin-bottom-right'
-    : 'top-full mt-2 origin-top-right';
+    ? 'origin-bottom-right'
+    : 'origin-top-right';
 
   const toggleActionMenu = (
     e: React.MouseEvent<HTMLButtonElement>,
@@ -1233,25 +1288,33 @@ const EventsList: React.FC = () => {
 
     if (openActionMenuId === eventId) {
       setOpenActionMenuId(null);
-      return;
-    }
-
-    if (preferredDirection) {
-      setActionMenuDirection(preferredDirection);
-      setOpenActionMenuId(eventId);
+      setActionMenuPosition(null);
       return;
     }
 
     const viewportPadding = 16;
-    const menuItemCount = canDeleteEvents ? 2 : 1;
+    const menuItemCount = eventView === 'deleted' && isAdmin ? 2 : (canDeleteEvents ? 2 : 1);
     const estimatedMenuHeight = (menuItemCount * 44) + 16;
+    const estimatedMenuWidth = 176;
     const triggerRect = e.currentTarget.getBoundingClientRect();
     const spaceAbove = triggerRect.top - viewportPadding;
     const spaceBelow = window.innerHeight - triggerRect.bottom - viewportPadding;
-
-    setActionMenuDirection(
+    const direction = preferredDirection || (
       spaceBelow >= estimatedMenuHeight || spaceBelow >= spaceAbove ? 'down' : 'up'
     );
+    const top = direction === 'up'
+      ? Math.max(viewportPadding, triggerRect.top - estimatedMenuHeight - 8)
+      : Math.min(
+          window.innerHeight - estimatedMenuHeight - viewportPadding,
+          triggerRect.bottom + 8
+        );
+    const left = Math.min(
+      window.innerWidth - estimatedMenuWidth - viewportPadding,
+      Math.max(viewportPadding, triggerRect.right - estimatedMenuWidth)
+    );
+
+    setActionMenuDirection(direction);
+    setActionMenuPosition({ top, left });
     setOpenActionMenuId(eventId);
   };
 
@@ -1264,7 +1327,7 @@ const EventsList: React.FC = () => {
   // Reset to page 1 when search or filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, eventView]);
 
   useEffect(() => {
     if (totalPages === 0 && currentPage !== 1) {
@@ -1279,8 +1342,8 @@ const EventsList: React.FC = () => {
 
   return (
     <div className="h-full min-h-0 flex flex-col gap-6">
-      <div className="flex items-center gap-3 w-full">
-        <div className="relative flex-1 min-w-0 lg:flex-none lg:w-[30%]">
+      <div className="flex flex-wrap items-center gap-3 w-full">
+        <div className="relative min-w-[220px] flex-1 lg:flex-none lg:w-[30%]">
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
               <Search size={18} />
             </div>
@@ -1301,6 +1364,40 @@ const EventsList: React.FC = () => {
               </button>
             )}
         </div>
+        {isAdmin && (
+          <div className="flex shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+            <button
+              type="button"
+              onClick={() => {
+                setEventView('active');
+                setStatusFilter('All');
+              }}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors ${
+                eventView === 'active'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Calendar size={14} />
+              Active
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEventView('deleted');
+                setStatusFilter('All');
+              }}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors ${
+                eventView === 'deleted'
+                  ? 'bg-red-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Trash2 size={14} />
+              Deleted
+            </button>
+          </div>
+        )}
         <button 
             onClick={openCreateModal}
             type="button"
@@ -1325,7 +1422,7 @@ const EventsList: React.FC = () => {
               <div className="flex justify-between items-start mb-0.5 w-full">
                   <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
                     <span className="sm:hidden">Total</span>
-                    <span className="hidden sm:inline">Total Events</span>
+                    <span className="hidden sm:inline">{eventView === 'deleted' ? 'Deleted Events' : 'Total Events'}</span>
                   </p>
                   <div className={`p-1 rounded-lg ${statusFilter === 'All' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-600'}`}>
                     <CalendarPlus size={12} className="sm:h-3.5 sm:w-3.5" />
@@ -1410,6 +1507,12 @@ const EventsList: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
+          {eventView === 'deleted' && (
+              <div className="px-6 py-3 bg-red-50 border-b border-red-100 flex items-center gap-2 text-sm text-red-700">
+                  <Trash2 size={14} />
+                  <span>Deleted Events view. Admins can restore events or permanently delete them.</span>
+              </div>
+          )}
           {statusFilter !== 'All' && (
               <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2 text-sm text-slate-600">
                   <Clock size={14} />
@@ -1466,15 +1569,26 @@ const EventsList: React.FC = () => {
                                   return (
                                   <tr 
                                       key={event.event_id} 
-                                      onClick={() => handleRowClick(event)}
-                                      className="group hover:bg-indigo-50/30 transition-all duration-200 cursor-pointer hover:shadow-sm"
-                                      title="Click to view participants"
+                                      onClick={() => {
+                                          if (eventView === 'active') handleRowClick(event);
+                                      }}
+                                      className={`group transition-all duration-200 ${
+                                          eventView === 'active'
+                                            ? 'cursor-pointer hover:bg-indigo-50/30 hover:shadow-sm'
+                                            : 'bg-red-50/20 hover:bg-red-50/40'
+                                      }`}
+                                      title={eventView === 'active' ? 'Click to view participants' : 'Deleted event'}
                                   >
                                       <td className="px-6 py-4 text-left border-l-2 border-l-transparent group-hover:border-l-indigo-500">
                                           <div className="font-semibold text-sm text-slate-800 group-hover:text-indigo-700 transition-colors">
                                             {event.event_name}
                                           </div>
                                           <div className="flex gap-2 mt-1.5 justify-start">
+                                            {eventView === 'deleted' && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100">
+                                                    <Trash2 size={10} className="mr-1" /> Deleted
+                                                </span>
+                                            )}
                                             {event.has_accommodation && (
                                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
                                                     <Bed size={10} className="mr-1" /> Accommodation
@@ -1504,14 +1618,16 @@ const EventsList: React.FC = () => {
                                       </td>
                                       <td className="px-6 py-4">
                                           <div className="flex items-center justify-center gap-2 relative">
-                                            <button 
-                                                onClick={(e) => openShareModal(e, event)}
-                                                className="inline-flex items-center justify-center p-2 text-sm rounded-lg border border-slate-200 text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors"
-                                                title="Share"
-                                                aria-label="Share"
-                                            >
-                                                <Share2 size={14} />
-                                            </button>
+                                            {eventView === 'active' && (
+                                                <button
+                                                    onClick={(e) => openShareModal(e, event)}
+                                                    className="inline-flex items-center justify-center p-2 text-sm rounded-lg border border-slate-200 text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors"
+                                                    title="Share"
+                                                    aria-label="Share"
+                                                >
+                                                    <Share2 size={14} />
+                                                </button>
+                                            )}
 
                                             {showEventActionsMenu ? (
                                                 <>
@@ -1526,46 +1642,80 @@ const EventsList: React.FC = () => {
                                                     {openActionMenuId === event.event_id && (
                                                         <>
                                                             <div 
-                                                                className="fixed inset-0 z-10"
+                                                                className="fixed inset-0 z-40"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     setOpenActionMenuId(null);
+                                                                    setActionMenuPosition(null);
                                                                 }}
                                                             />
-                                                            <div className={`absolute right-0 w-36 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100 ${actionMenuPlacementClass}`}>
-                                                                <button 
-                                                                    onClick={(e) => {
-                                                                        setOpenActionMenuId(null);
-                                                                        openEditModal(e, event);
-                                                                    }}
-                                                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors text-left"
-                                                                >
-                                                                    <Edit size={16} /> Edit
-                                                                </button>
-                                                                {canDeleteEvents && (
-                                                                    <button 
-                                                                        onClick={(e) => {
-                                                                            setOpenActionMenuId(null);
-                                                                            handleDelete(e, event.event_id);
-                                                                        }} 
-                                                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                                                                    >
-                                                                        <Trash2 size={16} /> Delete
-                                                                    </button>
+                                                            <div
+                                                                className={`fixed w-44 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100 ${actionMenuPlacementClass}`}
+                                                                style={{
+                                                                    top: actionMenuPosition?.top ?? 0,
+                                                                    left: actionMenuPosition?.left ?? 0
+                                                                }}
+                                                            >
+                                                                {eventView === 'deleted' && isAdmin ? (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                setOpenActionMenuId(null);
+                                                                                handleRestoreEvent(e, event.event_id);
+                                                                            }}
+                                                                            className="flex items-center gap-2 w-full px-4 py-2 text-sm text-emerald-700 hover:bg-emerald-50 transition-colors text-left"
+                                                                        >
+                                                                            <RotateCcw size={16} /> Restore
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                setOpenActionMenuId(null);
+                                                                                handleDelete(e, event.event_id);
+                                                                            }}
+                                                                            className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
+                                                                        >
+                                                                            <Trash2 size={16} /> Delete Forever
+                                                                        </button>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                setOpenActionMenuId(null);
+                                                                                openEditModal(e, event);
+                                                                            }}
+                                                                            className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors text-left"
+                                                                        >
+                                                                            <Edit size={16} /> Edit
+                                                                        </button>
+                                                                        {canDeleteEvents && (
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    setOpenActionMenuId(null);
+                                                                                    handleDelete(e, event.event_id);
+                                                                                }}
+                                                                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
+                                                                            >
+                                                                                <Trash2 size={16} /> Delete
+                                                                            </button>
+                                                                        )}
+                                                                    </>
                                                                 )}
                                                             </div>
                                                         </>
                                                     )}
                                                 </>
                                             ) : (
-                                                <button
-                                                    onClick={(e) => openEditModal(e, event)}
-                                                    className="inline-flex items-center justify-center p-2 text-sm rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
-                                                    title="Edit"
-                                                    aria-label="Edit"
-                                                >
-                                                    <Edit size={14} />
-                                                </button>
+                                                eventView === 'active' && (
+                                                    <button
+                                                        onClick={(e) => openEditModal(e, event)}
+                                                        className="inline-flex items-center justify-center p-2 text-sm rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+                                                        title="Edit"
+                                                        aria-label="Edit"
+                                                    >
+                                                        <Edit size={14} />
+                                                    </button>
+                                                )
                                             )}
                                           </div>
                                       </td>
@@ -1576,9 +1726,13 @@ const EventsList: React.FC = () => {
                                   <tr>
                                       <td colSpan={5} className="text-center py-12 text-slate-400 bg-slate-50/50">
                                           <div className="flex flex-col items-center justify-center">
-                                            {searchTerm ? <Search className="w-12 h-12 text-slate-300 mb-3" /> : <Calendar className="w-12 h-12 text-slate-300 mb-3" />}
-                                            <p className="font-medium text-slate-500">{searchTerm ? `No results for "${searchTerm}"` : 'No events found'}</p>
-                                            <p className="text-xs mt-1">{searchTerm ? 'Try adjusting your search terms' : 'Create a new event to get started'}</p>
+                                            {searchTerm ? <Search className="w-12 h-12 text-slate-300 mb-3" /> : eventView === 'deleted' ? <Trash2 className="w-12 h-12 text-slate-300 mb-3" /> : <Calendar className="w-12 h-12 text-slate-300 mb-3" />}
+                                            <p className="font-medium text-slate-500">
+                                              {searchTerm ? `No results for "${searchTerm}"` : eventView === 'deleted' ? 'No deleted events found' : 'No events found'}
+                                            </p>
+                                            <p className="text-xs mt-1">
+                                              {searchTerm ? 'Try adjusting your search terms' : eventView === 'deleted' ? 'Deleted events will appear here for Admin recovery.' : 'Create a new event to get started'}
+                                            </p>
                                           </div>
                                       </td>
                                   </tr>
@@ -1605,9 +1759,13 @@ const EventsList: React.FC = () => {
               ) : filteredEvents.length === 0 ? (
                   <div className="text-center py-12 text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100">
                       <div className="flex flex-col items-center justify-center">
-                          {searchTerm ? <Search className="w-12 h-12 text-slate-300 mb-3" /> : <Calendar className="w-12 h-12 text-slate-300 mb-3" />}
-                          <p className="font-medium text-slate-500">{searchTerm ? `No results for "${searchTerm}"` : 'No events found'}</p>
-                          <p className="text-xs mt-1">{searchTerm ? 'Try adjusting your search terms' : 'Create a new event to get started'}</p>
+                          {searchTerm ? <Search className="w-12 h-12 text-slate-300 mb-3" /> : eventView === 'deleted' ? <Trash2 className="w-12 h-12 text-slate-300 mb-3" /> : <Calendar className="w-12 h-12 text-slate-300 mb-3" />}
+                          <p className="font-medium text-slate-500">
+                            {searchTerm ? `No results for "${searchTerm}"` : eventView === 'deleted' ? 'No deleted events found' : 'No events found'}
+                          </p>
+                          <p className="text-xs mt-1">
+                            {searchTerm ? 'Try adjusting your search terms' : eventView === 'deleted' ? 'Deleted events will appear here for Admin recovery.' : 'Create a new event to get started'}
+                          </p>
                       </div>
                   </div>
               ) : (
@@ -1615,13 +1773,24 @@ const EventsList: React.FC = () => {
                       return (
                       <div
                           key={event.event_id}
-                          onClick={() => handleRowClick(event)}
-                          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:scale-[0.99] transition-transform"
+                          onClick={() => {
+                              if (eventView === 'active') handleRowClick(event);
+                          }}
+                          className={`rounded-xl border p-4 shadow-sm transition-transform ${
+                              eventView === 'active'
+                                ? 'border-slate-200 bg-white active:scale-[0.99]'
+                                : 'border-red-100 bg-red-50/40'
+                          }`}
                       >
                           <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                   <h3 className="font-semibold text-slate-800 leading-tight">{event.event_name}</h3>
                                   <div className="flex flex-wrap gap-2 mt-2">
+                                      {eventView === 'deleted' && (
+                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100">
+                                              <Trash2 size={10} className="mr-1" /> Deleted
+                                          </span>
+                                      )}
                                       {event.has_accommodation && (
                                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
                                               <Bed size={10} className="mr-1" /> Accommodation
@@ -1651,43 +1820,71 @@ const EventsList: React.FC = () => {
                           </div>
 
                           <div className="mt-4 flex flex-wrap items-center gap-2">
-                              <button
-                                  onClick={(e) => {
-                                      e.stopPropagation();
-                                      openShareModal(e, event);
-                                  }}
-                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
-                                  title="Share"
-                                  aria-label="Share"
-                              >
-                                  <Share2 size={14} />
-                                  <span>Share</span>
-                              </button>
-                              <button
-                                  onClick={(e) => {
-                                      e.stopPropagation();
-                                      openEditModal(e, event);
-                                  }}
-                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
-                                  title="Edit"
-                                  aria-label="Edit"
-                              >
-                                  <Edit size={14} />
-                                  <span>Edit</span>
-                              </button>
-                              {canDeleteEvents && (
-                                  <button
-                                      onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDelete(e, event.event_id);
-                                      }}
-                                      className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
-                                      title="Delete"
-                                      aria-label="Delete"
-                                  >
-                                      <Trash2 size={14} />
-                                      <span>Delete</span>
-                                  </button>
+                              {eventView === 'deleted' && isAdmin ? (
+                                  <>
+                                      <button
+                                          onClick={(e) => handleRestoreEvent(e, event.event_id)}
+                                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                                          title="Restore"
+                                          aria-label="Restore"
+                                      >
+                                          <RotateCcw size={14} />
+                                          <span>Restore</span>
+                                      </button>
+                                      <button
+                                          onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDelete(e, event.event_id);
+                                          }}
+                                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
+                                          title="Permanently delete"
+                                          aria-label="Permanently delete"
+                                      >
+                                          <Trash2 size={14} />
+                                          <span>Delete Forever</span>
+                                      </button>
+                                  </>
+                              ) : (
+                                  <>
+                                      <button
+                                          onClick={(e) => {
+                                              e.stopPropagation();
+                                              openShareModal(e, event);
+                                          }}
+                                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
+                                          title="Share"
+                                          aria-label="Share"
+                                      >
+                                          <Share2 size={14} />
+                                          <span>Share</span>
+                                      </button>
+                                      <button
+                                          onClick={(e) => {
+                                              e.stopPropagation();
+                                              openEditModal(e, event);
+                                          }}
+                                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
+                                          title="Edit"
+                                          aria-label="Edit"
+                                      >
+                                          <Edit size={14} />
+                                          <span>Edit</span>
+                                      </button>
+                                      {canDeleteEvents && (
+                                          <button
+                                              onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleDelete(e, event.event_id);
+                                              }}
+                                              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
+                                              title="Delete"
+                                              aria-label="Delete"
+                                          >
+                                              <Trash2 size={14} />
+                                              <span>Delete</span>
+                                          </button>
+                                      )}
+                                  </>
                               )}
                           </div>
                       </div>
@@ -2582,12 +2779,18 @@ const EventsList: React.FC = () => {
                     <div className="bg-red-100 p-3 rounded-full mb-4">
                         <AlertTriangle className="text-red-600" size={32} />
                     </div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-2">Delete Event?</h3>
+                    <h3 className="text-lg font-bold text-slate-800 mb-2">
+                        {eventView === 'deleted' && isAdmin ? 'Permanently Delete Event?' : 'Move Event to Deleted Events?'}
+                    </h3>
                     <p className="text-sm text-slate-500 mb-4">
-                        Are you sure you want to delete this event? This action cannot be undone and will delete all attendance logs associated with this event.
+                        {eventView === 'deleted' && isAdmin
+                            ? 'This action cannot be undone and will delete all participants and attendance logs associated with this event.'
+                            : 'This event will be hidden from normal event lists and can be restored later by an Administrator.'}
                     </p>
                     <div className="w-full mb-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-left">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-red-500 mb-1">Event to delete</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-red-500 mb-1">
+                            {eventView === 'deleted' && isAdmin ? 'Event to permanently delete' : 'Event to move'}
+                        </p>
                         <p className="text-sm font-semibold text-red-700 break-words">
                             {eventPendingDelete?.event_name || 'Selected event'}
                         </p>
@@ -2618,7 +2821,7 @@ const EventsList: React.FC = () => {
                             disabled={isDeleting || eventDeleteConfirmation.trim().toLowerCase() !== 'delete'}
                             className="flex-1 px-4 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
                         >
-                            {isDeleting ? <Loader2 className="animate-spin" size={18} /> : 'Delete'}
+                            {isDeleting ? <Loader2 className="animate-spin" size={18} /> : eventView === 'deleted' && isAdmin ? 'Delete Forever' : 'Move to Deleted'}
                         </button>
                     </div>
                 </div>

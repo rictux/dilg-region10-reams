@@ -44,6 +44,9 @@ export interface Event {
   days_accommodation?: number | null;
   dates_with_accom?: string[] | null;
   food_inclusion?: string[] | null;
+  deleted_at?: string | null;
+  deleted_by?: number | null;
+  delete_reason?: string | null;
 }
 
 export interface Participant {
