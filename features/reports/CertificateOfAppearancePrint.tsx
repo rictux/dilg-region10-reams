@@ -430,6 +430,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [participantSearch, setParticipantSearch] = useState('');
   const [showMissingSerialOnly, setShowMissingSerialOnly] = useState(false);
+  const [showWantsCaOnly, setShowWantsCaOnly] = useState(false);
   const [selectedParticipantId, setSelectedParticipantId] = useState<number | null>(null);
   const [isSavingCertificate, setIsSavingCertificate] = useState(false);
   const [isGeneratingSerials, setIsGeneratingSerials] = useState(false);
@@ -590,22 +591,33 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
   const filteredParticipants = useMemo(() => {
     const search = participantSearch.trim().toLowerCase();
-    const serialFilteredParticipants = showMissingSerialOnly
+    let workingParticipants = showMissingSerialOnly
       ? participants.filter((record: CertificateParticipant) => record.ca_serial_no == null)
       : participants;
 
-    if (!search) return serialFilteredParticipants;
+    if (showWantsCaOnly) {
+      workingParticipants = workingParticipants.filter(
+        (record: CertificateParticipant) => !!record.need_ca
+      );
+    }
 
-    return serialFilteredParticipants.filter((record: CertificateParticipant) => {
+    if (!search) return workingParticipants;
+
+    return workingParticipants.filter((record: CertificateParticipant) => {
       const fullName = (record.participant.full_name || '').toLowerCase();
       const displayName = buildParticipantListName(record.participant).toLowerCase();
 
       return fullName.includes(search) || displayName.includes(search);
     });
-  }, [participantSearch, participants, showMissingSerialOnly]);
+  }, [participantSearch, participants, showMissingSerialOnly, showWantsCaOnly]);
 
   const missingSerialCount = useMemo(
     () => participants.filter((record: CertificateParticipant) => record.ca_serial_no == null).length,
+    [participants]
+  );
+
+  const wantsCaCount = useMemo(
+    () => participants.filter((record: CertificateParticipant) => !!record.need_ca).length,
     [participants]
   );
 
@@ -1135,29 +1147,51 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
           <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
             <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
-              {requiresReferenceCode && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {requiresReferenceCode && (
+                  <button
+                    type="button"
+                    onClick={() => setShowMissingSerialOnly((current) => !current)}
+                    className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                      showMissingSerialOnly
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Hash size={12} />
+                    No Serial
+                    <span
+                      className={`rounded-full px-1.5 text-[10px] font-bold leading-4 ${
+                        showMissingSerialOnly
+                          ? 'bg-emerald-200 text-emerald-800'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {missingSerialCount}
+                    </span>
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => setShowMissingSerialOnly((current) => !current)}
+                  onClick={() => setShowWantsCaOnly((current) => !current)}
                   className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                    showMissingSerialOnly
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    showWantsCaOnly
+                      ? 'border-amber-200 bg-amber-50 text-amber-800'
                       : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
                   }`}
                 >
-                  <Hash size={12} />
-                  No Serial Number
+                  Wants CA
                   <span
                     className={`rounded-full px-1.5 text-[10px] font-bold leading-4 ${
-                      showMissingSerialOnly
-                        ? 'bg-emerald-200 text-emerald-800'
+                      showWantsCaOnly
+                        ? 'bg-amber-200 text-amber-800'
                         : 'bg-slate-100 text-slate-600'
                     }`}
                   >
-                    {missingSerialCount}
+                    {wantsCaCount}
                   </span>
                 </button>
-              )}
+              </div>
               <div className="flex flex-wrap items-center justify-end gap-1.5">
                 <span className="px-1 text-[11px] font-medium text-slate-500">
                   {selectedDownloadParticipants.length} Selected
