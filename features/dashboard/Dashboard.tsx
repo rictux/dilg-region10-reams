@@ -108,19 +108,19 @@ const Dashboard: React.FC = () => {
 
     try {
         // 1. Stats
-        let totalQ = supabase.from('events').select('*', { count: 'exact', head: true });
+        let totalQ = supabase.from('events').select('*', { count: 'exact', head: true }).is('deleted_at', null);
         if (user?.role !== 'Admin' && user?.office_id) totalQ = totalQ.eq('organize_by', user.office_id);
         const { count: total } = await totalQ;
 
-        let activeQ = supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'Ongoing');
+        let activeQ = supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'Ongoing').is('deleted_at', null);
         if (user?.role !== 'Admin' && user?.office_id) activeQ = activeQ.eq('organize_by', user.office_id);
         const { count: active } = await activeQ;
 
-        let completedQ = supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'Completed');
+        let completedQ = supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'Completed').is('deleted_at', null);
         if (user?.role !== 'Admin' && user?.office_id) completedQ = completedQ.eq('organize_by', user.office_id);
         const { count: completed } = await completedQ;
 
-        let upcomingCountQ = supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'Scheduled');
+        let upcomingCountQ = supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'Scheduled').is('deleted_at', null);
         if (user?.role !== 'Admin' && user?.office_id) upcomingCountQ = upcomingCountQ.eq('organize_by', user.office_id);
         const { count: upcoming } = await upcomingCountQ;
 
@@ -135,6 +135,7 @@ const Dashboard: React.FC = () => {
         let ongoingQuery = supabase
             .from('events')
             .select('*')
+            .is('deleted_at', null)
             .lte('start_date', today)
             .gte('end_date', today);
         
@@ -168,6 +169,7 @@ const Dashboard: React.FC = () => {
         let upcomingQuery = supabase
             .from('events')
             .select('*')
+            .is('deleted_at', null)
             .gt('start_date', today)
             .order('start_date', { ascending: true });
         
@@ -192,6 +194,7 @@ const Dashboard: React.FC = () => {
         let calendarQuery = supabase
             .from('events')
             .select('*')
+            .is('deleted_at', null)
             .neq('status', 'Cancelled');
         
         if (user?.role !== 'Admin' && user?.office_id) calendarQuery = calendarQuery.eq('organize_by', user.office_id);

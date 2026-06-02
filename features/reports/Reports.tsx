@@ -48,6 +48,7 @@ const Reports: React.FC = () => {
       .from('events')
       .select('*')
       .in('status', ['Ongoing', 'Completed'])
+      .is('deleted_at', null)
       .order('start_date', { ascending: false });
 
     // Filter events by office for non-admins

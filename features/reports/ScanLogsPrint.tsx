@@ -54,10 +54,11 @@ const ScanLogsPrint: React.FC = () => {
           attendance_id,
           remarks,
           action_session,
-          events ( event_name ),
+          events!inner ( event_name, deleted_at ),
           participants ( participant_id, participant_code, full_name, email, mobile_no, gender, office ),
           users ( user_id, full_name, email )
         `)
+        .is('events.deleted_at', null)
         .order('scan_time', { ascending: true });
 
         if (eventId) {

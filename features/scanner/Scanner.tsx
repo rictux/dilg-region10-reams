@@ -201,6 +201,7 @@ const Scanner: React.FC = () => {
           .lte('start_date', today)
           .gte('end_date', today)
           .neq('status', 'Cancelled')
+          .is('deleted_at', null)
           .order('start_date', { ascending: false });
 
         // Filter events by office for non-admins

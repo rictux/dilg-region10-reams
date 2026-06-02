@@ -46,7 +46,12 @@ const AttendanceSheetPrint: React.FC = () => {
 
   const fetchData = async (id: number) => {
     try {
-        const { data: eventData } = await supabase.from('events').select('*').eq('event_id', id).single();
+        const { data: eventData } = await supabase
+            .from('events')
+            .select('*')
+            .eq('event_id', id)
+            .is('deleted_at', null)
+            .single();
         if (!eventData) throw new Error("Event not found");
         setEvent(eventData);
 

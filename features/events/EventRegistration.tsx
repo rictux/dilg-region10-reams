@@ -157,6 +157,7 @@ const EventRegistration: React.FC = () => {
       .from('events')
       .select('*')
       .eq('event_id', parseInt(eventId))
+      .is('deleted_at', null)
       .single();
     
     if (error || !data) {

@@ -492,6 +492,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
         .from('events')
         .select('*')
         .eq('event_id', id)
+        .is('deleted_at', null)
         .single();
 
       if (!eventData) throw new Error('Event not found');

@@ -83,16 +83,18 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
         .select(`
           role,
           event_id,
-          events (
+          events!inner (
             event_id,
             event_name,
             venue,
             start_date,
-            end_date
+            end_date,
+            deleted_at
           )
         `)
         .eq('participant_id', participant.participant_id)
-        .in('event_id', attendedEventIds);
+        .in('event_id', attendedEventIds)
+        .is('events.deleted_at', null);
 
       if (epError) throw epError;
 

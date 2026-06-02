@@ -421,6 +421,16 @@ const EventsList: React.FC = () => {
     return `${format(startDate, 'MMM d, yyyy')} - ${format(endDate, 'MMM d, yyyy')}`;
   };
 
+  const formatDeletedDate = (value?: string | null) => {
+      if (!value) return '-';
+
+      try {
+          return format(parseISO(value), 'MMM d, yyyy h:mm a');
+      } catch {
+          return value;
+      }
+  };
+
   const getFormEventDateOptions = (start = formData.start_date, end = formData.end_date) => {
       return getDateRangeOptions(start, end);
   };
@@ -1381,7 +1391,7 @@ const EventsList: React.FC = () => {
     }
 
     const viewportPadding = 16;
-    const menuItemCount = eventView === 'deleted' && isAdmin ? 2 : (canDeleteEvents ? 2 : 1);
+    const menuItemCount = canDeleteEvents ? 2 : 1;
     const estimatedMenuHeight = (menuItemCount * 44) + 16;
     const estimatedMenuWidth = 176;
     const triggerRect = e.currentTarget.getBoundingClientRect();
@@ -1620,7 +1630,9 @@ const EventsList: React.FC = () => {
                           <th className="px-6 py-4 text-left bg-slate-50">Event Details</th>
                           <th className="px-6 py-4 text-left bg-slate-50">Venue</th>
                           <th className="px-6 py-4 text-left bg-slate-50">Date</th>
-                          <th className="px-6 py-4 text-center bg-slate-50">Status</th>
+                          <th className="px-6 py-4 text-center bg-slate-50">
+                              {eventView === 'deleted' ? 'Deleted Date' : 'Status'}
+                          </th>
                           <th className="px-6 py-4 text-center bg-slate-50">Actions</th>
                       </tr>
                   </thead>
@@ -1702,7 +1714,14 @@ const EventsList: React.FC = () => {
                                           </div>
                                       </td>
                                       <td className="px-6 py-4 text-center">
-                                          {getStatusBadge(event.status)}
+                                          {eventView === 'deleted' ? (
+                                              <div className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
+                                                  <Clock size={12} />
+                                                  {formatDeletedDate(event.deleted_at)}
+                                              </div>
+                                          ) : (
+                                              getStatusBadge(event.status)
+                                          )}
                                       </td>
                                       <td className="px-6 py-4">
                                           <div className="flex items-center justify-center gap-2 relative">
@@ -1717,7 +1736,31 @@ const EventsList: React.FC = () => {
                                                 </button>
                                             )}
 
-                                            {showEventActionsMenu ? (
+                                            {eventView === 'deleted' && isAdmin ? (
+                                                <>
+                                                    <button
+                                                        onClick={(e) => handleRestoreEvent(e, event.event_id)}
+                                                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                                                        title="Restore"
+                                                        aria-label="Restore"
+                                                    >
+                                                        <RotateCcw size={14} />
+                                                        Restore
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDelete(e, event.event_id);
+                                                        }}
+                                                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
+                                                        title="Permanently delete"
+                                                        aria-label="Permanently delete"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                        Delete Forever
+                                                    </button>
+                                                </>
+                                            ) : showEventActionsMenu ? (
                                                 <>
                                                     <button 
                                                         onClick={(e) => toggleActionMenu(e, event.event_id, forceMenuUp ? 'up' : undefined)}
@@ -1744,50 +1787,25 @@ const EventsList: React.FC = () => {
                                                                     left: actionMenuPosition?.left ?? 0
                                                                 }}
                                                             >
-                                                                {eventView === 'deleted' && isAdmin ? (
-                                                                    <>
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                setOpenActionMenuId(null);
-                                                                                handleRestoreEvent(e, event.event_id);
-                                                                            }}
-                                                                            className="flex items-center gap-2 w-full px-4 py-2 text-sm text-emerald-700 hover:bg-emerald-50 transition-colors text-left"
-                                                                        >
-                                                                            <RotateCcw size={16} /> Restore
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                setOpenActionMenuId(null);
-                                                                                handleDelete(e, event.event_id);
-                                                                            }}
-                                                                            className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                                                                        >
-                                                                            <Trash2 size={16} /> Delete Forever
-                                                                        </button>
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                setOpenActionMenuId(null);
-                                                                                openEditModal(e, event);
-                                                                            }}
-                                                                            className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors text-left"
-                                                                        >
-                                                                            <Edit size={16} /> Edit
-                                                                        </button>
-                                                                        {canDeleteEvents && (
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    setOpenActionMenuId(null);
-                                                                                    handleDelete(e, event.event_id);
-                                                                                }}
-                                                                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                                                                            >
-                                                                                <Trash2 size={16} /> Delete
-                                                                            </button>
-                                                                        )}
-                                                                    </>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        setOpenActionMenuId(null);
+                                                                        openEditModal(e, event);
+                                                                    }}
+                                                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors text-left"
+                                                                >
+                                                                    <Edit size={16} /> Edit
+                                                                </button>
+                                                                {canDeleteEvents && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            setOpenActionMenuId(null);
+                                                                            handleDelete(e, event.event_id);
+                                                                        }}
+                                                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
+                                                                    >
+                                                                        <Trash2 size={16} /> Delete
+                                                                    </button>
                                                                 )}
                                                             </div>
                                                         </>
@@ -1892,7 +1910,14 @@ const EventsList: React.FC = () => {
                                   </div>
                               </div>
                               <div className="shrink-0">
-                                  {getStatusBadge(event.status)}
+                                  {eventView === 'deleted' ? (
+                                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
+                                          <Clock size={12} />
+                                          {formatDeletedDate(event.deleted_at)}
+                                      </span>
+                                  ) : (
+                                      getStatusBadge(event.status)
+                                  )}
                               </div>
                           </div>
 
