@@ -18,11 +18,50 @@ interface AuthContextType {
   signupWithGoogle: () => Promise<void>;
 }
 
+type LoginActivityInput = {
+  userRecord?: User | null;
+  username?: string | null;
+  authUserId?: string | null;
+  loginMethod: 'Password' | 'Google';
+  loginStatus: 'Success' | 'Failed';
+  failureReason?: string | null;
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const loggedGoogleSessionRef = React.useRef<string | null>(null);
+
+  const recordLoginActivity = async ({
+    userRecord,
+    username,
+    authUserId,
+    loginMethod,
+    loginStatus,
+    failureReason
+  }: LoginActivityInput) => {
+    try {
+      const { error } = await supabase
+        .from('user_login_activity')
+        .insert([{
+          user_id: userRecord?.user_id ?? null,
+          auth_user_id: authUserId ?? userRecord?.auth_user_id ?? null,
+          username: username ?? userRecord?.username ?? null,
+          login_method: loginMethod,
+          login_status: loginStatus,
+          failure_reason: loginStatus === 'Failed' ? (failureReason || null) : null,
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null
+        }]);
+
+      if (error) {
+        console.error('Error recording login activity:', error);
+      }
+    } catch (err) {
+      console.error('Error recording login activity:', err);
+    }
+  };
 
   // Load user from local storage or session storage on mount
   useEffect(() => {
@@ -43,9 +82,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           if (userRecord) {
             if (userRecord.status === 'Active') {
+              const sessionKey = session.access_token || session.user.id;
+              if (loggedGoogleSessionRef.current !== sessionKey) {
+                loggedGoogleSessionRef.current = sessionKey;
+                await recordLoginActivity({
+                  userRecord: userRecord as User,
+                  username: userRecord.username || email,
+                  authUserId: session.user.id,
+                  loginMethod: 'Google',
+                  loginStatus: 'Success'
+                });
+              }
               setUser(userRecord as User);
               localStorage.setItem('eventpulse_user', JSON.stringify(userRecord));
             } else {
+              await recordLoginActivity({
+                userRecord: userRecord as User,
+                username: userRecord.username || email,
+                authUserId: session.user.id,
+                loginMethod: 'Google',
+                loginStatus: 'Failed',
+                failureReason: 'Inactive account'
+              });
               await supabase.auth.signOut();
               localStorage.setItem('auth_error', 'Your account is currently Inactive. Please contact the administrator.');
             }
@@ -59,6 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 password_hash: hash,
                 full_name: full_name,
                 email: email,
+                auth_user_id: session.user.id,
                 position: 'Google User',
                 role: 'EventManager',
                 status: 'Inactive'
@@ -72,6 +131,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 localStorage.setItem('auth_error', 'Failed to create account with Google.');
               }
             } else {
+              await recordLoginActivity({
+                username: email,
+                authUserId: session.user.id,
+                loginMethod: 'Google',
+                loginStatus: 'Failed',
+                failureReason: 'Account not found'
+              });
               await supabase.auth.signOut();
               localStorage.setItem('auth_error', 'Account not found. Please sign up first.');
             }
@@ -152,6 +218,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (error || !data) {
+        await recordLoginActivity({
+          username,
+          loginMethod: 'Password',
+          loginStatus: 'Failed',
+          failureReason: 'Invalid username or inactive account'
+        });
         throw new Error('Invalid username or password');
       }
 
@@ -161,8 +233,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const isMatch = await bcrypt.compare(passwordPlain, userRecord.password_hash);
       
       if (!isMatch) {
+        await recordLoginActivity({
+          userRecord,
+          username: userRecord.username,
+          loginMethod: 'Password',
+          loginStatus: 'Failed',
+          failureReason: 'Invalid password'
+        });
         throw new Error('Invalid username or password');
       }
+
+      await recordLoginActivity({
+        userRecord,
+        username: userRecord.username,
+        loginMethod: 'Password',
+        loginStatus: 'Success'
+      });
 
       // 3. Set Session
       setUser(userRecord);

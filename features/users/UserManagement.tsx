@@ -9,11 +9,20 @@ import bcrypt from 'bcryptjs';
 import ParticipantsList from './ParticipantsList';
 
 // Extend User type locally to include joined office data
+type UserLoginActivity = {
+    login_activity_id: number;
+    user_id: number | null;
+    login_method: 'Password' | 'Google' | string;
+    login_status: 'Success' | 'Failed' | string;
+    created_at: string;
+};
+
 interface UserWithOffice extends User {
     offices?: {
         code: string;
         name: string;
     } | null;
+    last_login_activity?: UserLoginActivity | null;
 }
 
 const UserManagement: React.FC = () => {
@@ -86,7 +95,34 @@ const UserManagement: React.FC = () => {
       
       const { data, error } = await query;
       if (error) throw error;
-      setUsers(data as UserWithOffice[] || []);
+
+      const userRows = (data as UserWithOffice[] || []);
+      const userIds = userRows.map((user) => user.user_id);
+
+      if (userIds.length === 0) {
+        setUsers([]);
+        return;
+      }
+
+      const { data: loginActivityData, error: loginActivityError } = await supabase
+        .from('user_login_activity')
+        .select('login_activity_id, user_id, login_method, login_status, created_at')
+        .in('user_id', userIds)
+        .eq('login_status', 'Success')
+        .order('created_at', { ascending: false });
+
+      if (loginActivityError) throw loginActivityError;
+
+      const latestLoginByUserId = new Map<number, UserLoginActivity>();
+      (loginActivityData || []).forEach((activity) => {
+        if (!activity.user_id || latestLoginByUserId.has(activity.user_id)) return;
+        latestLoginByUserId.set(activity.user_id, activity as UserLoginActivity);
+      });
+
+      setUsers(userRows.map((user) => ({
+        ...user,
+        last_login_activity: latestLoginByUserId.get(user.user_id) || null
+      })));
     } catch (err) {
       console.error('Error fetching users:', err);
     } finally {
@@ -127,6 +163,38 @@ const UserManagement: React.FC = () => {
     if (!isAdmin || !currentUser) return false;
 
     return targetUser.user_id !== currentUser.user_id && targetUser.role !== 'Admin';
+  };
+
+  const formatLastLogin = (activity?: UserLoginActivity | null) => {
+      if (!activity?.created_at) return 'Never';
+
+      try {
+          return format(new Date(activity.created_at), 'MMM d, yyyy h:mm a');
+      } catch {
+          return 'Invalid date';
+      }
+  };
+
+  const getLoginMethodBadge = (activity?: UserLoginActivity | null) => {
+      if (!activity) {
+          return (
+            <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                No activity
+            </span>
+          );
+      }
+
+      const isGoogle = activity.login_method === 'Google';
+
+      return (
+        <span className={`inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+            isGoogle
+              ? 'border-sky-200 bg-sky-50 text-sky-700'
+              : 'border-indigo-200 bg-indigo-50 text-indigo-700'
+        }`}>
+            {activity.login_method}
+        </span>
+      );
   };
 
   const handleDelete = async (targetUser: UserWithOffice) => {
@@ -456,15 +524,16 @@ const UserManagement: React.FC = () => {
                           <th className="px-6 py-4 bg-slate-50">Office Code</th>
                           <th className="px-6 py-4 bg-slate-50">Role & Position</th>
                           <th className="px-6 py-4 bg-slate-50">Status</th>
+                          <th className="px-6 py-4 bg-slate-50">Last Login</th>
                           <th className="px-6 py-4 bg-slate-50">Created</th>
                           <th className="px-6 py-4 text-right bg-slate-50">Actions</th>
                       </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                       {loading ? (
-                          <tr><td colSpan={6} className="text-center py-8">Loading users...</td></tr>
+                          <tr><td colSpan={7} className="text-center py-8">Loading users...</td></tr>
                       ) : paginatedUsers.length === 0 ? (
-                          <tr><td colSpan={6} className="text-center py-8 text-slate-400">No users found.</td></tr>
+                          <tr><td colSpan={7} className="text-center py-8 text-slate-400">No users found.</td></tr>
                       ) : (
                           paginatedUsers.map((user) => (
                               <tr key={user.user_id} className="hover:bg-slate-50 transition-colors">
@@ -509,6 +578,12 @@ const UserManagement: React.FC = () => {
                                           <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-green-500' : 'bg-slate-400'}`}></span>
                                           {user.status}
                                       </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-slate-500">
+                                      <div className="flex flex-col gap-1">
+                                          <span>{formatLastLogin(user.last_login_activity)}</span>
+                                          {getLoginMethodBadge(user.last_login_activity)}
+                                      </div>
                                   </td>
                                   <td className="px-6 py-4 text-slate-500">
                                       {user.created_at ? format(new Date(user.created_at), 'MMM d, yyyy') : '-'}
@@ -606,6 +681,10 @@ const UserManagement: React.FC = () => {
                               </div>
                               <div className="text-xs text-slate-500">
                                   Created: {user.created_at ? format(new Date(user.created_at), 'MMM d, yyyy') : '-'}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                  <span>Last login: {formatLastLogin(user.last_login_activity)}</span>
+                                  {getLoginMethodBadge(user.last_login_activity)}
                               </div>
                           </div>
 
