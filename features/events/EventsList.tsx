@@ -68,7 +68,7 @@ const createEmptyParticipantForm = (): ParticipantFormData => ({
   office: '',
   mobile_no: '',
   position: '',
-  gender: 'Male',
+  gender: '',
   age_group: '18-24',
   pwd: 'No',
   indigenous_people: 'No',
@@ -911,7 +911,7 @@ const EventsList: React.FC = () => {
           office: p.office || '',
           mobile_no: p.mobile_no || '',
           position: p.position || '',
-          gender: p.gender || 'Male',
+          gender: p.gender || '',
           age_group: p.age_group || '18-24',
           pwd: p.pwd || 'No',
           indigenous_people: p.indigenous_people || 'No',
@@ -967,6 +967,11 @@ const EventsList: React.FC = () => {
           }
       } else if (!newParticipant.office.trim()) {
           toast.error("Please enter your Office / Agency name.");
+          return null;
+      }
+
+      if (newParticipant.gender !== 'Male' && newParticipant.gender !== 'Female') {
+          toast.error("Please select a gender (Male or Female).");
           return null;
       }
 
@@ -1081,7 +1086,7 @@ const EventsList: React.FC = () => {
           office: participant.office || '',
           mobile_no: participant.mobile_no || '',
           position: participant.position || '',
-          gender: participant.gender || 'Male',
+          gender: participant.gender || '',
           age_group: participant.age_group || '18-24',
           pwd: participant.pwd || 'No',
           indigenous_people: participant.indigenous_people || 'No',
@@ -2897,6 +2902,7 @@ const EventsList: React.FC = () => {
                                                 value={newParticipant.gender}
                                                 onChange={e => setNewParticipant({...newParticipant, gender: e.target.value})}
                                             >
+                                                <option value="">Select Gender</option>
                                                 <option value="Male">Male</option>
                                                 <option value="Female">Female</option>
                                             </select>

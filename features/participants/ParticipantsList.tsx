@@ -76,7 +76,7 @@ const AttendanceList: React.FC = () => {
       office: '',
       mobile_no: '',
       position: '',
-      gender: 'Male',
+      gender: '',
       age_group: '18-24',
       pwd: 'No',
       indigenous_people: 'No',
@@ -699,7 +699,7 @@ const AttendanceList: React.FC = () => {
           office: p.office || '',
           mobile_no: p.mobile_no || '',
           position: p.position || '',
-          gender: p.gender || 'Male',
+          gender: p.gender || '',
           age_group: p.age_group || '18-24',
           pwd: p.pwd || 'No',
           indigenous_people: p.indigenous_people || 'No',
@@ -768,6 +768,11 @@ const AttendanceList: React.FC = () => {
               toast.error("Please enter your Office / Agency name.");
               return;
           }
+      }
+
+      if (newParticipant.gender !== 'Male' && newParticipant.gender !== 'Female') {
+          toast.error("Please select a gender (Male or Female).");
+          return;
       }
 
       if (newParticipant.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newParticipant.email)) {
@@ -962,7 +967,7 @@ const AttendanceList: React.FC = () => {
               office: '',
               mobile_no: '',
               position: '',
-              gender: 'Male',
+              gender: '',
               age_group: '18-24',
               pwd: 'No',
               indigenous_people: 'No',
@@ -1760,6 +1765,7 @@ const AttendanceList: React.FC = () => {
                                         value={newParticipant.gender}
                                         onChange={e => setNewParticipant({...newParticipant, gender: e.target.value})}
                                     >
+                                        <option value="">Select Gender</option>
                                         <option value="Male">Male</option>
                                         <option value="Female">Female</option>
                                     </select>

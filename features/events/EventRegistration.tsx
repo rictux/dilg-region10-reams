@@ -97,7 +97,7 @@ const EventRegistration: React.FC = () => {
     suffix: '',
     full_name: '', // We'll keep this to store the returned full_name from backend
     email: '',
-    gender: 'Male',
+    gender: '',
     position: '',
     office: '',
     mobile_no: '',
@@ -278,6 +278,11 @@ const EventRegistration: React.FC = () => {
       return null;
     }
 
+    if (formData.gender !== 'Male' && formData.gender !== 'Female') {
+      setError("Please select a gender (Male or Female).");
+      return null;
+    }
+
     if (formData.needs_accommodation && formData.accommodation_pax < 1) {
       setError("Please specify at least 1 pax for accommodation.");
       return null;
@@ -430,7 +435,7 @@ const EventRegistration: React.FC = () => {
         suffix: data.suffix || '',
         full_name: data.full_name || '',
         email: data.email || '',
-        gender: data.gender || 'Male',
+        gender: data.gender || '',
         position: data.position || '',
         office: data.office || '',
         mobile_no: data.mobile_no || '',
@@ -632,7 +637,7 @@ const EventRegistration: React.FC = () => {
           m_initial: data.m_initial || '',
           suffix: data.suffix || '',
           email: data.email || '',
-          gender: data.gender || 'Male',
+          gender: data.gender || '',
           position: data.position || '',
           office: data.office || '',
           mobile_no: data.mobile_no || '',
@@ -1060,9 +1065,9 @@ const EventRegistration: React.FC = () => {
                                     value={formData.gender}
                                     onChange={e => setFormData({...formData, gender: e.target.value})}
                                 >
+                                    <option value="">Select Gender</option>
                                     <option value="Male">Male</option>
                                     <option value="Female">Female</option>
-                                    <option value="Other">Other</option>
                                 </select>
                             </div>
                             <div>
