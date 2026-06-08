@@ -194,6 +194,8 @@ const EventsList: React.FC = () => {
   const [showVenueSuggestions, setShowVenueSuggestions] = useState(false);
   const [loadingVenueSuggestions, setLoadingVenueSuggestions] = useState(false);
   const venueInputFocusedRef = React.useRef(false);
+  const qrCodeRef = React.useRef<HTMLDivElement>(null);
+  const [downloadingBadge, setDownloadingBadge] = useState(false);
 
   useEffect(() => {
     if (!isAdmin && eventView === 'deleted') {
@@ -1207,6 +1209,127 @@ const EventsList: React.FC = () => {
       setTimeout(() => setCopied(false), 2000);
   };
 
+  const downloadRegistrationBadge = async () => {
+      if (!selectedEvent) return;
+
+      const svgElement = qrCodeRef.current?.querySelector('svg');
+      if (!svgElement) {
+          toast.error('Unable to generate badge. Please try again.');
+          return;
+      }
+
+      setDownloadingBadge(true);
+      try {
+          const link = getRegistrationLink(selectedEvent.event_id);
+          const eventName = selectedEvent.event_name || 'Event';
+
+          // Render the QR SVG into an image
+          const svgString = new XMLSerializer().serializeToString(svgElement);
+          const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+          const svgUrl = URL.createObjectURL(svgBlob);
+
+          const qrImage = new Image();
+          await new Promise<void>((resolve, reject) => {
+              qrImage.onload = () => resolve();
+              qrImage.onerror = () => reject(new Error('Failed to load QR code image'));
+              qrImage.src = svgUrl;
+          });
+
+          // Layout constants (use a high scale for a crisp printable badge)
+          const scale = 3;
+          const width = 600;
+          const padding = 48;
+          const qrSize = 260;
+
+          // Measure dynamic text height before sizing the canvas
+          const measureCtx = document.createElement('canvas').getContext('2d');
+          if (!measureCtx) throw new Error('Canvas not supported');
+
+          const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
+              const words = text.split(/\s+/);
+              const lines: string[] = [];
+              let current = '';
+              for (const word of words) {
+                  const test = current ? `${current} ${word}` : word;
+                  if (ctx.measureText(test).width > maxWidth && current) {
+                      lines.push(current);
+                      current = word;
+                  } else {
+                      current = test;
+                  }
+              }
+              if (current) lines.push(current);
+              return lines;
+          };
+
+          const contentWidth = width - padding * 2;
+
+          measureCtx.font = 'bold 18px Arial, sans-serif';
+          const linkLines = wrapText(measureCtx, link, contentWidth);
+
+          const linkHeight = linkLines.length * 26;
+          const height = padding + qrSize + 28 + 24 + linkHeight + padding;
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width * scale;
+          canvas.height = height * scale;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('Canvas not supported');
+          ctx.scale(scale, scale);
+
+          // Background
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, width, height);
+
+          // Rounded border accent
+          ctx.strokeStyle = '#e0e7ff';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(8, 8, width - 16, height - 16);
+
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+
+          let cursorY = padding;
+
+          // QR code
+          const qrX = (width - qrSize) / 2;
+          ctx.drawImage(qrImage, qrX, cursorY, qrSize, qrSize);
+          cursorY += qrSize + 28;
+
+          // "Scan to register" caption
+          ctx.fillStyle = '#4f46e5';
+          ctx.font = 'bold 16px Arial, sans-serif';
+          ctx.fillText('Scan to register', width / 2, cursorY);
+          cursorY += 24;
+
+          // Registration link
+          ctx.fillStyle = '#1e293b';
+          ctx.font = 'bold 18px Arial, sans-serif';
+          for (const line of linkLines) {
+              ctx.fillText(line, width / 2, cursorY);
+              cursorY += 26;
+          }
+
+          URL.revokeObjectURL(svgUrl);
+
+          // Trigger download
+          const dataUrl = canvas.toDataURL('image/png');
+          const safeName = eventName.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').toLowerCase() || 'event';
+          const downloadLink = document.createElement('a');
+          downloadLink.href = dataUrl;
+          downloadLink.download = `${safeName}_registration_badge.png`;
+          document.body.appendChild(downloadLink);
+          downloadLink.click();
+          document.body.removeChild(downloadLink);
+
+          toast.success('Badge downloaded.');
+      } catch (err: any) {
+          toast.error('Error generating badge: ' + (err?.message || 'Unknown error'));
+      } finally {
+          setDownloadingBadge(false);
+      }
+  };
+
   const exportParticipantsToExcel = async () => {
       if (!selectedEvent || viewingParticipants.length === 0) return;
 
@@ -2072,19 +2195,19 @@ const EventsList: React.FC = () => {
                         </div>
                     ) : (
                         <>
-                            <div className="p-4 border-2 border-indigo-100 rounded-lg bg-indigo-50/50">
+                            <div ref={qrCodeRef} className="p-4 border-2 border-indigo-100 rounded-lg bg-indigo-50/50">
                                 <QRCode value={getRegistrationLink(selectedEvent.event_id)} size={180} />
                             </div>
-                            
+
                             <div className="w-full">
                                 <label className="block text-sm font-medium text-slate-700 mb-2">Registration Link</label>
                                 <div className="flex gap-2">
-                                    <input 
-                                        readOnly 
+                                    <input
+                                        readOnly
                                         value={getRegistrationLink(selectedEvent.event_id)}
                                         className="flex-1 block w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 bg-slate-50 focus:outline-none"
                                     />
-                                    <button 
+                                    <button
                                         onClick={copyToClipboard}
                                         className={`px-3 py-2 rounded-lg border flex items-center gap-2 transition-all
                                             ${copied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'}
@@ -2094,6 +2217,15 @@ const EventsList: React.FC = () => {
                                     </button>
                                 </div>
                             </div>
+
+                            <button
+                                onClick={downloadRegistrationBadge}
+                                disabled={downloadingBadge}
+                                className="w-full px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                {downloadingBadge ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                                {downloadingBadge ? 'Generating...' : 'Download Badge'}
+                            </button>
                         </>
                     )}
                 </div>
