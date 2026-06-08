@@ -133,6 +133,7 @@ const EventsList: React.FC = () => {
   const [isAddingParticipant, setIsAddingParticipant] = useState(false);
   const [newParticipant, setNewParticipant] = useState<ParticipantFormData>(createEmptyParticipantForm());
   const [editingParticipantRecord, setEditingParticipantRecord] = useState<ParticipantModalRecord | null>(null);
+  const [logAttendanceOnRegister, setLogAttendanceOnRegister] = useState(false);
 
   // Affiliation State
   const [affiliationType, setAffiliationType] = useState<'Office' | 'LGU'>('Office');
@@ -450,6 +451,18 @@ const EventsList: React.FC = () => {
       return savedDates.length > 0 ? savedDates : getDateRangeOptions(event.start_date, event.end_date);
   };
 
+  // True when today's date falls within the event's date range, i.e. the participant
+  // is being registered on an actual day of the event.
+  const isTodayEventDay = (event: Event | null) => {
+      if (!event) return false;
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      return getDateRangeOptions(event.start_date, event.end_date).includes(todayStr);
+  };
+
+  // Attendance session to auto-log on registration: AM for All_Day / AM-only events, PM for PM-only events.
+  const getRegistrationAttendanceSession = (event: Event | null): 'AM' | 'PM' =>
+      event?.session === 'PM' ? 'PM' : 'AM';
+
   const toggleParticipantAccommodation = (checked: boolean) => {
       const availableDates = getSelectedEventAccommodationDates(selectedEvent);
       const normalizedSelectedDates = (newParticipant.date_accommodation || []).filter((date) => availableDates.includes(date));
@@ -763,6 +776,7 @@ const EventsList: React.FC = () => {
   const resetParticipantForm = () => {
       setNewParticipant(createEmptyParticipantForm());
       setEditingParticipantRecord(null);
+      setLogAttendanceOnRegister(false);
       setAffiliationType('Office');
       setSelectedProvince('');
       setSelectedCity('');
@@ -1152,7 +1166,50 @@ const EventsList: React.FC = () => {
             });
 
           if (regError && regError.code !== '23505') throw regError;
-          
+
+          // 3. Optionally auto-log attendance when registering on the day of the event.
+          // The logged-in user acts as the "scanner" and the device is recorded as Web.
+          if (logAttendanceOnRegister && user && isTodayEventDay(selectedEvent)) {
+              try {
+                  const session = getRegistrationAttendanceSession(selectedEvent);
+                  const attendanceDate = format(new Date(), 'yyyy-MM-dd');
+
+                  const { data: existingLog } = await supabase
+                    .from('attendance_logs')
+                    .select('attendance_id')
+                    .eq('event_id', selectedEvent.event_id)
+                    .eq('participant_id', participantId)
+                    .eq('attendance_date', attendanceDate)
+                    .eq('action_session', session)
+                    .eq('scan_status', 'Valid')
+                    .maybeSingle();
+
+                  if (!existingLog) {
+                      const { error: attendanceError } = await supabase
+                        .from('attendance_logs')
+                        .insert({
+                            event_id: selectedEvent.event_id,
+                            participant_id: participantId,
+                            user_id: user.user_id,
+                            attendance_date: attendanceDate,
+                            scan_time: new Date().toISOString(),
+                            action_session: session,
+                            scan_status: 'Valid',
+                            remarks: `Auto-logged on registration (${session})`,
+                            scanner_device: 'Web'
+                        });
+
+                      if (attendanceError) throw attendanceError;
+                      toast.success(`${session} attendance logged for today.`);
+                  } else {
+                      toast.info(`${session} attendance was already logged for today.`);
+                  }
+              } catch (attendanceErr: any) {
+                  // Registration already succeeded; surface attendance issue without failing the whole flow.
+                  toast.error('Participant registered, but attendance logging failed: ' + attendanceErr.message);
+              }
+          }
+
           // Success
           setParticipantModalView('list');
           resetParticipantForm();
@@ -2983,6 +3040,23 @@ const EventsList: React.FC = () => {
                                         </label>
                                     </div>
                                 </div>
+
+                                {participantModalView === 'add' && isTodayEventDay(selectedEvent) && (
+                                    <div className="flex items-start gap-3 mt-6 p-3 rounded-lg bg-indigo-50 border border-indigo-100">
+                                        <div className="flex items-center h-5">
+                                            <input
+                                                id="modal-log-attendance"
+                                                type="checkbox"
+                                                checked={logAttendanceOnRegister}
+                                                onChange={(e) => setLogAttendanceOnRegister(e.target.checked)}
+                                                className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                            />
+                                        </div>
+                                        <label htmlFor="modal-log-attendance" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
+                                            Log <span className="font-semibold text-indigo-700">{getRegistrationAttendanceSession(selectedEvent)}</span> attendance for today ({format(new Date(), 'MMM d, yyyy')}) upon registration.
+                                        </label>
+                                    </div>
+                                )}
 
                                 <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
                                     <button 
