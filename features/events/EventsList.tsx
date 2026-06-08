@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event, Participant, Office } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import ExcelJS from 'exceljs';
@@ -158,6 +158,8 @@ const EventsList: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [participantSearchTerm, setParticipantSearchTerm] = useState('');
   const [accommodationFilter, setAccommodationFilter] = useState<'all' | 'with'>('all');
+  const [photoConsentFilter, setPhotoConsentFilter] = useState<'all' | 'declined'>('all');
+  const [storeConsentFilter, setStoreConsentFilter] = useState<'all' | 'declined'>('all');
   
   // Role Editing State
   const [editingRole, setEditingRole] = useState<{ participantId: number; role: string } | null>(null);
@@ -773,6 +775,8 @@ const EventsList: React.FC = () => {
       setParticipantModalView('list');
       setParticipantSearchTerm('');
       setAccommodationFilter('all');
+      setPhotoConsentFilter('all');
+      setStoreConsentFilter('all');
       setEditingRole(null);
       resetParticipantForm();
   };
@@ -1339,15 +1343,20 @@ const EventsList: React.FC = () => {
           return aTime - bTime;
       });
 
+      const includeAccommodation = !!selectedEvent.has_accommodation;
+
       const rows = sorted.map((record) => [
           record.participants?.full_name || '',
           record.participants?.gender || '',
+          record.participants?.position || '',
           record.participants?.office || '',
           record.participants?.age_group || '',
           record.participants?.mobile_no || '',
           record.participants?.email || '',
           record.role || 'Delegate',
-          record.needs_accommodation ? 'Yes' : 'No'
+          ...(includeAccommodation ? [record.needs_accommodation ? 'Yes' : 'No'] : []),
+          record.accept_photo_video ? 'Yes' : 'No',
+          record.store_to_db ? 'Yes' : 'No'
       ]);
 
       const workbook = new ExcelJS.Workbook();
@@ -1365,17 +1374,20 @@ const EventsList: React.FC = () => {
           columns: [
               { name: 'Participant Name', filterButton: true },
               { name: 'Gender', filterButton: true },
+              { name: 'Position', filterButton: true },
               { name: 'Office', filterButton: true },
               { name: 'Age Group', filterButton: true },
-              { name: 'Mobile No', filterButton: true },
+              { name: 'Mobile Number', filterButton: true },
               { name: 'Email', filterButton: true },
               { name: 'Role', filterButton: true },
-              { name: 'Accommodation', filterButton: true }
+              ...(includeAccommodation ? [{ name: 'Accommodation', filterButton: true }] : []),
+              { name: 'Photo/Video', filterButton: true },
+              { name: 'Data Storage', filterButton: true }
           ],
           rows
       });
 
-      [32, 10, 34, 12, 14, 30, 14, 14].forEach((w, idx) => {
+      [32, 10, 28, 34, 12, 16, 30, 14, ...(includeAccommodation ? [14] : []), 14, 14].forEach((w, idx) => {
           worksheet.getColumn(idx + 1).width = w;
       });
 
@@ -1407,12 +1419,20 @@ const EventsList: React.FC = () => {
       matched = matched.filter(p => p.needs_accommodation);
     }
 
+    if (photoConsentFilter === 'declined') {
+      matched = matched.filter(p => !p.accept_photo_video);
+    }
+
+    if (storeConsentFilter === 'declined') {
+      matched = matched.filter(p => !p.store_to_db);
+    }
+
     return [...matched].sort((a, b) => {
       const aTime = a.registered_at ? new Date(a.registered_at).getTime() : Number.POSITIVE_INFINITY;
       const bTime = b.registered_at ? new Date(b.registered_at).getTime() : Number.POSITIVE_INFINITY;
       return aTime - bTime;
     });
-  }, [viewingParticipants, participantSearchTerm, accommodationFilter]);
+  }, [viewingParticipants, participantSearchTerm, accommodationFilter, photoConsentFilter, storeConsentFilter]);
 
   // Grouping Logic
   const specialRoles = ['Speaker', 'Secretariat', 'VIP', 'Guest'];
@@ -2282,22 +2302,50 @@ const EventsList: React.FC = () => {
 
                 {participantModalView === 'list' && (
                     <div className="px-4 sm:px-6 py-3 border-b border-slate-100 bg-white shrink-0">
-                        <div className="flex items-center justify-end gap-2">
-                            {selectedEvent?.has_accommodation && (
+                        <div className="flex items-center justify-end gap-2 flex-wrap">
+                            <div className="mr-auto flex items-center gap-2 flex-wrap">
+                                {selectedEvent?.has_accommodation && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setAccommodationFilter(accommodationFilter === 'with' ? 'all' : 'with')}
+                                        aria-pressed={accommodationFilter === 'with'}
+                                        title="Show only participants needing accommodation"
+                                        className={`shrink-0 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 border transition-colors shadow-sm ${
+                                            accommodationFilter === 'with'
+                                                ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700'
+                                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <Bed size={16} /> Has Accommodation
+                                    </button>
+                                )}
                                 <button
                                     type="button"
-                                    onClick={() => setAccommodationFilter(accommodationFilter === 'with' ? 'all' : 'with')}
-                                    aria-pressed={accommodationFilter === 'with'}
-                                    title="Show only participants needing accommodation"
-                                    className={`mr-auto shrink-0 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 border transition-colors shadow-sm ${
-                                        accommodationFilter === 'with'
-                                            ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700'
+                                    onClick={() => setPhotoConsentFilter(photoConsentFilter === 'declined' ? 'all' : 'declined')}
+                                    aria-pressed={photoConsentFilter === 'declined'}
+                                    title="Show only participants who did not accept photo/video"
+                                    className={`shrink-0 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 border transition-colors shadow-sm ${
+                                        photoConsentFilter === 'declined'
+                                            ? 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700'
                                             : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                                     }`}
                                 >
-                                    <Bed size={16} /> Has Accommodation
+                                    <CameraOff size={16} /> No Photo/Video
                                 </button>
-                            )}
+                                <button
+                                    type="button"
+                                    onClick={() => setStoreConsentFilter(storeConsentFilter === 'declined' ? 'all' : 'declined')}
+                                    aria-pressed={storeConsentFilter === 'declined'}
+                                    title="Show only participants who did not consent to store their data"
+                                    className={`shrink-0 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 border transition-colors shadow-sm ${
+                                        storeConsentFilter === 'declined'
+                                            ? 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700'
+                                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <DatabaseBackup size={16} /> No Data Storage
+                                </button>
+                            </div>
                             <div className="relative w-full max-w-xs">
                                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                                     <Search size={16} />
