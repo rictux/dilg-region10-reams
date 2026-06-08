@@ -1082,6 +1082,7 @@ const EventRegistration: React.FC = () => {
                                     <option value="35-44">35-44</option>
                                     <option value="45-54">45-54</option>
                                     <option value="55-65">55-65</option>
+                                    <option value="65+">65+</option>
                                 </select>
                             </div>
                         </div>
