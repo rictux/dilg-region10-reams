@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Printer, Calendar, ScrollText, Search, ChevronDown, Check, X } from 'lucide-react';
+import { Printer, Calendar, ScrollText, Search, ChevronDown, Check, X, Award } from 'lucide-react';
 import { Event } from '../../types/database';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -80,6 +80,13 @@ const Reports: React.FC = () => {
     if (selectedEventId) {
         sessionStorage.setItem('reports_selected_event_id', selectedEventId);
         navigate(`/print-certificate/${selectedEventId}`);
+    }
+  };
+
+  const handlePrintCertificateOfParticipation = () => {
+    if (selectedEventId) {
+        sessionStorage.setItem('reports_selected_event_id', selectedEventId);
+        navigate(`/print-cop/${selectedEventId}`);
     }
   };
 
@@ -296,6 +303,25 @@ const Reports: React.FC = () => {
                     className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
                 >
                     <Printer size={18} /> Print Certificates
+                </button>
+            </div>
+
+            {/* Certificate of Participation Card */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+                <div className="bg-violet-100 p-3 rounded-lg text-violet-600 mb-4">
+                    <Award size={24} />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 mb-2">Certificate of Participation</h3>
+                <p className="text-slate-500 text-sm mb-6 flex-1">
+                    Generate Certificates of Participation with a custom theme, font, and paper size. Dates reflect each participant's actual attendance logs.
+                    {selectedEventId ? ' Creates certificates for the selected event.' : ' Please select an event first.'}
+                </p>
+                <button
+                    onClick={handlePrintCertificateOfParticipation}
+                    disabled={!selectedEventId}
+                    className="w-full bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
+                >
+                    <Award size={18} /> Generate Certificates
                 </button>
             </div>
 

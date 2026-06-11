@@ -15,6 +15,7 @@ import Reports from './features/reports/Reports';
 import AttendanceSheetPrint from './features/participants/AttendanceSheetPrint';
 import ScanLogsPrint from './features/reports/ScanLogsPrint';
 import CertificateOfAppearancePrint from './features/reports/CertificateOfAppearancePrint';
+import CertificateOfParticipation from './features/reports/CertificateOfParticipation';
 import UserManagement from './features/users/UserManagement';
 import Settings from './features/settings/Settings';
 import NameLookup from './features/lookup/NameLookup';
@@ -116,6 +117,13 @@ const App: React.FC = () => {
           <Route path="/print-certificate/:eventId" element={
             <ProtectedRoute requiredPermission="VIEW_REPORTS">
               <CertificateOfAppearancePrint />
+            </ProtectedRoute>
+          } />
+
+          {/* Certificate of Participation - Requires VIEW_REPORTS */}
+          <Route path="/print-cop/:eventId" element={
+            <ProtectedRoute requiredPermission="VIEW_REPORTS">
+              <CertificateOfParticipation />
             </ProtectedRoute>
           } />
 

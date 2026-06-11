@@ -264,7 +264,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
             position,
             attendance_logs!inner(attendance_id)
           `)
-          .ilike('full_name', `%${searchTerm}%`)
+          .or(`full_name.ilike.%${searchTerm}%,office.ilike.%${searchTerm}%`)
           .limit(8);
 
         if (!error && data) {
@@ -458,7 +458,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
               </div>
               <input
                 type="text"
-                placeholder="Enter full name to search..."
+                placeholder="Search by name or office..."
                 className="w-full pl-10 pr-16 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-medium shadow-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-slate-400"
                 value={searchTerm}
                 onChange={(e) => {

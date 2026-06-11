@@ -387,8 +387,11 @@ const AttendanceList: React.FC = () => {
   const hasMultipleSessions = visibleSessions.length > 1;
 
   const filteredData = data.filter(row => {
-    if (searchQuery && !row.participant.full_name.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchesName = row.participant.full_name?.toLowerCase().includes(query);
+      const matchesOffice = row.participant.office?.toLowerCase().includes(query);
+      if (!matchesName && !matchesOffice) return false;
     }
     
     const hasAM = !!row.amLog;
@@ -653,7 +656,7 @@ const AttendanceList: React.FC = () => {
         const { data } = await supabase
             .from('participants')
             .select('*')
-            .ilike('full_name', `%${val}%`)
+            .or(`full_name.ilike.%${val}%,office.ilike.%${val}%`)
             .limit(5);
             
         if (data && data.length > 0) {
@@ -1130,9 +1133,9 @@ const AttendanceList: React.FC = () => {
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                         <Search size={18} />
                     </div>
-                    <input 
-                        type="text" 
-                        placeholder="Search participants..." 
+                    <input
+                        type="text"
+                        placeholder="Search by name or office..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full min-w-0 rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-12 text-xs font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 sm:py-2.5 sm:text-sm lg:py-3"
