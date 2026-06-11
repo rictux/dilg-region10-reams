@@ -239,6 +239,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
             fontFamily: CERT_FONT,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
+            textTransform: 'uppercase',
           }}>
             {participantRecord.participant.full_name}
           </p>
