@@ -192,13 +192,13 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
               onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
             />
           </div>
-          <p style={{ fontSize: subSz, margin: 0, lineHeight: 1.3, letterSpacing: '0.04em' }}>
+          <p style={{ fontSize: subSz, margin: 0, lineHeight: 1.3, letterSpacing: '0.04em', whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'center' }}>
             REPUBLIC OF THE PHILIPPINES
           </p>
-          <p style={{ fontSize: subSz, fontWeight: 'bold', margin: 0, lineHeight: 1.3, textAlign: 'center', letterSpacing: '0.04em' }}>
+          <p style={{ fontSize: subSz, fontWeight: 'bold', margin: 0, lineHeight: 1.3, textAlign: 'center', letterSpacing: '0.04em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
             DEPARTMENT OF THE INTERIOR AND LOCAL GOVERNMENT
           </p>
-          <p style={{ fontSize: subSz, fontWeight: 'bold', margin: 0, lineHeight: 1.3, letterSpacing: '0.04em' }}>
+          <p style={{ fontSize: subSz, fontWeight: 'bold', margin: 0, lineHeight: 1.3, letterSpacing: '0.04em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
             {header}
           </p>
           {subHeader && (
@@ -287,6 +287,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
               margin: 0,
               textAlign: 'center',
               letterSpacing: '0.02em',
+              whiteSpace: 'nowrap',
             }}>
               {sigName}
               {postNom && (
