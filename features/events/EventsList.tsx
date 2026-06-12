@@ -922,7 +922,21 @@ const EventsList: React.FC = () => {
   };
   
   const toProperCase = (str: string) => {
-    return str.toLowerCase().replace(/(^|\s)\S/g, l => l.toUpperCase());
+    const lowerStr = str.toLowerCase();
+    const parts = lowerStr.split('-');
+
+    // Known Filipino/indigenous particle suffixes that shouldn't be capitalized
+    const particles = ['a', 'an', 'om', 'ay', 'in', 'oy', 'on', 'ud'];
+
+    return parts
+      .map((part, index) => {
+        // First part always capitalize, or if not a known particle
+        if (index === 0 || !particles.includes(part)) {
+          return part.split(/\s+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        }
+        return part; // Keep known particles lowercase
+      })
+      .join('-');
   };
 
   const formatSuffix = (value: string) => {

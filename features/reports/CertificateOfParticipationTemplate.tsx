@@ -57,21 +57,21 @@ export const formatAttendanceDates = (logDates: string[]): string => {
     d => d.getMonth() === parsed[0].getMonth() && d.getFullYear() === parsed[0].getFullYear()
   );
   if (sameMonthYear) {
-    const days = parsed.map(d => format(d, 'd'));
-    const last = days.pop()!;
-    return `${format(parsed[0], 'MMMM')} ${days.length ? days.join(', ') + ' and ' : ''}${last}, ${format(parsed[0], 'yyyy')}`;
+    const first = parsed[0];
+    const last = parsed[parsed.length - 1];
+    return `${format(first, 'MMMM d')}-${format(last, 'd, yyyy')}`;
   }
 
   const sameYear = parsed.every(d => d.getFullYear() === parsed[0].getFullYear());
   if (sameYear) {
-    const parts = parsed.map(d => format(d, 'MMMM d'));
-    const last = parts.pop()!;
-    return `${parts.join(', ')} and ${last}, ${format(parsed[0], 'yyyy')}`;
+    const first = parsed[0];
+    const last = parsed[parsed.length - 1];
+    return `${format(first, 'MMMM d')} - ${format(last, 'MMMM d, yyyy')}`;
   }
 
-  const parts = parsed.map(d => format(d, 'MMMM d, yyyy'));
-  const last = parts.pop()!;
-  return `${parts.join(', ')} and ${last}`;
+  const first = parsed[0];
+  const last = parsed[parsed.length - 1];
+  return `${format(first, 'MMMM d, yyyy')} - ${format(last, 'MMMM d, yyyy')}`;
 };
 
 export const formatGivenDate = (logDates: string[], eventEndDate: string): string => {
@@ -122,12 +122,12 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   const sigSz    = s(17.6);
   const sigPosSz = s(13);
 
-  // Auto-shrink name to fit within ~82% of the certificate width on one line
+  // Auto-shrink name to fit within ~70% of the certificate width on one line
   const fullName      = participantRecord.participant.full_name || '';
-  const maxNameWidth  = widthPx * 0.82;
+  const maxNameWidth  = widthPx * 0.70;
   const baseNameSz    = s(36);
   const minNameSz     = s(18);
-  const charWidthCoef = 0.58; // approximate em-ratio for bold Poppins
+  const charWidthCoef = 0.48; // approximate em-ratio for bold Poppins (conservative)
   const nameSz = fullName.length > 0
     ? Math.max(minNameSz, Math.min(baseNameSz, Math.floor(maxNameWidth / (fullName.length * charWidthCoef))))
     : baseNameSz;
@@ -234,12 +234,15 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
             fontSize: nameSz,
             fontWeight: 'bold',
             margin: 0,
-            lineHeight: 1.05,
+            marginBottom: s(3),
+            lineHeight: 1.2,
             textAlign: 'center',
             fontFamily: CERT_FONT,
             whiteSpace: 'nowrap',
-            overflow: 'hidden',
             textTransform: 'uppercase',
+            paddingLeft: s(4),
+            paddingRight: s(4),
+            display: 'block',
           }}>
             {participantRecord.participant.full_name}
           </p>
@@ -247,7 +250,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
           <div style={{
             width: '85%',
             borderBottom: `${s(1.5)}px solid #111`,
-            marginTop: s(5),
+            marginTop: s(1),
             marginBottom: s(8),
           }} />
 
