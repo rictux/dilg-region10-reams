@@ -259,10 +259,12 @@ const Reports: React.FC = () => {
                 <h3 className="text-lg font-bold text-slate-800 mb-2">Print Scan Logs</h3>
                 <p className="text-slate-500 text-sm mb-6 flex-1">
                     Generate a detailed log of every scan transaction, including timestamps, scanner operator details, and participant info.
+                    {selectedEventId ? ' Creates a specific report for the selected event.' : ' Please select an event first.'}
                 </p>
-                <button 
+                <button
                     onClick={handlePrintScanLogs}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
+                    disabled={!selectedEventId}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
                 >
                     <Printer size={18} /> Print Scan Logs
                 </button>
