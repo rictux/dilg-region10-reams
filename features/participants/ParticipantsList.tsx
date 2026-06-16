@@ -1055,9 +1055,9 @@ const AttendanceList: React.FC = () => {
                     className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 shadow-sm transition-colors hover:border-indigo-400 sm:px-4 sm:py-2.5 lg:py-3"
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
-                    <div className="flex items-start gap-2 flex-1">
-                        <Calendar className="text-slate-400 shrink-0 mt-0.5 lg:mt-0" size={16} />
-                        <span className={`whitespace-normal break-words text-[11px] leading-snug sm:text-xs lg:text-sm ${!selectedEvent ? 'text-slate-500' : 'text-slate-800 font-medium'}`}>
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <Calendar className="text-slate-400 shrink-0" size={16} />
+                        <span className={`min-w-0 flex-1 truncate text-[11px] leading-snug sm:text-xs lg:text-sm ${!selectedEvent ? 'text-slate-500' : 'text-slate-800 font-medium'}`}>
                             {selectedEvent ? selectedEvent.event_name : "-- Select Event --"}
                         </span>
                     </div>
@@ -1355,7 +1355,7 @@ const AttendanceList: React.FC = () => {
                 <table className="datatable w-full table-fixed text-[13px] lg:text-sm text-left">
                     <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                         <tr>
-                            <th className="px-5 py-4 lg:px-6 lg:py-5 w-14 bg-slate-50 text-center">
+                            <th className="px-5 py-2 lg:px-6 lg:py-2.5 w-14 bg-slate-50 text-center">
                                 <input
                                     type="checkbox"
                                     checked={allFilteredSelected}
@@ -1364,16 +1364,16 @@ const AttendanceList: React.FC = () => {
                                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
                                 />
                             </th>
-                            <th className="px-5 py-4 lg:px-6 lg:py-5 w-14 bg-slate-50">#</th>
-                            <th className="px-5 py-4 lg:px-6 lg:py-5 w-[28%] bg-slate-50">Name</th>
-                            <th className="px-5 py-4 lg:px-6 lg:py-5 w-[18%] bg-slate-50">Position</th>
-                            <th className="px-5 py-4 lg:px-6 lg:py-5 w-[16%] bg-slate-50">Office</th>
+                            <th className="px-5 py-2 lg:px-6 lg:py-2.5 w-14 bg-slate-50">#</th>
+                            <th className="px-5 py-2 lg:px-6 lg:py-2.5 w-[28%] bg-slate-50">Name</th>
+                            <th className="px-5 py-2 lg:px-6 lg:py-2.5 w-[18%] bg-slate-50">Position</th>
+                            <th className="px-5 py-2 lg:px-6 lg:py-2.5 w-[16%] bg-slate-50">Office</th>
                             {visibleSessions.map((session) => (
-                                <th key={session} className="px-4 py-4 lg:px-5 lg:py-5 w-[112px] text-center bg-slate-50">
+                                <th key={session} className="px-4 py-2 lg:px-5 lg:py-2.5 w-[112px] text-center bg-slate-50">
                                     {session} Time
                                 </th>
                             ))}
-                            <th className="px-4 py-4 lg:px-5 lg:py-5 w-[84px] text-center bg-slate-50">Actions</th>
+                            <th className="px-4 py-2 lg:px-5 lg:py-2.5 w-[84px] text-center bg-slate-50">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1381,9 +1381,9 @@ const AttendanceList: React.FC = () => {
                             <tr 
                                 key={row.participant.participant_id} 
                                 onClick={() => handleRowClick(row.participant)}
-                                className="hover:bg-slate-50 cursor-pointer transition-colors group"
+                                className="hover:bg-indigo-50 cursor-pointer transition-colors group"
                             >
-                                <td className="px-5 py-4 lg:px-6 lg:py-5 text-center">
+                                <td className="px-5 py-2 lg:px-6 lg:py-2.5 text-center">
                                     <input
                                         type="checkbox"
                                         checked={selectedManualIds.includes(row.participant.participant_id)}
@@ -1392,8 +1392,8 @@ const AttendanceList: React.FC = () => {
                                         className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                     />
                                 </td>
-                                <td className="px-5 py-4 lg:px-6 lg:py-5 text-slate-500 font-mono text-xs lg:text-sm">{index + 1}</td>
-                                <td className="px-5 py-4 lg:px-6 lg:py-5 font-medium text-slate-800 group-hover:text-indigo-600">
+                                <td className="px-5 py-2 lg:px-6 lg:py-2.5 text-slate-500 font-mono text-xs lg:text-sm">{index + 1}</td>
+                                <td className="px-5 py-2 lg:px-6 lg:py-2.5 font-medium text-slate-800 group-hover:text-indigo-600">
                                     <div className="flex items-start gap-1.5 whitespace-normal break-words leading-snug">
                                         <span>{row.participant.full_name}</span>
                                         {row.needs_accommodation && (
@@ -1405,12 +1405,12 @@ const AttendanceList: React.FC = () => {
                                         )}
                                     </div>
                                 </td>
-                                <td className="px-5 py-4 lg:px-6 lg:py-5 text-slate-600">
+                                <td className="px-5 py-2 lg:px-6 lg:py-2.5 text-slate-600">
                                     <div className="whitespace-normal break-words leading-snug">
                                         {row.participant.position}
                                     </div>
                                 </td>
-                                <td className="px-5 py-4 lg:px-6 lg:py-5 text-slate-600">
+                                <td className="px-5 py-2 lg:px-6 lg:py-2.5 text-slate-600">
                                     <div className="whitespace-normal break-words leading-snug">
                                         {row.participant.office}
                                     </div>
@@ -1422,7 +1422,7 @@ const AttendanceList: React.FC = () => {
                                         : 'inline-flex min-w-[78px] items-center justify-center whitespace-nowrap bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold';
 
                                     return (
-                                        <td key={session} className="px-4 py-4 lg:px-5 lg:py-5 text-center">
+                                        <td key={session} className="px-4 py-2 lg:px-5 lg:py-2.5 text-center">
                                             {sessionLog ? (
                                                 <span className={badgeClassName}>
                                                     {formatLogTime(sessionLog.time)}
@@ -1433,7 +1433,7 @@ const AttendanceList: React.FC = () => {
                                         </td>
                                     );
                                 })}
-                                <td className="px-4 py-4 lg:px-5 lg:py-5 text-center">
+                                <td className="px-4 py-2 lg:px-5 lg:py-2.5 text-center">
                                     <button
                                         onClick={(e) => openManualModal(e, row.participant)}
                                         className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
