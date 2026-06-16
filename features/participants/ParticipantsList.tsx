@@ -1047,7 +1047,7 @@ const AttendanceList: React.FC = () => {
           : 'sm:[grid-template-columns:repeat(3,minmax(0,1fr))]';
 
   return (
-    <div className="attendance-page h-auto min-h-0 flex flex-col gap-1.5 sm:gap-2 lg:h-full lg:gap-3">
+    <div className="attendance-page h-full min-h-0 flex flex-col gap-1.5 overflow-y-auto sm:gap-2 lg:h-full lg:gap-3 lg:overflow-visible">
       <div className="attendance-toolbar rounded-xl border border-slate-100 bg-slate-50 p-0">
         <div className="flex w-full flex-col gap-3 sm:gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3 xl:flex-nowrap xl:gap-4">
             <div className="relative w-full sm:mx-auto sm:max-w-[32rem] lg:mx-0 lg:max-w-[32rem] lg:flex-[1.25] xl:max-w-[36rem]" ref={dropdownRef}>
@@ -1115,9 +1115,12 @@ const AttendanceList: React.FC = () => {
                 )}
             </div>
 
+            {/* Mobile: days + search + actions share one row. Desktop: `lg:contents` dissolves
+                this wrapper so the day selector and search group are direct toolbar flex children. */}
+            <div className="flex w-full items-stretch gap-2 lg:contents">
             {eventDays.length > 1 && (
-                <div className="w-full rounded-lg border border-slate-200 bg-white p-0.5 sm:mx-auto sm:max-w-[32rem] lg:mx-0 lg:max-w-[26rem] lg:flex-1 xl:max-w-[30rem]">
-                    <div className="grid grid-cols-5 gap-0.5 sm:grid-cols-5 md:grid-cols-5 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="max-w-[42%] shrink-0 rounded-lg border border-slate-200 bg-white p-0.5 lg:max-w-[26rem] lg:flex-1 xl:max-w-[30rem]">
+                    <div className="flex gap-0.5 overflow-x-auto no-scrollbar lg:grid lg:grid-cols-3 xl:grid-cols-4">
                         {eventDays.map((day, idx) => {
                             const dStr = format(day, 'yyyy-MM-dd');
                             const isSelected = selectedDate === dStr;
@@ -1125,7 +1128,7 @@ const AttendanceList: React.FC = () => {
                                 <button
                                     key={dStr}
                                     onClick={() => setSelectedDate(dStr)}
-                                    className={`flex w-full min-w-0 flex-col items-center justify-center rounded-md px-0.5 py-1 text-[8px] font-bold leading-tight whitespace-nowrap transition-all sm:px-0.5 sm:py-1 sm:text-[8px] md:px-1 md:py-1 md:text-[9px] lg:px-3 lg:py-1.5 lg:text-xs
+                                    className={`flex w-[2.75rem] shrink-0 flex-col items-center justify-center rounded-md px-0.5 py-1 text-[8px] font-bold leading-tight whitespace-nowrap transition-all md:w-[3.1rem] md:text-[9px] lg:w-full lg:px-3 lg:py-1.5 lg:text-xs
                                         ${isSelected 
                                             ? 'bg-indigo-600 text-white shadow-sm' 
                                             : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
@@ -1142,7 +1145,7 @@ const AttendanceList: React.FC = () => {
                 </div>
             )}
 
-            <div className="mx-auto grid w-full max-w-[32rem] grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 sm:max-w-[32rem] md:max-w-[40rem] lg:ml-auto lg:mx-0 lg:w-[24rem] lg:max-w-none xl:w-[28rem]">
+            <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 lg:ml-auto lg:w-[24rem] lg:max-w-none lg:flex-none xl:w-[28rem]">
                 <div className="relative min-w-0 w-full">
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                         <Search size={18} />
@@ -1189,6 +1192,7 @@ const AttendanceList: React.FC = () => {
                         <span className="hidden lg:inline text-sm">Add</span>
                     </button>
                 </div>
+            </div>
             </div>
         </div>
       </div>
