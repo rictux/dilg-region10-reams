@@ -29,6 +29,18 @@ export interface User {
   auth_user_id?: string | null;
 }
 
+// A single giveaway/freebie an event offers (e.g. T-shirt with sizes, or a yes/no cap).
+// `key` is the stable machine id used to store answers; `label` is the display text.
+export type GiveawayType = 'single-select' | 'boolean';
+
+export interface GiveawayItem {
+  key: string;
+  label: string;
+  type: GiveawayType;
+  required?: boolean;
+  options?: string[]; // used when type === 'single-select'
+}
+
 export interface Event {
   event_id: number;
   event_name: string;
@@ -45,6 +57,7 @@ export interface Event {
   days_accommodation?: number | null;
   dates_with_accom?: string[] | null;
   food_inclusion?: string[] | null;
+  giveaways?: GiveawayItem[] | null;
   deleted_at?: string | null;
   deleted_by?: number | null;
   delete_reason?: string | null;
@@ -85,6 +98,7 @@ export interface EventParticipant {
   ca_serial_no?: number | null;
   ca_issued_at?: string | null;
   need_ca?: boolean | null;
+  giveaway_selections?: Record<string, string | boolean> | null;
 }
 
 export interface AttendanceLog {

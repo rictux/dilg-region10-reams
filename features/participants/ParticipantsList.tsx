@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Participant, Event } from '../../types/database';
-import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Bed, ChevronDown, Check, UserPlus, Building, Landmark, Download } from 'lucide-react';
+import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Bed, ChevronDown, Check, UserPlus, Building, Landmark, Download, Gift } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { format, parseISO, eachDayOfInterval, isSameMonth, isSameYear } from 'date-fns';
 import { toPng } from 'html-to-image';
@@ -86,7 +86,8 @@ const AttendanceList: React.FC = () => {
       participant_id: null as number | null,
       accept_photo_video: true,
       store_to_db: true,
-      need_ca: false
+      need_ca: false,
+      giveaway_selections: {} as Record<string, string | boolean>
   });
   const [suggestions, setSuggestions] = useState<Participant[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -813,6 +814,22 @@ const AttendanceList: React.FC = () => {
           return;
       }
 
+      // Giveaways: validate required selections and keep only answers for items this event defines.
+      const eventGiveaways = selectedEvent.giveaways || [];
+      const normalizedGiveawaySelections: Record<string, string | boolean> = {};
+      for (const item of eventGiveaways) {
+          const value = newParticipant.giveaway_selections[item.key];
+          if (item.type === 'single-select') {
+              if (item.required && !value) {
+                  toast.error(`Please select ${item.label}.`);
+                  return;
+              }
+              if (value) normalizedGiveawaySelections[item.key] = value;
+          } else if (item.type === 'boolean') {
+              normalizedGiveawaySelections[item.key] = !!value;
+          }
+      }
+
       setIsAddingParticipant(true);
       
       try {
@@ -923,7 +940,8 @@ const AttendanceList: React.FC = () => {
                 date_accommodation: selectedEvent.has_accommodation && newParticipant.needs_accommodation ? normalizedAccommodationDates : null,
                 accept_photo_video: newParticipant.accept_photo_video,
                 store_to_db: newParticipant.store_to_db,
-                need_ca: newParticipant.need_ca
+                need_ca: newParticipant.need_ca,
+                giveaway_selections: normalizedGiveawaySelections
             });
 
           if (regError && regError.code !== '23505') throw regError;
@@ -994,7 +1012,8 @@ const AttendanceList: React.FC = () => {
               participant_id: null,
               accept_photo_video: true,
               store_to_db: true,
-              need_ca: false
+              need_ca: false,
+              giveaway_selections: {}
           });
           setSuggestions([]);
           setLogAttendanceOnRegister(false);
@@ -1891,6 +1910,45 @@ const AttendanceList: React.FC = () => {
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* Giveaways (Conditional, separate from CA) */}
+                    {(selectedEvent?.giveaways && selectedEvent.giveaways.length > 0) && (
+                        <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 space-y-3">
+                            <h4 className="text-xs font-bold text-purple-800 uppercase tracking-wider flex items-center gap-2">
+                                <Gift size={14}/> Giveaways
+                            </h4>
+                            {selectedEvent.giveaways.map((item) => (
+                                <div key={item.key}>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                        {item.label}
+                                        {item.required && item.type === 'single-select' && <span className="text-red-500"> *</span>}
+                                    </label>
+                                    {item.type === 'single-select' ? (
+                                        <select
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                            value={(newParticipant.giveaway_selections[item.key] as string) || ''}
+                                            onChange={(e) => setNewParticipant({ ...newParticipant, giveaway_selections: { ...newParticipant.giveaway_selections, [item.key]: e.target.value } })}
+                                        >
+                                            <option value="">-- Select --</option>
+                                            {(item.options || []).map((opt) => (
+                                                <option key={opt} value={opt}>{opt}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                                                checked={!!newParticipant.giveaway_selections[item.key]}
+                                                onChange={(e) => setNewParticipant({ ...newParticipant, giveaway_selections: { ...newParticipant.giveaway_selections, [item.key]: e.target.checked } })}
+                                            />
+                                            <span className="text-sm text-slate-700">Yes</span>
+                                        </label>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     )}
 

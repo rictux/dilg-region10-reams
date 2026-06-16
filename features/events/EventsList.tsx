@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Event, Participant, Office } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup } from 'lucide-react';
+import { Event, Participant, Office, GiveawayItem } from '../../types/database';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import ExcelJS from 'exceljs';
@@ -40,6 +40,7 @@ type ParticipantFormData = {
   accept_photo_video: boolean;
   store_to_db: boolean;
   need_ca: boolean;
+  giveaway_selections: Record<string, string | boolean>;
 };
 
 type ParticipantModalRecord = {
@@ -54,6 +55,7 @@ type ParticipantModalRecord = {
   store_to_db: boolean;
   need_ca: boolean;
   date_accommodation: string[] | null;
+  giveaway_selections: Record<string, string | boolean> | null;
   participants: Participant | null;
 };
 
@@ -78,7 +80,8 @@ const createEmptyParticipantForm = (): ParticipantFormData => ({
   participant_id: null,
   accept_photo_video: true,
   store_to_db: true,
-  need_ca: false
+  need_ca: false,
+  giveaway_selections: {}
 });
 
 const getDateRangeOptions = (start?: string | null, end?: string | null) => {
@@ -187,7 +190,8 @@ const EventsList: React.FC = () => {
       registration_open: true,
       session: 'All_Day' as const,
       days_accommodation: 0,
-      dates_with_accom: [] as string[]
+      dates_with_accom: [] as string[],
+      giveaways: [] as GiveawayItem[]
   };
   const [formData, setFormData] = useState<Partial<Event>>(initialFormState);
   const [foodInclusionByDate, setFoodInclusionByDate] = useState<EventFoodInclusionMap>({});
@@ -373,6 +377,7 @@ const EventsList: React.FC = () => {
             store_to_db,
             need_ca,
             date_accommodation,
+            giveaway_selections,
             participants (
                 participant_id,
                 full_name,
@@ -599,7 +604,8 @@ const EventsList: React.FC = () => {
           registration_open: event.registration_open,
           session: event.session || 'All_Day',
           days_accommodation: event.days_accommodation || 0,
-          dates_with_accom: event.dates_with_accom || []
+          dates_with_accom: event.dates_with_accom || [],
+          giveaways: event.giveaways || []
       });
       setHasEventCode(!!event.event_serial?.trim());
       setFoodInclusionByDate(
@@ -613,6 +619,50 @@ const EventsList: React.FC = () => {
       setLoadingVenueSuggestions(false);
       setShowEventModal(true);
   };
+
+  // --- Giveaways / freebies config helpers ---
+  const addGiveaway = () => {
+      setFormData((prev) => ({
+          ...prev,
+          giveaways: [
+              ...((prev.giveaways as GiveawayItem[]) || []),
+              {
+                  key: `g_${Math.random().toString(36).slice(2, 9)}`,
+                  label: '',
+                  type: 'single-select',
+                  required: true,
+                  options: ['S', 'M', 'L', 'XL']
+              }
+          ]
+      }));
+  };
+
+  const updateGiveaway = (index: number, patch: Partial<GiveawayItem>) => {
+      setFormData((prev) => {
+          const list = [...(((prev.giveaways as GiveawayItem[]) || []))];
+          list[index] = { ...list[index], ...patch };
+          return { ...prev, giveaways: list };
+      });
+  };
+
+  const removeGiveaway = (index: number) => {
+      setFormData((prev) => ({
+          ...prev,
+          giveaways: (((prev.giveaways as GiveawayItem[]) || [])).filter((_, i) => i !== index)
+      }));
+  };
+
+  // Drop incomplete items and clean up options before saving.
+  const normalizeGiveaways = (items: GiveawayItem[] = []): GiveawayItem[] =>
+      items
+          .map((g) => ({
+              ...g,
+              label: (g.label || '').trim(),
+              options: g.type === 'single-select'
+                  ? (g.options || []).map((o) => o.trim()).filter(Boolean)
+                  : []
+          }))
+          .filter((g) => g.label && (g.type === 'boolean' || (g.options && g.options.length > 0)));
 
   const handleSaveEvent = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -634,7 +684,8 @@ const EventsList: React.FC = () => {
           session: formData.session || 'All_Day',
           dates_with_accom: formData.has_accommodation ? normalizedAccommodationDates : null,
           days_accommodation: formData.has_accommodation ? normalizedAccommodationDates.length : 0,
-          food_inclusion: normalizedFoodInclusion
+          food_inclusion: normalizedFoodInclusion,
+          giveaways: normalizeGiveaways(formData.giveaways as GiveawayItem[])
       };
       if (user?.role !== 'Admin' && user?.office_id) {
           payload.organize_by = user.office_id;
@@ -1026,6 +1077,22 @@ const EventsList: React.FC = () => {
           return null;
       }
 
+      // Giveaways: validate required selections and keep only answers for items this event defines.
+      const eventGiveaways = selectedEvent.giveaways || [];
+      const normalizedGiveawaySelections: Record<string, string | boolean> = {};
+      for (const item of eventGiveaways) {
+          const value = newParticipant.giveaway_selections[item.key];
+          if (item.type === 'single-select') {
+              if (item.required && !value) {
+                  toast.error(`Please select ${item.label}.`);
+                  return null;
+              }
+              if (value) normalizedGiveawaySelections[item.key] = value;
+          } else if (item.type === 'boolean') {
+              normalizedGiveawaySelections[item.key] = !!value;
+          }
+      }
+
       return {
           participantPayload: {
               f_name: toProperCase(newParticipant.f_name.trim()),
@@ -1049,7 +1116,8 @@ const EventsList: React.FC = () => {
               accept_photo_video: newParticipant.accept_photo_video,
               store_to_db: newParticipant.store_to_db,
               need_ca: newParticipant.need_ca,
-              date_accommodation: selectedEvent.has_accommodation && newParticipant.needs_accommodation ? normalizedAccommodationDates : null
+              date_accommodation: selectedEvent.has_accommodation && newParticipant.needs_accommodation ? normalizedAccommodationDates : null,
+              giveaway_selections: normalizedGiveawaySelections
           }
       };
   };
@@ -1110,7 +1178,8 @@ const EventsList: React.FC = () => {
           participant_id: participant.participant_id,
           accept_photo_video: !!record.accept_photo_video,
           store_to_db: !!record.store_to_db,
-          need_ca: !!record.need_ca
+          need_ca: !!record.need_ca,
+          giveaway_selections: record.giveaway_selections || {}
       });
       setParticipantModalView('edit');
   };
@@ -1420,6 +1489,26 @@ const EventsList: React.FC = () => {
       });
 
       const includeAccommodation = !!selectedEvent.has_accommodation;
+      const giveaways = selectedEvent.giveaways || [];
+
+      const formatGiveawayValue = (item: GiveawayItem, selections: Record<string, string | boolean> | null) => {
+          const value = selections?.[item.key];
+          if (item.type === 'boolean') return value ? 'Yes' : 'No';
+          return (value as string) || '';
+      };
+
+      // Excel table column names must be unique — dedupe giveaway labels against fixed headers.
+      const usedColumnNames = new Set(['Participant Name', 'Gender', 'Position', 'Office', 'Age Group', 'Mobile Number', 'Email', 'Role', 'Accommodation', 'Photo/Video', 'Data Storage']);
+      const giveawayHeaders = giveaways.map((g) => {
+          const base = g.label || 'Giveaway';
+          let name = base;
+          let suffix = 2;
+          while (usedColumnNames.has(name)) {
+              name = `${base} (${suffix++})`;
+          }
+          usedColumnNames.add(name);
+          return name;
+      });
 
       const rows = sorted.map((record) => [
           record.participants?.full_name || '',
@@ -1431,6 +1520,7 @@ const EventsList: React.FC = () => {
           record.participants?.email || '',
           record.role || 'Delegate',
           ...(includeAccommodation ? [record.needs_accommodation ? 'Yes' : 'No'] : []),
+          ...giveaways.map((g) => formatGiveawayValue(g, record.giveaway_selections)),
           record.accept_photo_video ? 'Yes' : 'No',
           record.store_to_db ? 'Yes' : 'No'
       ]);
@@ -1457,13 +1547,14 @@ const EventsList: React.FC = () => {
               { name: 'Email', filterButton: true },
               { name: 'Role', filterButton: true },
               ...(includeAccommodation ? [{ name: 'Accommodation', filterButton: true }] : []),
+              ...giveawayHeaders.map((name) => ({ name, filterButton: true })),
               { name: 'Photo/Video', filterButton: true },
               { name: 'Data Storage', filterButton: true }
           ],
           rows
       });
 
-      [32, 10, 28, 34, 12, 16, 30, 14, ...(includeAccommodation ? [14] : []), 14, 14].forEach((w, idx) => {
+      [32, 10, 28, 34, 12, 16, 30, 14, ...(includeAccommodation ? [14] : []), ...giveaways.map(() => 16), 14, 14].forEach((w, idx) => {
           worksheet.getColumn(idx + 1).width = w;
       });
 
@@ -3013,6 +3104,45 @@ const EventsList: React.FC = () => {
                                     </div>
                                 )}
 
+                                {/* Giveaways (Conditional, separate from CA) */}
+                                {(selectedEvent?.giveaways && selectedEvent.giveaways.length > 0) && (
+                                    <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 space-y-3">
+                                        <h4 className="text-xs font-bold text-purple-800 uppercase tracking-wider flex items-center gap-2">
+                                            <Gift size={14}/> Giveaways
+                                        </h4>
+                                        {selectedEvent.giveaways.map((item) => (
+                                            <div key={item.key}>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                                    {item.label}
+                                                    {item.required && item.type === 'single-select' && <span className="text-red-500"> *</span>}
+                                                </label>
+                                                {item.type === 'single-select' ? (
+                                                    <select
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                                        value={(newParticipant.giveaway_selections[item.key] as string) || ''}
+                                                        onChange={(e) => setNewParticipant({ ...newParticipant, giveaway_selections: { ...newParticipant.giveaway_selections, [item.key]: e.target.value } })}
+                                                    >
+                                                        <option value="">-- Select --</option>
+                                                        {(item.options || []).map((opt) => (
+                                                            <option key={opt} value={opt}>{opt}</option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                                                            checked={!!newParticipant.giveaway_selections[item.key]}
+                                                            onChange={(e) => setNewParticipant({ ...newParticipant, giveaway_selections: { ...newParticipant.giveaway_selections, [item.key]: e.target.checked } })}
+                                                        />
+                                                        <span className="text-sm text-slate-700">Yes</span>
+                                                    </label>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
                                 {/* Certificate of Appearance */}
                                 <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
                                     <label className="flex items-center gap-2 cursor-pointer">
@@ -3620,6 +3750,92 @@ const EventsList: React.FC = () => {
                         </div>
                     ) : (
                         <p className="text-xs text-slate-500">Select the event start and end dates first.</p>
+                    )}
+                </div>
+
+                {/* Giveaways / Freebies (optional) */}
+                <div className="space-y-3 rounded-xl border border-purple-100 bg-purple-50/60 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-start gap-2">
+                            <Gift size={16} className="mt-0.5 text-purple-700" />
+                            <div>
+                                <p className="text-sm font-semibold text-purple-900">Giveaways / Freebies</p>
+                                <p className="text-xs text-purple-700">Items participants can request at registration (e.g. T-shirt size). Leave empty if this event has none.</p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={addGiveaway}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-purple-700"
+                        >
+                            <UserPlus size={14} /> Add item
+                        </button>
+                    </div>
+
+                    {((formData.giveaways as GiveawayItem[]) || []).length === 0 ? (
+                        <p className="text-xs text-slate-500">No giveaways configured for this event.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {((formData.giveaways as GiveawayItem[]) || []).map((g, idx) => (
+                                <div key={g.key} className="space-y-3 rounded-xl border border-purple-100 bg-white/90 p-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-600 mb-1">Item label</label>
+                                            <input
+                                                type="text"
+                                                value={g.label}
+                                                onChange={(e) => updateGiveaway(idx, { label: e.target.value })}
+                                                placeholder="e.g. Event T-shirt"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-600 mb-1">Response type</label>
+                                            <select
+                                                value={g.type}
+                                                onChange={(e) => updateGiveaway(idx, { type: e.target.value as GiveawayItem['type'] })}
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                            >
+                                                <option value="single-select">Choose an option (e.g. size)</option>
+                                                <option value="boolean">Yes / No</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {g.type === 'single-select' && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-600 mb-1">Options (comma-separated)</label>
+                                            <input
+                                                type="text"
+                                                value={(g.options || []).join(',')}
+                                                onChange={(e) => updateGiveaway(idx, { options: e.target.value.split(',') })}
+                                                placeholder="XS, S, M, L, XL, 2XL"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                            />
+                                        </div>
+                                    )}
+
+                                    <div className="flex items-center justify-between">
+                                        <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={g.required || false}
+                                                onChange={(e) => updateGiveaway(idx, { required: e.target.checked })}
+                                                className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                                            />
+                                            Required at registration
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={() => removeGiveaway(idx)}
+                                            className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700"
+                                        >
+                                            <Trash2 size={14} /> Remove
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     )}
                 </div>
 
