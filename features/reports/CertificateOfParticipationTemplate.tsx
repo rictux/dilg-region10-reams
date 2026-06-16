@@ -10,12 +10,15 @@ export type CoPParticipantRecord = {
   log_dates: string[];
 };
 
+export type CoPTitle = 'Certificate of Participation' | 'Acknowledgement Receipt';
+
 type CoPTemplateProps = {
   event: Event;
   participantRecord: CoPParticipantRecord;
   signatory: CertificateSignatory;
   themeUrl: string | null;
   paperSize: CoPPaperSize;
+  title?: string;
 };
 
 const MM_TO_PX = 3.7795275591;
@@ -93,6 +96,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   signatory,
   themeUrl,
   paperSize,
+  title = 'Certificate of Participation',
 }) => {
   const dims     = PAPER_DIMS[paperSize];
   const scale    = paperSize === 'A4' ? 1.414 : 1;
@@ -216,8 +220,9 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
             lineHeight: 1.05,
             textAlign: 'center',
             whiteSpace: 'nowrap',
+            textTransform: 'uppercase',
           }}>
-            CERTIFICATE OF PARTICIPATION
+            {title}
           </h1>
 
           <p style={{
