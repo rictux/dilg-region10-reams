@@ -1047,12 +1047,12 @@ const AttendanceList: React.FC = () => {
           : 'sm:[grid-template-columns:repeat(3,minmax(0,1fr))]';
 
   return (
-    <div className="attendance-page h-full min-h-0 flex flex-col gap-1.5 overflow-y-auto sm:gap-2 lg:h-full lg:gap-3 lg:overflow-visible">
-      <div className="attendance-toolbar rounded-xl border border-slate-100 bg-slate-50 p-0">
+    <div className="attendance-page -mt-4 -mb-6 h-[calc(100%+2.5rem)] min-h-0 flex flex-col gap-2 overflow-y-auto md:-mt-6 md:-mb-8 md:h-[calc(100%+3.5rem)] lg:overflow-visible">
+      <div className="attendance-toolbar">
         <div className="flex w-full flex-col gap-3 sm:gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3 xl:flex-nowrap xl:gap-4">
             <div className="relative w-full sm:mx-auto sm:max-w-[32rem] lg:mx-0 lg:max-w-[32rem] lg:flex-[1.25] xl:max-w-[36rem]" ref={dropdownRef}>
                 <div 
-                    className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 shadow-sm transition-colors hover:border-indigo-400 sm:px-4 sm:py-2.5 lg:py-3"
+                    className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-1.5 shadow-sm transition-colors hover:border-indigo-400 sm:px-4 sm:py-2 lg:py-2"
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
                     <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -1119,8 +1119,8 @@ const AttendanceList: React.FC = () => {
                 this wrapper so the day selector and search group are direct toolbar flex children. */}
             <div className="flex w-full items-stretch gap-2 lg:contents">
             {eventDays.length > 1 && (
-                <div className="max-w-[42%] shrink-0 rounded-lg border border-slate-200 bg-white p-0.5 lg:max-w-[26rem] lg:flex-1 xl:max-w-[30rem]">
-                    <div className="flex gap-0.5 overflow-x-auto no-scrollbar lg:grid lg:grid-cols-3 xl:grid-cols-4">
+                <div className="max-w-[42%] shrink-0 rounded-lg border border-slate-200 bg-white p-0 lg:max-w-none">
+                    <div className="flex gap-0.5 overflow-x-auto no-scrollbar">
                         {eventDays.map((day, idx) => {
                             const dStr = format(day, 'yyyy-MM-dd');
                             const isSelected = selectedDate === dStr;
@@ -1128,7 +1128,7 @@ const AttendanceList: React.FC = () => {
                                 <button
                                     key={dStr}
                                     onClick={() => setSelectedDate(dStr)}
-                                    className={`flex w-[2.75rem] shrink-0 flex-col items-center justify-center rounded-md px-0.5 py-1 text-[8px] font-bold leading-tight whitespace-nowrap transition-all md:w-[3.1rem] md:text-[9px] lg:w-full lg:px-3 lg:py-1.5 lg:text-xs
+                                    className={`flex w-[2.75rem] shrink-0 flex-col items-center justify-center rounded-md px-0.5 py-1 text-[8px] font-bold leading-tight whitespace-nowrap transition-all md:w-[3.1rem] md:text-[9px] lg:w-auto lg:px-3 lg:py-1.5 lg:text-xs
                                         ${isSelected 
                                             ? 'bg-indigo-600 text-white shadow-sm' 
                                             : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
@@ -1145,7 +1145,7 @@ const AttendanceList: React.FC = () => {
                 </div>
             )}
 
-            <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 lg:ml-auto lg:w-[24rem] lg:max-w-none lg:flex-none xl:w-[28rem]">
+            <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 lg:w-[24rem] lg:max-w-none lg:flex-none xl:w-[28rem]">
                 <div className="relative min-w-0 w-full">
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                         <Search size={18} />
@@ -1155,7 +1155,7 @@ const AttendanceList: React.FC = () => {
                         placeholder="Search by name or office..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full min-w-0 rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-12 text-xs font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 sm:py-2.5 sm:text-sm lg:py-3"
+                        className="w-full min-w-0 rounded-lg border border-slate-300 bg-white py-1.5 pl-10 pr-12 text-xs font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 sm:py-2 sm:text-sm lg:py-2"
                     />
                     {searchQuery && (
                         <button
@@ -1175,7 +1175,7 @@ const AttendanceList: React.FC = () => {
                         type="button"
                         aria-label="Export attendance"
                         title="Export attendance"
-                        className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:h-11 sm:w-11 lg:h-11 lg:w-auto lg:gap-2 lg:px-4 xl:px-5"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:h-10 sm:w-10 lg:h-10 lg:w-auto lg:gap-2 lg:px-4 xl:px-5"
                     >
                         <Download size={16} />
                         <span className="hidden lg:inline text-sm">Export</span>
@@ -1186,7 +1186,7 @@ const AttendanceList: React.FC = () => {
                         type="button"
                         aria-label="Add participant"
                         title="Add participant"
-                        className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:h-11 sm:w-11 lg:h-11 lg:w-auto lg:gap-2 lg:px-4 xl:px-5"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:h-10 sm:w-10 lg:h-10 lg:w-auto lg:gap-2 lg:px-4 xl:px-5"
                     >
                         <UserPlus size={16} />
                         <span className="hidden lg:inline text-sm">Add</span>
@@ -1198,13 +1198,13 @@ const AttendanceList: React.FC = () => {
       </div>
 
       {/* Stats Cards as Filters */}
-      <div className="attendance-stats w-full">
+      <div className="attendance-stats w-full -mt-1.5">
           <div
             className={`grid w-full gap-1 sm:gap-3 lg:gap-4 ${statsGridClassName}`}
           >
           <button 
             onClick={() => setFilter('Show All')}
-            className={`attendance-stat-card min-w-0 min-h-[52px] sm:min-h-[72px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                 ${filter === 'Show All' ? 'ring-2 ring-slate-400 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-slate-300'}
                 bg-white
             `}
@@ -1220,7 +1220,7 @@ const AttendanceList: React.FC = () => {
 
           <button 
             onClick={() => setFilter('Present')}
-            className={`attendance-stat-card min-w-0 min-h-[52px] sm:min-h-[72px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                 ${filter === 'Present' ? 'ring-2 ring-green-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-green-200'}
                 bg-white
             `}
@@ -1236,7 +1236,7 @@ const AttendanceList: React.FC = () => {
 
           <button 
             onClick={() => setFilter('No Logs')}
-            className={`attendance-stat-card min-w-0 min-h-[52px] sm:min-h-[72px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+            className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                 ${filter === 'No Logs' ? 'ring-2 ring-red-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-red-200'}
                 bg-white
             `}
@@ -1256,7 +1256,7 @@ const AttendanceList: React.FC = () => {
           {hasMultipleSessions && (
             <button 
               onClick={() => setFilter('No PM')}
-              className={`attendance-stat-card min-w-0 min-h-[52px] sm:min-h-[72px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+              className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                   ${filter === 'No PM' ? 'ring-2 ring-amber-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-amber-200'}
                   bg-white
               `}
@@ -1274,7 +1274,7 @@ const AttendanceList: React.FC = () => {
           {hasMultipleSessions && (
             <button 
               onClick={() => setFilter('Complete Logs')}
-              className={`attendance-stat-card min-w-0 min-h-[52px] sm:min-h-[72px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+              className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                   ${filter === 'Complete Logs' ? 'ring-2 ring-indigo-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-indigo-200'}
                   bg-white
               `}
@@ -1292,7 +1292,7 @@ const AttendanceList: React.FC = () => {
           {hasAccommodationFilter && (
             <button
               onClick={() => setFilter('Accommodation')}
-              className={`attendance-stat-card min-w-0 min-h-[52px] sm:min-h-[72px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
+              className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
                   ${filter === 'Accommodation' ? 'ring-2 ring-sky-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-sky-200'}
                   bg-white
               `}
@@ -1318,7 +1318,7 @@ const AttendanceList: React.FC = () => {
         </div>
       ) : (
         <div className="attendance-table bg-white rounded-xl shadow-sm border border-slate-100 overflow-visible lg:overflow-hidden flex-none lg:flex-1 min-h-0 flex flex-col">
-            <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 lg:px-6">
+            <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4 lg:px-6">
                 <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
                     <input
                         type="checkbox"
@@ -1355,7 +1355,7 @@ const AttendanceList: React.FC = () => {
                 <table className="datatable w-full table-fixed text-[13px] lg:text-sm text-left">
                     <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                         <tr>
-                            <th className="px-5 py-2 lg:px-6 lg:py-2.5 w-14 bg-slate-50 text-center">
+                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-14 bg-slate-50 text-center">
                                 <input
                                     type="checkbox"
                                     checked={allFilteredSelected}
@@ -1364,16 +1364,16 @@ const AttendanceList: React.FC = () => {
                                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
                                 />
                             </th>
-                            <th className="px-5 py-2 lg:px-6 lg:py-2.5 w-14 bg-slate-50">#</th>
-                            <th className="px-5 py-2 lg:px-6 lg:py-2.5 w-[28%] bg-slate-50">Name</th>
-                            <th className="px-5 py-2 lg:px-6 lg:py-2.5 w-[18%] bg-slate-50">Position</th>
-                            <th className="px-5 py-2 lg:px-6 lg:py-2.5 w-[16%] bg-slate-50">Office</th>
+                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-14 bg-slate-50">#</th>
+                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[28%] bg-slate-50">Name</th>
+                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[18%] bg-slate-50">Position</th>
+                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[16%] bg-slate-50">Office</th>
                             {visibleSessions.map((session) => (
-                                <th key={session} className="px-4 py-2 lg:px-5 lg:py-2.5 w-[112px] text-center bg-slate-50">
+                                <th key={session} className="px-4 py-1.5 lg:px-5 lg:py-1.5 w-[112px] text-center bg-slate-50">
                                     {session} Time
                                 </th>
                             ))}
-                            <th className="px-4 py-2 lg:px-5 lg:py-2.5 w-[84px] text-center bg-slate-50">Actions</th>
+                            <th className="px-4 py-1.5 lg:px-5 lg:py-1.5 w-[84px] text-center bg-slate-50">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1383,7 +1383,7 @@ const AttendanceList: React.FC = () => {
                                 onClick={() => handleRowClick(row.participant)}
                                 className="hover:bg-indigo-50 cursor-pointer transition-colors group"
                             >
-                                <td className="px-5 py-2 lg:px-6 lg:py-2.5 text-center">
+                                <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 text-center">
                                     <input
                                         type="checkbox"
                                         checked={selectedManualIds.includes(row.participant.participant_id)}
@@ -1392,8 +1392,8 @@ const AttendanceList: React.FC = () => {
                                         className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                     />
                                 </td>
-                                <td className="px-5 py-2 lg:px-6 lg:py-2.5 text-slate-500 font-mono text-xs lg:text-sm">{index + 1}</td>
-                                <td className="px-5 py-2 lg:px-6 lg:py-2.5 font-medium text-slate-800 group-hover:text-indigo-600">
+                                <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 text-slate-500 font-mono text-xs lg:text-sm">{index + 1}</td>
+                                <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 font-medium text-slate-800 group-hover:text-indigo-600">
                                     <div className="flex items-start gap-1.5 whitespace-normal break-words leading-snug">
                                         <span>{row.participant.full_name}</span>
                                         {row.needs_accommodation && (
@@ -1405,12 +1405,12 @@ const AttendanceList: React.FC = () => {
                                         )}
                                     </div>
                                 </td>
-                                <td className="px-5 py-2 lg:px-6 lg:py-2.5 text-slate-600">
+                                <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 text-slate-600">
                                     <div className="whitespace-normal break-words leading-snug">
                                         {row.participant.position}
                                     </div>
                                 </td>
-                                <td className="px-5 py-2 lg:px-6 lg:py-2.5 text-slate-600">
+                                <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 text-slate-600">
                                     <div className="whitespace-normal break-words leading-snug">
                                         {row.participant.office}
                                     </div>
@@ -1422,7 +1422,7 @@ const AttendanceList: React.FC = () => {
                                         : 'inline-flex min-w-[78px] items-center justify-center whitespace-nowrap bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold';
 
                                     return (
-                                        <td key={session} className="px-4 py-2 lg:px-5 lg:py-2.5 text-center">
+                                        <td key={session} className="px-4 py-1.5 lg:px-5 lg:py-1.5 text-center">
                                             {sessionLog ? (
                                                 <span className={badgeClassName}>
                                                     {formatLogTime(sessionLog.time)}
@@ -1433,7 +1433,7 @@ const AttendanceList: React.FC = () => {
                                         </td>
                                     );
                                 })}
-                                <td className="px-4 py-2 lg:px-5 lg:py-2.5 text-center">
+                                <td className="px-4 py-1.5 lg:px-5 lg:py-1.5 text-center">
                                     <button
                                         onClick={(e) => openManualModal(e, row.participant)}
                                         className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
