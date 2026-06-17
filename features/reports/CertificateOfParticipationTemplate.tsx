@@ -19,11 +19,18 @@ type CoPTemplateProps = {
   themeUrl: string | null;
   paperSize: CoPPaperSize;
   title?: string;
+  /** When set (> 0), appends "with a credit of <word> (<n>) training hours." to the body. */
+  creditHours?: number | null;
 };
 
 const MM_TO_PX = 3.7795275591;
 
+// Body copy ("for actively participating …") → Poppins
 const CERT_FONT = 'Poppins, sans-serif';
+// Header, participant name, signatory name & position → Helvetica
+const HELVETICA_FONT = 'Helvetica, "Helvetica Neue", Arial, sans-serif';
+// Title ("Certificate of Participation") → Snell Roundhand (Pinyon Script web fallback)
+const SCRIPT_FONT = '"Snell Roundhand", "Pinyon Script", "Apple Chancery", cursive';
 
 export const PAPER_DIMS: Record<CoPPaperSize, {
   widthMm: number;
@@ -37,6 +44,28 @@ export const PAPER_DIMS: Record<CoPPaperSize, {
 
 export const getCoP_WidthPx  = (size: CoPPaperSize) => PAPER_DIMS[size].widthMm  * MM_TO_PX;
 export const getCoP_HeightPx = (size: CoPPaperSize) => PAPER_DIMS[size].heightMm * MM_TO_PX;
+
+const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+  'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+
+// Spell out a whole number 0–999 (e.g. 4 → "four", 24 → "twenty-four"). Falls back to the digits.
+export const numberToWords = (n: number): string => {
+  if (!Number.isFinite(n) || n < 0) return String(n);
+  const num = Math.floor(n);
+  if (num < 20) return ONES[num];
+  if (num < 100) {
+    const t = TENS[Math.floor(num / 10)];
+    const o = num % 10;
+    return o ? `${t}-${ONES[o]}` : t;
+  }
+  if (num < 1000) {
+    const h = `${ONES[Math.floor(num / 100)]} hundred`;
+    const rest = num % 100;
+    return rest ? `${h} ${numberToWords(rest)}` : h;
+  }
+  return String(num);
+};
 
 const getOrdinalSuffix = (n: number) => {
   const v = n % 100;
@@ -97,6 +126,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   themeUrl,
   paperSize,
   title = 'Certificate of Participation',
+  creditHours = null,
 }) => {
   const dims     = PAPER_DIMS[paperSize];
   const scale    = paperSize === 'A4' ? 1.414 : 1;
@@ -117,10 +147,14 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   const eventName       = event.event_name || '';
   const venue           = event.venue      || '';
   const venuePrep       = /^(via|at|in)\s/i.test(venue.trim()) ? venue.trim() : `at ${venue.trim()}`;
+  const hasCredit       = typeof creditHours === 'number' && creditHours > 0;
+  const creditPhrase    = hasCredit
+    ? `, with a credit of ${numberToWords(creditHours!)} (${creditHours}) training hour${creditHours === 1 ? '' : 's'}`
+    : '';
 
   const logoH    = s(44);
   const subSz    = s(11.5);
-  const titleSz  = s(32);
+  const titleSz  = s(48);
   const presTo   = s(15.6);
   const bodySz   = s(15);
   const sigSz    = s(17.6);
@@ -181,8 +215,8 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
         }}
       >
 
-        {/* ── 1. Header: logos + org text ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: s(2) }}>
+        {/* ── 1. Header: logos + org text (Helvetica) ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: s(2), fontFamily: HELVETICA_FONT }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: s(10), marginBottom: s(2) }}>
             <img
               src="/assets/dilg_logo.png"
@@ -213,14 +247,14 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
         {/* ── 2. Title + "is presented to" + NAME + body ── */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', gap: 0 }}>
           <h1 style={{
+            fontFamily: SCRIPT_FONT,
             fontSize: titleSz,
-            fontWeight: 'bold',
-            letterSpacing: '0.02em',
+            fontWeight: 'normal',
+            letterSpacing: '0.01em',
             margin: `0 0 ${s(8)}px`,
-            lineHeight: 1.05,
+            lineHeight: 1.1,
             textAlign: 'center',
             whiteSpace: 'nowrap',
-            textTransform: 'uppercase',
           }}>
             {title}
           </h1>
@@ -242,7 +276,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
             marginBottom: s(3),
             lineHeight: 1.2,
             textAlign: 'center',
-            fontFamily: CERT_FONT,
+            fontFamily: HELVETICA_FONT,
             whiteSpace: 'nowrap',
             textTransform: 'uppercase',
             paddingLeft: s(4),
@@ -259,18 +293,18 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
             marginBottom: s(8),
           }} />
 
-          <p style={{ fontSize: bodySz, margin: `0 0 ${s(4)}px`, lineHeight: 1.5, textAlign: 'center', width: '88%' }}>
+          <p style={{ fontSize: bodySz, margin: `0 0 ${s(4)}px`, lineHeight: 1.5, textAlign: 'center', width: '88%', fontFamily: CERT_FONT }}>
             for having actively participated during the conduct of the{' '}
             <strong>&ldquo;{eventName}&rdquo;</strong>{' '}
-            held on {dateString}, {venuePrep}.
+            held on {dateString}, {venuePrep}{creditPhrase}.
           </p>
-          <p style={{ fontSize: bodySz, margin: 0, letterSpacing: '0.01em', textAlign: 'center' }}>
+          <p style={{ fontSize: bodySz, margin: 0, letterSpacing: '0.01em', textAlign: 'center', fontFamily: CERT_FONT }}>
             {givenDateString}
           </p>
         </div>
 
-        {/* ── 4. Signatory ── */}
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
+        {/* ── 4. Signatory (Helvetica) ── */}
+        <div style={{ display: 'flex', justifyContent: 'center', fontFamily: HELVETICA_FONT }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             {signatory?.esig_link ? (
               <img
