@@ -79,7 +79,11 @@ CREATE TABLE IF NOT EXISTS events (
 ALTER TABLE events
     ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE,
     ADD COLUMN IF NOT EXISTS deleted_by BIGINT REFERENCES users(user_id) ON DELETE SET NULL,
-    ADD COLUMN IF NOT EXISTS delete_reason TEXT;
+    ADD COLUMN IF NOT EXISTS delete_reason TEXT,
+    -- Giveaways/freebies offered at registration (e.g. T-shirt sizes).
+    ADD COLUMN IF NOT EXISTS giveaways JSONB,
+    -- When FALSE, giveaway selection is closed for new registrants (sizes etc. become read-only).
+    ADD COLUMN IF NOT EXISTS giveaways_open BOOLEAN DEFAULT TRUE;
 
 CREATE INDEX IF NOT EXISTS events_active_idx
     ON events(start_date DESC)

@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Participant, Event } from '../../types/database';
+import { Participant, Event, GiveawayItem } from '../../types/database';
 import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Bed, ChevronDown, Check, UserPlus, Building, Landmark, Download, Gift } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { format, parseISO, eachDayOfInterval, isSameMonth, isSameYear } from 'date-fns';
@@ -14,9 +14,64 @@ interface AttendanceRow {
     participant: Participant;
     role?: string;
     needs_accommodation?: boolean;
+    giveaway_selections?: Record<string, string | boolean> | null;
     amLog?: { time: string, status: string };
     pmLog?: { time: string, status: string };
 }
+
+// Distinct color per size/option value so different sizes are visually separable.
+// Picked deterministically by hashing the value, so the same size always maps to
+// the same color across rows.
+const GIVEAWAY_SIZE_COLORS = [
+    'bg-blue-100 text-blue-700',
+    'bg-amber-100 text-amber-700',
+    'bg-teal-100 text-teal-700',
+    'bg-violet-100 text-violet-700',
+    'bg-orange-100 text-orange-700',
+    'bg-cyan-100 text-cyan-700',
+    'bg-rose-100 text-rose-700',
+    'bg-lime-100 text-lime-700',
+];
+const giveawaySizeColor = (value: string) => {
+    let h = 0;
+    for (let i = 0; i < value.length; i++) h = (h * 31 + value.charCodeAt(i)) >>> 0;
+    return GIVEAWAY_SIZE_COLORS[h % GIVEAWAY_SIZE_COLORS.length];
+};
+
+type GiveawayChip = { key: string; text: string; className: string };
+
+// Build per-value colored chips + a full tooltip describing a participant's giveaway
+// choices made at registration. Yes → green, No → grey, and each size/option gets its
+// own color. Returns null when the event offers no giveaways.
+const summarizeGiveaways = (
+    giveaways: GiveawayItem[] | null | undefined,
+    selections: Record<string, string | boolean> | null | undefined,
+): { chips: GiveawayChip[]; detail: string } | null => {
+    if (!giveaways || giveaways.length === 0) return null;
+    const chips: GiveawayChip[] = [];
+    const detailParts: string[] = [];
+    for (const item of giveaways) {
+        const value = selections?.[item.key];
+        if (item.type === 'boolean') {
+            const yes = value === true;
+            chips.push({
+                key: item.key,
+                text: yes ? 'Yes' : 'No',
+                className: yes ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500',
+            });
+            detailParts.push(`${item.label}: ${yes ? 'Yes' : 'No'}`);
+        } else {
+            const sel = typeof value === 'string' ? value.trim() : '';
+            chips.push({
+                key: item.key,
+                text: sel || '—',
+                className: sel ? giveawaySizeColor(sel) : 'bg-slate-100 text-slate-400',
+            });
+            detailParts.push(`${item.label}: ${sel || '—'}`);
+        }
+    }
+    return { chips, detail: detailParts.join('\n') };
+};
 
 const ATTENDANCE_EVENT_STATUS_SORT_ORDER: Record<string, number> = {
     Ongoing: 0,
@@ -321,7 +376,7 @@ const AttendanceList: React.FC = () => {
     try {
         const { data: eventParticipants, error: epError } = await supabase
             .from('event_participants')
-            .select('participant_id, role, needs_accommodation, participants(*)')
+            .select('participant_id, role, needs_accommodation, giveaway_selections, participants(*)')
             .eq('event_id', eventId);
         
         if (epError) throw epError;
@@ -348,6 +403,7 @@ const AttendanceList: React.FC = () => {
                         participant: p,
                         role: ep.role,
                         needs_accommodation: ep.needs_accommodation,
+                        giveaway_selections: ep.giveaway_selections,
                         amLog: amLogs.length > 0 ? { time: amLogs[0].scan_time, status: amLogs[0].scan_status } : undefined,
                         pmLog: pmLogs.length > 0 ? { time: pmLogs[pmLogs.length - 1].scan_time, status: pmLogs[pmLogs.length - 1].scan_status } : undefined,
                     };
@@ -815,12 +871,14 @@ const AttendanceList: React.FC = () => {
       }
 
       // Giveaways: validate required selections and keep only answers for items this event defines.
+      // When giveaway selection is closed, skip required checks — it can no longer be chosen.
+      const giveawaysClosed = selectedEvent.giveaways_open === false;
       const eventGiveaways = selectedEvent.giveaways || [];
       const normalizedGiveawaySelections: Record<string, string | boolean> = {};
       for (const item of eventGiveaways) {
           const value = newParticipant.giveaway_selections[item.key];
           if (item.type === 'single-select') {
-              if (item.required && !value) {
+              if (item.required && !value && !giveawaysClosed) {
                   toast.error(`Please select ${item.label}.`);
                   return;
               }
@@ -1422,6 +1480,20 @@ const AttendanceList: React.FC = () => {
                                                 aria-label="Needs accommodation"
                                             />
                                         )}
+                                        {(() => {
+                                            const g = summarizeGiveaways(selectedEvent?.giveaways, row.giveaway_selections);
+                                            if (!g) return null;
+                                            return (
+                                                <span className="mt-0.5 inline-flex shrink-0 items-center gap-1" title={g.detail}>
+                                                    <Gift size={11} className="shrink-0 text-pink-600" />
+                                                    {g.chips.map((c) => (
+                                                        <span key={c.key} className={`inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-semibold whitespace-nowrap ${c.className}`}>
+                                                            {c.text}
+                                                        </span>
+                                                    ))}
+                                                </span>
+                                            );
+                                        })()}
                                     </div>
                                 </td>
                                 <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 text-slate-600">
@@ -1511,7 +1583,7 @@ const AttendanceList: React.FC = () => {
                                         aria-label={`Select ${row.participant.full_name}`}
                                     />
                                     <div className="min-w-0 flex-1">
-                                        <h3 className="flex items-start gap-1.5 text-[13px] font-semibold leading-tight text-slate-800 sm:text-sm">
+                                        <h3 className="flex flex-wrap items-start gap-1.5 text-[13px] font-semibold leading-tight text-slate-800 sm:text-sm">
                                             <span className="min-w-0 break-words">{row.participant.full_name}</span>
                                             {row.needs_accommodation && (
                                                 <Bed
@@ -1520,6 +1592,20 @@ const AttendanceList: React.FC = () => {
                                                     aria-label="Needs accommodation"
                                                 />
                                             )}
+                                            {(() => {
+                                                const g = summarizeGiveaways(selectedEvent?.giveaways, row.giveaway_selections);
+                                                if (!g) return null;
+                                                return (
+                                                    <span className="inline-flex shrink-0 items-center gap-1" title={g.detail}>
+                                                        <Gift size={11} className="shrink-0 text-pink-600" />
+                                                        {g.chips.map((c) => (
+                                                            <span key={c.key} className={`inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-semibold whitespace-nowrap ${c.className}`}>
+                                                                {c.text}
+                                                            </span>
+                                                        ))}
+                                                    </span>
+                                                );
+                                            })()}
                                         </h3>
                                     </div>
                                     <button
@@ -1919,15 +2005,23 @@ const AttendanceList: React.FC = () => {
                             <h4 className="text-xs font-bold text-purple-800 uppercase tracking-wider flex items-center gap-2">
                                 <Gift size={14}/> Giveaways
                             </h4>
-                            {selectedEvent.giveaways.map((item) => (
-                                <div key={item.key}>
+                            {selectedEvent.giveaways_open === false && (
+                                <p className="rounded-lg bg-purple-100 px-3 py-2 text-xs font-medium text-purple-800">
+                                    Giveaway selection is closed for this event.
+                                </p>
+                            )}
+                            {selectedEvent.giveaways.map((item) => {
+                                const giveawaysClosed = selectedEvent.giveaways_open === false;
+                                return (
+                                <div key={item.key} className={giveawaysClosed ? 'opacity-60' : ''}>
                                     <label className="block text-sm font-medium text-slate-700 mb-1.5">
                                         {item.label}
-                                        {item.required && item.type === 'single-select' && <span className="text-red-500"> *</span>}
+                                        {item.required && item.type === 'single-select' && !giveawaysClosed && <span className="text-red-500"> *</span>}
                                     </label>
                                     {item.type === 'single-select' ? (
                                         <select
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                            disabled={giveawaysClosed}
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                                             value={(newParticipant.giveaway_selections[item.key] as string) || ''}
                                             onChange={(e) => setNewParticipant({ ...newParticipant, giveaway_selections: { ...newParticipant.giveaway_selections, [item.key]: e.target.value } })}
                                         >
@@ -1937,10 +2031,11 @@ const AttendanceList: React.FC = () => {
                                             ))}
                                         </select>
                                     ) : (
-                                        <label className="flex items-center gap-2 cursor-pointer">
+                                        <label className={`flex items-center gap-2 ${giveawaysClosed ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                             <input
                                                 type="checkbox"
-                                                className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                                                disabled={giveawaysClosed}
+                                                className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500 disabled:cursor-not-allowed"
                                                 checked={!!newParticipant.giveaway_selections[item.key]}
                                                 onChange={(e) => setNewParticipant({ ...newParticipant, giveaway_selections: { ...newParticipant.giveaway_selections, [item.key]: e.target.checked } })}
                                             />
@@ -1948,7 +2043,8 @@ const AttendanceList: React.FC = () => {
                                         </label>
                                     )}
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
 

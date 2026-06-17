@@ -191,7 +191,8 @@ const EventsList: React.FC = () => {
       session: 'All_Day' as const,
       days_accommodation: 0,
       dates_with_accom: [] as string[],
-      giveaways: [] as GiveawayItem[]
+      giveaways: [] as GiveawayItem[],
+      giveaways_open: true
   };
   const [formData, setFormData] = useState<Partial<Event>>(initialFormState);
   const [foodInclusionByDate, setFoodInclusionByDate] = useState<EventFoodInclusionMap>({});
@@ -605,7 +606,8 @@ const EventsList: React.FC = () => {
           session: event.session || 'All_Day',
           days_accommodation: event.days_accommodation || 0,
           dates_with_accom: event.dates_with_accom || [],
-          giveaways: event.giveaways || []
+          giveaways: event.giveaways || [],
+          giveaways_open: event.giveaways_open ?? true
       });
       setHasEventCode(!!event.event_serial?.trim());
       setFoodInclusionByDate(
@@ -1078,12 +1080,14 @@ const EventsList: React.FC = () => {
       }
 
       // Giveaways: validate required selections and keep only answers for items this event defines.
+      // When giveaway selection is closed, skip required checks — it can no longer be chosen.
+      const giveawaysClosed = selectedEvent.giveaways_open === false;
       const eventGiveaways = selectedEvent.giveaways || [];
       const normalizedGiveawaySelections: Record<string, string | boolean> = {};
       for (const item of eventGiveaways) {
           const value = newParticipant.giveaway_selections[item.key];
           if (item.type === 'single-select') {
-              if (item.required && !value) {
+              if (item.required && !value && !giveawaysClosed) {
                   toast.error(`Please select ${item.label}.`);
                   return null;
               }
@@ -3110,15 +3114,23 @@ const EventsList: React.FC = () => {
                                         <h4 className="text-xs font-bold text-purple-800 uppercase tracking-wider flex items-center gap-2">
                                             <Gift size={14}/> Giveaways
                                         </h4>
-                                        {selectedEvent.giveaways.map((item) => (
-                                            <div key={item.key}>
+                                        {selectedEvent.giveaways_open === false && (
+                                            <p className="rounded-lg bg-purple-100 px-3 py-2 text-xs font-medium text-purple-800">
+                                                Giveaway selection is closed for this event.
+                                            </p>
+                                        )}
+                                        {selectedEvent.giveaways.map((item) => {
+                                            const giveawaysClosed = selectedEvent.giveaways_open === false;
+                                            return (
+                                            <div key={item.key} className={giveawaysClosed ? 'opacity-60' : ''}>
                                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
                                                     {item.label}
-                                                    {item.required && item.type === 'single-select' && <span className="text-red-500"> *</span>}
+                                                    {item.required && item.type === 'single-select' && !giveawaysClosed && <span className="text-red-500"> *</span>}
                                                 </label>
                                                 {item.type === 'single-select' ? (
                                                     <select
-                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                                        disabled={giveawaysClosed}
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                                                         value={(newParticipant.giveaway_selections[item.key] as string) || ''}
                                                         onChange={(e) => setNewParticipant({ ...newParticipant, giveaway_selections: { ...newParticipant.giveaway_selections, [item.key]: e.target.value } })}
                                                     >
@@ -3128,10 +3140,11 @@ const EventsList: React.FC = () => {
                                                         ))}
                                                     </select>
                                                 ) : (
-                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                    <label className={`flex items-center gap-2 ${giveawaysClosed ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                                         <input
                                                             type="checkbox"
-                                                            className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                                                            disabled={giveawaysClosed}
+                                                            className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500 disabled:cursor-not-allowed"
                                                             checked={!!newParticipant.giveaway_selections[item.key]}
                                                             onChange={(e) => setNewParticipant({ ...newParticipant, giveaway_selections: { ...newParticipant.giveaway_selections, [item.key]: e.target.checked } })}
                                                         />
@@ -3139,7 +3152,8 @@ const EventsList: React.FC = () => {
                                                     </label>
                                                 )}
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
 
@@ -3771,6 +3785,27 @@ const EventsList: React.FC = () => {
                             <UserPlus size={14} /> Add item
                         </button>
                     </div>
+
+                    {((formData.giveaways as GiveawayItem[]) || []).length > 0 && (
+                        <label className="flex items-center justify-between gap-3 rounded-lg border border-purple-100 bg-white/90 px-3 py-2.5 cursor-pointer group">
+                            <span className="min-w-0">
+                                <span className="block text-sm font-semibold text-purple-900">Giveaway selection {formData.giveaways_open ? 'open' : 'closed'}</span>
+                                <span className="block text-xs text-purple-700">When closed, new registrants can no longer pick sizes / answers — existing choices are kept.</span>
+                            </span>
+                            <span className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${formData.giveaways_open ? 'bg-green-500' : 'bg-slate-300'}`}>
+                                <span
+                                    aria-hidden="true"
+                                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${formData.giveaways_open ? 'translate-x-4' : 'translate-x-0'}`}
+                                />
+                            </span>
+                            <input
+                                type="checkbox"
+                                className="hidden"
+                                checked={formData.giveaways_open ?? true}
+                                onChange={e => setFormData({ ...formData, giveaways_open: e.target.checked })}
+                            />
+                        </label>
+                    )}
 
                     {((formData.giveaways as GiveawayItem[]) || []).length === 0 ? (
                         <p className="text-xs text-slate-500">No giveaways configured for this event.</p>

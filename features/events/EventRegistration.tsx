@@ -366,12 +366,14 @@ const EventRegistration: React.FC = () => {
     }
 
     // Giveaways: validate required selections and keep only answers for items this event defines.
+    // When giveaway selection is closed, skip required checks — registrants can't choose anymore.
+    const giveawaysClosed = event?.giveaways_open === false;
     const eventGiveaways = event?.giveaways || [];
     const normalizedGiveawaySelections: Record<string, string | boolean> = {};
     for (const item of eventGiveaways) {
       const value = formData.giveaway_selections[item.key];
       if (item.type === 'single-select') {
-        if (item.required && !value) {
+        if (item.required && !value && !giveawaysClosed) {
           setError(`Please select ${item.label}.`);
           return null;
         }
@@ -1345,8 +1347,9 @@ const EventRegistration: React.FC = () => {
                         </div>
                     )}
 
-                    {/* SECTION: Giveaways / Freebies (Conditional, separate from CA) */}
-                    {(event.giveaways && event.giveaways.length > 0) && (
+                    {/* SECTION: Giveaways / Freebies (Conditional, separate from CA).
+                        Hidden entirely when giveaway selection is closed for the event. */}
+                    {(event.giveaways && event.giveaways.length > 0 && event.giveaways_open !== false) && (
                         <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
                             <h3 className="text-sm font-bold text-purple-800 uppercase tracking-wider flex items-center gap-2">
                                 <Gift size={16}/> Giveaways

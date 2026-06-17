@@ -58,6 +58,9 @@ export interface Event {
   dates_with_accom?: string[] | null;
   food_inclusion?: string[] | null;
   giveaways?: GiveawayItem[] | null;
+  // When false, giveaway selection is closed: new registrants can no longer pick
+  // sizes / Yes-No answers, though existing selections are kept. Defaults to open.
+  giveaways_open?: boolean | null;
   deleted_at?: string | null;
   deleted_by?: number | null;
   delete_reason?: string | null;
