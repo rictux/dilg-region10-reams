@@ -29,7 +29,8 @@ const MM_TO_PX = 3.7795275591;
 const CERT_FONT = 'Poppins, sans-serif';
 // Header, participant name, signatory name & position → Helvetica
 const HELVETICA_FONT = 'Helvetica, "Helvetica Neue", Arial, sans-serif';
-// Title ("Certificate of Participation") → Snell Roundhand (Pinyon Script web fallback)
+// Title ("Certificate of Participation") → bundled Snell Roundhand (see @font-face
+// in index.html); Pinyon Script / Apple Chancery are fallbacks.
 const SCRIPT_FONT = '"Snell Roundhand", "Pinyon Script", "Apple Chancery", cursive';
 
 export const PAPER_DIMS: Record<CoPPaperSize, {
