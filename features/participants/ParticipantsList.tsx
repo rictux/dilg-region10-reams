@@ -1164,7 +1164,7 @@ const AttendanceList: React.FC = () => {
                 </div>
             )}
 
-            <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 lg:w-[24rem] lg:max-w-none lg:flex-none xl:w-[28rem]">
+            <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 lg:ml-auto lg:w-[24rem] lg:max-w-none lg:flex-none xl:w-[28rem]">
                 <div className="relative min-w-0 w-full">
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                         <Search size={18} />
@@ -1217,7 +1217,7 @@ const AttendanceList: React.FC = () => {
       </div>
 
       {/* Stats Cards as Filters */}
-      <div className="attendance-stats w-full -mt-1.5">
+      <div className="attendance-stats w-full -mt-1.5 md:mt-4">
           <div
             className={`grid w-full gap-1 sm:gap-3 lg:gap-4 ${statsGridClassName}`}
           >
