@@ -12,6 +12,9 @@ export type CoPParticipantRecord = {
 
 export type CoPTitle = 'Certificate of Participation' | 'Acknowledgement Receipt';
 
+/** Default lead-in sentence that precedes the event name in the certificate body. */
+export const DEFAULT_COP_BODY_TEXT = 'for having actively participated during the conduct of the';
+
 type CoPTemplateProps = {
   event: Event;
   participantRecord: CoPParticipantRecord;
@@ -19,6 +22,8 @@ type CoPTemplateProps = {
   themeUrl: string | null;
   paperSize: CoPPaperSize;
   title?: string;
+  /** Lead-in text before the event name. Defaults to DEFAULT_COP_BODY_TEXT. */
+  bodyText?: string;
   /** When set (> 0), appends "with a credit of <word> (<n>) training hours." to the body. */
   creditHours?: number | null;
 };
@@ -127,6 +132,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   themeUrl,
   paperSize,
   title = 'Certificate of Participation',
+  bodyText = DEFAULT_COP_BODY_TEXT,
   creditHours = null,
 }) => {
   const dims     = PAPER_DIMS[paperSize];
@@ -295,7 +301,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
           }} />
 
           <p style={{ fontSize: bodySz, margin: `0 0 ${s(4)}px`, lineHeight: 1.5, textAlign: 'center', width: '88%', fontFamily: CERT_FONT }}>
-            for having actively participated during the conduct of the{' '}
+            {bodyText}{' '}
             <strong>&ldquo;{eventName}&rdquo;</strong>{' '}
             held on {dateString}, {venuePrep}{creditPhrase}.
           </p>
