@@ -824,7 +824,7 @@ const EventRegistration: React.FC = () => {
                         className="bg-white p-6 rounded-xl w-full border-2 border-slate-100"
                       >
                           <div className="border-4 border-slate-900 p-4 rounded-xl mb-4 bg-white inline-block">
-                              <QRCode value={qrToken} size={180} />
+                              <QRCode value={qrToken} size={180} fgColor="#000000" bgColor="#FFFFFF" />
                           </div>
 
                           <div className="w-full text-center">
