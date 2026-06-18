@@ -383,7 +383,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
     return (
       <div className="flex-1 min-h-0 overflow-auto w-full">
         <table className="datatable w-full text-[13px] text-left min-w-[600px]">
-          <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+          <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200">
             <tr>
               <th className="px-5 py-3 w-[36%]">Event Name</th>
               <th className="px-5 py-3 w-[18%]">Date</th>
@@ -447,73 +447,85 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
 
       <div className={isInternal ? 'w-full flex-1 min-h-0 flex flex-col gap-6' : 'w-full max-w-5xl space-y-4 sm:space-y-6'}>
         {isInternal ? (
-          <div className="relative" ref={dropdownRef}>
-            <div className="text-center mb-4">
-              <p className="text-sm text-slate-500">Verify attendance history across all Regional events.</p>
-            </div>
-
-            <div className="relative group max-w-2xl mx-auto">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
-                {searching ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
-              </div>
-              <input
-                type="text"
-                placeholder="Search by name or office..."
-                className="w-full pl-10 pr-16 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-medium shadow-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-slate-400"
-                value={searchTerm}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setSearchTerm(value);
-                  if (selectedParticipant && value !== '' && value !== selectedParticipant.full_name) {
-                    setSelectedParticipant(null);
-                    setAttendedEvents([]);
-                  }
-                }}
-                onFocus={() => {
-                  if (suggestions.length > 0) setShowSuggestions(true);
-                }}
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchTerm('');
-                    setShowSuggestions(false);
-                  }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-
-            {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute top-full left-1/2 -translate-x-1/2 w-full max-w-2xl mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                <div className="p-2 border-b border-slate-50 bg-slate-50/50">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Suggested Names from Records</span>
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <Search size={20} />
                 </div>
-                <ul className="max-h-60 overflow-y-auto">
-                  {suggestions.map((participant) => (
-                    <li
-                      key={participant.participant_id}
-                      onClick={() => handleSelectParticipant(participant)}
-                      className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors flex items-center justify-between group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm">
-                          {participant.full_name.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-sm text-slate-800 group-hover:text-indigo-700">{participant.full_name}</div>
-                          <div className="text-xs text-slate-500 line-clamp-1">{participant.office} &bull; {participant.position}</div>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
-                    </li>
-                  ))}
-                </ul>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 leading-tight">Participant Lookup</h2>
+                  <p className="text-sm text-slate-500 mt-0.5 leading-relaxed">
+                    Verify attendance history across all Regional events.
+                  </p>
+                </div>
               </div>
-            )}
+
+              <div className="relative w-full lg:w-auto lg:min-w-[360px]" ref={dropdownRef}>
+                <div className="relative group">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                    {searching ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search by name or office..."
+                    className="w-full pl-11 pr-16 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium shadow-sm focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-slate-400"
+                    value={searchTerm}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSearchTerm(value);
+                      if (selectedParticipant && value !== '' && value !== selectedParticipant.full_name) {
+                        setSelectedParticipant(null);
+                        setAttendedEvents([]);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (suggestions.length > 0) setShowSuggestions(true);
+                    }}
+                  />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchTerm('');
+                        setShowSuggestions(false);
+                      }}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="p-2.5 border-b border-slate-100 bg-slate-50/50">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Suggested Names from Records</span>
+                    </div>
+                    <ul className="max-h-72 overflow-y-auto">
+                      {suggestions.map((participant) => (
+                        <li
+                          key={participant.participant_id}
+                          onClick={() => handleSelectParticipant(participant)}
+                          className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors flex items-center justify-between group"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm shrink-0">
+                              {participant.full_name.charAt(0)}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-sm text-slate-800 group-hover:text-indigo-700 truncate">{participant.full_name}</div>
+                              <div className="text-xs text-slate-500 line-clamp-1">{participant.office} &bull; {participant.position}</div>
+                            </div>
+                          </div>
+                          <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all shrink-0" />
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 md:p-6 space-y-4">
@@ -597,10 +609,15 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
               </div>
 
               {isInternal ? (
-                <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
-                  <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
-                    <History className="text-indigo-600" size={18} />
-                    <h4 className="text-sm font-bold text-slate-800">Event History</h4>
+                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
+                  <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <History className="text-indigo-600" size={18} />
+                      <h4 className="text-sm font-bold text-slate-800">Event History</h4>
+                    </div>
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
+                      {attendedEvents.length} {attendedEvents.length === 1 ? 'record' : 'records'}
+                    </span>
                   </div>
                   {renderInternalTable()}
                 </div>
@@ -619,11 +636,16 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-16 opacity-40 select-none pointer-events-none">
+            <div className={isInternal
+              ? 'bg-white border border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center py-16 px-6 text-center select-none'
+              : 'flex flex-col items-center justify-center py-16 opacity-40 select-none pointer-events-none'}>
               {isInternal ? (
                 <>
-                  <Search size={48} className="text-slate-300 mb-4" />
-                  <p className="text-sm font-medium text-slate-500">Search to view attendance history</p>
+                  <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-4">
+                    <Search size={26} className="text-slate-300" />
+                  </div>
+                  <p className="text-sm font-semibold text-slate-600">Search to view attendance history</p>
+                  <p className="text-xs text-slate-400 mt-1 max-w-xs">Start typing a name or office above to find a participant&apos;s event records.</p>
                 </>
               ) : (
                 <>
