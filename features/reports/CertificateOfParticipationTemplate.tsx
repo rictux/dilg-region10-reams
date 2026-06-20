@@ -10,10 +10,11 @@ export type CoPParticipantRecord = {
   log_dates: string[];
 };
 
-export type CoPTitle = 'Certificate of Participation' | 'Acknowledgement Receipt';
+export type CoPTitle = 'Certificate of Participation' | 'Certificate of Appreciation' | 'Acknowledgement Receipt';
 
-/** Default lead-in sentence that precedes the event name in the certificate body. */
-export const DEFAULT_COP_BODY_TEXT = 'for having actively participated during the conduct of the';
+/** Default body section shown before the signatory block. */
+export const DEFAULT_COP_BODY_TEXT =
+  'for having actively participated during the conduct of the "{EventName}" held on {EventDate}, at {Venue}{CreditPhrase}.\nGiven this {EventDate}';
 
 type CoPTemplateProps = {
   event: Event;
@@ -22,7 +23,7 @@ type CoPTemplateProps = {
   themeUrl: string | null;
   paperSize: CoPPaperSize;
   title?: string;
-  /** Lead-in text before the event name. Defaults to DEFAULT_COP_BODY_TEXT. */
+  /** Body section template before the signatory block. */
   bodyText?: string;
   /** When set (> 0), appends "with a credit of <word> (<n>) training hours." to the body. */
   creditHours?: number | null;
@@ -123,6 +124,23 @@ export const formatGivenDate = (logDates: string[], eventEndDate: string): strin
   }
 };
 
+export const formatEventDates = (event: Pick<Event, 'start_date' | 'end_date'>): string => {
+  try {
+    const start = parseISO(event.start_date);
+    const end = event.end_date ? parseISO(event.end_date) : start;
+    if (!event.end_date || event.start_date === event.end_date) return format(start, 'MMMM d, yyyy');
+    if (start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
+      return `${format(start, 'MMMM d')}-${format(end, 'd, yyyy')}`;
+    }
+    if (start.getFullYear() === end.getFullYear()) {
+      return `${format(start, 'MMMM d')} - ${format(end, 'MMMM d, yyyy')}`;
+    }
+    return `${format(start, 'MMMM d, yyyy')} - ${format(end, 'MMMM d, yyyy')}`;
+  } catch {
+    return event.start_date;
+  }
+};
+
 const DEFAULT_HEADER = 'REGION X - NORTHERN MINDANAO';
 
 const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
@@ -149,15 +167,33 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   const postNom   = signatory?.post_nominals?.trim()   || '';
 
   const logDates        = participantRecord.log_dates;
-  const dateString      = formatAttendanceDates(logDates);
-  const givenDateString = formatGivenDate(logDates, event.end_date || event.start_date);
   const eventName       = event.event_name || '';
   const venue           = event.venue      || '';
-  const venuePrep       = /^(via|at|in)\s/i.test(venue.trim()) ? venue.trim() : `at ${venue.trim()}`;
+  const eventDateString = formatEventDates(event);
   const hasCredit       = typeof creditHours === 'number' && creditHours > 0;
   const creditPhrase    = hasCredit
     ? `, with a credit of ${numberToWords(creditHours!)} (${creditHours}) training hour${creditHours === 1 ? '' : 's'}`
     : '';
+  const bodyTokens: Record<string, React.ReactNode> = {
+    eventName: <strong key="eventName">{eventName}</strong>,
+    eventDate: eventDateString,
+    venue: venue.trim(),
+    creditPhrase,
+    givenDate: formatGivenDate(logDates, event.end_date || event.start_date),
+  };
+  const bodyTemplate = bodyText.trim() || DEFAULT_COP_BODY_TEXT;
+  const bodyTemplateWithCredit = hasCredit && !/\{CreditPhrase\}/i.test(bodyTemplate)
+    ? bodyTemplate.replace(/(\.\s*(?:\n|$))/, `${creditPhrase}$1`)
+    : bodyTemplate;
+  const bodyParts = bodyTemplateWithCredit
+    .split(/(\{[A-Za-z]+\})/g)
+    .map((part, index) => {
+      const token = part.match(/^\{(.+)\}$/)?.[1];
+      const tokenKey = token ? token.charAt(0).toLowerCase() + token.slice(1) : '';
+      if (!tokenKey || !(tokenKey in bodyTokens)) return part;
+      const value = bodyTokens[tokenKey];
+      return React.isValidElement(value) ? React.cloneElement(value, { key: `${token}-${index}` }) : value;
+    });
 
   const logoH    = s(44);
   const subSz    = s(11.5);
@@ -300,13 +336,8 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
             marginBottom: s(8),
           }} />
 
-          <p style={{ fontSize: bodySz, margin: `0 0 ${s(4)}px`, lineHeight: 1.5, textAlign: 'center', width: '88%', fontFamily: CERT_FONT }}>
-            {bodyText}{' '}
-            <strong>&ldquo;{eventName}&rdquo;</strong>{' '}
-            held on {dateString}, {venuePrep}{creditPhrase}.
-          </p>
-          <p style={{ fontSize: bodySz, margin: 0, letterSpacing: '0.01em', textAlign: 'center', fontFamily: CERT_FONT }}>
-            {givenDateString}
+          <p style={{ fontSize: bodySz, margin: 0, lineHeight: 1.5, textAlign: 'center', width: '88%', fontFamily: CERT_FONT, whiteSpace: 'pre-wrap' }}>
+            {bodyParts}
           </p>
         </div>
 
