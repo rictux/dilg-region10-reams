@@ -172,7 +172,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   const eventDateString = formatEventDates(event);
   const hasCredit       = typeof creditHours === 'number' && creditHours > 0;
   const creditPhrase    = hasCredit
-    ? `, with a credit of ${numberToWords(creditHours!)} (${creditHours}) training hour${creditHours === 1 ? '' : 's'}`
+    ? `with a credit of ${numberToWords(creditHours!)} (${creditHours}) training hour${creditHours === 1 ? '' : 's'}`
     : '';
   const bodyTokens: Record<string, React.ReactNode> = {
     eventName: <strong key="eventName">{eventName}</strong>,
@@ -182,9 +182,14 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
     givenDate: formatGivenDate(logDates, event.end_date || event.start_date),
   };
   const bodyTemplate = bodyText.trim() || DEFAULT_COP_BODY_TEXT;
-  const bodyTemplateWithCredit = hasCredit && !/\{CreditPhrase\}/i.test(bodyTemplate)
-    ? bodyTemplate.replace(/(\.\s*(?:\n|$))/, `${creditPhrase}$1`)
-    : bodyTemplate;
+  const hasCreditToken = /\{CreditPhrase\}/i.test(bodyTemplate);
+  const bodyTemplateNormalized = bodyTemplate
+    .replace(/\{Venue\}\s*\{CreditPhrase\}/gi, hasCredit ? '{Venue}, {CreditPhrase}' : '{Venue}')
+    .replace(/,\s*\{CreditPhrase\}/gi, hasCredit ? ', {CreditPhrase}' : '')
+    .replace(/\s*\{CreditPhrase\}/gi, hasCredit ? ' {CreditPhrase}' : '');
+  const bodyTemplateWithCredit = hasCredit && !hasCreditToken
+    ? bodyTemplateNormalized.replace(/(\.\s*(?:\n|$))/, `, ${creditPhrase}$1`)
+    : bodyTemplateNormalized;
   const bodyParts = bodyTemplateWithCredit
     .split(/(\{[A-Za-z]+\})/g)
     .map((part, index) => {
