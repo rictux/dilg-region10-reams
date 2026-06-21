@@ -27,6 +27,7 @@ type CoPTemplateProps = {
   bodyText?: string;
   /** When set (> 0), appends "with a credit of <word> (<n>) training hours." to the body. */
   creditHours?: number | null;
+  includeSignature?: boolean;
 };
 
 const MM_TO_PX = 3.7795275591;
@@ -152,6 +153,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   title = 'Certificate of Participation',
   bodyText = DEFAULT_COP_BODY_TEXT,
   creditHours = null,
+  includeSignature = true,
 }) => {
   const dims     = PAPER_DIMS[paperSize];
   const scale    = paperSize === 'A4' ? 1.414 : 1;
@@ -349,7 +351,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
         {/* ── 4. Signatory (Helvetica) ── */}
         <div style={{ display: 'flex', justifyContent: 'center', fontFamily: HELVETICA_FONT }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            {signatory?.esig_link ? (
+            {includeSignature && signatory?.esig_link ? (
               <img
                 src={signatory.esig_link}
                 alt="E-Signature"
