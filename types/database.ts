@@ -17,7 +17,7 @@ export interface Office {
 export interface User {
   user_id: number;
   full_name: string;
-  email: string;
+  email?: string | null;
   password_hash: string;
   username: string;
   role: UserRole;

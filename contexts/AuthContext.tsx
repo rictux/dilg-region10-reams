@@ -9,7 +9,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (username: string, passwordPlain: string, remember?: boolean) => Promise<void>;
-  signup: (userData: { username: string; passwordPlain: string; full_name: string; email: string; position: string; office_id?: number | null }) => Promise<void>;
+  signup: (userData: { username: string; passwordPlain: string; full_name: string; email?: string | null; position: string; office_id?: number | null }) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   changePassword: (newPw: string) => Promise<void>;
@@ -214,7 +214,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('users')
         .select('*')
         .eq('username', username)
-        .eq('status', 'Active')
         .single();
 
       if (error || !data) {
@@ -228,6 +227,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const userRecord = data as User;
+
+      if (userRecord.status === 'Inactive') {
+        await recordLoginActivity({
+          userRecord,
+          username: userRecord.username,
+          loginMethod: 'Password',
+          loginStatus: 'Failed',
+          failureReason: 'Inactive account'
+        });
+        throw new Error('Your account has not been activated yet. Please contact RICTU personnel to activate your account.');
+      }
 
       // 2. Verify password with bcrypt
       const isMatch = await bcrypt.compare(passwordPlain, userRecord.password_hash);
@@ -266,7 +276,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signup = async (userData: { username: string; passwordPlain: string; full_name: string; email: string; position: string; office_id?: number | null }) => {
+  const signup = async (userData: { username: string; passwordPlain: string; full_name: string; email?: string | null; position: string; office_id?: number | null }) => {
     setLoading(true);
     try {
       // 1. Check if username exists

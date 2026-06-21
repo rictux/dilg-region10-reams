@@ -96,6 +96,8 @@ const Signup: React.FC = () => {
     e.preventDefault();
     setError(null);
 
+    const fullName = formData.fullName.trim();
+
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -109,9 +111,34 @@ const Signup: React.FC = () => {
     setIsLoading(true);
 
     try {
+      const { data: existingUsers, error: existingUserError } = await supabase
+        .from('users')
+        .select('status')
+        .ilike('full_name', fullName)
+        .in('status', ['Active', 'Inactive'])
+        .limit(1);
+
+      if (existingUserError) {
+        throw existingUserError;
+      }
+
+      const existingUser = existingUsers?.[0];
+
+      if (existingUser?.status === 'Inactive') {
+        setError('You have already signed up for an account. Please contact RICTU personnel to activate your account before logging in.');
+        setIsLoading(false);
+        return;
+      }
+
+      if (existingUser?.status === 'Active') {
+        setError('You already have an active account. Please log in using your account. If you cannot log in, contact RICTU personnel to reset your password.');
+        setIsLoading(false);
+        return;
+      }
+
       await signup({
-        full_name: formData.fullName,
-        email: formData.email,
+        full_name: fullName,
+        email: formData.email.trim() || null,
         position: formData.position,
         username: formData.username.toLowerCase(),
         passwordPlain: formData.password,
@@ -119,9 +146,6 @@ const Signup: React.FC = () => {
       });
 
       setSuccess(true);
-      setTimeout(() => {
-        navigate('/');
-      }, 4000);
     } catch (err: any) {
       setError(err.message || 'Failed to create account.');
       setIsLoading(false);
@@ -148,7 +172,7 @@ const Signup: React.FC = () => {
           </div>
           <h2 className="text-2xl font-bold text-slate-800 mb-2">Account Created!</h2>
           <p className="text-slate-600 mb-6">
-            Your account has been successfully created. You may now proceed to log in.
+            Your account has been successfully created. Please contact RICTU personnel to activate your account before logging in.
           </p>
           <button
             onClick={() => navigate('/')}
@@ -192,14 +216,13 @@ const Signup: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address <span className="text-slate-400">(optional)</span></label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
                 className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                 placeholder="john@example.com"
               />
