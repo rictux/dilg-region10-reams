@@ -11,6 +11,9 @@ interface AttendanceRow {
     pmLog?: { time: string, status: string };
 }
 
+const ROWS_PER_PAGE = 25;
+const COMPACT_ROW_HEIGHT_PX = 24;
+
 const chunkArray = <T,>(arr: T[], size: number): T[][] => {
     return Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
         arr.slice(i * size, i * size + size)
@@ -20,12 +23,12 @@ const chunkArray = <T,>(arr: T[], size: number): T[][] => {
 const renderCellText = (text: string | null | undefined, threshold1: number, threshold2: number) => {
     if (!text) return '';
     if (text.length > threshold2) {
-        return <div className="text-[8px] leading-[1.1] line-clamp-3">{text}</div>;
+        return <div className="text-[6.5px] leading-[1.05] line-clamp-2">{text}</div>;
     }
     if (text.length > threshold1) {
-        return <div className="text-[10px] leading-[1.15] line-clamp-2">{text}</div>;
+        return <div className="text-[8px] leading-[1.1] line-clamp-2">{text}</div>;
     }
-    return <div className="text-xs leading-tight line-clamp-2">{text}</div>;
+    return <div className="text-[9px] leading-tight line-clamp-1">{text}</div>;
 };
 
 const AttendanceSheetPrint: React.FC = () => {
@@ -148,74 +151,74 @@ const AttendanceSheetPrint: React.FC = () => {
             </div>
         </div>
 
-        {eventDates.map((date, dateIndex) => {
+        {eventDates.map((date) => {
             const allRows = getRowsForDate(date);
-            const rowChunks = allRows.length > 0 ? chunkArray(allRows, 12) : [[]];
+            const rowChunks = allRows.length > 0 ? chunkArray(allRows, ROWS_PER_PAGE) : [[]];
 
             return rowChunks.map((rows, chunkIndex) => (
-                <div key={`${date.toISOString()}-${chunkIndex}`} className="w-[297mm] h-[210mm] mx-auto bg-white shadow-xl mb-10 print:mb-0 print:shadow-none print:w-full print:h-screen print:max-w-none page-break-after relative overflow-hidden flex flex-col">
-                    <div className="flex items-center pt-8 px-8 mb-2">
-                        <div className="w-24 h-24 mr-4 flex-shrink-0 flex items-center justify-center">
+                <div key={`${date.toISOString()}-${chunkIndex}`} className="w-[297mm] h-[210mm] mx-auto bg-white shadow-xl mb-10 print:mb-0 print:shadow-none print:w-[297mm] print:h-[210mm] print:max-w-none page-break-after relative overflow-hidden flex flex-col">
+                    <div className="flex items-center pt-4 px-6 mb-1">
+                        <div className="w-14 h-14 mr-3 flex-shrink-0 flex items-center justify-center">
                             <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/6/6f/DILG_Seal.svg'; }} />
                         </div>
                         <div className="flex flex-col justify-center">
-                            <h1 className="text-lg font-bold font-sans text-slate-900">DILG Region 10 - Northern Mindanao</h1>
-                            <h2 className="text-2xl font-black text-black tracking-wide mt-1 uppercase font-sans">ATTENDANCE SHEET</h2>
+                            <h1 className="text-xs font-bold font-sans text-slate-900">DILG Region 10 - Northern Mindanao</h1>
+                            <h2 className="text-lg font-black text-black tracking-wide uppercase font-sans">ATTENDANCE SHEET</h2>
                         </div>
                     </div>
-                    <div className="flex flex-col items-center justify-center text-center w-full mb-6">
-                        <div className="text-base font-bold font-serif mb-1 uppercase tracking-wide">{event.event_name}</div>
-                        <div className="text-sm font-sans text-slate-700">{event.venue}</div>
-                        <div className="text-sm font-sans text-slate-900 mt-1">{format(date, 'MMMM d, yyyy')}</div>
+                    <div className="flex flex-col items-center justify-center text-center w-full mb-2">
+                        <div className="text-[12px] leading-tight font-bold font-serif mb-0.5 uppercase tracking-wide max-w-[260mm] line-clamp-2">{event.event_name}</div>
+                        <div className="text-[10px] leading-tight font-sans text-slate-700">{event.venue}</div>
+                        <div className="text-[10px] leading-tight font-sans text-slate-900 mt-0.5">{format(date, 'MMMM d, yyyy')}</div>
                     </div>
-                    <div className="px-8 flex-1">
-                        <table className="w-full text-xs table-fixed">
+                    <div className="px-6 pb-1 flex-1 min-h-0 overflow-hidden">
+                        <table className="w-full text-[9px] table-fixed">
                             <thead>
                                 <tr className="bg-gray-200 text-center font-bold uppercase font-sans print:bg-gray-200 print:print-color-adjust-exact">
-                                    <th rowSpan={2} className="border border-black px-2 py-2 w-10">No.</th>
-                                    <th rowSpan={2} className="border border-black px-4 py-2 text-left w-48">NAME</th>
-                                    <th rowSpan={2} className="border border-black px-4 py-2 w-32">POSITION</th>
-                                    <th rowSpan={2} className="border border-black px-4 py-2 w-32">OFFICE</th>
-                                    <th colSpan={2} className="border border-black px-2 py-1 w-16">GENDER</th>
-                                    <th rowSpan={2} className="border border-black px-1 py-1 w-24 text-[8px] leading-tight normal-case font-normal align-top">I consent to the capture of my photo, video, and audio for use in DILG publications.</th>
-                                    <th rowSpan={2} className="border border-black px-1 py-1 w-24 text-[8px] leading-tight normal-case font-normal align-top">I consent to the storage of my data in the organizer’s database for future document processing.</th>
+                                    <th rowSpan={2} className="border border-black px-1 py-0.5 w-8">No.</th>
+                                    <th rowSpan={2} className="border border-black px-2 py-1 text-left w-44">NAME</th>
+                                    <th rowSpan={2} className="border border-black px-2 py-1 w-28">POSITION</th>
+                                    <th rowSpan={2} className="border border-black px-2 py-1 w-28">OFFICE</th>
+                                    <th colSpan={2} className="border border-black px-1 py-0.5 w-14">GENDER</th>
+                                    <th rowSpan={2} className="border border-black px-1 py-0.5 w-20 text-[6.5px] leading-[1.05] normal-case font-normal align-top">I consent to the capture of my photo, video, and audio for use in DILG publications.</th>
+                                    <th rowSpan={2} className="border border-black px-1 py-0.5 w-20 text-[6.5px] leading-[1.05] normal-case font-normal align-top">I consent to the storage of my data in the organizer’s database for future document processing.</th>
                                     {visibleSessions.map((session) => (
-                                        <th key={session} rowSpan={2} className="border border-black px-4 py-2 w-24">
+                                        <th key={session} rowSpan={2} className="border border-black px-2 py-1 w-20">
                                             {session}
                                         </th>
                                     ))}
                                 </tr>
                                 <tr className="bg-gray-200 text-center font-bold uppercase font-sans print:bg-gray-200 print:print-color-adjust-exact">
-                                    <th className="border border-black px-1 py-1 w-8">M</th>
-                                    <th className="border border-black px-1 py-1 w-8">F</th>
+                                    <th className="border border-black px-1 py-0.5 w-7">M</th>
+                                    <th className="border border-black px-1 py-0.5 w-7">F</th>
                                 </tr>
                             </thead>
-                            <tbody className="font-sans text-xs">
+                            <tbody className="font-sans text-[9px]">
                                 {rows.length === 0 ? (
                                     <tr>
                                         <td colSpan={totalColumnCount} className="text-center py-12 text-slate-500 italic">No attendance recorded for this date.</td>
                                     </tr>
                                 ) : (
                                     rows.map((row, index) => {
-                                        const globalIndex = chunkIndex * 12 + index + 1;
+                                        const globalIndex = chunkIndex * ROWS_PER_PAGE + index + 1;
                                         return (
-                                            <tr key={row.participant.participant_id} className="text-center h-[38px] hover:bg-slate-50 print:hover:bg-transparent overflow-hidden">
-                                                <td className="px-2 py-1 border border-black">{globalIndex}</td>
-                                                <td className="px-3 py-1 text-left capitalize border border-black">
+                                            <tr key={row.participant.participant_id} className="text-center hover:bg-slate-50 print:hover:bg-transparent overflow-hidden" style={{ height: COMPACT_ROW_HEIGHT_PX }}>
+                                                <td className="px-1 py-0.5 border border-black">{globalIndex}</td>
+                                                <td className="px-2 py-0.5 text-left capitalize border border-black">
                                                     {renderCellText(row.participant.full_name, 25, 40)}
                                                 </td>
-                                                <td className="px-2 py-1 border border-black">
+                                                <td className="px-1 py-0.5 border border-black">
                                                     {renderCellText(row.participant.position, 20, 35)}
                                                 </td>
-                                                <td className="px-2 py-1 border border-black">
+                                                <td className="px-1 py-0.5 border border-black">
                                                     {renderCellText(row.participant.office, 20, 35)}
                                                 </td>
-                                                <td className="px-1 py-1 font-bold border border-black">{(row.participant.gender === 'Male' || row.participant.gender === 'M') && '✓'}</td>
-                                                <td className="px-1 py-1 font-bold border border-black">{(row.participant.gender === 'Female' || row.participant.gender === 'F') && '✓'}</td>
-                                                <td className="px-1 py-1 font-bold border border-black">{(row.participant as any).accept_photo_video ? '✓' : ''}</td>
-                                                <td className="px-1 py-1 font-bold border border-black">{(row.participant as any).store_to_db ? '✓' : ''}</td>
+                                                <td className="px-1 py-0.5 font-bold border border-black">{(row.participant.gender === 'Male' || row.participant.gender === 'M') && '✓'}</td>
+                                                <td className="px-1 py-0.5 font-bold border border-black">{(row.participant.gender === 'Female' || row.participant.gender === 'F') && '✓'}</td>
+                                                <td className="px-1 py-0.5 font-bold border border-black">{(row.participant as any).accept_photo_video ? '✓' : ''}</td>
+                                                <td className="px-1 py-0.5 font-bold border border-black">{(row.participant as any).store_to_db ? '✓' : ''}</td>
                                                 {visibleSessions.map((session) => (
-                                                    <td key={session} className="px-2 py-1 font-mono border border-black">
+                                                    <td key={session} className="px-1 py-0.5 font-mono border border-black">
                                                         {session === 'AM'
                                                             ? (row.amLog ? formatLogTime(row.amLog.time) : '')
                                                             : (row.pmLog ? formatLogTime(row.pmLog.time) : '')}
@@ -228,8 +231,8 @@ const AttendanceSheetPrint: React.FC = () => {
                             </tbody>
                         </table>
                     </div>
-                    <div className="w-full px-10 pb-6 pt-2 flex flex-col text-[10px] text-slate-600 font-sans">
-                        <div className="mt-2 text-slate-400">System Generated Report - Page {chunkIndex + 1} of {rowChunks.length}</div>
+                    <div className="w-full shrink-0 px-6 pb-1 pt-0.5 flex flex-col text-[8px] text-slate-600 font-sans">
+                        <div className="text-slate-400">System Generated Report - Page {chunkIndex + 1} of {rowChunks.length}</div>
                     </div>
                 </div>
             ));
