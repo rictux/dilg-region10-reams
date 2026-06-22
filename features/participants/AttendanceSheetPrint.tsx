@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Event, Participant } from '../../types/database';
+import { Event, Participant, GiveawayItem } from '../../types/database';
 import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
 import { format, parseISO, eachDayOfInterval, isBefore } from 'date-fns';
 
 interface AttendanceRow {
     participant: Participant;
+    giveaway_selections?: Record<string, string | boolean> | null;
     amLog?: { time: string, status: string };
     pmLog?: { time: string, status: string };
 }
@@ -29,6 +30,18 @@ const renderCellText = (text: string | null | undefined, threshold1: number, thr
         return <div className="text-[9px] leading-[1.1] line-clamp-2">{text}</div>;
     }
     return <div className="text-[10px] leading-tight line-clamp-1">{text}</div>;
+};
+
+const getAttendanceGiveaways = (event: Event | null): GiveawayItem[] =>
+    (event?.giveaways || []).filter((item) => item.include_in_attendance);
+
+const formatGiveawayAttendanceValue = (
+    item: GiveawayItem,
+    selections: Record<string, string | boolean> | null | undefined,
+) => {
+    const value = selections?.[item.key];
+    if (item.type === 'boolean') return value ? 'Yes' : 'No';
+    return typeof value === 'string' && value.trim() ? 'Yes' : 'No';
 };
 
 const AttendanceSheetPrint: React.FC = () => {
@@ -72,13 +85,14 @@ const AttendanceSheetPrint: React.FC = () => {
         const { data: logs } = await supabase.from('attendance_logs').select('*').eq('event_id', id);
         setAllLogs(logs || []);
         
-        const { data: eventParticipants } = await supabase.from('event_participants').select('accept_photo_video, store_to_db, participants(*)').eq('event_id', id);
+        const { data: eventParticipants } = await supabase.from('event_participants').select('accept_photo_video, store_to_db, giveaway_selections, participants(*)').eq('event_id', id);
         const fetchedParticipants = eventParticipants?.map((ep: any) => {
             if (!ep.participants) return null;
             return {
                 ...ep.participants,
                 accept_photo_video: ep.accept_photo_video,
-                store_to_db: ep.store_to_db
+                store_to_db: ep.store_to_db,
+                giveaway_selections: ep.giveaway_selections
             };
         }).filter((p: any) => p !== null) || [];
         setParticipants(fetchedParticipants);
@@ -104,6 +118,7 @@ const AttendanceSheetPrint: React.FC = () => {
 
               return {
                   participant: p,
+                  giveaway_selections: (p as any).giveaway_selections,
                   amLog: amLogs.length > 0 ? { time: amLogs[0].scan_time, status: amLogs[0].scan_status } : undefined,
                   pmLog: pmLogs.length > 0 ? { time: pmLogs[pmLogs.length - 1].scan_time, status: pmLogs[pmLogs.length - 1].scan_status } : undefined,
               };
@@ -135,7 +150,8 @@ const AttendanceSheetPrint: React.FC = () => {
 
   const visibleSessions: Array<'AM' | 'PM'> =
       event.session === 'All_Day' ? ['AM', 'PM'] : [event.session];
-  const totalColumnCount = 8 + visibleSessions.length;
+  const attendanceGiveaways = getAttendanceGiveaways(event);
+  const totalColumnCount = 8 + attendanceGiveaways.length + visibleSessions.length;
 
   return (
     <div className="min-h-screen bg-slate-50 p-8 font-serif print:p-0 print:bg-white">
@@ -182,6 +198,11 @@ const AttendanceSheetPrint: React.FC = () => {
                                     <th colSpan={2} className="border border-black px-1 py-0.5 w-14">GENDER</th>
                                     <th rowSpan={2} className="border border-black px-1 py-0.5 w-20 text-[6.5px] leading-[1.05] normal-case font-normal align-top">I consent to the capture of my photo, video, and audio for use in DILG publications.</th>
                                     <th rowSpan={2} className="border border-black px-1 py-0.5 w-20 text-[6.5px] leading-[1.05] normal-case font-normal align-top">I consent to the storage of my data in the organizer’s database for future document processing.</th>
+                                    {attendanceGiveaways.map((item) => (
+                                        <th key={item.key} rowSpan={2} className="border border-black px-1 py-0.5 w-20 text-[8px] leading-[1.05]">
+                                            {item.label}
+                                        </th>
+                                    ))}
                                     {visibleSessions.map((session) => (
                                         <th key={session} rowSpan={2} className="border border-black px-2 py-1 w-20">
                                             {session}
@@ -217,6 +238,11 @@ const AttendanceSheetPrint: React.FC = () => {
                                                 <td className="px-1 py-0.5 font-bold border border-black">{(row.participant.gender === 'Female' || row.participant.gender === 'F') && '✓'}</td>
                                                 <td className="px-1 py-0.5 font-bold border border-black">{(row.participant as any).accept_photo_video ? '✓' : ''}</td>
                                                 <td className="px-1 py-0.5 font-bold border border-black">{(row.participant as any).store_to_db ? '✓' : ''}</td>
+                                                {attendanceGiveaways.map((item) => (
+                                                    <td key={item.key} className="px-1 py-0.5 border border-black">
+                                                        {renderCellText(formatGiveawayAttendanceValue(item, row.giveaway_selections), 8, 14)}
+                                                    </td>
+                                                ))}
                                                 {visibleSessions.map((session) => (
                                                     <td key={session} className="px-1 py-0.5 font-mono border border-black">
                                                         {session === 'AM'

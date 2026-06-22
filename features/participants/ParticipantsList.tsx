@@ -74,6 +74,18 @@ const summarizeGiveaways = (
     return { chips, detail: detailParts.join('\n') };
 };
 
+const getAttendanceGiveaways = (event: Event | null | undefined): GiveawayItem[] =>
+    (event?.giveaways || []).filter((item) => item.include_in_attendance);
+
+const formatGiveawayAttendanceValue = (
+    item: GiveawayItem,
+    selections: Record<string, string | boolean> | null | undefined,
+) => {
+    const value = selections?.[item.key];
+    if (item.type === 'boolean') return value ? 'Yes' : 'No';
+    return typeof value === 'string' && value.trim() ? 'Yes' : 'No';
+};
+
 const ATTENDANCE_EVENT_STATUS_SORT_ORDER: Record<string, number> = {
     Ongoing: 0,
     Completed: 1
@@ -488,6 +500,31 @@ const AttendanceList: React.FC = () => {
 
       // Flatten grouped data into an array of objects for XLSX
       const exportData: any[] = [];
+      const attendanceGiveaways = getAttendanceGiveaways(selectedEvent);
+      const usedColumnNames = new Set([
+          'Name',
+          'Gender',
+          'Position',
+          'Office',
+          'Mobile No',
+          'Email',
+          'Event Name',
+          'Role',
+          'Needs Accomodation',
+          'Present',
+          'AM Time',
+          'PM Time'
+      ]);
+      const giveawayColumnNames = attendanceGiveaways.map((item) => {
+          const base = item.label || 'Giveaway';
+          let name = base;
+          let suffix = 2;
+          while (usedColumnNames.has(name)) {
+              name = `${base} (${suffix++})`;
+          }
+          usedColumnNames.add(name);
+          return name;
+      });
       
       Object.keys(groupedData).sort().forEach(office => {
           groupedData[office].forEach(row => {
@@ -503,6 +540,10 @@ const AttendanceList: React.FC = () => {
                   'Needs Accomodation': row.needs_accommodation ? 'Yes' : 'No',
                   'Present': visibleSessions.some(session => session === 'AM' ? !!row.amLog : !!row.pmLog) ? 'Yes' : 'No'
               };
+
+              attendanceGiveaways.forEach((item, index) => {
+                  exportRow[giveawayColumnNames[index]] = formatGiveawayAttendanceValue(item, row.giveaway_selections);
+              });
 
               if (visibleSessions.includes('AM')) {
                   exportRow['AM Time'] = row.amLog ? formatLogTime(row.amLog.time) : '';

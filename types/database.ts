@@ -50,6 +50,7 @@ export interface GiveawayItem {
   label: string;
   type: GiveawayType;
   required?: boolean;
+  include_in_attendance?: boolean;
   options?: string[]; // used when type === 'single-select'
 }
 

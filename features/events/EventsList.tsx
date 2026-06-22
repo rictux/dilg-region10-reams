@@ -762,6 +762,7 @@ const EventsList: React.FC = () => {
                   label: '',
                   type: 'single-select',
                   required: true,
+                  include_in_attendance: false,
                   options: ['S', 'M', 'L', 'XL']
               }
           ]
@@ -789,6 +790,7 @@ const EventsList: React.FC = () => {
           .map((g) => ({
               ...g,
               label: (g.label || '').trim(),
+              include_in_attendance: !!g.include_in_attendance,
               options: g.type === 'single-select'
                   ? (g.options || []).map((o) => o.trim()).filter(Boolean)
                   : []
@@ -4376,7 +4378,8 @@ const EventsList: React.FC = () => {
                                         </div>
                                     )}
 
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div className="flex flex-wrap items-center gap-4">
                                         <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
                                             <input
                                                 type="checkbox"
@@ -4386,6 +4389,16 @@ const EventsList: React.FC = () => {
                                             />
                                             Required at registration
                                         </label>
+                                        <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={g.include_in_attendance || false}
+                                                onChange={(e) => updateGiveaway(idx, { include_in_attendance: e.target.checked })}
+                                                className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                                            />
+                                            Add to attendance sheet
+                                        </label>
+                                        </div>
                                         <button
                                             type="button"
                                             onClick={() => removeGiveaway(idx)}
