@@ -11,8 +11,8 @@ interface AttendanceRow {
     pmLog?: { time: string, status: string };
 }
 
-const ROWS_PER_PAGE = 25;
-const COMPACT_ROW_HEIGHT_PX = 24;
+const ROWS_PER_PAGE = 22;
+const COMPACT_ROW_HEIGHT_PX = 27;
 
 const chunkArray = <T,>(arr: T[], size: number): T[][] => {
     return Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
@@ -23,12 +23,12 @@ const chunkArray = <T,>(arr: T[], size: number): T[][] => {
 const renderCellText = (text: string | null | undefined, threshold1: number, threshold2: number) => {
     if (!text) return '';
     if (text.length > threshold2) {
-        return <div className="text-[6.5px] leading-[1.05] line-clamp-2">{text}</div>;
+        return <div className="text-[7.5px] leading-[1.05] line-clamp-2">{text}</div>;
     }
     if (text.length > threshold1) {
-        return <div className="text-[8px] leading-[1.1] line-clamp-2">{text}</div>;
+        return <div className="text-[9px] leading-[1.1] line-clamp-2">{text}</div>;
     }
-    return <div className="text-[9px] leading-tight line-clamp-1">{text}</div>;
+    return <div className="text-[10px] leading-tight line-clamp-1">{text}</div>;
 };
 
 const AttendanceSheetPrint: React.FC = () => {
@@ -172,7 +172,7 @@ const AttendanceSheetPrint: React.FC = () => {
                         <div className="text-[10px] leading-tight font-sans text-slate-900 mt-0.5">{format(date, 'MMMM d, yyyy')}</div>
                     </div>
                     <div className="px-6 pb-1 flex-1 min-h-0 overflow-hidden">
-                        <table className="w-full text-[9px] table-fixed">
+                        <table className="w-full text-[10px] table-fixed">
                             <thead>
                                 <tr className="bg-gray-200 text-center font-bold uppercase font-sans print:bg-gray-200 print:print-color-adjust-exact">
                                     <th rowSpan={2} className="border border-black px-1 py-0.5 w-8">No.</th>
@@ -193,7 +193,7 @@ const AttendanceSheetPrint: React.FC = () => {
                                     <th className="border border-black px-1 py-0.5 w-7">F</th>
                                 </tr>
                             </thead>
-                            <tbody className="font-sans text-[9px]">
+                            <tbody className="font-sans text-[10px]">
                                 {rows.length === 0 ? (
                                     <tr>
                                         <td colSpan={totalColumnCount} className="text-center py-12 text-slate-500 italic">No attendance recorded for this date.</td>
@@ -203,14 +203,14 @@ const AttendanceSheetPrint: React.FC = () => {
                                         const globalIndex = chunkIndex * ROWS_PER_PAGE + index + 1;
                                         return (
                                             <tr key={row.participant.participant_id} className="text-center hover:bg-slate-50 print:hover:bg-transparent overflow-hidden" style={{ height: COMPACT_ROW_HEIGHT_PX }}>
-                                                <td className="px-1 py-0.5 border border-black">{globalIndex}</td>
+                                                <td className="px-1 py-px border border-black">{globalIndex}</td>
                                                 <td className="px-2 py-0.5 text-left capitalize border border-black">
                                                     {renderCellText(row.participant.full_name, 25, 40)}
                                                 </td>
-                                                <td className="px-1 py-0.5 border border-black">
+                                                <td className="px-1 py-px border border-black">
                                                     {renderCellText(row.participant.position, 20, 35)}
                                                 </td>
-                                                <td className="px-1 py-0.5 border border-black">
+                                                <td className="px-1 py-px border border-black">
                                                     {renderCellText(row.participant.office, 20, 35)}
                                                 </td>
                                                 <td className="px-1 py-0.5 font-bold border border-black">{(row.participant.gender === 'Male' || row.participant.gender === 'M') && '✓'}</td>
