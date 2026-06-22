@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event, Participant, Office, GiveawayItem, EventAccessRole, EventUserAccess, User } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift, Settings } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift, Settings, ChevronDown } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import ExcelJS from 'exceljs';
@@ -60,7 +60,7 @@ type ParticipantModalRecord = {
   participants: Participant | null;
 };
 
-type EventAccessUser = Pick<User, 'user_id' | 'full_name' | 'username' | 'role' | 'office_id' | 'status'> & {
+type EventAccessUser = Pick<User, 'user_id' | 'full_name' | 'username' | 'office_id' | 'status'> & {
   offices?: Pick<Office, 'code' | 'name'> | null;
 };
 
@@ -146,6 +146,7 @@ const EventsList: React.FC = () => {
   const [loadingEventAccess, setLoadingEventAccess] = useState(false);
   const [accessUserSearch, setAccessUserSearch] = useState('');
   const [selectedAccessUserId, setSelectedAccessUserId] = useState('');
+  const [isAccessUserDropdownOpen, setIsAccessUserDropdownOpen] = useState(false);
   const [selectedAccessRole, setSelectedAccessRole] = useState<EventAccessRole>('ManagerScanner');
   const [savingEventAccess, setSavingEventAccess] = useState(false);
   
@@ -399,7 +400,6 @@ const EventsList: React.FC = () => {
             user_id,
             full_name,
             username,
-            role,
             office_id,
             status,
             offices (
@@ -428,7 +428,6 @@ const EventsList: React.FC = () => {
           user_id,
           full_name,
           username,
-          role,
           office_id,
           status,
           offices (
@@ -731,6 +730,7 @@ const EventsList: React.FC = () => {
       setAccessUserSearch('');
       setSelectedAccessUserId('');
       setSelectedAccessRole('ManagerScanner');
+      setIsAccessUserDropdownOpen(false);
       setOpenActionMenuId(null);
       setActionMenuPosition(null);
       setShowEventAccessModal(true);
@@ -745,6 +745,7 @@ const EventsList: React.FC = () => {
       setAccessUserSearch('');
       setSelectedAccessUserId('');
       setSelectedAccessRole('ManagerScanner');
+      setIsAccessUserDropdownOpen(false);
   };
 
   // --- Giveaways / freebies config helpers ---
@@ -879,6 +880,7 @@ const EventsList: React.FC = () => {
           toast.success('Event access saved.');
           setSelectedAccessUserId('');
           setAccessUserSearch('');
+          setIsAccessUserDropdownOpen(false);
           fetchEventAccess(selectedAccessEvent.event_id);
       }
 
@@ -1824,11 +1826,13 @@ const EventsList: React.FC = () => {
     return (
       accessUser.full_name.toLowerCase().includes(normalizedSearch) ||
       accessUser.username.toLowerCase().includes(normalizedSearch) ||
-      accessUser.role.toLowerCase().includes(normalizedSearch) ||
       Boolean(accessUser.offices?.code?.toLowerCase().includes(normalizedSearch)) ||
       Boolean(accessUser.offices?.name?.toLowerCase().includes(normalizedSearch))
     );
   });
+  const selectedAccessUser = selectedAccessUserId
+    ? eventAccessUsers.find((accessUser) => accessUser.user_id === Number(selectedAccessUserId)) || null
+    : null;
 
   // Helper for status badges
   const getStatusBadge = (status: string) => {
@@ -3635,28 +3639,79 @@ const EventsList: React.FC = () => {
                         <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 lg:grid-cols-[minmax(0,1fr)_180px_auto]">
                             <div className="space-y-2">
                                 <label className="block text-xs font-medium text-slate-600">User</label>
-                                <input
-                                    type="text"
-                                    value={accessUserSearch}
-                                    onChange={(e) => {
-                                        setAccessUserSearch(e.target.value);
-                                        setSelectedAccessUserId('');
-                                    }}
-                                    placeholder="Search by name, username, role, or office"
-                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                                />
-                                <select
-                                    value={selectedAccessUserId}
-                                    onChange={(e) => setSelectedAccessUserId(e.target.value)}
-                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                                >
-                                    <option value="">Select user</option>
-                                    {filteredEventAccessUsers.slice(0, 25).map((accessUser) => (
-                                        <option key={accessUser.user_id} value={accessUser.user_id}>
-                                            {accessUser.full_name} (@{accessUser.username}) - {accessUser.offices?.code || 'No office'} - {accessUser.role}
-                                        </option>
-                                    ))}
-                                </select>
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAccessUserDropdownOpen((open) => !open)}
+                                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-900 transition-colors hover:border-indigo-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                        aria-expanded={isAccessUserDropdownOpen}
+                                    >
+                                        <span className="min-w-0">
+                                            {selectedAccessUser ? (
+                                                <>
+                                                    <span className="block truncate font-medium">{selectedAccessUser.full_name}</span>
+                                                    <span className="block truncate text-xs text-slate-500">
+                                                        @{selectedAccessUser.username} - {selectedAccessUser.offices?.code || 'No office'}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <span className="text-slate-500">Select user</span>
+                                            )}
+                                        </span>
+                                        <ChevronDown size={16} className={`shrink-0 text-slate-400 transition-transform ${isAccessUserDropdownOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {isAccessUserDropdownOpen && (
+                                        <div className="absolute z-[90] mt-2 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                                            <div className="border-b border-slate-100 p-2">
+                                                <div className="relative">
+                                                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                    <input
+                                                        type="text"
+                                                        value={accessUserSearch}
+                                                        onChange={(e) => setAccessUserSearch(e.target.value)}
+                                                        placeholder="Search user or office"
+                                                        className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                                        autoFocus
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="max-h-60 overflow-y-auto py-1">
+                                                {filteredEventAccessUsers.length === 0 ? (
+                                                    <div className="px-3 py-3 text-sm text-slate-500">No users found.</div>
+                                                ) : (
+                                                    filteredEventAccessUsers.slice(0, 25).map((accessUser) => {
+                                                        const selected = selectedAccessUserId === String(accessUser.user_id);
+
+                                                        return (
+                                                            <button
+                                                                key={accessUser.user_id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedAccessUserId(String(accessUser.user_id));
+                                                                    setAccessUserSearch('');
+                                                                    setIsAccessUserDropdownOpen(false);
+                                                                }}
+                                                                className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors ${
+                                                                    selected ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'
+                                                                }`}
+                                                            >
+                                                                <span className="min-w-0">
+                                                                    <span className="block truncate font-medium">{accessUser.full_name}</span>
+                                                                    <span className="block truncate text-xs text-slate-500">
+                                                                        @{accessUser.username} - {accessUser.offices?.code || 'No office'}
+                                                                    </span>
+                                                                </span>
+                                                                {selected && <Check size={15} className="shrink-0 text-indigo-600" />}
+                                                            </button>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div>
@@ -3708,7 +3763,6 @@ const EventsList: React.FC = () => {
                                             <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                                                 <span>@{access.users?.username || 'unknown'}</span>
                                                 <span>{access.users?.offices?.code || 'No office'}</span>
-                                                <span>{access.users?.role || 'User'}</span>
                                             </p>
                                         </div>
                                         <div className="flex flex-wrap items-center gap-2">
