@@ -295,7 +295,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
   };
 
   const contentClass = isInternal
-    ? 'w-full h-full min-h-0 flex flex-col gap-6'
+    ? 'w-full h-full min-h-0 flex flex-col gap-6 overflow-y-auto lg:overflow-visible'
     : 'min-h-screen bg-slate-50 flex flex-col items-center w-full px-3 py-5 sm:p-8';
 
   const renderPublicTimeline = () => {
@@ -381,8 +381,40 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
     }
 
     return (
-      <div className="flex-1 min-h-0 overflow-auto w-full">
-        <table className="datatable w-full text-[13px] text-left min-w-[600px]">
+      <div className="lg:flex-1 lg:min-h-0 lg:overflow-auto w-full">
+        {/* Card layout for mobile and tablet */}
+        <div className="lg:hidden p-3 sm:p-4 space-y-3">
+          {attendedEvents.map((event) => (
+            <div
+              key={event.event_id}
+              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <h5 className="text-sm font-bold text-slate-900 leading-snug break-words min-w-0">
+                  {event.event_name}
+                </h5>
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 text-[11px] font-medium border border-indigo-100 shrink-0 whitespace-nowrap">
+                  <Shield size={12} />
+                  {event.role}
+                </span>
+              </div>
+
+              <div className="mt-3 space-y-2 text-[13px] text-slate-600">
+                <div className="flex items-start gap-2">
+                  <Calendar size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                  <span className="break-words">{formatEventDate(event.start_date, event.end_date)}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <MapPin size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                  <span className="break-words">{event.venue}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Table layout for desktop */}
+        <table className="datatable hidden lg:table w-full text-[13px] text-left">
           <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200">
             <tr>
               <th className="px-5 py-3 w-[36%]">Event Name</th>
@@ -445,7 +477,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
         </div>
       )}
 
-      <div className={isInternal ? 'w-full flex-1 min-h-0 flex flex-col gap-6' : 'w-full max-w-5xl space-y-4 sm:space-y-6'}>
+      <div className={isInternal ? 'w-full lg:flex-1 lg:min-h-0 flex flex-col gap-6' : 'w-full max-w-5xl space-y-4 sm:space-y-6'}>
         {isInternal ? (
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -579,37 +611,59 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
           </div>
         )}
 
-        <div className={isInternal ? 'flex-1 min-h-0 flex flex-col gap-6' : 'space-y-6'}>
+        <div className={isInternal ? 'lg:flex-1 lg:min-h-0 flex flex-col gap-6' : 'space-y-6'}>
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12 text-slate-400">
               <Loader2 className="animate-spin mb-3" size={32} />
               <p className="text-sm font-medium">Retrieving attendance logs...</p>
             </div>
           ) : selectedParticipant ? (
-            <div className={isInternal ? 'animate-in fade-in slide-in-from-bottom-4 duration-500 flex-1 min-h-0 flex flex-col gap-6' : 'animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4 sm:space-y-6'}>
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 md:p-6 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
-                <div className="w-14 h-14 sm:w-16 sm:h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-xl sm:text-2xl font-bold shrink-0 mx-auto sm:mx-0">
+            <div className={isInternal ? 'animate-in fade-in slide-in-from-bottom-4 duration-500 lg:flex-1 lg:min-h-0 flex flex-col gap-6' : 'animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4 sm:space-y-6'}>
+              <div className={isInternal
+                ? 'bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-sm flex flex-row items-center gap-3 sm:gap-4'
+                : 'bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 md:p-6 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5'}>
+                <div className={isInternal
+                  ? 'w-11 h-11 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center text-lg font-bold shrink-0'
+                  : 'w-14 h-14 sm:w-16 sm:h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-xl sm:text-2xl font-bold shrink-0 mx-auto sm:mx-0'}>
                   {selectedParticipant.full_name.charAt(0)}
                 </div>
-                <div className="text-center sm:text-left flex-1 min-w-0">
-                  <p className="text-xs font-bold text-indigo-600 uppercase tracking-[0.2em] mb-2">Participant Record</p>
-                  <h3 className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">{selectedParticipant.full_name}</h3>
-                  <div className="mt-3 space-y-2 text-sm text-slate-600">
-                    <p className="font-medium text-slate-700">{selectedParticipant.position}</p>
-                    <div className="flex items-start justify-center sm:justify-start gap-2">
-                      <Landmark size={14} className="text-slate-400 shrink-0 mt-0.5" />
-                      <span>{selectedParticipant.office}</span>
-                    </div>
-                  </div>
+                <div className={isInternal ? 'text-left flex-1 min-w-0' : 'text-center sm:text-left flex-1 min-w-0'}>
+                  {isInternal ? (
+                    <>
+                      <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-tight truncate">{selectedParticipant.full_name}</h3>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm text-slate-600">
+                        <span className="font-medium text-slate-700">{selectedParticipant.position}</span>
+                        <span className="text-slate-300 hidden sm:inline">&bull;</span>
+                        <span className="inline-flex items-center gap-1 min-w-0">
+                          <Landmark size={13} className="text-slate-400 shrink-0" />
+                          <span className="truncate">{selectedParticipant.office}</span>
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs font-bold text-indigo-600 uppercase tracking-[0.2em] mb-2">Participant Record</p>
+                      <h3 className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">{selectedParticipant.full_name}</h3>
+                      <div className="mt-3 space-y-2 text-sm text-slate-600">
+                        <p className="font-medium text-slate-700">{selectedParticipant.position}</p>
+                        <div className="flex items-start justify-center sm:justify-start gap-2">
+                          <Landmark size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                          <span>{selectedParticipant.office}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div className="bg-slate-50 border border-slate-200 px-5 py-3 rounded-xl text-center w-full sm:w-auto sm:min-w-[140px]">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Events Attended</p>
-                  <p className="text-2xl font-bold text-indigo-600">{attendedEvents.length}</p>
+                <div className={isInternal
+                  ? 'bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-center shrink-0'
+                  : 'bg-slate-50 border border-slate-200 px-5 py-3 rounded-xl text-center w-full sm:w-auto sm:min-w-[140px]'}>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{isInternal ? 'Events' : 'Events Attended'}</p>
+                  <p className={isInternal ? 'text-xl font-bold text-indigo-600 leading-none mt-0.5' : 'text-2xl font-bold text-indigo-600'}>{attendedEvents.length}</p>
                 </div>
               </div>
 
               {isInternal ? (
-                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
+                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden lg:flex-1 lg:min-h-0 flex flex-col">
                   <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <History className="text-indigo-600" size={18} />
