@@ -3614,7 +3614,7 @@ const EventsList: React.FC = () => {
       {showEventAccessModal && selectedAccessEvent && (
         <div className="fixed inset-0 z-[75] flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeEventAccessModal}></div>
-            <div className="relative z-20 flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="relative z-20 flex h-[85vh] max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
                 <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
                     <div className="min-w-0">
                         <h3 className="flex items-center gap-2 text-base font-bold text-slate-800">
@@ -3634,7 +3634,7 @@ const EventsList: React.FC = () => {
                     </button>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto p-5 space-y-4">
+                <div className="flex min-h-0 flex-1 flex-col gap-4 p-5">
                     {canAssignAccessForSelectedEvent && (
                         <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 lg:grid-cols-[minmax(0,1fr)_180px_auto]">
                             <div className="space-y-2">
@@ -3741,10 +3741,11 @@ const EventsList: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
                         <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
                             <p className="text-sm font-semibold text-slate-800">Assigned Users</p>
                         </div>
+                        <div className="min-h-0 flex-1 overflow-y-auto">
                         {loadingEventAccess ? (
                             <div className="flex items-center gap-2 px-4 py-4 text-sm text-slate-500">
                                 <Loader2 size={15} className="animate-spin text-indigo-500" />
@@ -3791,6 +3792,7 @@ const EventsList: React.FC = () => {
                                 ))}
                             </div>
                         )}
+                        </div>
                     </div>
                 </div>
             </div>
