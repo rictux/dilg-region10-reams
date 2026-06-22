@@ -33,6 +33,7 @@ import {
     isAfter,
     differenceInDays
 } from 'date-fns';
+import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
 
 interface DashboardEvent {
   event_id: number;
@@ -107,40 +108,20 @@ const Dashboard: React.FC = () => {
     const today = format(new Date(), 'yyyy-MM-dd');
 
     try {
-        // 1. Stats
-        let totalQ = supabase.from('events').select('*', { count: 'exact', head: true }).is('deleted_at', null);
-        if (user?.role !== 'Admin' && user?.office_id) totalQ = totalQ.eq('organize_by', user.office_id);
-        const { count: total } = await totalQ;
-
-        let activeQ = supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'Ongoing').is('deleted_at', null);
-        if (user?.role !== 'Admin' && user?.office_id) activeQ = activeQ.eq('organize_by', user.office_id);
-        const { count: active } = await activeQ;
-
-        let completedQ = supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'Completed').is('deleted_at', null);
-        if (user?.role !== 'Admin' && user?.office_id) completedQ = completedQ.eq('organize_by', user.office_id);
-        const { count: completed } = await completedQ;
-
-        let upcomingCountQ = supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'Scheduled').is('deleted_at', null);
-        if (user?.role !== 'Admin' && user?.office_id) upcomingCountQ = upcomingCountQ.eq('organize_by', user.office_id);
-        const { count: upcoming } = await upcomingCountQ;
+        const accessibleEvents = await fetchAccessibleEvents(user, {
+            accessRoles: MANAGE_EVENT_ACCESS_ROLES,
+            deletedView: 'active'
+        });
 
         setStats({
-            totalEvents: total || 0,
-            activeEvents: active || 0,
-            upcomingEvents: upcoming || 0,
-            completedEvents: completed || 0
+            totalEvents: accessibleEvents.length,
+            activeEvents: accessibleEvents.filter((event) => event.status === 'Ongoing').length,
+            upcomingEvents: accessibleEvents.filter((event) => event.status === 'Scheduled').length,
+            completedEvents: accessibleEvents.filter((event) => event.status === 'Completed').length
         });
 
         // 2. On-going Events
-        let ongoingQuery = supabase
-            .from('events')
-            .select('*')
-            .is('deleted_at', null)
-            .lte('start_date', today)
-            .gte('end_date', today);
-        
-        if (user?.role !== 'Admin' && user?.office_id) ongoingQuery = ongoingQuery.eq('organize_by', user.office_id);
-        const { data: ongoingData } = await ongoingQuery;
+        const ongoingData = accessibleEvents.filter((event) => event.start_date <= today && event.end_date >= today);
         
         const ongoingEventsWithCounts = await Promise.all((ongoingData || []).map(async (e) => {
             const { count: regCount } = await supabase
@@ -166,15 +147,9 @@ const Dashboard: React.FC = () => {
         setOngoingEvents(ongoingEventsWithCounts);
 
         // 3. Upcoming Events
-        let upcomingQuery = supabase
-            .from('events')
-            .select('*')
-            .is('deleted_at', null)
-            .gt('start_date', today)
-            .order('start_date', { ascending: true });
-        
-        if (user?.role !== 'Admin' && user?.office_id) upcomingQuery = upcomingQuery.eq('organize_by', user.office_id);
-        const { data: upcomingData } = await upcomingQuery;
+        const upcomingData = accessibleEvents
+            .filter((event) => event.start_date > today)
+            .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
 
         const upcomingEventsWithCounts = await Promise.all((upcomingData || []).map(async (e) => {
              const { count: regCount } = await supabase
@@ -191,14 +166,7 @@ const Dashboard: React.FC = () => {
         setUpcomingEvents(upcomingEventsWithCounts);
 
         // 4. All Events (For Calendar)
-        let calendarQuery = supabase
-            .from('events')
-            .select('*')
-            .is('deleted_at', null)
-            .neq('status', 'Cancelled');
-        
-        if (user?.role !== 'Admin' && user?.office_id) calendarQuery = calendarQuery.eq('organize_by', user.office_id);
-        const { data: allEventsData } = await calendarQuery;
+        const allEventsData = accessibleEvents.filter((event) => event.status !== 'Cancelled');
             
         const mappedCalendarEvents = await Promise.all((allEventsData || []).map(async (e) => {
             const { count: regCount } = await supabase

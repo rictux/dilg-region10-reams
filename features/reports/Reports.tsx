@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../lib/supabase';
 import { Printer, Calendar, ScrollText, Search, ChevronDown, Check, X, Award } from 'lucide-react';
 import { Event } from '../../types/database';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
+import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
 
 const Reports: React.FC = () => {
   const navigate = useNavigate();
@@ -44,22 +44,14 @@ const Reports: React.FC = () => {
   }, [selectedEventId]);
 
   const fetchEvents = async () => {
-    let query = supabase
-      .from('events')
-      .select('*')
-      .in('status', ['Ongoing', 'Completed'])
-      .is('deleted_at', null)
-      .order('start_date', { ascending: false });
-
-    // Filter events by office for non-admins
-    if (user?.role !== 'Admin' && user?.office_id) {
-        query = query.eq('organize_by', user.office_id);
-    }
-
-    const { data } = await query;
-    if (data) {
-        setEvents(data);
-    }
+    const data = await fetchAccessibleEvents(user, {
+      accessRoles: MANAGE_EVENT_ACCESS_ROLES,
+      statuses: ['Ongoing', 'Completed'],
+      deletedView: 'active',
+      orderBy: 'start_date',
+      ascending: false
+    });
+    setEvents(data);
     setLoading(false);
   };
 

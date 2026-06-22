@@ -29,6 +29,18 @@ export interface User {
   auth_user_id?: string | null;
 }
 
+export type EventAccessRole = 'Manager' | 'Scanner' | 'ManagerScanner';
+
+export interface EventUserAccess {
+  id: number;
+  event_id: number;
+  user_id: number;
+  access_role: EventAccessRole;
+  assigned_by?: number | null;
+  assigned_at?: string;
+  status: 'Active' | 'Revoked';
+}
+
 // A single giveaway/freebie an event offers (e.g. T-shirt with sizes, or a yes/no cap).
 // `key` is the stable machine id used to store answers; `label` is the display text.
 export type GiveawayType = 'single-select' | 'boolean';
