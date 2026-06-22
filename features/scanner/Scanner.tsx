@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Event } from '../../types/database';
 import { format } from 'date-fns';
+import { SCAN_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
 
 interface RecentScan {
     id: string;
@@ -195,21 +196,14 @@ const Scanner: React.FC = () => {
       try {
         const today = format(new Date(), 'yyyy-MM-dd');
 
-        let query = supabase
-          .from('events')
-          .select('*')
-          .lte('start_date', today)
-          .gte('end_date', today)
-          .neq('status', 'Cancelled')
-          .is('deleted_at', null)
-          .order('start_date', { ascending: false });
-
-        // Filter events by office for non-admins
-        if (user?.role !== 'Admin' && user?.office_id) {
-            query = query.eq('organize_by', user.office_id);
-        }
-
-        const { data } = await query;
+        const data = await fetchAccessibleEvents(user, {
+          accessRoles: SCAN_EVENT_ACCESS_ROLES,
+          dateContains: today,
+          excludeCancelled: true,
+          deletedView: 'active',
+          orderBy: 'start_date',
+          ascending: false
+        });
         
         if (data && data.length > 0) {
           setEvents(data);

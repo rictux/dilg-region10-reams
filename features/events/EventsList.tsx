@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Event, Participant, Office, GiveawayItem } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift } from 'lucide-react';
+import { Event, Participant, Office, GiveawayItem, EventAccessRole, EventUserAccess, User } from '../../types/database';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift, Settings } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import ExcelJS from 'exceljs';
@@ -17,6 +17,7 @@ import {
   parseFoodInclusion,
   serializeFoodInclusion
 } from '../../lib/eventFoodInclusion';
+import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents, isEventOwnerOffice } from '../../lib/eventAccess';
 
 type ParticipantFormData = {
   f_name: string;
@@ -57,6 +58,14 @@ type ParticipantModalRecord = {
   date_accommodation: string[] | null;
   giveaway_selections: Record<string, string | boolean> | null;
   participants: Participant | null;
+};
+
+type EventAccessUser = Pick<User, 'user_id' | 'full_name' | 'username' | 'role' | 'office_id' | 'status'> & {
+  offices?: Pick<Office, 'code' | 'name'> | null;
+};
+
+type EventAccessRecord = EventUserAccess & {
+  users?: EventAccessUser | null;
 };
 
 const createEmptyParticipantForm = (): ParticipantFormData => ({
@@ -130,6 +139,15 @@ const EventsList: React.FC = () => {
   const [showEventModal, setShowEventModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [showEventAccessModal, setShowEventAccessModal] = useState(false);
+  const [selectedAccessEvent, setSelectedAccessEvent] = useState<Event | null>(null);
+  const [eventAccessList, setEventAccessList] = useState<EventAccessRecord[]>([]);
+  const [eventAccessUsers, setEventAccessUsers] = useState<EventAccessUser[]>([]);
+  const [loadingEventAccess, setLoadingEventAccess] = useState(false);
+  const [accessUserSearch, setAccessUserSearch] = useState('');
+  const [selectedAccessUserId, setSelectedAccessUserId] = useState('');
+  const [selectedAccessRole, setSelectedAccessRole] = useState<EventAccessRole>('ManagerScanner');
+  const [savingEventAccess, setSavingEventAccess] = useState(false);
   
   // Add Participant Modal State
   const [participantModalView, setParticipantModalView] = useState<'list' | 'add' | 'edit'>('list');
@@ -222,12 +240,18 @@ const EventsList: React.FC = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
         fetchEvents();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_user_access' }, () => {
+        fetchEvents();
+        if (selectedAccessEvent) {
+          fetchEventAccess(selectedAccessEvent.event_id);
+        }
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [user, eventView]);
+  }, [user, eventView, selectedAccessEvent]);
 
   // Realtime updates for the Participants Modal
   useEffect(() => {
@@ -335,31 +359,94 @@ const EventsList: React.FC = () => {
 
   const fetchEvents = async () => {
     setLoading(true);
-    
-    let query = supabase
-      .from('events')
-      .select('*')
-      .order(eventView === 'deleted' ? 'deleted_at' : 'start_date', { ascending: false });
 
-    query = eventView === 'deleted'
-      ? query.not('deleted_at', 'is', null)
-      : query.is('deleted_at', null);
+    try {
+      const data = await fetchAccessibleEvents(user, {
+        accessRoles: MANAGE_EVENT_ACCESS_ROLES,
+        deletedView: eventView,
+        orderBy: eventView === 'deleted' ? 'deleted_at' : 'start_date',
+        ascending: false
+      });
 
-    // Display only the event with same office_id of the login user IF NOT ADMIN
-    // If the user has an office assigned, filter events organized by that office
-    // Admin sees everything regardless of their office_id
-    if (user?.role !== 'Admin' && user?.office_id) {
-        query = query.eq('organize_by', user.office_id);
+      setEvents(data);
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      toast.error('Unable to load events.');
+    } finally {
+      setLoading(false);
     }
-    
-    const { data, error } = await query;
-    if (!error && data) setEvents(data);
-    setLoading(false);
   };
 
   const fetchOffices = async () => {
       const { data } = await supabase.from('offices').select('*').order('name');
       if (data) setOffices(data);
+  };
+
+  const fetchEventAccess = async (eventId: number) => {
+      setLoadingEventAccess(true);
+
+      const { data, error } = await supabase
+        .from('event_user_access')
+        .select(`
+          id,
+          event_id,
+          user_id,
+          access_role,
+          assigned_by,
+          assigned_at,
+          status,
+          users!event_user_access_user_id_fkey (
+            user_id,
+            full_name,
+            username,
+            role,
+            office_id,
+            status,
+            offices (
+              code,
+              name
+            )
+          )
+        `)
+        .eq('event_id', eventId)
+        .order('assigned_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching event access:', error);
+        toast.error('Unable to load event access list.');
+      } else {
+        setEventAccessList((data || []) as EventAccessRecord[]);
+      }
+
+      setLoadingEventAccess(false);
+  };
+
+  const fetchEventAccessUsers = async () => {
+      const { data, error } = await supabase
+        .from('users')
+        .select(`
+          user_id,
+          full_name,
+          username,
+          role,
+          office_id,
+          status,
+          offices (
+            code,
+            name
+          )
+        `)
+        .eq('status', 'Active')
+        .neq('role', 'Admin')
+        .order('full_name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching users for event access:', error);
+        toast.error('Unable to load users for event access.');
+        return;
+      }
+
+      setEventAccessUsers((data || []) as EventAccessUser[]);
   };
 
   const fetchEventParticipants = async (eventId: number) => {
@@ -587,6 +674,10 @@ const EventsList: React.FC = () => {
       setVenueSuggestions([]);
       setShowVenueSuggestions(false);
       setLoadingVenueSuggestions(false);
+      setEventAccessList([]);
+      setAccessUserSearch('');
+      setSelectedAccessUserId('');
+      setSelectedAccessRole('ManagerScanner');
       setShowEventModal(true);
   };
 
@@ -620,6 +711,40 @@ const EventsList: React.FC = () => {
       setShowVenueSuggestions(false);
       setLoadingVenueSuggestions(false);
       setShowEventModal(true);
+  };
+
+  const canSetEventAccess = (event: Event | null | undefined) =>
+      Boolean(
+        eventView === 'active' &&
+        event &&
+        (
+          isAdmin ||
+          (user?.role === 'OfficeManager' && isEventOwnerOffice(user, event))
+        )
+      );
+
+  const openEventAccessModal = (e: React.MouseEvent, event: Event) => {
+      e.stopPropagation();
+      if (!canSetEventAccess(event)) return;
+
+      setSelectedAccessEvent(event);
+      setAccessUserSearch('');
+      setSelectedAccessUserId('');
+      setSelectedAccessRole('ManagerScanner');
+      setOpenActionMenuId(null);
+      setActionMenuPosition(null);
+      setShowEventAccessModal(true);
+      fetchEventAccess(event.event_id);
+      fetchEventAccessUsers();
+  };
+
+  const closeEventAccessModal = () => {
+      setShowEventAccessModal(false);
+      setSelectedAccessEvent(null);
+      setEventAccessList([]);
+      setAccessUserSearch('');
+      setSelectedAccessUserId('');
+      setSelectedAccessRole('ManagerScanner');
   };
 
   // --- Giveaways / freebies config helpers ---
@@ -689,8 +814,8 @@ const EventsList: React.FC = () => {
           food_inclusion: normalizedFoodInclusion,
           giveaways: normalizeGiveaways(formData.giveaways as GiveawayItem[])
       };
-      if (user?.role !== 'Admin' && user?.office_id) {
-          payload.organize_by = user.office_id;
+      if (user?.role !== 'Admin') {
+          payload.organize_by = editingEventId ? (formData.organize_by || null) : (user?.office_id || null);
       }
 
       let error;
@@ -726,6 +851,61 @@ const EventsList: React.FC = () => {
       }
   };
 
+  const handleGrantEventAccess = async () => {
+      if (!selectedAccessEvent || !selectedAccessUserId || !user) return;
+
+      if (!canSetEventAccess(selectedAccessEvent)) {
+          toast.error('Only Admin or the owning Office Manager can assign users to this event.');
+          return;
+      }
+
+      setSavingEventAccess(true);
+
+      const { error } = await supabase
+        .from('event_user_access')
+        .upsert({
+          event_id: selectedAccessEvent.event_id,
+          user_id: Number(selectedAccessUserId),
+          access_role: selectedAccessRole,
+          assigned_by: user.user_id,
+          status: 'Active'
+        }, {
+          onConflict: 'event_id,user_id'
+        });
+
+      if (error) {
+          toast.error('Error assigning user: ' + error.message);
+      } else {
+          toast.success('Event access saved.');
+          setSelectedAccessUserId('');
+          setAccessUserSearch('');
+          fetchEventAccess(selectedAccessEvent.event_id);
+      }
+
+      setSavingEventAccess(false);
+  };
+
+  const handleRevokeEventAccess = async (access: EventAccessRecord) => {
+      if (!selectedAccessEvent || !user) return;
+
+      if (!canSetEventAccess(selectedAccessEvent)) {
+          toast.error('Only Admin or the owning Office Manager can revoke event access.');
+          return;
+      }
+
+      const { error } = await supabase
+        .from('event_user_access')
+        .update({ status: 'Revoked' })
+        .eq('id', access.id);
+
+      if (error) {
+          toast.error('Error revoking access: ' + error.message);
+      } else {
+          toast.success('Event access revoked.');
+          fetchEventAccess(selectedAccessEvent.event_id);
+      }
+  };
+
   const selectVenueSuggestion = (venue: string) => {
       setFormData((prev) => ({ ...prev, venue }));
       setVenueSuggestions([]);
@@ -735,9 +915,10 @@ const EventsList: React.FC = () => {
   };
 
   const handleDelete = async (e: React.MouseEvent, id: number) => {
-      if (!canDeleteEvents) return;
-
       e.stopPropagation(); // Prevent row click
+      const targetEvent = events.find((event) => event.event_id === id);
+      if (!targetEvent || !canDeleteEventRecord(targetEvent)) return;
+
       setEventDeleteConfirmation('');
       setEventToDelete(id);
   };
@@ -748,7 +929,10 @@ const EventsList: React.FC = () => {
   };
 
   const confirmDeleteEvent = async () => {
-      if (!canDeleteEvents || !eventToDelete) return;
+      if (!eventToDelete) return;
+
+      const targetEvent = events.find((event) => event.event_id === eventToDelete);
+      if (!targetEvent || !canDeleteEventRecord(targetEvent)) return;
       
       const deletedEventId = eventToDelete;
       setIsDeleting(true);
@@ -1621,6 +1805,30 @@ const EventsList: React.FC = () => {
   }, [viewingParticipants]);
   const canManageParticipants = hasPermission('MANAGE_PARTICIPANTS');
   const canDeleteEvents = hasPermission('DELETE_EVENTS');
+  const canEditEventRecord = (event: Event) =>
+    eventView === 'active' && hasPermission('MANAGE_EVENTS');
+  const canDeleteEventRecord = (event: Event) =>
+    isAdmin || (canDeleteEvents && isEventOwnerOffice(user, event));
+  const canAssignAccessForSelectedEvent = canSetEventAccess(selectedAccessEvent);
+  const activeAssignedUserIds = new Set(
+    eventAccessList
+      .filter((access) => access.status === 'Active')
+      .map((access) => access.user_id)
+  );
+  const filteredEventAccessUsers = eventAccessUsers.filter((accessUser) => {
+    if (accessUser.user_id === user?.user_id || activeAssignedUserIds.has(accessUser.user_id)) return false;
+
+    const normalizedSearch = accessUserSearch.trim().toLowerCase();
+    if (!normalizedSearch) return true;
+
+    return (
+      accessUser.full_name.toLowerCase().includes(normalizedSearch) ||
+      accessUser.username.toLowerCase().includes(normalizedSearch) ||
+      accessUser.role.toLowerCase().includes(normalizedSearch) ||
+      Boolean(accessUser.offices?.code?.toLowerCase().includes(normalizedSearch)) ||
+      Boolean(accessUser.offices?.name?.toLowerCase().includes(normalizedSearch))
+    );
+  });
 
   // Helper for status badges
   const getStatusBadge = (status: string) => {
@@ -1686,7 +1894,6 @@ const EventsList: React.FC = () => {
     () => events.find((event) => event.event_id === eventToDelete) ?? null,
     [events, eventToDelete]
   );
-  const showEventActionsMenu = isAdmin || canDeleteEvents;
   const actionMenuPlacementClass = actionMenuDirection === 'up'
     ? 'origin-bottom-right'
     : 'origin-top-right';
@@ -1705,9 +1912,13 @@ const EventsList: React.FC = () => {
     }
 
     const viewportPadding = 16;
-    const menuItemCount = canDeleteEvents ? 2 : 1;
+    const activeEvent = events.find((event) => event.event_id === eventId);
+    const menuItemCount =
+      (activeEvent && canEditEventRecord(activeEvent) ? 1 : 0) +
+      (activeEvent && canSetEventAccess(activeEvent) ? 1 : 0) +
+      (activeEvent && canDeleteEventRecord(activeEvent) ? 1 : 0);
     const estimatedMenuHeight = (menuItemCount * 44) + 16;
-    const estimatedMenuWidth = 176;
+    const estimatedMenuWidth = 208;
     const triggerRect = e.currentTarget.getBoundingClientRect();
     const spaceAbove = triggerRect.top - viewportPadding;
     const spaceBelow = window.innerHeight - triggerRect.bottom - viewportPadding;
@@ -1979,6 +2190,10 @@ const EventsList: React.FC = () => {
                           <>
                               {paginatedEvents.map((event, index) => {
                                   const forceMenuUp = index >= Math.max(paginatedEvents.length - 2, 0);
+                                  const canEditCurrentEvent = canEditEventRecord(event);
+                                  const canDeleteCurrentEvent = canDeleteEventRecord(event);
+                                  const canSetCurrentEventAccess = canSetEventAccess(event);
+                                  const showEventActionMenuForRow = canEditCurrentEvent || canDeleteCurrentEvent || canSetCurrentEventAccess;
 
                                   return (
                                   <tr 
@@ -2074,7 +2289,7 @@ const EventsList: React.FC = () => {
                                                         Delete Forever
                                                     </button>
                                                 </>
-                                            ) : showEventActionsMenu ? (
+                                            ) : showEventActionMenuForRow ? (
                                                 <>
                                                     <button 
                                                         onClick={(e) => toggleActionMenu(e, event.event_id, forceMenuUp ? 'up' : undefined)}
@@ -2095,22 +2310,35 @@ const EventsList: React.FC = () => {
                                                                 }}
                                                             />
                                                             <div
-                                                                className={`fixed w-44 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100 ${actionMenuPlacementClass}`}
+                                                                className={`fixed w-52 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100 ${actionMenuPlacementClass}`}
                                                                 style={{
                                                                     top: actionMenuPosition?.top ?? 0,
                                                                     left: actionMenuPosition?.left ?? 0
                                                                 }}
                                                             >
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        setOpenActionMenuId(null);
-                                                                        openEditModal(e, event);
-                                                                    }}
-                                                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors text-left"
-                                                                >
-                                                                    <Edit size={16} /> Edit
-                                                                </button>
-                                                                {canDeleteEvents && (
+                                                                {canEditCurrentEvent && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            setOpenActionMenuId(null);
+                                                                            openEditModal(e, event);
+                                                                        }}
+                                                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors text-left"
+                                                                    >
+                                                                        <Edit size={16} /> Edit
+                                                                    </button>
+                                                                )}
+                                                                {canSetCurrentEventAccess && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            setOpenActionMenuId(null);
+                                                                            openEventAccessModal(e, event);
+                                                                        }}
+                                                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors text-left"
+                                                                    >
+                                                                        <Settings size={16} /> Access Settings
+                                                                    </button>
+                                                                )}
+                                                                {canDeleteCurrentEvent && (
                                                                     <button
                                                                         onClick={(e) => {
                                                                             setOpenActionMenuId(null);
@@ -2126,7 +2354,7 @@ const EventsList: React.FC = () => {
                                                     )}
                                                 </>
                                             ) : (
-                                                eventView === 'active' && (
+                                                eventView === 'active' && canEditCurrentEvent && (
                                                     <button
                                                         onClick={(e) => openEditModal(e, event)}
                                                         className="inline-flex items-center justify-center p-2 text-sm rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
@@ -2190,6 +2418,10 @@ const EventsList: React.FC = () => {
                   </div>
               ) : (
                   paginatedEvents.map((event) => {
+                      const canEditCurrentEvent = canEditEventRecord(event);
+                      const canDeleteCurrentEvent = canDeleteEventRecord(event);
+                      const canSetCurrentEventAccess = canSetEventAccess(event);
+
                       return (
                       <div
                           key={event.event_id}
@@ -2285,6 +2517,7 @@ const EventsList: React.FC = () => {
                                           <Share2 size={14} />
                                           <span>Share</span>
                                       </button>
+                                      {canEditCurrentEvent && (
                                       <button
                                           onClick={(e) => {
                                               e.stopPropagation();
@@ -2297,7 +2530,19 @@ const EventsList: React.FC = () => {
                                           <Edit size={14} />
                                           <span>Edit</span>
                                       </button>
-                                      {canDeleteEvents && (
+                                      )}
+                                      {canSetCurrentEventAccess && (
+                                          <button
+                                              onClick={(e) => openEventAccessModal(e, event)}
+                                              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
+                                              title="Access Settings"
+                                              aria-label="Access Settings"
+                                          >
+                                              <Settings size={14} />
+                                              <span>Access</span>
+                                          </button>
+                                      )}
+                                      {canDeleteCurrentEvent && (
                                           <button
                                               onClick={(e) => {
                                                   e.stopPropagation();
@@ -3360,6 +3605,143 @@ const EventsList: React.FC = () => {
         </div>
       )}
 
+
+      {/* Event Access Settings Modal */}
+      {showEventAccessModal && selectedAccessEvent && (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeEventAccessModal}></div>
+            <div className="relative z-20 flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+                <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+                    <div className="min-w-0">
+                        <h3 className="flex items-center gap-2 text-base font-bold text-slate-800">
+                            <Settings size={18} className="text-indigo-600" />
+                            Event Access Settings
+                        </h3>
+                        <p className="mt-1 truncate text-sm font-semibold text-indigo-700">{selectedAccessEvent.event_name}</p>
+                        <p className="mt-1 text-xs text-slate-500">Only Admins and the owning Office Manager can assign users from another office.</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={closeEventAccessModal}
+                        className="rounded-full p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                        aria-label="Close access settings"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto p-5 space-y-4">
+                    {canAssignAccessForSelectedEvent && (
+                        <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 lg:grid-cols-[minmax(0,1fr)_180px_auto]">
+                            <div className="space-y-2">
+                                <label className="block text-xs font-medium text-slate-600">User</label>
+                                <input
+                                    type="text"
+                                    value={accessUserSearch}
+                                    onChange={(e) => {
+                                        setAccessUserSearch(e.target.value);
+                                        setSelectedAccessUserId('');
+                                    }}
+                                    placeholder="Search by name, username, role, or office"
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                />
+                                <select
+                                    value={selectedAccessUserId}
+                                    onChange={(e) => setSelectedAccessUserId(e.target.value)}
+                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                >
+                                    <option value="">Select user</option>
+                                    {filteredEventAccessUsers.slice(0, 25).map((accessUser) => (
+                                        <option key={accessUser.user_id} value={accessUser.user_id}>
+                                            {accessUser.full_name} (@{accessUser.username}) - {accessUser.offices?.code || 'No office'} - {accessUser.role}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-slate-600 mb-2">Access</label>
+                                <select
+                                    value={selectedAccessRole}
+                                    onChange={(e) => setSelectedAccessRole(e.target.value as EventAccessRole)}
+                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                >
+                                    <option value="ManagerScanner">Manager + Scanner</option>
+                                    <option value="Manager">Manager only</option>
+                                    <option value="Scanner">Scanner only</option>
+                                </select>
+                            </div>
+
+                            <div className="flex items-end">
+                                <button
+                                    type="button"
+                                    onClick={handleGrantEventAccess}
+                                    disabled={!selectedAccessUserId || savingEventAccess}
+                                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 lg:w-auto"
+                                >
+                                    {savingEventAccess ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+                                    Assign
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+                            <p className="text-sm font-semibold text-slate-800">Assigned Users</p>
+                        </div>
+                        {loadingEventAccess ? (
+                            <div className="flex items-center gap-2 px-4 py-4 text-sm text-slate-500">
+                                <Loader2 size={15} className="animate-spin text-indigo-500" />
+                                Loading assigned users...
+                            </div>
+                        ) : eventAccessList.length === 0 ? (
+                            <div className="px-4 py-4 text-sm text-slate-500">No users assigned to this event yet.</div>
+                        ) : (
+                            <div className="divide-y divide-slate-100">
+                                {eventAccessList.map((access) => (
+                                    <div key={access.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="min-w-0">
+                                            <p className="truncate text-sm font-semibold text-slate-800">
+                                                {access.users?.full_name || `User #${access.user_id}`}
+                                            </p>
+                                            <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                                <span>@{access.users?.username || 'unknown'}</span>
+                                                <span>{access.users?.offices?.code || 'No office'}</span>
+                                                <span>{access.users?.role || 'User'}</span>
+                                            </p>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                                                access.status === 'Active'
+                                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                                  : 'border-slate-200 bg-slate-50 text-slate-500'
+                                            }`}>
+                                                {access.status}
+                                            </span>
+                                            <span className="rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                                                {access.access_role === 'ManagerScanner' ? 'Manager + Scanner' : access.access_role}
+                                            </span>
+                                            {canAssignAccessForSelectedEvent && access.status === 'Active' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRevokeEventAccess(access)}
+                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100"
+                                                >
+                                                    <XCircle size={14} />
+                                                    Revoke
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
 
 
       {showEventCodeInfo && (

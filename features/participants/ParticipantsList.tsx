@@ -9,6 +9,7 @@ import { format, parseISO, eachDayOfInterval, isSameMonth, isSameYear } from 'da
 import { toPng } from 'html-to-image';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
 
 interface AttendanceRow {
     participant: Participant;
@@ -225,19 +226,13 @@ const AttendanceList: React.FC = () => {
   // Fetch Events
   useEffect(() => {
     const fetchAllEvents = async () => {
-        let query = supabase
-            .from('events')
-            .select('*')
-            .in('status', ['Ongoing', 'Completed'])
-            .is('deleted_at', null)
-            .order('start_date', { ascending: false });
-
-        // Filter events by office for non-admins
-        if (user?.role !== 'Admin' && user?.office_id) {
-            query = query.eq('organize_by', user.office_id);
-        }
-
-        const { data } = await query;
+        const data = await fetchAccessibleEvents(user, {
+            accessRoles: MANAGE_EVENT_ACCESS_ROLES,
+            statuses: ['Ongoing', 'Completed'],
+            deletedView: 'active',
+            orderBy: 'start_date',
+            ascending: false
+        });
         if (data && data.length > 0) {
             const sortedEvents = [...data].sort((a, b) => {
                 const statusPriorityDiff =
