@@ -149,6 +149,9 @@ const EventsList: React.FC = () => {
   const [isAccessUserDropdownOpen, setIsAccessUserDropdownOpen] = useState(false);
   const [selectedAccessRole, setSelectedAccessRole] = useState<EventAccessRole>('ManagerScanner');
   const [savingEventAccess, setSavingEventAccess] = useState(false);
+  const [editingAccessId, setEditingAccessId] = useState<number | null>(null);
+  const [editingAccessRole, setEditingAccessRole] = useState<EventAccessRole>('ManagerScanner');
+  const [updatingAccessId, setUpdatingAccessId] = useState<number | null>(null);
   
   // Add Participant Modal State
   const [participantModalView, setParticipantModalView] = useState<'list' | 'add' | 'edit'>('list');
@@ -885,6 +888,46 @@ const EventsList: React.FC = () => {
       }
 
       setSavingEventAccess(false);
+  };
+
+  const startEditEventAccess = (access: EventAccessRecord) => {
+      setEditingAccessId(access.id);
+      setEditingAccessRole(access.access_role);
+  };
+
+  const cancelEditEventAccess = () => {
+      setEditingAccessId(null);
+  };
+
+  const handleUpdateEventAccessRole = async (access: EventAccessRecord) => {
+      if (!selectedAccessEvent || !user) return;
+
+      if (!canSetEventAccess(selectedAccessEvent)) {
+          toast.error('Only Admin or the owning Office Manager can update event access.');
+          return;
+      }
+
+      if (editingAccessRole === access.access_role) {
+          setEditingAccessId(null);
+          return;
+      }
+
+      setUpdatingAccessId(access.id);
+
+      const { error } = await supabase
+        .from('event_user_access')
+        .update({ access_role: editingAccessRole })
+        .eq('id', access.id);
+
+      if (error) {
+          toast.error('Error updating access: ' + error.message);
+      } else {
+          toast.success('Event access updated.');
+          setEditingAccessId(null);
+          fetchEventAccess(selectedAccessEvent.event_id);
+      }
+
+      setUpdatingAccessId(null);
   };
 
   const handleRevokeEventAccess = async (access: EventAccessRecord) => {
@@ -3774,18 +3817,63 @@ const EventsList: React.FC = () => {
                                             }`}>
                                                 {access.status}
                                             </span>
-                                            <span className="rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
-                                                {access.access_role === 'ManagerScanner' ? 'Manager + Scanner' : access.access_role}
-                                            </span>
-                                            {canAssignAccessForSelectedEvent && access.status === 'Active' && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRevokeEventAccess(access)}
-                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100"
-                                                >
-                                                    <XCircle size={14} />
-                                                    Revoke
-                                                </button>
+                                            {editingAccessId === access.id ? (
+                                                <>
+                                                    <select
+                                                        value={editingAccessRole}
+                                                        onChange={(e) => setEditingAccessRole(e.target.value as EventAccessRole)}
+                                                        disabled={updatingAccessId === access.id}
+                                                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                                    >
+                                                        <option value="ManagerScanner">Manager + Scanner</option>
+                                                        <option value="Manager">Manager only</option>
+                                                        <option value="Scanner">Scanner only</option>
+                                                    </select>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleUpdateEventAccessRole(access)}
+                                                        disabled={updatingAccessId === access.id}
+                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                        {updatingAccessId === access.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                                                        Save
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={cancelEditEventAccess}
+                                                        disabled={updatingAccessId === access.id}
+                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                        <X size={14} />
+                                                        Cancel
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                                                        {access.access_role === 'ManagerScanner' ? 'Manager + Scanner' : access.access_role}
+                                                    </span>
+                                                    {canAssignAccessForSelectedEvent && access.status === 'Active' && (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => startEditEventAccess(access)}
+                                                                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100"
+                                                            >
+                                                                <Edit size={14} />
+                                                                Edit
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRevokeEventAccess(access)}
+                                                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100"
+                                                            >
+                                                                <XCircle size={14} />
+                                                                Revoke
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     </div>
