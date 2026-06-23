@@ -14,7 +14,7 @@ export type CoPTitle = 'Certificate of Participation' | 'Certificate of Apprecia
 
 /** Default body section shown before the signatory block. */
 export const DEFAULT_COP_BODY_TEXT =
-  'for having actively participated during the conduct of the "{EventName}" held on {EventDate}, at {Venue}{CreditPhrase}.\nGiven this {EventDate}';
+  'for having actively participated during the conduct of the "{EventName}" held on {EventDate}, at {Venue}{CreditPhrase}.\n{GivenDate}';
 
 type CoPTemplateProps = {
   event: Event;
@@ -114,10 +114,9 @@ export const formatAttendanceDates = (logDates: string[]): string => {
   return `${format(first, 'MMMM d, yyyy')} - ${format(last, 'MMMM d, yyyy')}`;
 };
 
-export const formatGivenDate = (logDates: string[], eventEndDate: string): string => {
-  const lastDate = logDates.length ? [...logDates].sort().at(-1)! : eventEndDate;
+export const formatGivenDate = (eventEndDate: string): string => {
   try {
-    const d = parseISO(lastDate);
+    const d = parseISO(eventEndDate);
     const day = d.getDate();
     return `Given this ${day}${getOrdinalSuffix(day)} day of ${format(d, 'MMMM yyyy')}.`;
   } catch {
@@ -168,7 +167,6 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   const sigPos    = signatory?.position?.trim()        || '';
   const postNom   = signatory?.post_nominals?.trim()   || '';
 
-  const logDates        = participantRecord.log_dates;
   const eventName       = event.event_name || '';
   const venue           = event.venue      || '';
   const eventDateString = formatEventDates(event);
@@ -181,11 +179,12 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
     eventDate: eventDateString,
     venue: venue.trim(),
     creditPhrase,
-    givenDate: formatGivenDate(logDates, event.end_date || event.start_date),
+    givenDate: formatGivenDate(event.end_date || event.start_date),
   };
   const bodyTemplate = bodyText.trim() || DEFAULT_COP_BODY_TEXT;
   const hasCreditToken = /\{CreditPhrase\}/i.test(bodyTemplate);
   const bodyTemplateNormalized = bodyTemplate
+    .replace(/Given this\s+\{EventDate\}/gi, '{GivenDate}')
     .replace(/\{Venue\}\s*\{CreditPhrase\}/gi, hasCredit ? '{Venue}, {CreditPhrase}' : '{Venue}')
     .replace(/,\s*\{CreditPhrase\}/gi, hasCredit ? ', {CreditPhrase}' : '')
     .replace(/\s*\{CreditPhrase\}/gi, hasCredit ? ' {CreditPhrase}' : '');
