@@ -15,11 +15,14 @@ import {
   MapPin,
   Calendar,
   WifiOff,
-  CloudUpload
+  CloudUpload,
+  Gift
 } from 'lucide-react';
-import { Event } from '../../types/database';
+import { Event, GiveawayItem } from '../../types/database';
 import { format } from 'date-fns';
 import { SCAN_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
+
+type ScanMode = 'attendance' | 'giveaway';
 
 interface RecentScan {
     id: string;
@@ -51,12 +54,34 @@ interface ParticipantCache {
     };
 }
 
+interface ParticipantDetails {
+    name: string;
+    position: string;
+    office: string;
+    photo?: string;
+}
+
+interface GiveawayDisplayItem {
+    key: string;
+    label: string;
+    value: string;
+}
+
+interface GiveawayClaimDetails {
+    items: GiveawayDisplayItem[];
+    claimedAt?: string | null;
+    alreadyClaimed: boolean;
+}
+
 const Scanner: React.FC = () => {
   const { user } = useAuth();
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<'Valid' | 'Invalid' | 'Duplicate' | 'Offline-Saved' | null>(null);
   const [resultMessage, setResultMessage] = useState('');
-  const [participantDetails, setParticipantDetails] = useState<{ name: string; position: string; office: string; photo?: string } | null>(null);
+  const [resultRequiresAck, setResultRequiresAck] = useState(false);
+  const [participantDetails, setParticipantDetails] = useState<ParticipantDetails | null>(null);
+  const [giveawayClaimDetails, setGiveawayClaimDetails] = useState<GiveawayClaimDetails | null>(null);
+  const [scanMode, setScanMode] = useState<ScanMode>('attendance');
   const [session, setSession] = useState<'AM' | 'PM'>('AM');
   const [selectedEventId, setSelectedEventId] = useState<string>(''); 
   const [events, setEvents] = useState<Event[]>([]);
@@ -79,8 +104,10 @@ const Scanner: React.FC = () => {
   
   // Ref to hold selectedEventId to avoid restarting scanner on change
   const eventIdRef = useRef(selectedEventId);
+  const scanModeRef = useRef<ScanMode>(scanMode);
   const sessionRef = useRef<'AM' | 'PM'>(session);
   const isProcessingRef = useRef(false);
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Utility function to generate 8 character alphanumeric string
   const generateDeviceToken = () => {
@@ -105,6 +132,9 @@ const Scanner: React.FC = () => {
   }, []);
 
   const selectedEvent = events.find((event) => event.event_id.toString() === selectedEventId);
+  const selectedEventGiveaways = selectedEvent?.giveaways || [];
+  const selectedEventHasGiveaways = selectedEventGiveaways.length > 0;
+
   const isSessionEnabled = (sessionOption: 'AM' | 'PM') => {
     if (!selectedEvent) return false;
     return selectedEvent.session === 'All_Day' || selectedEvent.session === sessionOption;
@@ -117,6 +147,16 @@ const Scanner: React.FC = () => {
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  useEffect(() => {
+    scanModeRef.current = scanMode;
+  }, [scanMode]);
+
+  useEffect(() => {
+    if (scanMode === 'giveaway' && (!selectedEventHasGiveaways || !isOnline)) {
+      setScanMode('attendance');
+    }
+  }, [scanMode, selectedEventHasGiveaways, isOnline]);
 
   useEffect(() => {
     const updateFocusBoxSize = () => {
@@ -353,6 +393,9 @@ const Scanner: React.FC = () => {
 
   useEffect(() => {
       return () => {
+          if (resetTimerRef.current) {
+              clearTimeout(resetTimerRef.current);
+          }
           cleanupScanner();
       };
   }, []);
@@ -439,9 +482,21 @@ const Scanner: React.FC = () => {
     const scanMoment = new Date();
     const deviceScanTime = scanMoment.toISOString();
     const deviceAttendanceDate = getDeviceDateString(scanMoment);
+    const currentMode = scanModeRef.current;
     const currentSession = sessionRef.current;
 
     if (!isOnline) {
+        if (currentMode === 'giveaway') {
+            processScanResult(
+                'Invalid',
+                'Giveaway claim logging requires an internet connection.',
+                'Offline',
+                '',
+                { autoReset: false }
+            );
+            return;
+        }
+
         const cachedP = participantCache[qrToken];
         
         if (cachedP) {
@@ -482,7 +537,7 @@ const Scanner: React.FC = () => {
             .single();
 
         if (partError || !partData) {
-            processScanResult('Invalid', 'Participant not found in database.', qrToken);
+            processScanResult('Invalid', 'Participant not found in database.', qrToken, '', { autoReset: currentMode !== 'giveaway' });
             return;
         }
 
@@ -495,14 +550,21 @@ const Scanner: React.FC = () => {
 
         const { data: regData } = await supabase
             .from('event_participants')
-            .select('registration_status')
+            .select('registration_status, giveaway_selections')
             .eq('event_id', eventId)
             .eq('participant_id', partData.participant_id)
             .single();
 
         if (!regData || regData.registration_status !== 'Registered') {
-            await logScan(eventId, partData.participant_id, 'Invalid', deviceScanTime, deviceAttendanceDate, currentSession, 'Not Registered');
-            processScanResult('Invalid', 'Not registered for this event.', participant.name, participant.position);
+            if (currentMode === 'attendance') {
+                await logScan(eventId, partData.participant_id, 'Invalid', deviceScanTime, deviceAttendanceDate, currentSession, 'Not Registered');
+            }
+            processScanResult('Invalid', 'Not registered for this event.', participant.name, participant.position, { autoReset: currentMode !== 'giveaway' });
+            return;
+        }
+
+        if (currentMode === 'giveaway') {
+            await handleGiveawayClaim(eventId, partData.participant_id, participant, regData.giveaway_selections || {}, deviceScanTime);
             return;
         }
 
@@ -540,7 +602,7 @@ const Scanner: React.FC = () => {
         processScanResult('Valid', 'Attendance Recorded', participant.name, participant.position);
 
     } catch (err: any) {
-        processScanResult('Invalid', err.message || 'Scan failed', 'Unknown');
+        processScanResult('Invalid', err.message || 'Scan failed', 'Unknown', '', { autoReset: currentMode !== 'giveaway' });
     }
   };
 
@@ -562,9 +624,139 @@ const Scanner: React.FC = () => {
       });
   };
 
-  const processScanResult = (status: 'Valid' | 'Invalid' | 'Duplicate' | 'Offline-Saved', message: string, name: string = 'Unknown', position: string = '') => {
+  const formatGiveawayValue = (item: GiveawayItem, rawValue: string | boolean | null | undefined) => {
+      if (item.type === 'boolean') {
+          return rawValue === true ? 'Yes' : 'No';
+      }
+
+      if (typeof rawValue === 'string' && rawValue.trim()) {
+          return rawValue;
+      }
+
+      return 'No selection';
+  };
+
+  const buildGiveawayDisplayItems = (giveaways: GiveawayItem[], selections: Record<string, string | boolean> | null | undefined) => {
+      return giveaways.map((item) => ({
+          key: item.key,
+          label: item.label,
+          value: formatGiveawayValue(item, selections?.[item.key])
+      }));
+  };
+
+  const buildGiveawaySnapshot = (giveaways: GiveawayItem[], selections: Record<string, string | boolean> | null | undefined) => {
+      return {
+          items: giveaways.map((item) => ({
+              key: item.key,
+              label: item.label,
+              type: item.type,
+              raw_value: selections?.[item.key] ?? null,
+              display_value: formatGiveawayValue(item, selections?.[item.key])
+          }))
+      };
+  };
+
+  const handleGiveawayClaim = async (
+      eventId: number,
+      participantId: number,
+      participant: ParticipantDetails,
+      giveawaySelections: Record<string, string | boolean>,
+      scanTimeStr: string
+  ) => {
+      const eventForScan = events.find((event) => event.event_id === eventId);
+      const giveaways = eventForScan?.giveaways || [];
+
+      if (giveaways.length === 0) {
+          setGiveawayClaimDetails(null);
+          processScanResult('Invalid', 'This event has no giveaways configured.', participant.name, participant.position, { autoReset: false });
+          return;
+      }
+
+      const displayItems = buildGiveawayDisplayItems(giveaways, giveawaySelections);
+      const claimDetails = {
+          items: displayItems,
+          alreadyClaimed: false
+      };
+
+      const { data: existingClaim, error: existingError } = await supabase
+          .from('giveaway_claim_logs')
+          .select('claim_id, claimed_at')
+          .eq('event_id', eventId)
+          .eq('participant_id', participantId)
+          .maybeSingle();
+
+      if (existingError) {
+          throw existingError;
+      }
+
+      if (existingClaim) {
+          setGiveawayClaimDetails({
+              ...claimDetails,
+              alreadyClaimed: true,
+              claimedAt: existingClaim.claimed_at
+          });
+          processScanResult(
+              'Duplicate',
+              `Giveaway already claimed on ${format(new Date(existingClaim.claimed_at), 'MMM d, yyyy h:mm a')}.`,
+              participant.name,
+              participant.position,
+              { autoReset: false }
+          );
+          return;
+      }
+
+      const { error: insertError } = await supabase.from('giveaway_claim_logs').insert({
+          event_id: eventId,
+          participant_id: participantId,
+          user_id: user?.user_id,
+          claimed_at: scanTimeStr,
+          claim_status: 'Claimed',
+          giveaway_snapshot: buildGiveawaySnapshot(giveaways, giveawaySelections),
+          scanner_device: deviceTokenRef.current,
+          remarks: 'Claimed via scanner giveaway mode'
+      });
+
+      if (insertError) {
+          if ((insertError as any).code === '23505') {
+              setGiveawayClaimDetails({
+                  ...claimDetails,
+                  alreadyClaimed: true
+              });
+              processScanResult('Duplicate', 'Giveaway already claimed.', participant.name, participant.position, { autoReset: false });
+              return;
+          }
+
+          throw insertError;
+      }
+
+      setGiveawayClaimDetails(claimDetails);
+      processScanResult('Valid', 'Giveaway claim logged.', participant.name, participant.position, { autoReset: false });
+  };
+
+  const clearScanResult = () => {
+      if (resetTimerRef.current) {
+          clearTimeout(resetTimerRef.current);
+          resetTimerRef.current = null;
+      }
+
+      setScanResult(null);
+      setParticipantDetails(null);
+      setGiveawayClaimDetails(null);
+      setResultMessage('');
+      setResultRequiresAck(false);
+      isProcessingRef.current = false;
+  };
+
+  const processScanResult = (
+      status: 'Valid' | 'Invalid' | 'Duplicate' | 'Offline-Saved',
+      message: string,
+      name: string = 'Unknown',
+      position: string = '',
+      options: { autoReset?: boolean } = {}
+  ) => {
       setScanResult(status);
       setResultMessage(message);
+      setResultRequiresAck(options.autoReset === false);
 
       const newScan: RecentScan = {
           id: Date.now().toString(),
@@ -581,12 +773,30 @@ const Scanner: React.FC = () => {
         else navigator.vibrate([300]);
       }
 
-      setTimeout(() => {
-          setScanResult(null);
-          setParticipantDetails(null);
-          setResultMessage('');
-          isProcessingRef.current = false;
-      }, 2000);
+      if (resetTimerRef.current) {
+          clearTimeout(resetTimerRef.current);
+      }
+
+      if (options.autoReset === false) {
+          resetTimerRef.current = null;
+          return;
+      }
+
+      resetTimerRef.current = setTimeout(clearScanResult, 2000);
+  };
+
+  const handleScanModeChange = (nextMode: ScanMode) => {
+      if (nextMode === scanMode) return;
+
+      if (nextMode === 'giveaway' && (!selectedEventHasGiveaways || !isOnline)) {
+          return;
+      }
+
+      if (scanResult) {
+          clearScanResult();
+      }
+
+      setScanMode(nextMode);
   };
 
   return (
@@ -611,7 +821,7 @@ const Scanner: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="grid gap-1.5 sm:gap-2.5 md:grid-cols-[minmax(0,1fr)_220px] xl:grid-cols-[minmax(0,1fr)_240px] md:items-start">
+                    <div className="grid gap-1.5 sm:gap-2.5 md:grid-cols-[minmax(0,1fr)_220px_220px] xl:grid-cols-[minmax(0,1fr)_240px_240px] md:items-start">
                         <div className="flex-1 w-full rounded-2xl border border-slate-800 bg-slate-900/70 p-1 sm:p-1.5">
                             <p className="px-2 pb-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Event</p>
                             {loadingEvents ? (
@@ -646,6 +856,44 @@ const Scanner: React.FC = () => {
                                     </div>
                                 </div>
                             )}
+                        </div>
+
+                        <div className="w-full xl:w-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-1 sm:p-1.5 shadow-sm">
+                            <p className="px-2 pb-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Mode</p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => handleScanModeChange('attendance')}
+                                    aria-pressed={scanMode === 'attendance'}
+                                    className={`px-3 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
+                                        ${scanMode === 'attendance'
+                                            ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                                            : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-emerald-500/10'
+                                        }`}
+                                >
+                                    <CheckCircle size={16} />
+                                    Attendance
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleScanModeChange('giveaway')}
+                                    disabled={!selectedEventHasGiveaways || !isOnline}
+                                    aria-pressed={scanMode === 'giveaway'}
+                                    title={!selectedEventHasGiveaways ? 'No giveaways configured for this event' : !isOnline ? 'Giveaway claims require internet connection' : 'Scan giveaway claims'}
+                                    className={`px-3 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
+                                        ${scanMode === 'giveaway'
+                                            ? 'bg-fuchsia-500/20 border-fuchsia-400/60 text-fuchsia-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                                            : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                                        }
+                                        ${selectedEventHasGiveaways && isOnline
+                                            ? 'hover:bg-fuchsia-500/10'
+                                            : 'opacity-40 cursor-not-allowed text-slate-500'
+                                        }`}
+                                >
+                                    <Gift size={16} />
+                                    Giveaway
+                                </button>
+                            </div>
                         </div>
                         
                         <div className="w-full xl:w-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-1 sm:p-1.5 shadow-sm">
@@ -728,7 +976,7 @@ const Scanner: React.FC = () => {
                                         <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-white -mb-1 -mr-1 rounded-br-xl"></div>
                                         <div className="absolute left-1/2 top-full mt-5 -translate-x-1/2 bg-black/75 backdrop-blur-md px-6 py-3 rounded-full text-white text-base sm:text-sm font-bold border border-white/20 tracking-wide flex items-center justify-center gap-2 shadow-lg whitespace-nowrap min-w-[250px] sm:min-w-0">
                                             <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
-                                            Focusing on QR Code...
+                                            {scanMode === 'giveaway' ? 'Scan Giveaway Claim' : 'Focusing on QR Code...'}
                                         </div>
                                     </div>
                                 </div>
@@ -811,10 +1059,48 @@ const Scanner: React.FC = () => {
                                 <p className="text-slate-500 text-xs">{participantDetails.office}</p>
                             </div>
                         )}
+
+                        {giveawayClaimDetails && (
+                            <div className="mt-4 w-full rounded-xl border border-fuchsia-100 bg-fuchsia-50/70 p-4 text-left">
+                                <div className="mb-3 flex items-center justify-between gap-3">
+                                    <p className="text-xs font-bold uppercase tracking-widest text-fuchsia-700">Giveaways / Freebies</p>
+                                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${
+                                        giveawayClaimDetails.alreadyClaimed
+                                            ? 'bg-amber-100 text-amber-700'
+                                            : 'bg-emerald-100 text-emerald-700'
+                                    }`}>
+                                        {giveawayClaimDetails.alreadyClaimed ? 'Claimed' : 'Logged'}
+                                    </span>
+                                </div>
+                                <div className="space-y-2">
+                                    {giveawayClaimDetails.items.map((item) => (
+                                        <div key={item.key} className="flex items-start justify-between gap-3 rounded-lg bg-white/80 px-3 py-2 text-sm">
+                                            <span className="font-medium text-slate-600">{item.label}</span>
+                                            <span className="font-bold text-slate-900 text-right">{item.value}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                {giveawayClaimDetails.claimedAt && (
+                                    <p className="mt-3 text-xs font-medium text-amber-700">
+                                        Previous claim: {format(new Date(giveawayClaimDetails.claimedAt), 'MMM d, yyyy h:mm a')}
+                                    </p>
+                                )}
+                            </div>
+                        )}
                         
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full mt-6 overflow-hidden">
-                             <div className="h-full bg-slate-300 animate-[progress_2s_linear_forwards]"></div>
-                        </div>
+                        {resultRequiresAck ? (
+                            <button
+                                type="button"
+                                onClick={clearScanResult}
+                                className="mt-6 w-full rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2"
+                            >
+                                OK
+                            </button>
+                        ) : (
+                            <div className="w-full bg-slate-100 h-1.5 rounded-full mt-6 overflow-hidden">
+                                 <div className="h-full bg-slate-300 animate-[progress_2s_linear_forwards]"></div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
