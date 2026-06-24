@@ -14,6 +14,7 @@ import Scanner from './features/scanner/Scanner';
 import Reports from './features/reports/Reports';
 import AttendanceSheetPrint from './features/participants/AttendanceSheetPrint';
 import ScanLogsPrint from './features/reports/ScanLogsPrint';
+import GiveawayClaimLogsPrint from './features/reports/GiveawayClaimLogsPrint';
 import CertificateOfAppearancePrint from './features/reports/CertificateOfAppearancePrint';
 import CertificateOfParticipation from './features/reports/CertificateOfParticipation';
 import UserManagement from './features/users/UserManagement';
@@ -110,6 +111,13 @@ const App: React.FC = () => {
           <Route path="/print-scan-logs/:eventId?" element={
             <ProtectedRoute requiredPermission="VIEW_REPORTS">
               <ScanLogsPrint />
+            </ProtectedRoute>
+          } />
+
+          {/* Giveaway Claim Logs Print View - (Printable) - Requires VIEW_REPORTS */}
+          <Route path="/print-giveaway-claims/:eventId" element={
+            <ProtectedRoute requiredPermission="VIEW_REPORTS">
+              <GiveawayClaimLogsPrint />
             </ProtectedRoute>
           } />
 

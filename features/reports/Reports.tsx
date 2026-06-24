@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Printer, Calendar, ScrollText, Search, ChevronDown, Check, X, Award } from 'lucide-react';
+import { Printer, Calendar, ScrollText, Search, ChevronDown, Check, X, Award, Gift } from 'lucide-react';
 import { Event } from '../../types/database';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -82,6 +82,13 @@ const Reports: React.FC = () => {
     }
   };
 
+  const handlePrintGiveawayClaims = () => {
+    if (selectedEventId) {
+        sessionStorage.setItem('reports_selected_event_id', selectedEventId);
+        navigate(`/print-giveaway-claims/${selectedEventId}`);
+    }
+  };
+
   const formatEventDate = (start: string, end: string) => {
     if (!start) return '';
 
@@ -115,6 +122,7 @@ const Reports: React.FC = () => {
   );
 
   const selectedEvent = events.find(e => e.event_id.toString() === selectedEventId);
+  const selectedEventHasGiveaways = (selectedEvent?.giveaways || []).length > 0;
 
   useEffect(() => {
     if (!loading && selectedEventId && !selectedEvent) {
@@ -259,6 +267,29 @@ const Reports: React.FC = () => {
                     className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
                 >
                     <Printer size={18} /> Print Scan Logs
+                </button>
+            </div>
+
+            {/* Giveaway Claim Logs Card */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+                <div className="bg-fuchsia-100 p-3 rounded-lg text-fuchsia-600 mb-4">
+                    <Gift size={24} />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 mb-2">Giveaway Claim Logs</h3>
+                <p className="text-slate-500 text-sm mb-6 flex-1">
+                    Generate a printable claim log showing participant details, selected giveaway values, and claim time.
+                    {!selectedEventId
+                        ? ' Please select an event first.'
+                        : selectedEventHasGiveaways
+                            ? ' Creates a specific report for the selected event.'
+                            : ' The selected event has no configured giveaways.'}
+                </p>
+                <button
+                    onClick={handlePrintGiveawayClaims}
+                    disabled={!selectedEventId || !selectedEventHasGiveaways}
+                    className="w-full bg-fuchsia-600 hover:bg-fuchsia-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
+                >
+                    <Printer size={18} /> Print Giveaway Claims
                 </button>
             </div>
 
