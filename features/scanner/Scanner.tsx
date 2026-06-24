@@ -1100,7 +1100,7 @@ const Scanner: React.FC = () => {
                         {giveawayClaimDetails && (
                             <div className="mt-4 w-full rounded-2xl border border-fuchsia-100 bg-fuchsia-50/70 p-5 text-left">
                                 <div className="mb-4 flex items-center justify-between gap-3">
-                                    <p className="text-sm font-bold uppercase tracking-widest text-fuchsia-700">Giveaways / Freebies</p>
+                                    <p className="text-[11px] font-bold uppercase tracking-widest text-fuchsia-700">Giveaways / Freebies</p>
                                     <span className={`rounded-full px-3 py-1.5 text-xs font-bold uppercase ${
                                         giveawayClaimDetails.alreadyClaimed
                                             ? 'bg-amber-100 text-amber-700'
