@@ -861,12 +861,12 @@ const Scanner: React.FC = () => {
   };
 
   return (
-    <div className="h-full w-full flex flex-col gap-1.5 bg-slate-100 p-1.5 sm:gap-3 sm:p-4 lg:flex-row lg:gap-0 lg:bg-slate-900 lg:p-0 overflow-hidden">
+    <div className="h-full w-full flex flex-col bg-black p-0 lg:flex-row lg:gap-0 lg:bg-slate-900 overflow-hidden">
         
         {/* LEFT/TOP: Controls + Camera Section */}
-        <div className="flex-1 flex flex-col overflow-hidden rounded-[28px] border border-slate-900/90 bg-slate-950 shadow-[0_18px_40px_rgba(15,23,42,0.28)] lg:rounded-none lg:border-0 lg:shadow-none">
-            <div className="shrink-0 border-b border-slate-800 bg-slate-950/95 p-1.5 sm:p-3">
-                 <div className="flex flex-col gap-1.5 sm:gap-2.5 max-w-5xl mx-auto">
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-none border-0 bg-slate-950 shadow-none lg:rounded-none">
+            <div className="shrink-0 border-b border-slate-800 bg-slate-950/95 p-1 sm:p-2 lg:p-3">
+                 <div className="flex flex-col gap-1 max-w-5xl mx-auto">
                     {(!isOnline || offlineQueue.length > 0) && (
                         <div className="flex justify-end gap-2">
                             {!isOnline && (
@@ -882,15 +882,15 @@ const Scanner: React.FC = () => {
                         </div>
                     )}
 
-                    <div className={`grid gap-1.5 sm:gap-2.5 md:items-start ${
+                    <div className={`grid grid-cols-2 gap-1 sm:gap-2 md:items-start ${
                         scanMode === 'giveaway'
                             ? 'md:grid-cols-[minmax(0,1fr)_220px] xl:grid-cols-[minmax(0,1fr)_240px]'
                             : 'md:grid-cols-[minmax(0,1fr)_220px_220px] xl:grid-cols-[minmax(0,1fr)_240px_240px]'
                     }`}>
-                        <div className="flex-1 w-full rounded-2xl border border-slate-800 bg-slate-900/70 p-1 sm:p-1.5">
-                            <p className="px-2 pb-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Event</p>
+                        <div className="col-span-2 md:col-span-1 flex-1 w-full rounded-none sm:rounded-xl lg:rounded-2xl border border-slate-800 bg-slate-900/70 p-0.5 sm:p-1.5">
+                            <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-slate-500">Event</p>
                             {loadingEvents ? (
-                                <div className="h-11 sm:h-12 bg-slate-800 rounded-xl animate-pulse"></div>
+                                <div className="h-9 sm:h-12 bg-slate-800 rounded-none sm:rounded-xl animate-pulse"></div>
                             ) : (
                                 <div className="relative">
                                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -906,7 +906,7 @@ const Scanner: React.FC = () => {
                                                 setSession(getDefaultSessionForEvent(nextEvent));
                                             }
                                         }}
-                                        className="w-full bg-slate-950 text-white text-xs sm:text-sm font-medium rounded-xl pl-9 pr-8 py-2 sm:py-2.5 border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm appearance-none"
+                                        className="w-full bg-slate-950 text-white text-xs sm:text-sm font-medium rounded-none sm:rounded-xl pl-9 pr-8 py-2 sm:py-2.5 border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm appearance-none"
                                     >
                                         {events.length === 0 ? (
                                             <option value="">No Events Today</option>
@@ -924,20 +924,20 @@ const Scanner: React.FC = () => {
                             )}
                         </div>
 
-                        <div className="w-full xl:w-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-1 sm:p-1.5 shadow-sm">
-                            <p className="px-2 pb-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Mode</p>
-                            <div className="grid grid-cols-2 gap-1.5">
+                        <div className={`${scanMode === 'giveaway' ? 'col-span-2 md:col-span-1' : 'col-span-1'} w-full xl:w-auto rounded-none sm:rounded-xl lg:rounded-2xl border border-slate-800 bg-slate-900/70 p-0.5 sm:p-1.5 shadow-sm`}>
+                            <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-slate-500">Mode</p>
+                            <div className="grid grid-cols-2 gap-1">
                                 <button
                                     type="button"
                                     onClick={() => handleScanModeChange('attendance')}
                                     aria-pressed={scanMode === 'attendance'}
-                                    className={`px-3 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
+                                    className={`px-2 py-2 sm:px-3 sm:py-2.5 rounded-none sm:rounded-xl text-[11px] sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
                                         ${scanMode === 'attendance'
                                             ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
                                             : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-emerald-500/10'
                                         }`}
                                 >
-                                    <CheckCircle size={16} />
+                                    <CheckCircle size={14} className="sm:w-4 sm:h-4" />
                                     Attendance
                                 </button>
                                 <button
@@ -946,7 +946,7 @@ const Scanner: React.FC = () => {
                                     disabled={!selectedEventHasGiveaways || !isOnline}
                                     aria-pressed={scanMode === 'giveaway'}
                                     title={!selectedEventHasGiveaways ? 'No giveaways configured for this event' : !isOnline ? 'Giveaway claims require internet connection' : 'Scan giveaway claims'}
-                                    className={`px-3 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
+                                    className={`px-2 py-2 sm:px-3 sm:py-2.5 rounded-none sm:rounded-xl text-[11px] sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
                                         ${scanMode === 'giveaway'
                                             ? 'bg-fuchsia-500/20 border-fuchsia-400/60 text-fuchsia-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
                                             : 'bg-slate-950/60 border-slate-800 text-slate-300'
@@ -956,22 +956,22 @@ const Scanner: React.FC = () => {
                                             : 'opacity-40 cursor-not-allowed text-slate-500'
                                         }`}
                                 >
-                                    <Gift size={16} />
+                                    <Gift size={14} className="sm:w-4 sm:h-4" />
                                     Giveaway
                                 </button>
                             </div>
                         </div>
                         
                         {scanMode === 'attendance' && (
-                            <div className="w-full xl:w-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-1 sm:p-1.5 shadow-sm">
-                                <p className="px-2 pb-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Session</p>
-                                <div className="grid grid-cols-2 gap-1.5">
+                            <div className="col-span-1 w-full xl:w-auto rounded-none sm:rounded-xl lg:rounded-2xl border border-slate-800 bg-slate-900/70 p-0.5 sm:p-1.5 shadow-sm">
+                                <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-slate-500">Session</p>
+                                <div className="grid grid-cols-2 gap-1">
                                     <button
                                         type="button"
                                         onClick={() => setSession('AM')}
                                         disabled={!isSessionEnabled('AM')}
                                         aria-pressed={session === 'AM'}
-                                        className={`px-3 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
+                                        className={`px-2 py-2 sm:px-3 sm:py-2.5 rounded-none sm:rounded-xl text-[11px] sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
                                             ${session === 'AM'
                                                 ? 'bg-amber-500/20 border-amber-400/60 text-amber-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
                                                 : 'bg-slate-950/60 border-slate-800 text-slate-300'
@@ -981,7 +981,7 @@ const Scanner: React.FC = () => {
                                                 : 'opacity-40 cursor-not-allowed text-slate-500'
                                             }`}
                                     >
-                                        <Sun size={16} className="fill-current" />
+                                        <Sun size={14} className="fill-current sm:w-4 sm:h-4" />
                                         AM
                                     </button>
                                     <button
@@ -989,7 +989,7 @@ const Scanner: React.FC = () => {
                                         onClick={() => setSession('PM')}
                                         disabled={!isSessionEnabled('PM')}
                                         aria-pressed={session === 'PM'}
-                                        className={`px-3 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
+                                        className={`px-2 py-2 sm:px-3 sm:py-2.5 rounded-none sm:rounded-xl text-[11px] sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
                                             ${session === 'PM'
                                                 ? 'bg-indigo-600/20 border-indigo-500/60 text-indigo-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
                                                 : 'bg-slate-950/60 border-slate-800 text-slate-300'
@@ -999,7 +999,7 @@ const Scanner: React.FC = () => {
                                                 : 'opacity-40 cursor-not-allowed text-slate-500'
                                             }`}
                                     >
-                                        <Moon size={16} className="fill-current" />
+                                        <Moon size={14} className="fill-current sm:w-4 sm:h-4" />
                                         PM
                                     </button>
                                 </div>
@@ -1012,7 +1012,7 @@ const Scanner: React.FC = () => {
                             type="button"
                             onClick={cameraPaused ? resumeCamera : pauseCamera}
                             disabled={!selectedEventId || !!scanResult}
-                            className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors ${
+                            className={`inline-flex items-center justify-center gap-1.5 rounded-none sm:rounded-xl border px-3 py-1.5 text-[11px] sm:text-xs font-bold transition-colors ${
                                 cameraPaused
                                     ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25'
                                     : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
@@ -1025,7 +1025,7 @@ const Scanner: React.FC = () => {
                 </div>
             </div>
 
-                <div ref={cameraViewportRef} className="relative flex min-h-[80svh] flex-1 items-center justify-center overflow-hidden bg-black sm:min-h-[600px] lg:min-h-0">
+                <div ref={cameraViewportRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black sm:min-h-[520px] lg:min-h-0">
                     {cameraError ? (
                         <div className="text-white text-center p-8 max-w-sm">
                             <div className="bg-red-500/20 p-6 rounded-full inline-block mb-6">
@@ -1054,11 +1054,11 @@ const Scanner: React.FC = () => {
                                         className="relative"
                                         style={{ width: `${focusBoxSize}px`, height: `${focusBoxSize}px` }}
                                     >
-                                        <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-white -mt-1 -ml-1 rounded-tl-xl"></div>
-                                        <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-white -mt-1 -mr-1 rounded-tr-xl"></div>
-                                        <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-white -mb-1 -ml-1 rounded-bl-xl"></div>
-                                        <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-white -mb-1 -mr-1 rounded-br-xl"></div>
-                                        <div className="absolute left-1/2 top-full mt-5 -translate-x-1/2 bg-black/75 backdrop-blur-md px-6 py-3 rounded-full text-white text-base sm:text-sm font-bold border border-white/20 tracking-wide flex items-center justify-center gap-2 shadow-lg whitespace-nowrap min-w-[250px] sm:min-w-0">
+                                        <div className="absolute top-0 left-0 w-9 h-9 sm:w-10 sm:h-10 border-t-4 border-l-4 border-white -mt-1 -ml-1 sm:rounded-tl-xl"></div>
+                                        <div className="absolute top-0 right-0 w-9 h-9 sm:w-10 sm:h-10 border-t-4 border-r-4 border-white -mt-1 -mr-1 sm:rounded-tr-xl"></div>
+                                        <div className="absolute bottom-0 left-0 w-9 h-9 sm:w-10 sm:h-10 border-b-4 border-l-4 border-white -mb-1 -ml-1 sm:rounded-bl-xl"></div>
+                                        <div className="absolute bottom-0 right-0 w-9 h-9 sm:w-10 sm:h-10 border-b-4 border-r-4 border-white -mb-1 -mr-1 sm:rounded-br-xl"></div>
+                                        <div className="absolute left-1/2 top-full mt-3 sm:mt-5 -translate-x-1/2 bg-black/75 backdrop-blur-md px-4 py-2 sm:px-6 sm:py-3 rounded-full text-white text-xs sm:text-sm font-bold border border-white/20 tracking-wide flex items-center justify-center gap-2 shadow-lg whitespace-nowrap min-w-[210px] sm:min-w-0">
                                             <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
                                             {scanMode === 'giveaway' ? 'Scan Giveaway Claim' : 'Focusing on QR Code...'}
                                         </div>
