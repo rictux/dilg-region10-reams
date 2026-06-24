@@ -16,7 +16,9 @@ import {
   Calendar,
   WifiOff,
   CloudUpload,
-  Gift
+  Gift,
+  Pause,
+  Play
 } from 'lucide-react';
 import { Event, GiveawayItem } from '../../types/database';
 import { format } from 'date-fns';
@@ -82,6 +84,7 @@ const Scanner: React.FC = () => {
   const [participantDetails, setParticipantDetails] = useState<ParticipantDetails | null>(null);
   const [giveawayClaimDetails, setGiveawayClaimDetails] = useState<GiveawayClaimDetails | null>(null);
   const [scanMode, setScanMode] = useState<ScanMode>('attendance');
+  const [cameraPaused, setCameraPaused] = useState(false);
   const [session, setSession] = useState<'AM' | 'PM'>('AM');
   const [selectedEventId, setSelectedEventId] = useState<string>(''); 
   const [events, setEvents] = useState<Event[]>([]);
@@ -383,13 +386,13 @@ const Scanner: React.FC = () => {
 
   // --- 5. Scanner Initialization ---
   useEffect(() => {
-    if (selectedEventId && !scanResult && !scanning) {
+    if (selectedEventId && !scanResult && !scanning && !cameraPaused) {
        startScanner();
     } 
-    else if ((!selectedEventId || scanResult) && scanning) {
+    else if ((!selectedEventId || scanResult || cameraPaused) && scanning) {
         cleanupScanner();
     }
-  }, [selectedEventId, scanResult, scanning]);
+  }, [selectedEventId, scanResult, scanning, cameraPaused]);
 
   useEffect(() => {
       return () => {
@@ -757,7 +760,7 @@ const Scanner: React.FC = () => {
       processScanResult('Valid', 'Giveaway claim logged.', participant.name, participant.position, { autoReset: false });
   };
 
-  const clearScanResult = () => {
+  const clearScanResult = (options: { resumeCamera?: boolean; pauseCamera?: boolean } = {}) => {
       if (resetTimerRef.current) {
           clearTimeout(resetTimerRef.current);
           resetTimerRef.current = null;
@@ -769,6 +772,12 @@ const Scanner: React.FC = () => {
       setResultMessage('');
       setResultRequiresAck(false);
       isProcessingRef.current = false;
+
+      if (options.resumeCamera) {
+          setCameraPaused(false);
+      } else if (options.pauseCamera) {
+          setCameraPaused(true);
+      }
   };
 
   const processScanResult = (
@@ -806,7 +815,28 @@ const Scanner: React.FC = () => {
           return;
       }
 
-      resetTimerRef.current = setTimeout(clearScanResult, 2000);
+      resetTimerRef.current = setTimeout(() => clearScanResult({ pauseCamera: true }), 2000);
+  };
+
+  const pauseCamera = () => {
+      if (scanResult) {
+          clearScanResult({ pauseCamera: true });
+          return;
+      }
+
+      setCameraPaused(true);
+  };
+
+  const resumeCamera = () => {
+      if (!selectedEventId) return;
+
+      if (scanResult) {
+          clearScanResult({ resumeCamera: true });
+          return;
+      }
+
+      setCameraError(null);
+      setCameraPaused(false);
   };
 
   const handleScanModeChange = (nextMode: ScanMode) => {
@@ -817,7 +847,7 @@ const Scanner: React.FC = () => {
       }
 
       if (scanResult) {
-          clearScanResult();
+          clearScanResult({ pauseCamera: cameraPaused });
       }
 
       setScanMode(nextMode);
@@ -869,6 +899,7 @@ const Scanner: React.FC = () => {
                                         onChange={(e) => {
                                             const nextEventId = e.target.value;
                                             setSelectedEventId(nextEventId);
+                                            setCameraPaused(false);
 
                                             const nextEvent = events.find((event) => event.event_id.toString() === nextEventId);
                                             if (nextEvent) {
@@ -975,6 +1006,22 @@ const Scanner: React.FC = () => {
                             </div>
                         )}
                     </div>
+
+                    <div className="flex justify-end">
+                        <button
+                            type="button"
+                            onClick={cameraPaused ? resumeCamera : pauseCamera}
+                            disabled={!selectedEventId || !!scanResult}
+                            className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors ${
+                                cameraPaused
+                                    ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25'
+                                    : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
+                            } ${(!selectedEventId || !!scanResult) ? 'cursor-not-allowed opacity-45' : ''}`}
+                        >
+                            {cameraPaused ? <Play size={15} /> : <Pause size={15} />}
+                            {cameraPaused ? 'Resume Camera' : 'Pause Camera'}
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -1021,7 +1068,25 @@ const Scanner: React.FC = () => {
                             
                             {!scanResult && !scanning && !loadingEvents && (
                                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-6 text-center">
-                                    {!selectedEventId ? (
+                                    {cameraPaused && selectedEventId ? (
+                                        <>
+                                            <div className="mb-5 rounded-full bg-emerald-500/20 p-5 text-emerald-300">
+                                                <Play size={52} />
+                                            </div>
+                                            <h3 className="text-2xl font-black text-white">Camera Paused</h3>
+                                            <p className="mt-2 max-w-xs text-sm font-medium leading-relaxed text-slate-400">
+                                                The camera is off to reduce heat and battery use.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={resumeCamera}
+                                                className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-3 text-sm font-black text-slate-950 transition-colors hover:bg-slate-200"
+                                            >
+                                                <Play size={18} />
+                                                Scan Again
+                                            </button>
+                                        </>
+                                    ) : !selectedEventId ? (
                                         <>
                                             <Calendar className="w-16 h-16 text-slate-500 mb-4" />
                                             <h3 className="text-xl font-bold text-slate-300">No Event Selected</h3>
@@ -1123,10 +1188,11 @@ const Scanner: React.FC = () => {
                         {resultRequiresAck ? (
                             <button
                                 type="button"
-                                onClick={clearScanResult}
-                                className="mt-6 w-full rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2"
+                                onClick={() => clearScanResult({ resumeCamera: true })}
+                                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2"
                             >
-                                OK
+                                <Play size={16} />
+                                Scan Again
                             </button>
                         ) : (
                             <div className="w-full bg-slate-100 h-1.5 rounded-full mt-6 overflow-hidden">
