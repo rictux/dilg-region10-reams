@@ -586,6 +586,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   };
 
+  const isScanRoute = location.pathname === '/scan';
+
   return (
     <div className="desktop-compact-shell h-screen bg-[#f4f5f9] flex flex-col md:flex-row font-sans overflow-hidden">
       <aside className={`
@@ -645,8 +647,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </aside>
 
-      <main className="app-main flex-1 overflow-hidden p-4 md:p-8 h-screen flex flex-col min-w-0">
-        <header className="app-main-header flex items-center justify-between mb-8 shrink-0">
+      <main className={`app-main flex-1 overflow-hidden h-screen flex flex-col min-w-0 ${isScanRoute ? 'p-0 md:p-8' : 'p-4 md:p-8'}`}>
+        <header className={`app-main-header flex items-center justify-between shrink-0 ${isScanRoute ? 'px-2 py-1.5 mb-0 md:px-0 md:py-0 md:mb-8' : 'mb-8'}`}>
           <div className="flex items-center gap-4">
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-600 hover:text-[#4322A7] md:hidden">
               <Menu size={28} />
