@@ -636,6 +636,18 @@ const Scanner: React.FC = () => {
       return 'No selection';
   };
 
+  const hasClaimableGiveawaySelection = (giveaways: GiveawayItem[], selections: Record<string, string | boolean> | null | undefined) => {
+      return giveaways.some((item) => {
+          const value = selections?.[item.key];
+
+          if (item.type === 'boolean') {
+              return value === true;
+          }
+
+          return typeof value === 'string' && value.trim().length > 0;
+      });
+  };
+
   const buildGiveawayDisplayItems = (giveaways: GiveawayItem[], selections: Record<string, string | boolean> | null | undefined) => {
       return giveaways.map((item) => ({
           key: item.key,
@@ -678,6 +690,18 @@ const Scanner: React.FC = () => {
           alreadyClaimed: false
       };
 
+      if (!hasClaimableGiveawaySelection(giveaways, giveawaySelections)) {
+          setGiveawayClaimDetails(null);
+          processScanResult(
+              'Invalid',
+              "Participant don't want giveaways selected.",
+              participant.name,
+              participant.position,
+              { autoReset: false }
+          );
+          return;
+      }
+
       const { data: existingClaim, error: existingError } = await supabase
           .from('giveaway_claim_logs')
           .select('claim_id, claimed_at')
@@ -697,7 +721,7 @@ const Scanner: React.FC = () => {
           });
           processScanResult(
               'Duplicate',
-              `Giveaway already claimed on ${format(new Date(existingClaim.claimed_at), 'MMM d, yyyy h:mm a')}.`,
+              `Claimed on ${format(new Date(existingClaim.claimed_at), 'MMM d, yyyy h:mm a')}.`,
               participant.name,
               participant.position,
               { autoReset: false }
@@ -722,7 +746,7 @@ const Scanner: React.FC = () => {
                   ...claimDetails,
                   alreadyClaimed: true
               });
-              processScanResult('Duplicate', 'Giveaway already claimed.', participant.name, participant.position, { autoReset: false });
+              processScanResult('Duplicate', 'Claimed already.', participant.name, participant.position, { autoReset: false });
               return;
           }
 
@@ -799,6 +823,13 @@ const Scanner: React.FC = () => {
       setScanMode(nextMode);
   };
 
+  const getResultTitle = () => {
+      if (scanResult === 'Valid') return 'Verified!';
+      if (scanResult === 'Offline-Saved') return 'Saved (Offline)';
+      if (scanResult === 'Duplicate' && giveawayClaimDetails?.alreadyClaimed) return 'Claimed Already';
+      return scanResult;
+  };
+
   return (
     <div className="h-full w-full flex flex-col gap-1.5 bg-slate-100 p-1.5 sm:gap-3 sm:p-4 lg:flex-row lg:gap-0 lg:bg-slate-900 lg:p-0 overflow-hidden">
         
@@ -821,7 +852,11 @@ const Scanner: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="grid gap-1.5 sm:gap-2.5 md:grid-cols-[minmax(0,1fr)_220px_220px] xl:grid-cols-[minmax(0,1fr)_240px_240px] md:items-start">
+                    <div className={`grid gap-1.5 sm:gap-2.5 md:items-start ${
+                        scanMode === 'giveaway'
+                            ? 'md:grid-cols-[minmax(0,1fr)_220px] xl:grid-cols-[minmax(0,1fr)_240px]'
+                            : 'md:grid-cols-[minmax(0,1fr)_220px_220px] xl:grid-cols-[minmax(0,1fr)_240px_240px]'
+                    }`}>
                         <div className="flex-1 w-full rounded-2xl border border-slate-800 bg-slate-900/70 p-1 sm:p-1.5">
                             <p className="px-2 pb-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Event</p>
                             {loadingEvents ? (
@@ -896,47 +931,49 @@ const Scanner: React.FC = () => {
                             </div>
                         </div>
                         
-                        <div className="w-full xl:w-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-1 sm:p-1.5 shadow-sm">
-                            <p className="px-2 pb-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Session</p>
-                            <div className="grid grid-cols-2 gap-1.5">
-                                <button
-                                    type="button"
-                                    onClick={() => setSession('AM')}
-                                    disabled={!isSessionEnabled('AM')}
-                                    aria-pressed={session === 'AM'}
-                                    className={`px-3 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
-                                        ${session === 'AM'
-                                            ? 'bg-amber-500/20 border-amber-400/60 text-amber-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-                                            : 'bg-slate-950/60 border-slate-800 text-slate-300'
-                                        }
-                                        ${isSessionEnabled('AM')
-                                            ? 'hover:bg-amber-500/10'
-                                            : 'opacity-40 cursor-not-allowed text-slate-500'
-                                        }`}
-                                >
-                                    <Sun size={16} className="fill-current" />
-                                    AM
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setSession('PM')}
-                                    disabled={!isSessionEnabled('PM')}
-                                    aria-pressed={session === 'PM'}
-                                    className={`px-3 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
-                                        ${session === 'PM'
-                                            ? 'bg-indigo-600/20 border-indigo-500/60 text-indigo-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-                                            : 'bg-slate-950/60 border-slate-800 text-slate-300'
-                                        }
-                                        ${isSessionEnabled('PM')
-                                            ? 'hover:bg-indigo-600/10'
-                                            : 'opacity-40 cursor-not-allowed text-slate-500'
-                                        }`}
-                                >
-                                    <Moon size={16} className="fill-current" />
-                                    PM
-                                </button>
+                        {scanMode === 'attendance' && (
+                            <div className="w-full xl:w-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-1 sm:p-1.5 shadow-sm">
+                                <p className="px-2 pb-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Session</p>
+                                <div className="grid grid-cols-2 gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSession('AM')}
+                                        disabled={!isSessionEnabled('AM')}
+                                        aria-pressed={session === 'AM'}
+                                        className={`px-3 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
+                                            ${session === 'AM'
+                                                ? 'bg-amber-500/20 border-amber-400/60 text-amber-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                                                : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                                            }
+                                            ${isSessionEnabled('AM')
+                                                ? 'hover:bg-amber-500/10'
+                                                : 'opacity-40 cursor-not-allowed text-slate-500'
+                                            }`}
+                                    >
+                                        <Sun size={16} className="fill-current" />
+                                        AM
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSession('PM')}
+                                        disabled={!isSessionEnabled('PM')}
+                                        aria-pressed={session === 'PM'}
+                                        className={`px-3 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
+                                            ${session === 'PM'
+                                                ? 'bg-indigo-600/20 border-indigo-500/60 text-indigo-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                                                : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                                            }
+                                            ${isSessionEnabled('PM')
+                                                ? 'hover:bg-indigo-600/10'
+                                                : 'opacity-40 cursor-not-allowed text-slate-500'
+                                            }`}
+                                    >
+                                        <Moon size={16} className="fill-current" />
+                                        PM
+                                    </button>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -1019,7 +1056,7 @@ const Scanner: React.FC = () => {
             {scanResult && (
                 <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-200 backdrop-blur-md bg-black/40`}>
                     <div className={`
-                        w-full max-w-sm rounded-3xl shadow-2xl p-8 flex flex-col items-center
+                        w-full ${giveawayClaimDetails ? 'max-w-lg' : 'max-w-sm'} rounded-3xl shadow-2xl p-8 flex flex-col items-center
                         bg-white
                         border-t-8
                         ${scanResult === 'Valid' ? 'border-emerald-500' : ''}
@@ -1046,12 +1083,12 @@ const Scanner: React.FC = () => {
                             ${scanResult === 'Invalid' ? 'text-red-600' : ''}
                             ${scanResult === 'Duplicate' ? 'text-amber-600' : ''}
                         `}>
-                            {scanResult === 'Valid' ? 'Verified!' : scanResult === 'Offline-Saved' ? 'Saved (Offline)' : scanResult}
+                            {getResultTitle()}
                         </h2>
                         
                         <p className="text-slate-500 font-medium mb-6">{resultMessage}</p>
 
-                        {(scanResult === 'Valid' || scanResult === 'Duplicate' || scanResult === 'Offline-Saved') && participantDetails && (
+                        {participantDetails && (scanResult === 'Valid' || scanResult === 'Duplicate' || scanResult === 'Offline-Saved' || resultRequiresAck) && (
                             <div className="w-full bg-slate-50 rounded-xl p-4 border border-slate-100">
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Participant</p>
                                 <p className="text-xl font-bold text-slate-900 leading-tight">{participantDetails.name}</p>
@@ -1061,30 +1098,25 @@ const Scanner: React.FC = () => {
                         )}
 
                         {giveawayClaimDetails && (
-                            <div className="mt-4 w-full rounded-xl border border-fuchsia-100 bg-fuchsia-50/70 p-4 text-left">
-                                <div className="mb-3 flex items-center justify-between gap-3">
-                                    <p className="text-xs font-bold uppercase tracking-widest text-fuchsia-700">Giveaways / Freebies</p>
-                                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${
+                            <div className="mt-4 w-full rounded-2xl border border-fuchsia-100 bg-fuchsia-50/70 p-5 text-left">
+                                <div className="mb-4 flex items-center justify-between gap-3">
+                                    <p className="text-sm font-bold uppercase tracking-widest text-fuchsia-700">Giveaways / Freebies</p>
+                                    <span className={`rounded-full px-3 py-1.5 text-xs font-bold uppercase ${
                                         giveawayClaimDetails.alreadyClaimed
                                             ? 'bg-amber-100 text-amber-700'
                                             : 'bg-emerald-100 text-emerald-700'
                                     }`}>
-                                        {giveawayClaimDetails.alreadyClaimed ? 'Claimed' : 'Logged'}
+                                        {giveawayClaimDetails.alreadyClaimed ? 'Claimed Already' : 'Logged'}
                                     </span>
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-3">
                                     {giveawayClaimDetails.items.map((item) => (
-                                        <div key={item.key} className="flex items-start justify-between gap-3 rounded-lg bg-white/80 px-3 py-2 text-sm">
+                                        <div key={item.key} className="flex items-start justify-between gap-4 rounded-xl bg-white/90 px-4 py-3 text-base shadow-sm">
                                             <span className="font-medium text-slate-600">{item.label}</span>
-                                            <span className="font-bold text-slate-900 text-right">{item.value}</span>
+                                            <span className="text-lg font-black text-slate-900 text-right">{item.value}</span>
                                         </div>
                                     ))}
                                 </div>
-                                {giveawayClaimDetails.claimedAt && (
-                                    <p className="mt-3 text-xs font-medium text-amber-700">
-                                        Previous claim: {format(new Date(giveawayClaimDetails.claimedAt), 'MMM d, yyyy h:mm a')}
-                                    </p>
-                                )}
                             </div>
                         )}
                         
