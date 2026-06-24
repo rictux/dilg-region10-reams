@@ -865,6 +865,10 @@ const Scanner: React.FC = () => {
       return scanResult;
   };
 
+  const eventOptionTextStyle: React.CSSProperties = {
+      fontSize: 'inherit'
+  };
+
   return (
     <div className="h-full w-full flex flex-col bg-black p-0 lg:flex-row lg:gap-0 lg:bg-slate-900 overflow-hidden">
         
@@ -914,11 +918,11 @@ const Scanner: React.FC = () => {
                                         className="w-full bg-slate-950 text-white text-[11px] sm:text-xs font-medium rounded-none sm:rounded-xl pl-9 pr-8 py-2 sm:py-2.5 border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm appearance-none"
                                     >
                                         {events.length === 0 ? (
-                                            <option className="text-[11px] sm:text-xs" value="">No Events Today</option>
+                                            <option className="text-[11px] sm:text-xs" style={eventOptionTextStyle} value="">No Events Today</option>
                                         ) : (
                                             <>
-                                                {(events.length > 1 || !selectedEventId) && <option className="text-[11px] sm:text-xs" value="">-- Select Event --</option>}
-                                                {events.map(e => <option className="text-[11px] sm:text-xs" key={e.event_id} value={e.event_id}>{e.event_name}</option>)}
+                                                {(events.length > 1 || !selectedEventId) && <option className="text-[11px] sm:text-xs" style={eventOptionTextStyle} value="">-- Select Event --</option>}
+                                                {events.map(e => <option className="text-[11px] sm:text-xs" style={eventOptionTextStyle} key={e.event_id} value={e.event_id}>{e.event_name}</option>)}
                                             </>
                                         )}
                                     </select>
