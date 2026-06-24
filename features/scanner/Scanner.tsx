@@ -815,7 +815,12 @@ const Scanner: React.FC = () => {
           return;
       }
 
-      resetTimerRef.current = setTimeout(() => clearScanResult({ pauseCamera: true }), 2000);
+      resetTimerRef.current = setTimeout(() => {
+          clearScanResult({
+              resumeCamera: scanModeRef.current === 'attendance',
+              pauseCamera: scanModeRef.current !== 'attendance'
+          });
+      }, 2000);
   };
 
   const pauseCamera = () => {
