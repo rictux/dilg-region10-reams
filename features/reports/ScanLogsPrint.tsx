@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { fetchAllSupabaseRows } from '../../lib/supabasePagination';
 
 interface ScanLog {
     attendance_id: number;
@@ -47,28 +48,31 @@ const ScanLogsPrint: React.FC = () => {
   const fetchLogs = async () => {
     try {
         // Constructing Supabase query to match the requested SQL structure
-        let query = supabase
-        .from('attendance_logs')
-        .select(`
-          scan_time,
-          attendance_id,
-          remarks,
-          action_session,
-          events!inner ( event_name, deleted_at ),
-          participants ( participant_id, participant_code, full_name, email, mobile_no, gender, office ),
-          users ( user_id, full_name, email )
-        `)
-        .is('events.deleted_at', null)
-        .order('scan_time', { ascending: true });
+        const parsedEventId = eventId ? parseInt(eventId) : null;
+        const data = await fetchAllSupabaseRows<ScanLog>(() => {
+            let query = supabase
+                .from('attendance_logs')
+                .select(`
+                  scan_time,
+                  attendance_id,
+                  remarks,
+                  action_session,
+                  events!inner ( event_name, deleted_at ),
+                  participants ( participant_id, participant_code, full_name, email, mobile_no, gender, office ),
+                  users ( user_id, full_name, email )
+                `)
+                .is('events.deleted_at', null)
+                .order('scan_time', { ascending: true })
+                .order('attendance_id', { ascending: true });
 
-        if (eventId) {
-            query = query.eq('event_id', parseInt(eventId));
-        }
+            if (parsedEventId) {
+                query = query.eq('event_id', parsedEventId);
+            }
 
-        const { data, error } = await query;
-        if (error) throw error;
+            return query;
+        });
         
-        setLogs(data as unknown as ScanLog[] || []);
+        setLogs(data);
     } catch (err) {
         console.error(err);
     } finally {

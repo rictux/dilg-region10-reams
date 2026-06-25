@@ -3,6 +3,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 import { 
     Calendar as CalendarIcon, 
     CheckCircle, 
@@ -136,7 +137,7 @@ const Dashboard: React.FC = () => {
                 .eq('event_id', e.event_id)
                 .eq('attendance_date', today)
                 .eq('action_session', 'AM')
-                .eq('scan_status', 'Valid');
+                .in('scan_status', [...PRESENT_ATTENDANCE_STATUSES]);
 
             return {
                 ...e,

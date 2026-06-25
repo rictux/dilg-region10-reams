@@ -18,6 +18,7 @@ import {
   serializeFoodInclusion
 } from '../../lib/eventFoodInclusion';
 import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents, isEventOwnerOffice } from '../../lib/eventAccess';
+import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 
 type ParticipantFormData = {
   f_name: string;
@@ -1504,7 +1505,9 @@ const EventsList: React.FC = () => {
                     .eq('participant_id', participantId)
                     .eq('attendance_date', attendanceDate)
                     .eq('action_session', session)
-                    .eq('scan_status', 'Valid')
+                    .in('scan_status', [...PRESENT_ATTENDANCE_STATUSES])
+                    .order('attendance_id', { ascending: true })
+                    .limit(1)
                     .maybeSingle();
 
                   if (!existingLog) {

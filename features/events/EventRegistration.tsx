@@ -9,6 +9,7 @@ import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'da
 import { toPng } from 'html-to-image';
 import { toast } from 'sonner';
 import QrScanner from './QrScanner';
+import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 
 type ParticipantMatch = Pick<Participant, 'participant_id' | 'participant_code'> & Partial<Pick<Participant, 'full_name' | 'f_name' | 'l_name' | 'm_initial' | 'suffix' | 'email' | 'mobile_no' | 'office' | 'position'>> & {
   participatedEventsCount?: number;
@@ -276,7 +277,7 @@ const EventRegistration: React.FC = () => {
       .from('attendance_logs')
       .select('participant_id, event_id')
       .in('participant_id', participantIds)
-      .eq('scan_status', 'Valid');
+      .in('scan_status', [...PRESENT_ATTENDANCE_STATUSES]);
 
     if (error) throw error;
 

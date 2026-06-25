@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { Event, Participant, GiveawayItem } from '../../types/database';
 import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
 import { format, parseISO, eachDayOfInterval, isBefore } from 'date-fns';
+import { fetchAllSupabaseRows } from '../../lib/supabasePagination';
+import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 
 interface AttendanceRow {
     participant: Participant;
@@ -82,11 +84,24 @@ const AttendanceSheetPrint: React.FC = () => {
         }
         setEventDates(dates);
 
-        const { data: logs } = await supabase.from('attendance_logs').select('*').eq('event_id', id);
-        setAllLogs(logs || []);
+        const logs = await fetchAllSupabaseRows<any>(() =>
+            supabase
+                .from('attendance_logs')
+                .select('*')
+                .eq('event_id', id)
+                .in('scan_status', [...PRESENT_ATTENDANCE_STATUSES])
+                .order('attendance_id', { ascending: true })
+        );
+        setAllLogs(logs);
         
-        const { data: eventParticipants } = await supabase.from('event_participants').select('accept_photo_video, store_to_db, giveaway_selections, participants(*)').eq('event_id', id);
-        const fetchedParticipants = eventParticipants?.map((ep: any) => {
+        const eventParticipants = await fetchAllSupabaseRows<any>(() =>
+            supabase
+                .from('event_participants')
+                .select('accept_photo_video, store_to_db, giveaway_selections, participants(*)')
+                .eq('event_id', id)
+                .order('participant_id', { ascending: true })
+        );
+        const fetchedParticipants = eventParticipants.map((ep: any) => {
             if (!ep.participants) return null;
             return {
                 ...ep.participants,
@@ -94,7 +109,7 @@ const AttendanceSheetPrint: React.FC = () => {
                 store_to_db: ep.store_to_db,
                 giveaway_selections: ep.giveaway_selections
             };
-        }).filter((p: any) => p !== null) || [];
+        }).filter((p: any) => p !== null);
         setParticipants(fetchedParticipants);
 
     } catch (e) {

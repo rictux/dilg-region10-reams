@@ -23,6 +23,7 @@ import {
 import { Event, GiveawayItem } from '../../types/database';
 import { format } from 'date-fns';
 import { SCAN_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
+import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 
 type ScanMode = 'attendance' | 'giveaway';
 
@@ -333,8 +334,10 @@ const Scanner: React.FC = () => {
                 .eq('participant_id', item.participant_id)
                 .eq('attendance_date', attendanceDate)
                 .eq('action_session', item.session)
-                .eq('scan_status', 'Valid')
-                .single();
+                .in('scan_status', [...PRESENT_ATTENDANCE_STATUSES])
+                .order('attendance_id', { ascending: true })
+                .limit(1)
+                .maybeSingle();
 
             if (existingLog) {
                 if (item.session === 'PM') {
@@ -578,8 +581,10 @@ const Scanner: React.FC = () => {
             .eq('participant_id', partData.participant_id)
             .eq('attendance_date', deviceAttendanceDate)
             .eq('action_session', currentSession)
-            .eq('scan_status', 'Valid')
-            .single();
+            .in('scan_status', [...PRESENT_ATTENDANCE_STATUSES])
+            .order('attendance_id', { ascending: true })
+            .limit(1)
+            .maybeSingle();
 
         if (existingLog) {
             if (currentSession === 'AM') {

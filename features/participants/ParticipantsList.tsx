@@ -10,6 +10,8 @@ import { toPng } from 'html-to-image';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
+import { fetchAllSupabaseRows } from '../../lib/supabasePagination';
+import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 
 interface AttendanceRow {
     participant: Participant;
@@ -381,19 +383,22 @@ const AttendanceList: React.FC = () => {
     if (data.length === 0) setLoading(true); 
     
     try {
-        const { data: eventParticipants, error: epError } = await supabase
-            .from('event_participants')
-            .select('participant_id, role, needs_accommodation, giveaway_selections, participants(*)')
-            .eq('event_id', eventId);
-        
-        if (epError) throw epError;
+        const eventParticipants = await fetchAllSupabaseRows<any>(() =>
+            supabase
+                .from('event_participants')
+                .select('participant_id, role, needs_accommodation, giveaway_selections, participants(*)')
+                .eq('event_id', eventId)
+                .order('participant_id', { ascending: true })
+        );
 
-        const { data: logs, error: logsError } = await supabase
-            .from('attendance_logs')
-            .select('*')
-            .eq('event_id', eventId);
-            
-        if (logsError) throw logsError;
+        const logs = await fetchAllSupabaseRows<any>(() =>
+            supabase
+                .from('attendance_logs')
+                .select('*')
+                .eq('event_id', eventId)
+                .in('scan_status', [...PRESENT_ATTENDANCE_STATUSES])
+                .order('attendance_id', { ascending: true })
+        );
             
         if (eventParticipants) {
             const rows = eventParticipants
@@ -623,7 +628,9 @@ const AttendanceList: React.FC = () => {
           .eq('participant_id', participantId)
           .eq('attendance_date', manualForm.date)
           .eq('action_session', manualForm.session)
-          .eq('scan_status', 'Valid')
+          .in('scan_status', [...PRESENT_ATTENDANCE_STATUSES])
+          .order('attendance_id', { ascending: true })
+          .limit(1)
           .maybeSingle();
 
       if (existingLog) {
@@ -1054,7 +1061,9 @@ const AttendanceList: React.FC = () => {
                     .eq('participant_id', participantId)
                     .eq('attendance_date', attendanceDate)
                     .eq('action_session', session)
-                    .eq('scan_status', 'Valid')
+                    .in('scan_status', [...PRESENT_ATTENDANCE_STATUSES])
+                    .order('attendance_id', { ascending: true })
+                    .limit(1)
                     .maybeSingle();
 
                   if (!existingLog) {
