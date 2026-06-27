@@ -67,7 +67,16 @@
       /* Compact density tuning for common laptop-size desktop screens */
       @media (min-width: 1024px) and (max-width: 1600px) and (max-height: 920px) {
           .desktop-compact-shell .app-sidebar.app-sidebar-expanded {
-              width: 252px !important;
+              width: 280px !important;
+          }
+
+          .desktop-compact-shell .app-sidebar.app-sidebar-collapsed {
+              width: 72px !important;
+          }
+
+          .desktop-compact-shell .app-sidebar.app-sidebar-collapsed .app-sidebar-header {
+              padding-left: 1.25rem !important;
+              padding-right: 1.25rem !important;
           }
 
           .desktop-compact-shell .app-sidebar-header,
@@ -100,7 +109,7 @@
           }
 
           .attendance-page {
-              gap: 1.25rem !important;
+              gap: 0.625rem !important;
           }
 
           .attendance-page .attendance-toolbar {

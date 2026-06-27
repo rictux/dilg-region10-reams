@@ -1320,7 +1320,7 @@ const AttendanceList: React.FC = () => {
       </div>
 
       {/* Stats Cards as Filters */}
-      <div className="attendance-stats w-full -mt-1.5 md:mt-4">
+      <div className="attendance-stats w-full -mt-1.5 md:mt-0">
           <div
             className={`grid w-full gap-1 sm:gap-3 lg:gap-4 ${statsGridClassName}`}
           >

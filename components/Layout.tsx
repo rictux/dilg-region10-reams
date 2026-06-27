@@ -596,16 +596,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         fixed inset-y-0 left-0 z-30 bg-[#4322A7] transform transition-all duration-300 ease-in-out
         md:translate-x-0 md:static md:shadow-none
         ${isMobileMenuOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full w-[280px]'}
-        ${isSidebarCollapsed ? 'md:w-[90px]' : 'md:w-[280px]'}
+        ${isSidebarCollapsed ? 'md:w-[72px]' : 'md:w-[280px]'}
         rounded-tr-3xl rounded-br-3xl md:rounded-r-3xl
         flex flex-col overflow-hidden
       `}>
         <div className={`app-sidebar-header p-8 flex items-center gap-3 ${shouldCollapseSidebarContent ? 'justify-center px-4' : ''}`}>
-          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0 overflow-hidden p-1">
+          <div className="w-[32px] h-[32px] bg-white rounded-full flex items-center justify-center shrink-0 overflow-hidden">
             <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" />
           </div>
           {!shouldCollapseSidebarContent && (
-            <h1 className="app-sidebar-title text-2xl font-bold text-white tracking-wide whitespace-nowrap">Admin Portal</h1>
+            <h1 className="app-sidebar-title text-2xl font-bold text-white tracking-wide whitespace-nowrap">REAMS</h1>
           )}
         </div>
 
