@@ -15,6 +15,8 @@ export type CertificateParticipantRecord = {
 };
 
 export type CertificateSignatory = {
+  id?: number;
+  label?: string | null;
   name: string;
   position: string;
   esig_link: string;
@@ -25,6 +27,7 @@ export type CertificateSignatory = {
   footer?: string | null;
   post_nominals?: string | null;
   certificate_template_variant?: CertificateTemplateVariant | null;
+  is_default?: boolean | null;
 } | null;
 
 type CertificateCardProps = {
