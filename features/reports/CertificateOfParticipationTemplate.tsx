@@ -10,7 +10,7 @@ export type CoPParticipantRecord = {
   log_dates: string[];
 };
 
-export type CoPTitle = 'Certificate of Participation' | 'Certificate of Appreciation' | 'Acknowledgement Receipt';
+export type CoPTitle = 'Certificate of Participation' | 'Certificate of Appreciation' | 'Certificate of Completion';
 
 /** Default body section shown before the signatory block. */
 export const DEFAULT_COP_BODY_TEXT =

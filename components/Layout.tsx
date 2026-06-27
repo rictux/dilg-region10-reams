@@ -185,7 +185,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const NavItem = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => {
     const isActive = location.pathname === to;
     return (
-      <div className="relative pl-6 pr-4 md:pr-0 my-1">
+      <div className="relative pl-0 pr-4 md:pr-0 my-1">
         {isActive && (
           <>
             {/* Top curve */}
@@ -595,12 +595,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         ${isSidebarCollapsed ? 'app-sidebar-collapsed' : 'app-sidebar-expanded'}
         fixed inset-y-0 left-0 z-30 bg-[#4322A7] transform transition-all duration-300 ease-in-out
         md:translate-x-0 md:static md:shadow-none
-        ${isMobileMenuOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full w-[280px]'}
-        ${isSidebarCollapsed ? 'md:w-[72px]' : 'md:w-[280px]'}
+        ${isMobileMenuOpen ? 'translate-x-0 w-[250px]' : '-translate-x-full w-[250px]'}
+        ${isSidebarCollapsed ? 'md:w-[70px]' : 'md:w-[250px]'}
         rounded-tr-3xl rounded-br-3xl md:rounded-r-3xl
         flex flex-col overflow-hidden
       `}>
-        <div className={`app-sidebar-header p-8 flex items-center gap-3 ${shouldCollapseSidebarContent ? 'justify-center px-4' : ''}`}>
+        <div className="app-sidebar-header px-4 py-8 flex items-center gap-3">
           <div className="w-[32px] h-[32px] bg-white rounded-full flex items-center justify-center shrink-0 overflow-hidden">
             <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" />
           </div>

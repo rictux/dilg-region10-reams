@@ -67,22 +67,20 @@
       /* Compact density tuning for common laptop-size desktop screens */
       @media (min-width: 1024px) and (max-width: 1600px) and (max-height: 920px) {
           .desktop-compact-shell .app-sidebar.app-sidebar-expanded {
-              width: 280px !important;
+              width: 250px !important;
           }
 
           .desktop-compact-shell .app-sidebar.app-sidebar-collapsed {
-              width: 72px !important;
+              width: 70px !important;
           }
 
-          .desktop-compact-shell .app-sidebar.app-sidebar-collapsed .app-sidebar-header {
-              padding-left: 1.25rem !important;
-              padding-right: 1.25rem !important;
-          }
-
-          .desktop-compact-shell .app-sidebar-header,
           .desktop-compact-shell .app-sidebar-footer,
           .desktop-compact-shell .app-main {
               padding: 1.5rem !important;
+          }
+
+          .desktop-compact-shell .app-sidebar-header {
+              padding: 1.5rem 1rem !important;
           }
 
           .desktop-compact-shell .app-main-header {
