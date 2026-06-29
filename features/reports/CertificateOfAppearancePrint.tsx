@@ -7,7 +7,9 @@ import { format, parseISO } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { toJpeg } from 'html-to-image';
 import * as XLSX from 'xlsx';
+import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
+import { fetchAllSupabaseRows } from '../../lib/supabasePagination';
 import CertificateOfAppearanceCard, {
   buildEventDateString,
   CertificateParticipantRecord,
@@ -550,15 +552,14 @@ const CertificateOfAppearancePrint: React.FC = () => {
         }
       }
 
-      const { data: logs } = await supabase
-        .from('attendance_logs')
-        .select('participant_id, attendance_date')
-        .eq('event_id', id);
-
-      if (!logs) {
-        setParticipants([]);
-        return;
-      }
+      const logs = await fetchAllSupabaseRows<any>(() =>
+        supabase
+          .from('attendance_logs')
+          .select('attendance_id, participant_id, attendance_date')
+          .eq('event_id', id)
+          .in('scan_status', [...PRESENT_ATTENDANCE_STATUSES])
+          .order('attendance_id', { ascending: true })
+      );
 
       const uniqueParticipantIds = Array.from(new Set(logs.map((log) => log.participant_id)));
       const logDatesByParticipant = new Map<number, Set<string>>();
@@ -576,22 +577,24 @@ const CertificateOfAppearancePrint: React.FC = () => {
         return;
       }
 
-      const { data: participantsData } = await supabase
-        .from('event_participants')
-        .select(`
-          participant_id,
-          needs_accommodation,
-          date_accommodation,
-          ca_serial_no,
-          role,
-          need_ca,
-          participants (*)
-        `)
-        .eq('event_id', id)
-        .in('participant_id', uniqueParticipantIds)
-        .order('participant_id', { ascending: true });
+      const participantsData = await fetchAllSupabaseRows<any>(() =>
+        supabase
+          .from('event_participants')
+          .select(`
+            participant_id,
+            needs_accommodation,
+            date_accommodation,
+            ca_serial_no,
+            role,
+            need_ca,
+            participants (*)
+          `)
+          .eq('event_id', id)
+          .in('participant_id', uniqueParticipantIds)
+          .order('participant_id', { ascending: true })
+      );
 
-      const normalizedParticipants = (participantsData || [])
+      const normalizedParticipants = participantsData
         .map((record: any) => ({
           participant: Array.isArray(record.participants) ? (record.participants[0] || null) : record.participants,
           needs_accommodation: !!record.needs_accommodation,
