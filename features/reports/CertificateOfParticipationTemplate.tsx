@@ -1,4 +1,5 @@
 import React from 'react';
+import QRCode from 'react-qr-code';
 import { format, parseISO } from 'date-fns';
 import { Event, Participant } from '../../types/database';
 import { CertificateSignatory } from './CertificateOfAppearanceTemplate';
@@ -208,6 +209,9 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   const bodySz   = s(15);
   const sigSz    = s(17.6);
   const sigPosSz = s(13);
+  const qrSize   = s(48);
+  const qrCaptionSz = s(8);
+  const lookupUrl = `${window.location.origin}/lookup?participant=${participantRecord.participant.participant_id}`;
 
   // Auto-shrink name to fit within ~70% of the certificate width on one line
   const fullName      = participantRecord.participant.full_name || '';
@@ -263,6 +267,33 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
           boxSizing: 'border-box',
         }}
       >
+        <div
+          style={{
+            position: 'absolute',
+            left: s(50),
+            bottom: s(36),
+            zIndex: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            fontFamily: CERT_FONT,
+            color: '#334155',
+            lineHeight: 1.15,
+          }}
+        >
+          <QRCode value={lookupUrl} size={qrSize} />
+          <p
+            style={{
+              margin: `${s(4)}px 0 0`,
+              maxWidth: s(88),
+              fontSize: qrCaptionSz,
+              fontWeight: 500,
+            }}
+          >
+            Scan to verify
+          </p>
+        </div>
 
         {/* ── 1. Header: logos + org text (Helvetica) ── */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: s(2), fontFamily: HELVETICA_FONT }}>
