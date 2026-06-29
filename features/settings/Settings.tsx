@@ -110,6 +110,9 @@ const createEmptySignatoryState = () => ({
   is_default: false
 });
 
+const normalizeSignatoryName = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase();
+const SIGNATORY_NAME_LOOKUP_DEBOUNCE_MS = 450;
+
 type SignatoryState = ReturnType<typeof createEmptySignatoryState>;
 
 type SignatoryRow = SignatoryState & {
@@ -279,6 +282,90 @@ const Settings: React.FC = () => {
     setIsPreviewModalOpen(false);
   };
 
+  const findLoadedSignatoryByName = (name: string) => {
+    const normalizedName = normalizeSignatoryName(name);
+
+    if (!normalizedName) {
+      return null;
+    }
+
+    return signatories.find((item) => normalizeSignatoryName(item.name || '') === normalizedName) || null;
+  };
+
+  const fetchExistingSignatoryByName = async (name: string) => {
+    if (!selectedOfficeId) {
+      return null;
+    }
+
+    const normalizedName = normalizeSignatoryName(name);
+
+    if (!normalizedName) {
+      return null;
+    }
+
+    const loadedMatch = findLoadedSignatoryByName(name);
+
+    if (loadedMatch) {
+      return loadedMatch;
+    }
+
+    const { data, error } = await supabase
+      .from('tbl_signatory')
+      .select('*')
+      .eq('office_id', selectedOfficeId)
+      .ilike('name', name.trim())
+      .order('active', { ascending: false })
+      .order('is_default', { ascending: false })
+      .limit(5);
+
+    if (error) throw error;
+
+    const rows = (data || []) as SignatoryRow[];
+    return rows.find((item) => normalizeSignatoryName(item.name || '') === normalizedName) || null;
+  };
+
+  useEffect(() => {
+    if (!selectedOfficeId || selectedSignatoryId) {
+      return;
+    }
+
+    const nameToLookup = signatory.name;
+
+    if (normalizeSignatoryName(nameToLookup).length < 2) {
+      return;
+    }
+
+    let isCurrentLookup = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        const existing = await fetchExistingSignatoryByName(nameToLookup);
+
+        if (!isCurrentLookup || !existing) {
+          return;
+        }
+
+        setSelectedSignatoryId(existing.id);
+        applySignatoryRow(existing);
+        setMessage({
+          type: 'success',
+          text: 'Existing signatory found. Saved details and signature were loaded.'
+        });
+      } catch (err: any) {
+        if (!isCurrentLookup) {
+          return;
+        }
+
+        console.error('Error checking existing signatory:', err);
+        setMessage({ type: 'error', text: err.message || 'Unable to check existing signatories.' });
+      }
+    }, SIGNATORY_NAME_LOOKUP_DEBOUNCE_MS);
+
+    return () => {
+      isCurrentLookup = false;
+      window.clearTimeout(timer);
+    };
+  }, [selectedOfficeId, selectedSignatoryId, signatory.name, signatories]);
+
   const fetchSignatories = async (officeId: number, preferredSignatoryId?: number | '') => {
     try {
       const { data, error } = await supabase
@@ -335,6 +422,27 @@ const Settings: React.FC = () => {
       is_default: signatories.length === 0
     }));
     setMessage(null);
+  };
+
+  const handleSignatoryNameChange = (value: string) => {
+    setSignatory((current) => ({ ...current, name: value }));
+
+    if (selectedSignatoryId) {
+      return;
+    }
+
+    const existing = findLoadedSignatoryByName(value);
+
+    if (!existing) {
+      return;
+    }
+
+    setSelectedSignatoryId(existing.id);
+    applySignatoryRow(existing);
+    setMessage({
+      type: 'success',
+      text: 'Existing signatory found. Saved details and signature were loaded.'
+    });
   };
 
   const handleDeactivateSignatory = async () => {
@@ -412,6 +520,20 @@ const Settings: React.FC = () => {
     setMessage(null);
 
     try {
+      const existingSignatory = selectedSignatoryId
+        ? null
+        : await fetchExistingSignatoryByName(signatory.name);
+
+      if (existingSignatory) {
+        setSelectedSignatoryId(existingSignatory.id);
+        applySignatoryRow(existingSignatory);
+        setMessage({
+          type: 'success',
+          text: 'Existing signatory found. Saved details and signature were loaded. Review the details, then save any changes.'
+        });
+        return;
+      }
+
       let esigLink = signatory.esig_link;
 
       if (selectedSignatureFile) {
@@ -758,7 +880,7 @@ const Settings: React.FC = () => {
                         required
                         disabled={!selectedOfficeId}
                         value={signatory.name}
-                        onChange={(e) => setSignatory({ ...signatory, name: e.target.value })}
+                        onChange={(e) => handleSignatoryNameChange(e.target.value)}
                         placeholder="e.g. Bruce A. Colao"
                         className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
                       />
