@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload, Eye, X, Trash2 } from 'lucide-react';
+import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload, Eye, X, Trash2, Plus, Star } from 'lucide-react';
 import { Event, Office } from '../../types/database';
 import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
 import CertificateOfAppearanceCard, {
@@ -96,6 +96,7 @@ const CERTIFICATE_PREVIEW_FOOD_INCLUSION_MAP = parseFoodInclusion(
 );
 
 const createEmptySignatoryState = () => ({
+  label: '',
   name: '',
   position: '',
   esig_link: '',
@@ -105,8 +106,21 @@ const createEmptySignatoryState = () => ({
   website: '',
   footer: '',
   post_nominals: '',
-  certificate_template_variant: DEFAULT_CERTIFICATE_TEMPLATE_VARIANT as CertificateTemplateVariant
+  certificate_template_variant: DEFAULT_CERTIFICATE_TEMPLATE_VARIANT as CertificateTemplateVariant,
+  is_default: false
 });
+
+const normalizeSignatoryName = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase();
+const SIGNATORY_NAME_LOOKUP_DEBOUNCE_MS = 450;
+
+type SignatoryState = ReturnType<typeof createEmptySignatoryState>;
+
+type SignatoryRow = SignatoryState & {
+  id: number;
+  office_id: number;
+  active?: boolean | null;
+  sort_order?: number | null;
+};
 
 const Settings: React.FC = () => {
   const { user } = useAuth();
@@ -121,6 +135,8 @@ const Settings: React.FC = () => {
   const [selectedOfficeId, setSelectedOfficeId] = useState<number | ''>('');
   
   const [signatory, setSignatory] = useState(createEmptySignatoryState);
+  const [signatories, setSignatories] = useState<SignatoryRow[]>([]);
+  const [selectedSignatoryId, setSelectedSignatoryId] = useState<number | ''>('');
   const [selectedSignatureFile, setSelectedSignatureFile] = useState<File | null>(null);
   const [signaturePreviewUrl, setSignaturePreviewUrl] = useState('');
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
@@ -147,8 +163,10 @@ const Settings: React.FC = () => {
 
   useEffect(() => {
     if (selectedOfficeId) {
-      fetchSignatory(selectedOfficeId);
+      fetchSignatories(selectedOfficeId);
     } else {
+      setSignatories([]);
+      setSelectedSignatoryId('');
       setSignatory(createEmptySignatoryState());
       setSelectedSignatureFile(null);
       setSignaturePreviewUrl('');
@@ -237,45 +255,225 @@ const Settings: React.FC = () => {
     }
   };
 
-  const fetchSignatory = async (officeId: number) => {
+  const applySignatoryRow = (row: SignatoryRow | null) => {
+    setSelectedSignatureFile(null);
+    setSignaturePreviewUrl(row?.esig_link || '');
+    setSignatory(
+      row
+        ? {
+            label: row.label || '',
+            name: row.name || '',
+            position: row.position || '',
+            esig_link: row.esig_link || '',
+            header: row.header || '',
+            sub_header: row.sub_header || '',
+            address: row.address || '',
+            website: row.website || '',
+            footer: row.footer || '',
+            post_nominals: row.post_nominals || '',
+            certificate_template_variant:
+              row.certificate_template_variant === 'without_serial'
+                ? 'without_serial'
+                : DEFAULT_CERTIFICATE_TEMPLATE_VARIANT,
+            is_default: !!row.is_default
+          }
+        : createEmptySignatoryState()
+    );
+    setIsPreviewModalOpen(false);
+  };
+
+  const findLoadedSignatoryByName = (name: string) => {
+    const normalizedName = normalizeSignatoryName(name);
+
+    if (!normalizedName) {
+      return null;
+    }
+
+    return signatories.find((item) => normalizeSignatoryName(item.name || '') === normalizedName) || null;
+  };
+
+  const fetchExistingSignatoryByName = async (name: string) => {
+    if (!selectedOfficeId) {
+      return null;
+    }
+
+    const normalizedName = normalizeSignatoryName(name);
+
+    if (!normalizedName) {
+      return null;
+    }
+
+    const loadedMatch = findLoadedSignatoryByName(name);
+
+    if (loadedMatch) {
+      return loadedMatch;
+    }
+
+    const { data, error } = await supabase
+      .from('tbl_signatory')
+      .select('*')
+      .eq('office_id', selectedOfficeId)
+      .ilike('name', name.trim())
+      .order('active', { ascending: false })
+      .order('is_default', { ascending: false })
+      .limit(5);
+
+    if (error) throw error;
+
+    const rows = (data || []) as SignatoryRow[];
+    return rows.find((item) => normalizeSignatoryName(item.name || '') === normalizedName) || null;
+  };
+
+  useEffect(() => {
+    if (!selectedOfficeId || selectedSignatoryId) {
+      return;
+    }
+
+    const nameToLookup = signatory.name;
+
+    if (normalizeSignatoryName(nameToLookup).length < 2) {
+      return;
+    }
+
+    let isCurrentLookup = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        const existing = await fetchExistingSignatoryByName(nameToLookup);
+
+        if (!isCurrentLookup || !existing) {
+          return;
+        }
+
+        setSelectedSignatoryId(existing.id);
+        applySignatoryRow(existing);
+        setMessage({
+          type: 'success',
+          text: 'Existing signatory found. Saved details and signature were loaded.'
+        });
+      } catch (err: any) {
+        if (!isCurrentLookup) {
+          return;
+        }
+
+        console.error('Error checking existing signatory:', err);
+        setMessage({ type: 'error', text: err.message || 'Unable to check existing signatories.' });
+      }
+    }, SIGNATORY_NAME_LOOKUP_DEBOUNCE_MS);
+
+    return () => {
+      isCurrentLookup = false;
+      window.clearTimeout(timer);
+    };
+  }, [selectedOfficeId, selectedSignatoryId, signatory.name, signatories]);
+
+  const fetchSignatories = async (officeId: number, preferredSignatoryId?: number | '') => {
     try {
-      setSelectedSignatureFile(null);
-      setSignaturePreviewUrl('');
       const { data, error } = await supabase
         .from('tbl_signatory')
         .select('*')
         .eq('office_id', officeId)
-        .maybeSingle();
+        .eq('active', true)
+        .order('is_default', { ascending: false })
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true });
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
+      if (error) throw error;
 
-      if (data) {
-        setSignatory({
-          name: data.name || '',
-          position: data.position || '',
-          esig_link: data.esig_link || '',
-          header: data.header || '',
-          sub_header: data.sub_header || '',
-          address: data.address || '',
-          website: data.website || '',
-          footer: data.footer || '',
-          post_nominals: data.post_nominals || '',
-          certificate_template_variant:
-            data.certificate_template_variant === 'without_serial'
-              ? 'without_serial'
-              : DEFAULT_CERTIFICATE_TEMPLATE_VARIANT
-        });
-        setSignaturePreviewUrl(data.esig_link || '');
-        setIsPreviewModalOpen(false);
-      } else {
-        setSignatory(createEmptySignatoryState());
-        setSignaturePreviewUrl('');
-        setIsPreviewModalOpen(false);
-      }
+      const rows = (data || []) as SignatoryRow[];
+      setSignatories(rows);
+
+      const selected =
+        rows.find((row) => row.id === preferredSignatoryId) ||
+        rows.find((row) => row.id === selectedSignatoryId) ||
+        rows.find((row) => row.is_default) ||
+        rows[0] ||
+        null;
+
+      setSelectedSignatoryId(selected?.id || '');
+      applySignatoryRow(selected);
     } catch (err) {
-      console.error('Error fetching signatory:', err);
+      console.error('Error fetching signatories:', err);
+    }
+  };
+
+  const handleSelectSignatory = (id: number | '') => {
+    setSelectedSignatoryId(id);
+
+    if (!id) {
+      applySignatoryRow(null);
+      return;
+    }
+
+    const row = signatories.find((item) => item.id === id) || null;
+    applySignatoryRow(row);
+  };
+
+  const handleAddSignatory = () => {
+    setSelectedSignatoryId('');
+    applySignatoryRow(null);
+    setSignatory((current) => ({
+      ...current,
+      header: signatory.header,
+      sub_header: signatory.sub_header,
+      address: signatory.address,
+      website: signatory.website,
+      footer: signatory.footer,
+      certificate_template_variant: signatory.certificate_template_variant,
+      is_default: signatories.length === 0
+    }));
+    setMessage(null);
+  };
+
+  const handleSignatoryNameChange = (value: string) => {
+    setSignatory((current) => ({ ...current, name: value }));
+
+    if (selectedSignatoryId) {
+      return;
+    }
+
+    const existing = findLoadedSignatoryByName(value);
+
+    if (!existing) {
+      return;
+    }
+
+    setSelectedSignatoryId(existing.id);
+    applySignatoryRow(existing);
+    setMessage({
+      type: 'success',
+      text: 'Existing signatory found. Saved details and signature were loaded.'
+    });
+  };
+
+  const handleDeactivateSignatory = async () => {
+    if (!selectedOfficeId || !selectedSignatoryId) {
+      handleAddSignatory();
+      return;
+    }
+
+    if (signatories.length <= 1) {
+      setMessage({ type: 'error', text: 'Each office must keep at least one active signatory.' });
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      const { error } = await supabase
+        .from('tbl_signatory')
+        .update({ active: false, is_default: false })
+        .eq('id', selectedSignatoryId);
+
+      if (error) throw error;
+
+      setMessage({ type: 'success', text: 'Signatory removed from the active list.' });
+      await fetchSignatories(selectedOfficeId);
+    } catch (err: any) {
+      console.error('Error removing signatory:', err);
+      setMessage({ type: 'error', text: err.message || 'Failed to remove signatory.' });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -322,6 +520,20 @@ const Settings: React.FC = () => {
     setMessage(null);
 
     try {
+      const existingSignatory = selectedSignatoryId
+        ? null
+        : await fetchExistingSignatoryByName(signatory.name);
+
+      if (existingSignatory) {
+        setSelectedSignatoryId(existingSignatory.id);
+        applySignatoryRow(existingSignatory);
+        setMessage({
+          type: 'success',
+          text: 'Existing signatory found. Saved details and signature were loaded. Review the details, then save any changes.'
+        });
+        return;
+      }
+
       let esigLink = signatory.esig_link;
 
       if (selectedSignatureFile) {
@@ -347,55 +559,78 @@ const Settings: React.FC = () => {
         esigLink = publicUrlData.publicUrl;
       }
 
-      // Check if exists
-      const { data: existing } = await supabase
-        .from('tbl_signatory')
-        .select('id')
-        .eq('office_id', selectedOfficeId)
-        .maybeSingle();
+      const shouldSetDefault = signatory.is_default || signatories.length === 0;
 
-      if (existing) {
+      if (shouldSetDefault) {
+        const { error } = await supabase
+          .from('tbl_signatory')
+          .update({ is_default: false })
+          .eq('office_id', selectedOfficeId)
+          .eq('active', true);
+
+        if (error) throw error;
+      }
+
+      const payload = {
+        office_id: selectedOfficeId,
+        label: signatory.label.trim() || null,
+        name: signatory.name,
+        position: signatory.position,
+        esig_link: esigLink,
+        header: signatory.header.trim() || null,
+        sub_header: signatory.sub_header.trim() || null,
+        address: signatory.address.trim() || null,
+        website: signatory.website.trim() || null,
+        footer: signatory.footer.trim() || null,
+        post_nominals: signatory.post_nominals.trim() || null,
+        certificate_template_variant: signatory.certificate_template_variant,
+        is_default: shouldSetDefault,
+        active: true,
+        sort_order: selectedSignatoryId
+          ? signatories.find((item) => item.id === selectedSignatoryId)?.sort_order || 0
+          : signatories.length
+      };
+
+      let savedSignatoryId = selectedSignatoryId;
+
+      if (selectedSignatoryId) {
         const { error } = await supabase
           .from('tbl_signatory')
           .update({
-            name: signatory.name,
-            position: signatory.position,
-            esig_link: esigLink,
-            header: signatory.header.trim() || null,
-            sub_header: signatory.sub_header.trim() || null,
-            address: signatory.address.trim() || null,
-            website: signatory.website.trim() || null,
-            footer: signatory.footer.trim() || null,
-            post_nominals: signatory.post_nominals.trim() || null,
-            certificate_template_variant: signatory.certificate_template_variant
+            label: payload.label,
+            name: payload.name,
+            position: payload.position,
+            esig_link: payload.esig_link,
+            header: payload.header,
+            sub_header: payload.sub_header,
+            address: payload.address,
+            website: payload.website,
+            footer: payload.footer,
+            post_nominals: payload.post_nominals,
+            certificate_template_variant: payload.certificate_template_variant,
+            is_default: payload.is_default,
+            active: payload.active,
+            sort_order: payload.sort_order
           })
-          .eq('id', existing.id);
+          .eq('id', selectedSignatoryId);
           
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
           .from('tbl_signatory')
-          .insert({
-            office_id: selectedOfficeId,
-            name: signatory.name,
-            position: signatory.position,
-            esig_link: esigLink,
-            header: signatory.header.trim() || null,
-            sub_header: signatory.sub_header.trim() || null,
-            address: signatory.address.trim() || null,
-            website: signatory.website.trim() || null,
-            footer: signatory.footer.trim() || null,
-            post_nominals: signatory.post_nominals.trim() || null,
-            certificate_template_variant: signatory.certificate_template_variant
-          });
+          .insert(payload)
+          .select('id')
+          .single();
           
         if (error) throw error;
+        savedSignatoryId = inserted?.id || '';
       }
 
       setSignatory((prev) => ({ ...prev, esig_link: esigLink }));
       setSelectedSignatureFile(null);
       setSignaturePreviewUrl(esigLink);
-      setMessage({ type: 'success', text: 'Certificate settings saved successfully.' });
+      setMessage({ type: 'success', text: 'Certificate signatory saved successfully.' });
+      await fetchSignatories(selectedOfficeId, savedSignatoryId);
     } catch (err: any) {
       console.error('Error saving signatory:', err);
       setMessage({ type: 'error', text: err.message || 'Failed to save settings.' });
@@ -572,6 +807,72 @@ const Settings: React.FC = () => {
                       </div>
                     </div>
 
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="block text-xs font-medium text-slate-700">Select Signatory</label>
+                      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                        <select
+                          value={selectedSignatoryId}
+                          onChange={(e) => handleSelectSignatory(e.target.value ? Number(e.target.value) : '')}
+                          disabled={!selectedOfficeId || signatories.length === 0}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                          {signatories.length === 0 ? (
+                            <option value="">No signatories yet</option>
+                          ) : (
+                            signatories.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.label || item.name}{item.is_default ? ' (Default)' : ''}
+                              </option>
+                            ))
+                          )}
+                        </select>
+
+                        <button
+                          type="button"
+                          onClick={handleAddSignatory}
+                          disabled={!selectedOfficeId}
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                          <Plus className="h-4 w-4" />
+                          New
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleDeactivateSignatory}
+                          disabled={!selectedOfficeId || saving || (!selectedSignatoryId && signatories.length === 0)}
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-xs font-medium text-slate-700">Label</label>
+                      <input
+                        type="text"
+                        disabled={!selectedOfficeId}
+                        value={signatory.label}
+                        onChange={(e) => setSignatory({ ...signatory, label: e.target.value })}
+                        placeholder="e.g. Regional Director"
+                        className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                      />
+                    </div>
+
+                    <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={signatory.is_default || signatories.length === 0}
+                        disabled={!selectedOfficeId || signatories.length === 0}
+                        onChange={(e) => setSignatory({ ...signatory, is_default: e.target.checked })}
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <Star className="h-4 w-4 text-amber-500" />
+                      Default
+                    </label>
+
                     <div className="space-y-1">
                       <label className="block text-xs font-medium text-slate-700">Name</label>
                       <input
@@ -579,7 +880,7 @@ const Settings: React.FC = () => {
                         required
                         disabled={!selectedOfficeId}
                         value={signatory.name}
-                        onChange={(e) => setSignatory({ ...signatory, name: e.target.value })}
+                        onChange={(e) => handleSignatoryNameChange(e.target.value)}
                         placeholder="e.g. Bruce A. Colao"
                         className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
                       />

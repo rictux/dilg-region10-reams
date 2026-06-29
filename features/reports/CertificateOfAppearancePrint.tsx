@@ -21,6 +21,13 @@ type CertificateParticipant = CertificateParticipantRecord & {
   need_ca: boolean | null;
 };
 
+type CertificateSignatoryRow = NonNullable<CertificateSignatory> & {
+  id: number;
+  office_id?: number | null;
+  active?: boolean | null;
+  sort_order?: number | null;
+};
+
 const isDelegateRole = (role: CertificateParticipant['role']) => role === 'Delegate';
 
 const sanitizeFileName = (value: string) => {
@@ -426,6 +433,8 @@ const CertificateOfAppearancePrint: React.FC = () => {
   const [event, setEvent] = useState<Event | null>(null);
   const [participants, setParticipants] = useState<CertificateParticipant[]>([]);
   const [signatory, setSignatory] = useState<CertificateSignatory>(null);
+  const [signatories, setSignatories] = useState<CertificateSignatoryRow[]>([]);
+  const [selectedSignatoryId, setSelectedSignatoryId] = useState<number | ''>('');
   const [officeCode, setOfficeCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [participantSearch, setParticipantSearch] = useState('');
@@ -499,17 +508,35 @@ const CertificateOfAppearancePrint: React.FC = () => {
       if (!eventData) throw new Error('Event not found');
       setEvent(eventData);
       setSignatory(null);
+      setSignatories([]);
+      setSelectedSignatoryId('');
       setOfficeCode(null);
 
       if (eventData.organize_by) {
-        const { data: sigData } = await supabase
+        const { data: sigData, error: signatoryError } = await supabase
           .from('tbl_signatory')
           .select('*')
           .eq('office_id', eventData.organize_by)
-          .maybeSingle();
+          .eq('active', true)
+          .order('is_default', { ascending: false })
+          .order('sort_order', { ascending: true })
+          .order('name', { ascending: true });
 
-        if (sigData) {
-          setSignatory(sigData);
+        if (signatoryError) throw signatoryError;
+
+        const officeSignatories = (sigData || []) as CertificateSignatoryRow[];
+        setSignatories(officeSignatories);
+
+        const savedSignatoryId = sessionStorage.getItem(`coa_signatory_${eventData.organize_by}`);
+        const selectedSignatory =
+          officeSignatories.find((item) => String(item.id) === savedSignatoryId) ||
+          officeSignatories.find((item) => item.is_default) ||
+          officeSignatories[0] ||
+          null;
+
+        if (selectedSignatory) {
+          setSelectedSignatoryId(selectedSignatory.id);
+          setSignatory(selectedSignatory);
         }
 
         const { data: officeData } = await supabase
@@ -652,6 +679,17 @@ const CertificateOfAppearancePrint: React.FC = () => {
       filteredParticipants[0]
     );
   }, [filteredParticipants, selectedParticipantId]);
+
+  const handleSelectSignatory = (id: number | '') => {
+    setSelectedSignatoryId(id);
+
+    const selected = signatories.find((item) => item.id === id) || null;
+    setSignatory(selected);
+
+    if (event?.organize_by && id) {
+      sessionStorage.setItem(`coa_signatory_${event.organize_by}`, String(id));
+    }
+  };
 
   const selectedDownloadParticipants = useMemo(
     () =>
@@ -997,6 +1035,20 @@ const CertificateOfAppearancePrint: React.FC = () => {
             </div>
 
             <div className="hidden shrink-0 items-center gap-2 md:flex">
+              {signatories.length > 0 && (
+                <select
+                  value={selectedSignatoryId}
+                  onChange={(e) => handleSelectSignatory(e.target.value ? Number(e.target.value) : '')}
+                  className="max-w-[220px] rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  title="Select certificate signatory"
+                >
+                  {signatories.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label || item.name}{item.is_default ? ' (Default)' : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
               {requiresReferenceCode && (
                 <button
                   onClick={handleGenerateSerials}
@@ -1052,6 +1104,20 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
           {/* Mobile-only button row (below md breakpoint) */}
           <div className="mt-3 flex flex-wrap items-center gap-2 md:hidden">
+            {signatories.length > 0 && (
+              <select
+                value={selectedSignatoryId}
+                onChange={(e) => handleSelectSignatory(e.target.value ? Number(e.target.value) : '')}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                title="Select certificate signatory"
+              >
+                {signatories.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label || item.name}{item.is_default ? ' (Default)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
             {requiresReferenceCode && (
               <button
                 onClick={handleGenerateSerials}
