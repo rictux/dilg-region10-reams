@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { User, Office, UserRole } from '../../types/database';
-import { Trash2, UserPlus, Shield, CheckCircle, XCircle, Search, Mail, Briefcase, Lock, X, Loader2, AlertCircle, Edit, Building2, Eye, EyeOff } from 'lucide-react';
+import { Trash2, UserPlus, Shield, CheckCircle, XCircle, Search, Mail, Briefcase, Lock, X, Loader2, AlertCircle, Edit, Building2, Eye, EyeOff, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import bcrypt from 'bcryptjs';
 import ParticipantsList from './ParticipantsList';
@@ -38,7 +38,12 @@ const UserManagement: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<'all' | UserRole>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'Active' | 'Inactive'>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [showFilters, setShowFilters] = useState(false);
   const itemsPerPage = 15;
+  const activeFilterCount =
+    (officeFilter !== 'all' ? 1 : 0) +
+    (roleFilter !== 'all' ? 1 : 0) +
+    (statusFilter !== 'all' ? 1 : 0);
   
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -424,32 +429,61 @@ const UserManagement: React.FC = () => {
           )}
 
           <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[35%_minmax(260px,1fr)_minmax(200px,240px)_minmax(190px,230px)_auto]">
-              <div className="relative min-w-0">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="Search users..."
-                  value={searchTerm}
-                  onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setCurrentPage(1);
-                  }}
-                  className="w-full pl-10 pr-16 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                />
-                {searchTerm && (
+            <div className="flex flex-col gap-3 md:grid md:grid-cols-2 xl:grid-cols-[35%_minmax(260px,1fr)_minmax(200px,240px)_minmax(190px,230px)_auto]">
+              <div className="flex min-w-0 gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search users..."
+                    value={searchTerm}
+                    onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setCurrentPage(1);
+                    }}
+                    className="w-full pl-10 pr-16 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchTerm('');
+                        setCurrentPage(1);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFilters((prev) => !prev)}
+                  aria-expanded={showFilters}
+                  className="flex shrink-0 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 md:hidden"
+                >
+                  <SlidersHorizontal size={16} />
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-[11px] font-semibold text-white">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                  <ChevronDown size={16} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+                </button>
+                {canCreateUsers && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setSearchTerm('');
-                      setCurrentPage(1);
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                    onClick={openCreateModal}
+                    aria-label="Add User"
+                    title="Add User"
+                    className="flex shrink-0 items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-white shadow-sm transition-colors hover:bg-indigo-700 md:hidden"
                   >
-                    Clear
+                    <UserPlus size={20} />
                   </button>
                 )}
               </div>
+              <div className={`${showFilters ? 'grid' : 'hidden'} grid-cols-1 gap-3 md:contents`}>
               <div className="relative min-w-0">
                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
                 <select
@@ -504,10 +538,11 @@ const UserManagement: React.FC = () => {
                   <option value="Inactive">Inactive</option>
                 </select>
               </div>
+              </div>
               {canCreateUsers && (
                 <button
                     onClick={openCreateModal}
-                    className="flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 md:w-auto"
+                    className="hidden w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 md:flex md:w-auto"
                 >
                     <UserPlus size={20} /> Add User
                 </button>
@@ -678,13 +713,6 @@ const UserManagement: React.FC = () => {
                                   ) : (
                                       <span className="text-slate-400 text-xs italic">Unassigned</span>
                                   )}
-                              </div>
-                              <div className="text-xs text-slate-500">
-                                  Created: {user.created_at ? format(new Date(user.created_at), 'MMM d, yyyy') : '-'}
-                              </div>
-                              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                                  <span>Last login: {formatLastLogin(user.last_login_activity)}</span>
-                                  {getLoginMethodBadge(user.last_login_activity)}
                               </div>
                           </div>
 
