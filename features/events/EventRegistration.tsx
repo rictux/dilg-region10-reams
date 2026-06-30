@@ -825,7 +825,12 @@ const EventRegistration: React.FC = () => {
                         className="bg-white p-6 rounded-xl w-full border-2 border-slate-100"
                       >
                           <div className="border-4 border-slate-900 p-4 rounded-xl mb-4 bg-white inline-block">
-                              <QRCode value={qrToken} size={180} fgColor="#000000" bgColor="#FFFFFF" />
+                              <div className="relative inline-block">
+                                  <QRCode value={qrToken} size={180} fgColor="#000000" bgColor="#FFFFFF" level="H" />
+                                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-1">
+                                      <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-11 h-11 object-contain rounded-full" />
+                                  </div>
+                              </div>
                           </div>
 
                           <div className="w-full text-center">

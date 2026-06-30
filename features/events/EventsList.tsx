@@ -1622,13 +1622,33 @@ const EventsList: React.FC = () => {
               qrImage.src = svgUrl;
           });
 
-          // Layout constants (use a high scale for a crisp printable badge)
+          // DILG seal drawn into the center of the QR (the on-screen logo is an
+          // overlay <img>, not part of the SVG, so it must be loaded separately)
+          const logoImage = new Image();
+          await new Promise<void>((resolve, reject) => {
+              logoImage.onload = () => resolve();
+              logoImage.onerror = () => reject(new Error('Failed to load logo image'));
+              logoImage.src = '/assets/dilg_logo.png';
+          });
+
+          // ── Ticket / pass layout (high scale for a crisp printable badge) ──
           const scale = 3;
           const width = 600;
-          const padding = 48;
-          const qrSize = 260;
+          const margin = 14;          // gap between canvas edge and card
+          const stripW = 14;          // colored accent strip on the left
+          const accent = '#4f46e5';
+          const qrSize = 230;
+          const qrBoxPad = 14;
+          const qrBox = qrSize + qrBoxPad * 2;
 
-          // Measure dynamic text height before sizing the canvas
+          const contentX = margin + stripW + 26;             // left edge of text/content
+          const contentRight = width - margin - 26;
+          const contentWidth = contentRight - contentX;
+
+          const eventDate = formatEventDate(selectedEvent.start_date, selectedEvent.end_date);
+          const venue = (selectedEvent.venue || '').trim() || 'To be announced';
+
+          // Measure dynamic text heights before sizing the canvas
           const measureCtx = document.createElement('canvas').getContext('2d');
           if (!measureCtx) throw new Error('Canvas not supported');
 
@@ -1649,13 +1669,22 @@ const EventsList: React.FC = () => {
               return lines;
           };
 
-          const contentWidth = width - padding * 2;
+          measureCtx.font = 'bold 20px Arial, sans-serif';
+          const nameLines = wrapText(measureCtx, eventName, contentWidth);
+          measureCtx.font = '15px Arial, sans-serif';
+          const venueLines = wrapText(measureCtx, venue, contentWidth);
+          const dateLines = wrapText(measureCtx, eventDate, contentWidth);
+          measureCtx.font = '13px Arial, sans-serif';
+          const linkLines = wrapText(measureCtx, link, contentWidth - 4);
 
-          measureCtx.font = 'bold 18px Arial, sans-serif';
-          const linkLines = wrapText(measureCtx, link, contentWidth);
+          const nameLineH = 26;
+          const infoLineH = 22;
+          const linkLineH = 19;
+          const infoCount = venueLines.length + dateLines.length;
 
-          const linkHeight = linkLines.length * 26;
-          const height = padding + qrSize + 28 + 24 + linkHeight + padding;
+          // Total height derived from the same vertical increments used when drawing
+          const height = margin + 34 + 24 + nameLines.length * nameLineH + 10 + 18
+              + infoCount * infoLineH + 22 + qrBox + 20 + linkLines.length * linkLineH + 30 + margin;
 
           const canvas = document.createElement('canvas');
           canvas.width = width * scale;
@@ -1664,37 +1693,115 @@ const EventsList: React.FC = () => {
           if (!ctx) throw new Error('Canvas not supported');
           ctx.scale(scale, scale);
 
-          // Background
+          const roundRectPath = (x: number, y: number, w: number, h: number, r: number) => {
+              ctx.beginPath();
+              ctx.moveTo(x + r, y);
+              ctx.arcTo(x + w, y, x + w, y + h, r);
+              ctx.arcTo(x + w, y + h, x, y + h, r);
+              ctx.arcTo(x, y + h, x, y, r);
+              ctx.arcTo(x, y, x + w, y, r);
+              ctx.closePath();
+          };
+
+          // Card (rounded white panel, transparent outside the corners)
+          const cardW = width - margin * 2;
+          const cardH = height - margin * 2;
+          const radius = 22;
+          roundRectPath(margin, margin, cardW, cardH, radius);
           ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, width, height);
+          ctx.fill();
 
-          // Rounded border accent
-          ctx.strokeStyle = '#e0e7ff';
-          ctx.lineWidth = 3;
-          ctx.strokeRect(8, 8, width - 16, height - 16);
+          // Left accent strip (clipped to the rounded card so corners stay round)
+          ctx.save();
+          roundRectPath(margin, margin, cardW, cardH, radius);
+          ctx.clip();
+          ctx.fillStyle = accent;
+          ctx.fillRect(margin, margin, stripW, cardH);
+          ctx.restore();
 
-          ctx.textAlign = 'center';
+          // Card border
+          roundRectPath(margin, margin, cardW, cardH, radius);
+          ctx.strokeStyle = '#e2e8f0';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
           ctx.textBaseline = 'top';
+          let cursorY = margin + 34;
 
-          let cursorY = padding;
-
-          // QR code
-          const qrX = (width - qrSize) / 2;
-          ctx.drawImage(qrImage, qrX, cursorY, qrSize, qrSize);
-          cursorY += qrSize + 28;
-
-          // "Scan to register" caption
-          ctx.fillStyle = '#4f46e5';
-          ctx.font = 'bold 16px Arial, sans-serif';
-          ctx.fillText('Scan to register', width / 2, cursorY);
+          // Eyebrow
+          ctx.textAlign = 'left';
+          ctx.fillStyle = accent;
+          ctx.font = 'bold 12px Arial, sans-serif';
+          ctx.fillText('E V E N T   R E G I S T R A T I O N', contentX, cursorY);
           cursorY += 24;
 
-          // Registration link
-          ctx.fillStyle = '#1e293b';
-          ctx.font = 'bold 18px Arial, sans-serif';
+          // Event name
+          ctx.fillStyle = '#0f172a';
+          ctx.font = 'bold 20px Arial, sans-serif';
+          for (const line of nameLines) {
+              ctx.fillText(line, contentX, cursorY);
+              cursorY += nameLineH;
+          }
+          cursorY += 10;
+
+          // Divider
+          ctx.strokeStyle = '#e2e8f0';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(contentX, cursorY);
+          ctx.lineTo(contentRight, cursorY);
+          ctx.stroke();
+          cursorY += 18;
+
+          // Venue then Date
+          ctx.fillStyle = '#475569';
+          ctx.font = '15px Arial, sans-serif';
+          for (const line of [...venueLines, ...dateLines]) {
+              ctx.fillText(line, contentX, cursorY);
+              cursorY += infoLineH;
+          }
+          cursorY += 22;
+
+          // QR box (rounded, centered in the content column)
+          const qrBoxX = contentX + (contentWidth - qrBox) / 2;
+          const qrBoxTop = cursorY;
+          roundRectPath(qrBoxX, qrBoxTop, qrBox, qrBox, 16);
+          ctx.fillStyle = '#f8fafc';
+          ctx.fill();
+          ctx.strokeStyle = '#e2e8f0';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          const qrX = qrBoxX + qrBoxPad;
+          const qrTop = qrBoxTop + qrBoxPad;
+          ctx.drawImage(qrImage, qrX, qrTop, qrSize, qrSize);
+
+          // DILG seal in the center, with a thin white circular border (matches UI)
+          const logoSize = qrSize * 0.24;
+          const ringPadding = qrSize * 0.022;
+          const logoCenterX = qrX + qrSize / 2;
+          const logoCenterY = qrTop + qrSize / 2;
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(logoCenterX, logoCenterY, logoSize / 2 + ringPadding, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(logoCenterX, logoCenterY, logoSize / 2, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(logoImage, logoCenterX - logoSize / 2, logoCenterY - logoSize / 2, logoSize, logoSize);
+          ctx.restore();
+
+          cursorY += qrBox + 20;
+
+          // Registration link (below the QR code)
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#64748b';
+          ctx.font = '13px Arial, sans-serif';
+          const linkCenterX = contentX + contentWidth / 2;
           for (const line of linkLines) {
-              ctx.fillText(line, width / 2, cursorY);
-              cursorY += 26;
+              ctx.fillText(line, linkCenterX, cursorY);
+              cursorY += linkLineH;
           }
 
           URL.revokeObjectURL(svgUrl);
@@ -2684,7 +2791,12 @@ const EventsList: React.FC = () => {
                     ) : (
                         <>
                             <div ref={qrCodeRef} className="p-4 border-2 border-indigo-100 rounded-lg bg-indigo-50/50">
-                                <QRCode value={getRegistrationLink(selectedEvent.event_id)} size={180} />
+                                <div className="relative inline-block">
+                                    <QRCode value={getRegistrationLink(selectedEvent.event_id)} size={180} level="H" />
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-1">
+                                        <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-11 h-11 object-contain rounded-full" />
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="w-full">

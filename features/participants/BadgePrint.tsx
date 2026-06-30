@@ -72,7 +72,14 @@ const BadgePrint: React.FC = () => {
 
           <div className="flex-1 flex flex-col items-center justify-center space-y-4">
               <div className="border-4 border-slate-900 p-2 rounded-lg">
-                {qrToken && <QRCode value={qrToken} size={150} />}
+                {qrToken && (
+                  <div className="relative inline-block">
+                    <QRCode value={qrToken} size={150} level="H" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-1">
+                      <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-9 h-9 object-contain rounded-full" />
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                   <h2 className="text-xl font-bold text-slate-900 mt-4">{participant.full_name}</h2>
