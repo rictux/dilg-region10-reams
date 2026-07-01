@@ -29,6 +29,8 @@ type CoPTemplateProps = {
   /** When set (> 0), appends "with a credit of <word> (<n>) training hours." to the body. */
   creditHours?: number | null;
   includeSignature?: boolean;
+  /** Full reference number shown under the QR "Scan to verify" caption. */
+  referenceNumber?: string | null;
 };
 
 const MM_TO_PX = 3.7795275591;
@@ -142,6 +144,46 @@ export const formatEventDates = (event: Pick<Event, 'start_date' | 'end_date'>):
   }
 };
 
+// Date segment for the reference number, e.g. "2026-Jun-29-30" for a two-day
+// event in the same month. Matches the Certificate of Appearance format.
+export const buildReferenceDateSegment = (event: Pick<Event, 'start_date' | 'end_date'>): string => {
+  try {
+    const start = parseISO(event.start_date);
+    const end = event.end_date ? parseISO(event.end_date) : start;
+    if (event.end_date && event.start_date !== event.end_date) {
+      if (start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
+        return `${format(start, 'yyyy-MMM-dd')}-${format(end, 'dd')}`;
+      }
+      if (start.getFullYear() === end.getFullYear()) {
+        return `${format(start, 'yyyy-MMM-dd')}-${format(end, 'MMM-dd')}`;
+      }
+      return `${format(start, 'yyyy-MMM-dd')}-${format(end, 'yyyy-MMM-dd')}`;
+    }
+    return format(start, 'yyyy-MMM-dd');
+  } catch {
+    return event.start_date;
+  }
+};
+
+// Full reference number, e.g. "LGCDD-2026-Jun-29-30-CSO-DO-B1-01":
+// <officeCode>-<dateSegment>-<eventCode>-<seriesNumber>. Returns null unless the
+// event has an event code and the organizing office has a code.
+export const buildCoPReferenceNumber = (
+  event: Event,
+  officeCode: string | null | undefined,
+  seriesNumber: number
+): string | null => {
+  const eventCode = event.event_serial?.trim();
+  const office = officeCode?.trim();
+  if (!eventCode || !office) return null;
+  return [
+    office,
+    buildReferenceDateSegment(event),
+    eventCode,
+    String(seriesNumber).padStart(2, '0'),
+  ].join('-');
+};
+
 const DEFAULT_HEADER = 'REGION X - NORTHERN MINDANAO';
 
 const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
@@ -154,6 +196,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   bodyText = DEFAULT_COP_BODY_TEXT,
   creditHours = null,
   includeSignature = true,
+  referenceNumber = null,
 }) => {
   const dims     = PAPER_DIMS[paperSize];
   const scale    = paperSize === 'A4' ? 1.414 : 1;
@@ -212,6 +255,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   const qrSize   = s(48);
   const qrCaptionSz = s(8);
   const lookupUrl = `${window.location.origin}/lookup?participant=${participantRecord.participant.participant_id}`;
+  const referenceLabel = referenceNumber?.trim() || '';
 
   // Auto-shrink name to fit within ~70% of the certificate width on one line
   const fullName      = participantRecord.participant.full_name || '';
@@ -270,8 +314,8 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
         <div
           style={{
             position: 'absolute',
-            left: s(50),
-            bottom: s(36),
+            left: s(66),
+            bottom: s(52),
             zIndex: 2,
             display: 'flex',
             flexDirection: 'column',
@@ -283,17 +327,27 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
           }}
         >
           <QRCode value={lookupUrl} size={qrSize} />
+        </div>
+
+        {referenceLabel && (
           <p
             style={{
-              margin: `${s(4)}px 0 0`,
-              maxWidth: s(88),
+              position: 'absolute',
+              left: s(135),
+              bottom: s(24),
+              transform: 'translateX(-50%)',
+              zIndex: 2,
+              margin: 0,
+              fontFamily: CERT_FONT,
+              color: '#334155',
               fontSize: qrCaptionSz,
-              fontWeight: 500,
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
             }}
           >
-            Scan to verify
+            {referenceLabel}
           </p>
-        </div>
+        )}
 
         {/* ── 1. Header: logos + org text (Helvetica) ── */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: s(2), fontFamily: HELVETICA_FONT }}>
