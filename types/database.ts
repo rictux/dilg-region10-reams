@@ -159,3 +159,23 @@ export interface AttendanceLogWithDetails extends AttendanceLog {
     email?: string;
   };
 }
+
+export type AnnouncementType = 'info' | 'warning' | 'success';
+
+export interface FeatureAnnouncement {
+  id: number;
+  title: string;
+  description: string;
+  type: AnnouncementType;
+  is_active: boolean;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AnnouncementView {
+  id: number;
+  announcement_id: number;
+  user_id: number;
+  viewed_at: string;
+}

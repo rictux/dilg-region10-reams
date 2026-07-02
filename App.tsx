@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './features/auth/Login';
 import Signup from './features/auth/Signup';
 import Layout from './components/Layout';
+import AnnouncementModal from './components/AnnouncementModal';
 import Dashboard from './features/dashboard/Dashboard';
 import EventsList from './features/events/EventsList';
 import EventRegistration from './features/events/EventRegistration';
@@ -43,6 +44,7 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
       <Router>
+        <AnnouncementModal />
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
