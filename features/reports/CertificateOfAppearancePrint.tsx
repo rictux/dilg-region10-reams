@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Event } from '../../types/database';
-import { ArrowLeft, Download, FileSpreadsheet, Hash, Info, Loader2, Printer, Search } from 'lucide-react';
+import { ArrowLeft, Download, FileSpreadsheet, Hash, Info, Loader2, Mail, Printer, Search } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { toJpeg } from 'html-to-image';
@@ -10,17 +10,21 @@ import * as XLSX from 'xlsx';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
 import { fetchAllSupabaseRows } from '../../lib/supabasePagination';
+import { sendCertificateEmail } from '../../lib/emailService';
+import { toast } from 'sonner';
 import CertificateOfAppearanceCard, {
   buildEventDateString,
   CertificateParticipantRecord,
   CertificateSignatory,
   getEventDateRows
 } from './CertificateOfAppearanceTemplate';
+import EmailProgressModal from './EmailProgressModal';
 
 type CertificateParticipant = CertificateParticipantRecord & {
   ca_serial_no: number | null;
   role: 'Delegate' | 'Speaker' | 'Secretariat' | 'Guest' | 'VIP';
   need_ca: boolean | null;
+  ca_email_sent_at: string | null;
 };
 
 type CertificateSignatoryRow = NonNullable<CertificateSignatory> & {
@@ -451,6 +455,8 @@ const CertificateOfAppearancePrint: React.FC = () => {
   const [printQueue, setPrintQueue] = useState<CertificateParticipant[]>([]);
   const [printPhase, setPrintPhase] = useState<'idle' | 'generating' | 'opening'>('idle');
   const [printProgress, setPrintProgress] = useState<{ done: number; total: number } | null>(null);
+  const [isSendingEmails, setIsSendingEmails] = useState(false);
+  const [emailProgress, setEmailProgress] = useState<{ done: number; total: number } | null>(null);
   const isPreparingPrint = printPhase !== 'idle';
 
   useEffect(() => {
@@ -587,6 +593,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
             ca_serial_no,
             role,
             need_ca,
+            ca_email_sent_at,
             participants (*)
           `)
           .eq('event_id', id)
@@ -602,7 +609,8 @@ const CertificateOfAppearancePrint: React.FC = () => {
           log_dates: Array.from(logDatesByParticipant.get(record.participant_id) || []).sort(),
           ca_serial_no: record.ca_serial_no ?? null,
           role: (record.role as CertificateParticipant['role']) || 'Delegate',
-          need_ca: record.need_ca ?? null
+          need_ca: record.need_ca ?? null,
+          ca_email_sent_at: record.ca_email_sent_at ?? null
         }))
         .filter((record): record is CertificateParticipant => !!record.participant)
         .sort((a, b) => {
@@ -982,6 +990,91 @@ const CertificateOfAppearancePrint: React.FC = () => {
     );
   };
 
+  const handleEmailCertificates = async () => {
+    const emailParticipants = selectedDownloadParticipants.length > 0
+      ? selectedDownloadParticipants
+      : (selectedParticipant ? [selectedParticipant] : []);
+
+    if (emailParticipants.length === 0) return;
+
+    if (requiresReferenceCode && pendingSerialAssignments.length > 0) {
+      const assigned = await assignPendingSerials();
+      if (!assigned) return;
+    }
+
+    setIsSendingEmails(true);
+    setEmailProgress({ done: 0, total: emailParticipants.length });
+
+    try {
+      await preloadCertificateAssets([signatory?.esig_link]);
+
+      for (let i = 0; i < emailParticipants.length; i += BATCH_RENDER_SIZE) {
+        const batch = emailParticipants.slice(i, i + BATCH_RENDER_SIZE);
+        const batchIds = batch.map((record: CertificateParticipant) => record.participant.participant_id);
+
+        setRenderingParticipantIds(batchIds);
+        await waitForNextPaint();
+
+        for (const participantRecord of batch) {
+          const node = batchPreviewRefs.current[participantRecord.participant.participant_id];
+          if (!node || !participantRecord.participant.email) {
+            setEmailProgress((prev) => prev ? { ...prev, done: prev.done + 1 } : null);
+            continue;
+          }
+
+          try {
+            const jpegBlob = await renderCertificateJpegBlob(
+              node,
+              CERTIFICATE_EXPORT_PIXEL_RATIO,
+              CERTIFICATE_EXPORT_JPEG_QUALITY
+            );
+            const pdfBlob = await createPdfBlobFromJpeg(jpegBlob);
+            const fileName = buildCertificateFileName(participantRecord.participant, 'pdf');
+
+            const result = await sendCertificateEmail(
+              participantRecord.participant.email,
+              pdfBlob,
+              fileName,
+              participantRecord.participant.full_name || 'Participant',
+              participantRecord.participant.participant_id,
+              'CA',
+              event.event_name,
+              dateString,
+              event.venue || 'To be announced'
+            );
+
+            if (result.success) {
+              toast.success(`Email sent to ${participantRecord.participant.email}`);
+            } else {
+              toast.error(`Failed to send email to ${participantRecord.participant.email}: ${result.error}`);
+            }
+          } catch (error) {
+            console.error('Error processing email for participant:', error);
+            toast.error(`Error processing certificate for ${participantRecord.participant.full_name}`);
+          }
+
+          setEmailProgress((prev: { done: number; total: number } | null) => prev ? { ...prev, done: prev.done + 1 } : null);
+        }
+
+        batchIds.forEach((id: number) => {
+          delete batchPreviewRefs.current[id];
+        });
+      }
+
+      setRenderingParticipantIds([]);
+    } catch (error) {
+      console.error('Error sending certificates', error);
+      toast.error('Unable to send certificates right now.');
+    } finally {
+      setIsSendingEmails(false);
+      setRenderingParticipantIds([]);
+      setEmailProgress(null);
+      if (eventId) {
+        await fetchData(parseInt(eventId, 10));
+      }
+    }
+  };
+
   const handleSelectAll = () => {
     setSelectedDownloadIds((current) => {
       const next = new Set(current);
@@ -1012,7 +1105,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-slate-100 print:block print:min-h-screen print:h-auto print:overflow-visible print:bg-white">
       <div className="print:hidden w-full border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-full px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/reports')}
@@ -1078,6 +1171,18 @@ const CertificateOfAppearancePrint: React.FC = () => {
                     ? `Saving ${saveProgress.done}/${saveProgress.total}...`
                     : 'Saving...'
                   : 'Save'}
+              </button>
+              <button
+                onClick={handleEmailCertificates}
+                disabled={(!selectedParticipant && selectedDownloadParticipants.length === 0) || isSendingEmails}
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-800 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Mail size={14} />
+                {isSendingEmails
+                  ? emailProgress
+                    ? `Sending ${emailProgress.done}/${emailProgress.total}...`
+                    : 'Sending...'
+                  : 'Email'}
               </button>
               <button
                 onClick={handlePrint}
@@ -1147,6 +1252,18 @@ const CertificateOfAppearancePrint: React.FC = () => {
                   ? `Saving ${saveProgress.done}/${saveProgress.total}...`
                   : 'Saving...'
                 : 'Save'}
+            </button>
+            <button
+              onClick={handleEmailCertificates}
+              disabled={(!selectedParticipant && selectedDownloadParticipants.length === 0) || isSendingEmails}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Mail size={14} />
+              {isSendingEmails
+                ? emailProgress
+                  ? `Sending ${emailProgress.done}/${emailProgress.total}...`
+                  : 'Sending...'
+                : 'Email'}
             </button>
             <button
               onClick={handlePrint}
@@ -1350,6 +1467,11 @@ const CertificateOfAppearancePrint: React.FC = () => {
                                 <div className="flex items-start justify-between gap-1.5">
                                   <p className="truncate text-xs font-semibold">{buildParticipantListName(record.participant)}</p>
                                   <div className="flex shrink-0 items-center gap-1">
+                                    {record.ca_email_sent_at && (
+                                      <div className="rounded-full bg-blue-100 p-1 text-blue-700" title="Email sent">
+                                        <Mail size={11} />
+                                      </div>
+                                    )}
                                     {record.need_ca && (
                                       <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700" title="Participant requested a Certificate of Appearance">
                                         Wants CA
@@ -1486,6 +1608,8 @@ const CertificateOfAppearancePrint: React.FC = () => {
             </div>
           ))}
       </div>
+
+      <EmailProgressModal isOpen={isSendingEmails} progress={emailProgress} />
 
       <style>{`
         @media print {
