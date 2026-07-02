@@ -1,0 +1,7 @@
+# Supabase Configuration
+
+[env.local]
+enabled = true
+
+[functions.send-certificate]
+verify_jwt = false
