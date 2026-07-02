@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload, Eye, X, Trash2, Plus, Star } from 'lucide-react';
 import { Event, Office } from '../../types/database';
+import AnnouncementManagement from './AnnouncementManagement';
 import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
 import CertificateOfAppearanceCard, {
   buildEventDateString,
@@ -1047,6 +1048,13 @@ const Settings: React.FC = () => {
             </div>
           </div>
         </form>
+
+        {/* Announcements Section - Admin Only */}
+        {isAdmin && (
+          <div className="mt-6">
+            <AnnouncementManagement />
+          </div>
+        )}
       </div>
 
       {isPreviewModalOpen && (
