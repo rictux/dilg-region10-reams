@@ -1992,19 +1992,19 @@ const EventsList: React.FC = () => {
   // Helper for status badges
   const getStatusBadge = (status: string) => {
     const styles = {
-      'Ongoing': 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-500/20',
-      'Scheduled': 'bg-blue-50 text-blue-700 border-blue-200 ring-blue-500/20',
-      'Completed': 'bg-slate-50 text-slate-600 border-slate-200 ring-slate-500/20',
-      'Cancelled': 'bg-red-50 text-red-700 border-red-200 ring-red-500/20',
+      'Ongoing': 'bg-emerald-50 text-emerald-700 border-emerald-100',
+      'Scheduled': 'bg-blue-50 text-blue-700 border-blue-100',
+      'Completed': 'bg-stone-100 text-stone-600 border-stone-200',
+      'Cancelled': 'bg-red-50 text-red-600 border-red-100',
     };
-    
+
     // @ts-ignore
     const activeStyle = styles[status] || styles['Completed'];
 
     return (
-      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium border inline-flex items-center gap-1.5 ring-1 ring-inset ${activeStyle}`}>
-         <span className={`w-1.5 h-1.5 rounded-full ${status === 'Ongoing' ? 'animate-pulse bg-emerald-500' : 'bg-current opacity-60'}`}></span>
-         {status.toUpperCase()}
+      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border inline-flex items-center gap-1.5 font-mono ${activeStyle}`}>
+         {status === 'Ongoing' && <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-emerald-500"></span>}
+         {status}
       </span>
     );
   };
@@ -2124,43 +2124,44 @@ const EventsList: React.FC = () => {
 
   return (
     <div className="h-full min-h-0 flex flex-col gap-6">
+      {!(showParticipantsModal && selectedEvent) && (<>
       <div className="flex flex-wrap items-center gap-3 w-full">
         <div className="relative min-w-[220px] flex-1 lg:flex-none lg:w-[30%]">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-              <Search size={18} />
+            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9A9890]">
+              <Search size={14} />
             </div>
-            <input 
-              type="text" 
-              placeholder="Search events..." 
+            <input
+              type="text"
+              placeholder="Filter events..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-16 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+              className="w-full pl-8 pr-16 h-9 bg-white border border-black/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] transition-colors"
             />
             {searchTerm && (
               <button
                 type="button"
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#6B6860] hover:text-[#4B3FE4] transition-colors"
               >
                 Clear
               </button>
             )}
         </div>
         {isAdmin && (
-          <div className="flex shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+          <div className="flex shrink-0 gap-1 p-1 bg-[#E8E5DC]/50 rounded-md border border-black/[0.05]">
             <button
               type="button"
               onClick={() => {
                 setEventView('active');
                 setStatusFilter('All');
               }}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors ${
+              className={`inline-flex h-7 items-center gap-1.5 rounded px-3 text-xs transition-all ${
                 eventView === 'active'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  ? 'bg-white text-[#111110] shadow-sm font-medium border border-black/[0.06]'
+                  : 'text-[#6B6860] hover:text-[#111110]'
               }`}
             >
-              <Calendar size={14} />
+              <Calendar size={12} />
               Active
             </button>
             <button
@@ -2169,25 +2170,25 @@ const EventsList: React.FC = () => {
                 setEventView('deleted');
                 setStatusFilter('All');
               }}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors ${
+              className={`inline-flex h-7 items-center gap-1.5 rounded px-3 text-xs transition-all ${
                 eventView === 'deleted'
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  ? 'bg-white text-red-600 shadow-sm font-medium border border-black/[0.06]'
+                  : 'text-[#6B6860] hover:text-[#111110]'
               }`}
             >
-              <Trash2 size={14} />
+              <Trash2 size={12} />
               Deleted
             </button>
           </div>
         )}
-        <button 
+        <button
             onClick={openCreateModal}
             type="button"
             aria-label="Add event"
             title="Add event"
-            className="ml-auto h-10 w-10 sm:h-auto sm:w-auto shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center justify-center gap-2 px-0 sm:px-4 py-2 shadow-sm transition-colors"
+            className="ml-auto h-9 w-9 sm:h-9 sm:w-auto shrink-0 bg-[#4B3FE4] hover:bg-[#3B30C4] text-white text-sm font-medium rounded-md flex items-center justify-center gap-1.5 px-0 sm:px-3 transition-colors"
         >
-            <CalendarPlus size={20} />
+            <CalendarPlus size={15} />
             <span className="hidden sm:inline">New Event</span>
         </button>
       </div>
@@ -2196,107 +2197,92 @@ const EventsList: React.FC = () => {
         <div className="grid grid-cols-5 gap-2 sm:gap-3 w-full">
           <button
             onClick={() => setStatusFilter('All')}
-            className={`events-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-              ${statusFilter === 'All' ? 'ring-2 ring-slate-400 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-slate-300'}
-              bg-white
-            `}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-md border text-left transition-all min-w-0 ${
+              statusFilter === 'All'
+                ? 'bg-[#E8E5DC]/60 border-black/20'
+                : 'bg-white border-black/[0.08] hover:border-black/20'
+            }`}
           >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
-                    <span className="sm:hidden">Total</span>
-                    <span className="hidden sm:inline">{eventView === 'deleted' ? 'Deleted Events' : 'Total Events'}</span>
-                  </p>
-                  <div className={`p-1 rounded-lg ${statusFilter === 'All' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-600'}`}>
-                    <CalendarPlus size={12} className="sm:h-3.5 sm:w-3.5" />
-                  </div>
-              </div>
-              <p className="events-stat-value text-sm sm:text-base font-bold text-slate-800">{eventSummary.total}</p>
+              <CalendarPlus size={13} className="text-[#6B6860] shrink-0 hidden sm:block" />
+              <span className="text-sm font-medium font-mono text-[#111110]">{eventSummary.total}</span>
+              <span className="text-[10px] sm:text-xs text-[#6B6860] truncate">
+                <span className="sm:hidden">Total</span>
+                <span className="hidden sm:inline">{eventView === 'deleted' ? 'Deleted' : 'Total'}</span>
+              </span>
           </button>
 
           <button
             onClick={() => setStatusFilter('Ongoing')}
-            className={`events-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-              ${statusFilter === 'Ongoing' ? 'ring-2 ring-emerald-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-emerald-200'}
-              bg-white
-            `}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-md border text-left transition-all min-w-0 ${
+              statusFilter === 'Ongoing'
+                ? 'bg-emerald-50 border-emerald-300'
+                : 'bg-white border-black/[0.08] hover:border-emerald-200'
+            }`}
           >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">Ongoing</p>
-                  <div className={`p-1 rounded-lg ${statusFilter === 'Ongoing' ? 'bg-emerald-200 text-emerald-700' : 'bg-emerald-100 text-emerald-600'}`}>
-                    <Clock size={12} className="sm:h-3.5 sm:w-3.5" />
-                  </div>
-              </div>
-              <p className="events-stat-value text-sm sm:text-base font-bold text-emerald-600">{eventSummary.ongoing}</p>
+              <Clock size={13} className="text-emerald-600 shrink-0 hidden sm:block" />
+              <span className="text-sm font-medium font-mono text-emerald-700">{eventSummary.ongoing}</span>
+              <span className="text-[10px] sm:text-xs text-[#6B6860] truncate">Ongoing</span>
           </button>
 
           <button
             onClick={() => setStatusFilter('Scheduled')}
-            className={`events-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-              ${statusFilter === 'Scheduled' ? 'ring-2 ring-blue-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-blue-200'}
-              bg-white
-            `}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-md border text-left transition-all min-w-0 ${
+              statusFilter === 'Scheduled'
+                ? 'bg-blue-50 border-blue-300'
+                : 'bg-white border-black/[0.08] hover:border-blue-200'
+            }`}
           >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
-                    <span className="sm:hidden">Sched.</span>
-                    <span className="hidden sm:inline">Scheduled</span>
-                  </p>
-                  <div className={`p-1 rounded-lg ${statusFilter === 'Scheduled' ? 'bg-blue-200 text-blue-700' : 'bg-blue-100 text-blue-600'}`}>
-                    <Calendar size={12} className="sm:h-3.5 sm:w-3.5" />
-                  </div>
-              </div>
-              <p className="events-stat-value text-sm sm:text-base font-bold text-blue-600">{eventSummary.scheduled}</p>
+              <Calendar size={13} className="text-blue-600 shrink-0 hidden sm:block" />
+              <span className="text-sm font-medium font-mono text-blue-700">{eventSummary.scheduled}</span>
+              <span className="text-[10px] sm:text-xs text-[#6B6860] truncate">
+                <span className="sm:hidden">Sched.</span>
+                <span className="hidden sm:inline">Scheduled</span>
+              </span>
           </button>
 
           <button
             onClick={() => setStatusFilter('Completed')}
-            className={`events-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-              ${statusFilter === 'Completed' ? 'ring-2 ring-indigo-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-indigo-200'}
-              bg-white
-            `}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-md border text-left transition-all min-w-0 ${
+              statusFilter === 'Completed'
+                ? 'bg-[#4B3FE4]/5 border-[#4B3FE4]/40'
+                : 'bg-white border-black/[0.08] hover:border-[#4B3FE4]/30'
+            }`}
           >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
-                    <span className="sm:hidden">Done</span>
-                    <span className="hidden sm:inline">Completed</span>
-                  </p>
-                  <div className={`p-1 rounded-lg ${statusFilter === 'Completed' ? 'bg-indigo-200 text-indigo-700' : 'bg-indigo-100 text-indigo-600'}`}>
-                    <Check size={12} className="sm:h-3.5 sm:w-3.5" />
-                  </div>
-              </div>
-              <p className="events-stat-value text-sm sm:text-base font-bold text-indigo-600">{eventSummary.completed}</p>
+              <Check size={13} className="text-[#4B3FE4] shrink-0 hidden sm:block" />
+              <span className="text-sm font-medium font-mono text-[#4B3FE4]">{eventSummary.completed}</span>
+              <span className="text-[10px] sm:text-xs text-[#6B6860] truncate">
+                <span className="sm:hidden">Done</span>
+                <span className="hidden sm:inline">Completed</span>
+              </span>
           </button>
 
           <button
             onClick={() => setStatusFilter('Cancelled')}
-            className={`events-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-              ${statusFilter === 'Cancelled' ? 'ring-2 ring-red-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-red-200'}
-              bg-white
-            `}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-md border text-left transition-all min-w-0 ${
+              statusFilter === 'Cancelled'
+                ? 'bg-red-50 border-red-300'
+                : 'bg-white border-black/[0.08] hover:border-red-200'
+            }`}
           >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
-                    <span className="sm:hidden">Cancel</span>
-                    <span className="hidden sm:inline">Cancelled</span>
-                  </p>
-                  <div className={`p-1 rounded-lg ${statusFilter === 'Cancelled' ? 'bg-red-200 text-red-700' : 'bg-red-100 text-red-600'}`}>
-                    <XCircle size={12} className="sm:h-3.5 sm:w-3.5" />
-                  </div>
-              </div>
-              <p className="events-stat-value text-sm sm:text-base font-bold text-red-600">{eventSummary.cancelled}</p>
+              <XCircle size={13} className="text-red-500 shrink-0 hidden sm:block" />
+              <span className="text-sm font-medium font-mono text-red-600">{eventSummary.cancelled}</span>
+              <span className="text-[10px] sm:text-xs text-[#6B6860] truncate">
+                <span className="sm:hidden">Cancel</span>
+                <span className="hidden sm:inline">Cancelled</span>
+              </span>
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
+      <div className="flex-1 min-h-0 flex flex-col gap-3">
           {eventView === 'deleted' && (
-              <div className="px-6 py-3 bg-red-50 border-b border-red-100 flex items-center gap-2 text-sm text-red-700">
+              <div className="px-4 py-3 bg-red-50 border border-red-100 rounded-md flex items-center gap-2 text-sm text-red-700 shrink-0">
                   <Trash2 size={14} />
                   <span>Deleted Events view. Admins can restore events or permanently delete them.</span>
               </div>
           )}
           {statusFilter !== 'All' && (
-              <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2 text-sm text-slate-600">
+              <div className="px-4 py-3 bg-white border border-black/[0.08] rounded-md flex items-center gap-2 text-sm text-slate-600 shrink-0">
                   <Clock size={14} />
                   <span>Filtering by: <span className="font-bold text-slate-800">{statusFilter}</span></span>
                   <button
@@ -2307,250 +2293,189 @@ const EventsList: React.FC = () => {
                   </button>
               </div>
           )}
-          <div className="hidden md:block flex-1 min-h-0 overflow-auto">
-              <table className="datatable w-full text-[13px] text-left">
-                  <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
-                      <tr>
-                          <th className="px-6 py-4 text-left bg-slate-50">Event Details</th>
-                          <th className="px-6 py-4 text-left bg-slate-50">Venue</th>
-                          <th className="px-6 py-4 text-left bg-slate-50">Date</th>
-                          <th className="px-6 py-4 text-center bg-slate-50">
-                              {eventView === 'deleted' ? 'Deleted Date' : 'Status'}
-                          </th>
-                          <th className="px-6 py-4 text-center bg-slate-50">Actions</th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                      {loading ? (
-                          // Skeleton Rows
-                          [...Array(5)].map((_, i) => (
-                              <tr key={i} className="animate-pulse">
-                                  <td className="px-6 py-4">
-                                      <div className="h-5 bg-slate-200 rounded w-48 mb-2 mx-auto"></div>
-                                      <div className="h-3 bg-slate-100 rounded w-24 mx-auto"></div>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                      <div className="h-4 bg-slate-200 rounded w-32"></div>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                      <div className="h-4 bg-slate-200 rounded w-24"></div>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                      <div className="h-6 bg-slate-200 rounded-full w-20 mx-auto"></div>
-                                  </td>
-                                  <td className="px-6 py-4 flex gap-2 justify-center">
-                                      <div className="h-8 w-8 bg-slate-200 rounded"></div>
-                                      <div className="h-8 w-8 bg-slate-200 rounded"></div>
-                                      <div className="h-8 w-8 bg-slate-200 rounded"></div>
-                                  </td>
-                              </tr>
-                          ))
-                      ) : (
-                          <>
-                              {paginatedEvents.map((event, index) => {
-                                  const forceMenuUp = index >= Math.max(paginatedEvents.length - 2, 0);
-                                  const canEditCurrentEvent = canEditEventRecord(event);
-                                  const canDeleteCurrentEvent = canDeleteEventRecord(event);
-                                  const canSetCurrentEventAccess = canSetEventAccess(event);
-                                  const showEventActionMenuForRow = canEditCurrentEvent || canDeleteCurrentEvent || canSetCurrentEventAccess;
+          <div className="hidden md:block flex-1 min-h-0 overflow-y-auto pr-1">
+              {loading ? (
+                  <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {[...Array(6)].map((_, i) => (
+                          <div key={i} className="animate-pulse bg-white border border-black/[0.08] rounded-lg p-5 space-y-3">
+                              <div className="h-4 bg-slate-200 rounded w-2/3"></div>
+                              <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                              <div className="h-3 bg-slate-100 rounded w-1/3"></div>
+                              <div className="h-8 bg-slate-100 rounded mt-4"></div>
+                          </div>
+                      ))}
+                  </div>
+              ) : filteredEvents.length === 0 ? (
+                  <div className="text-center py-16 text-slate-400 bg-white border border-black/[0.08] rounded-lg">
+                      <div className="flex flex-col items-center justify-center">
+                        {searchTerm ? <Search className="w-12 h-12 text-slate-300 mb-3" /> : eventView === 'deleted' ? <Trash2 className="w-12 h-12 text-slate-300 mb-3" /> : <Calendar className="w-12 h-12 text-slate-300 mb-3" />}
+                        <p className="font-medium text-slate-500">
+                          {searchTerm ? `No results for "${searchTerm}"` : eventView === 'deleted' ? 'No deleted events found' : 'No events found'}
+                        </p>
+                        <p className="text-xs mt-1">
+                          {searchTerm ? 'Try adjusting your search terms' : eventView === 'deleted' ? 'Deleted events will appear here for Admin recovery.' : 'Create a new event to get started'}
+                        </p>
+                      </div>
+                  </div>
+              ) : (
+                  <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {paginatedEvents.map((event) => {
+                          const canEditCurrentEvent = canEditEventRecord(event);
+                          const canDeleteCurrentEvent = canDeleteEventRecord(event);
+                          const canSetCurrentEventAccess = canSetEventAccess(event);
 
-                                  return (
-                                  <tr 
-                                      key={event.event_id} 
-                                      onClick={() => {
-                                          if (eventView === 'active') handleRowClick(event);
-                                      }}
-                                      className={`group transition-all duration-200 ${
-                                          eventView === 'active'
-                                            ? 'cursor-pointer hover:bg-indigo-50/30 hover:shadow-sm'
-                                            : 'bg-red-50/20 hover:bg-red-50/40'
-                                      }`}
-                                      title={eventView === 'active' ? 'Click to view participants' : 'Deleted event'}
-                                  >
-                                      <td className="px-6 py-4 text-left border-l-2 border-l-transparent group-hover:border-l-indigo-500">
-                                          <div className="font-semibold text-sm text-slate-800 group-hover:text-indigo-700 transition-colors">
-                                            {event.event_name}
-                                          </div>
-                                          <div className="flex gap-2 mt-1.5 justify-start">
-                                            {eventView === 'deleted' && (
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100">
-                                                    <Trash2 size={10} className="mr-1" /> Deleted
-                                                </span>
-                                            )}
-                                            {event.has_accommodation && (
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
-                                                    <Bed size={10} className="mr-1" /> Accommodation
-                                                </span>
-                                            )}
-                                            {!event.registration_open && (
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100">
-                                                    <Lock size={10} className="mr-1" /> Closed
-                                                </span>
-                                            )}
-                                          </div>
-                                      </td>
-                                      <td className="px-6 py-4 text-slate-600 text-left">
-                                          <div className="flex items-center justify-start gap-1.5 text-xs">
-                                            <MapPin size={12} className="text-slate-400" />
-                                            {event.venue}
-                                          </div>
-                                      </td>
-                                      <td className="px-6 py-4 text-slate-600 font-medium text-left">
-                                          <div className="flex items-center justify-start gap-1.5 text-xs">
-                                            <Calendar size={12} className="text-slate-400" />
-                                            {formatEventDate(event.start_date, event.end_date)}
-                                          </div>
-                                      </td>
-                                      <td className="px-6 py-4 text-center">
+                          return (
+                          <div
+                              key={event.event_id}
+                              onClick={() => {
+                                  if (eventView === 'active') handleRowClick(event);
+                              }}
+                              title={eventView === 'active' ? 'Click to view participants' : 'Deleted event'}
+                              className={`group flex flex-col rounded-lg border transition-all duration-150 ${
+                                  eventView === 'active'
+                                    ? 'bg-white border-black/[0.08] hover:border-[#4B3FE4]/30 hover:shadow-sm cursor-pointer'
+                                    : 'bg-red-50/20 border-red-100'
+                              }`}
+                          >
+                              {/* Card body */}
+                              <div className="flex-1 p-5">
+                                  <div className="flex items-start justify-between gap-3 mb-3">
+                                      <h3 className={`text-sm font-medium text-slate-800 leading-snug flex-1 line-clamp-2 ${
+                                          eventView === 'active' ? 'group-hover:text-[#4B3FE4] transition-colors' : ''
+                                      }`}>
+                                          {event.event_name}
+                                      </h3>
+                                      <div className="shrink-0">
                                           {eventView === 'deleted' ? (
-                                              <div className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
-                                                  <Clock size={12} />
+                                              <span className="inline-flex items-center gap-1 rounded border border-red-100 bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-700 font-mono">
+                                                  <Clock size={10} />
                                                   {formatDeletedDate(event.deleted_at)}
-                                              </div>
+                                              </span>
                                           ) : (
                                               getStatusBadge(event.status)
                                           )}
-                                      </td>
-                                      <td className="px-6 py-4">
-                                          <div className="flex items-center justify-center gap-2 relative">
-                                            {eventView === 'active' && (
-                                                <button
-                                                    onClick={(e) => openShareModal(e, event)}
-                                                    className="inline-flex items-center justify-center p-2 text-sm rounded-lg border border-slate-200 text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors"
-                                                    title="Share"
-                                                    aria-label="Share"
-                                                >
-                                                    <Share2 size={14} />
-                                                </button>
-                                            )}
+                                      </div>
+                                  </div>
 
-                                            {eventView === 'deleted' && isAdmin ? (
-                                                <>
-                                                    <button
-                                                        onClick={(e) => handleRestoreEvent(e, event.event_id)}
-                                                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
-                                                        title="Restore"
-                                                        aria-label="Restore"
-                                                    >
-                                                        <RotateCcw size={14} />
-                                                        Restore
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleDelete(e, event.event_id);
-                                                        }}
-                                                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
-                                                        title="Permanently delete"
-                                                        aria-label="Permanently delete"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                        Delete Forever
-                                                    </button>
-                                                </>
-                                            ) : showEventActionMenuForRow ? (
-                                                <>
-                                                    <button 
-                                                        onClick={(e) => toggleActionMenu(e, event.event_id, forceMenuUp ? 'up' : undefined)}
-                                                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                                        title="Actions"
-                                                    >
-                                                        <MoreVertical size={18} />
-                                                    </button>
-                                                    
-                                                    {openActionMenuId === event.event_id && (
-                                                        <>
-                                                            <div 
-                                                                className="fixed inset-0 z-40"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setOpenActionMenuId(null);
-                                                                    setActionMenuPosition(null);
-                                                                }}
-                                                            />
-                                                            <div
-                                                                className={`fixed w-52 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100 ${actionMenuPlacementClass}`}
-                                                                style={{
-                                                                    top: actionMenuPosition?.top ?? 0,
-                                                                    left: actionMenuPosition?.left ?? 0
-                                                                }}
-                                                            >
-                                                                {canEditCurrentEvent && (
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            setOpenActionMenuId(null);
-                                                                            openEditModal(e, event);
-                                                                        }}
-                                                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors text-left"
-                                                                    >
-                                                                        <Edit size={16} /> Edit
-                                                                    </button>
-                                                                )}
-                                                                {canSetCurrentEventAccess && (
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            setOpenActionMenuId(null);
-                                                                            openEventAccessModal(e, event);
-                                                                        }}
-                                                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors text-left"
-                                                                    >
-                                                                        <Settings size={16} /> Access Settings
-                                                                    </button>
-                                                                )}
-                                                                {canDeleteCurrentEvent && (
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            setOpenActionMenuId(null);
-                                                                            handleDelete(e, event.event_id);
-                                                                        }}
-                                                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                                                                    >
-                                                                        <Trash2 size={16} /> Delete
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                eventView === 'active' && canEditCurrentEvent && (
-                                                    <button
-                                                        onClick={(e) => openEditModal(e, event)}
-                                                        className="inline-flex items-center justify-center p-2 text-sm rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
-                                                        title="Edit"
-                                                        aria-label="Edit"
-                                                    >
-                                                        <Edit size={14} />
-                                                    </button>
-                                                )
-                                            )}
-                                          </div>
-                                      </td>
-                                  </tr>
-                                  );
-                              })}
-                              {filteredEvents.length === 0 && (
-                                  <tr>
-                                      <td colSpan={5} className="text-center py-12 text-slate-400 bg-slate-50/50">
-                                          <div className="flex flex-col items-center justify-center">
-                                            {searchTerm ? <Search className="w-12 h-12 text-slate-300 mb-3" /> : eventView === 'deleted' ? <Trash2 className="w-12 h-12 text-slate-300 mb-3" /> : <Calendar className="w-12 h-12 text-slate-300 mb-3" />}
-                                            <p className="font-medium text-slate-500">
-                                              {searchTerm ? `No results for "${searchTerm}"` : eventView === 'deleted' ? 'No deleted events found' : 'No events found'}
-                                            </p>
-                                            <p className="text-xs mt-1">
-                                              {searchTerm ? 'Try adjusting your search terms' : eventView === 'deleted' ? 'Deleted events will appear here for Admin recovery.' : 'Create a new event to get started'}
-                                            </p>
-                                          </div>
-                                      </td>
-                                  </tr>
-                              )}
-                          </>
-                      )}
-                  </tbody>
-              </table>
+                                  {(eventView === 'deleted' || event.has_accommodation || !event.registration_open) && (
+                                      <div className="flex flex-wrap gap-1.5 mb-3">
+                                          {eventView === 'deleted' && (
+                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100">
+                                                  <Trash2 size={10} className="mr-1" /> Deleted
+                                              </span>
+                                          )}
+                                          {event.has_accommodation && (
+                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
+                                                  <Bed size={10} className="mr-1" /> Accommodation
+                                              </span>
+                                          )}
+                                          {!event.registration_open && (
+                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100">
+                                                  <Lock size={10} className="mr-1" /> Closed
+                                              </span>
+                                          )}
+                                      </div>
+                                  )}
+
+                                  <div className="space-y-1.5">
+                                      <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                          <Calendar size={12} className="shrink-0 text-slate-400" />
+                                          <span className="font-mono">{formatEventDate(event.start_date, event.end_date)}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                          <MapPin size={12} className="shrink-0 text-slate-400" />
+                                          <span className="truncate">{event.venue}</span>
+                                      </div>
+                                  </div>
+                              </div>
+
+                              {/* Action bar */}
+                              <div className="flex items-center gap-1 px-4 py-2.5 border-t border-black/[0.06] bg-slate-50/40 rounded-b-lg">
+                                  {eventView === 'deleted' && isAdmin ? (
+                                      <>
+                                          <button
+                                              onClick={(e) => handleRestoreEvent(e, event.event_id)}
+                                              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors"
+                                              title="Restore"
+                                          >
+                                              <RotateCcw size={13} />
+                                              <span>Restore</span>
+                                          </button>
+                                          <button
+                                              onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleDelete(e, event.event_id);
+                                              }}
+                                              className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                              title="Permanently delete"
+                                          >
+                                              <Trash2 size={13} />
+                                              <span>Delete Forever</span>
+                                          </button>
+                                      </>
+                                  ) : (
+                                      <>
+                                          <button
+                                              onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  openShareModal(e, event);
+                                              }}
+                                              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                                              title="Share"
+                                          >
+                                              <Share2 size={13} />
+                                              <span>Share</span>
+                                          </button>
+                                          {canEditCurrentEvent && (
+                                              <button
+                                                  onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      openEditModal(e, event);
+                                                  }}
+                                                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                                                  title="Edit"
+                                              >
+                                                  <Edit size={13} />
+                                                  <span>Edit</span>
+                                              </button>
+                                          )}
+                                          {canSetCurrentEventAccess && (
+                                              <button
+                                                  onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      openEventAccessModal(e, event);
+                                                  }}
+                                                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                                                  title="Access Settings"
+                                              >
+                                                  <Settings size={13} />
+                                                  <span>Access</span>
+                                              </button>
+                                          )}
+                                          {canDeleteCurrentEvent && (
+                                              <button
+                                                  onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleDelete(e, event.event_id);
+                                                  }}
+                                                  className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                  title="Delete"
+                                              >
+                                                  <Trash2 size={13} />
+                                                  <span>Delete</span>
+                                              </button>
+                                          )}
+                                      </>
+                                  )}
+                              </div>
+                          </div>
+                          );
+                      })}
+                  </div>
+              )}
           </div>
 
-          <div className="md:hidden flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+          <div className="md:hidden flex-1 min-h-0 overflow-y-auto space-y-3">
               {loading ? (
                   [...Array(3)].map((_, i) => (
                       <div key={i} className="animate-pulse rounded-xl border border-slate-200 p-4 space-y-3">
@@ -2726,7 +2651,7 @@ const EventsList: React.FC = () => {
           
           {/* Pagination Controls */}
           {!loading && totalPages > 1 && (
-              <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+              <div className="pt-1 flex items-center justify-between shrink-0">
                   <div className="text-sm text-slate-500">
                       Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredEvents.length)}</span> of <span className="font-medium">{filteredEvents.length}</span> results
                   </div>
@@ -2764,6 +2689,7 @@ const EventsList: React.FC = () => {
               </div>
           )}
       </div>
+      </>)}
 
       {/* Share / Registration Modal */}
       {showShareModal && selectedEvent && (
@@ -2833,52 +2759,77 @@ const EventsList: React.FC = () => {
         </div>
       )}
 
-      {/* Participants List Modal */}
+      {/* Event Details View (in-page, replaces the old participants modal) */}
       {showParticipantsModal && selectedEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeParticipantsModal}></div>
-            <div className={`bg-white rounded-xl shadow-2xl w-full ${participantModalView === 'list' ? 'max-w-[95vw] lg:max-w-screen-2xl' : 'max-w-3xl'} ${participantModalView === 'list' ? 'h-[92vh]' : 'h-[85vh] sm:h-[80vh]'} flex flex-col relative z-10 animate-in zoom-in-95 duration-200`}>
-                {/* Header */}
-                <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start bg-slate-50/50 rounded-t-xl shrink-0">
-                    <div className="min-w-0 flex-1">
-                        <h3 className="text-lg sm:text-xl font-bold text-slate-800 flex items-start gap-2 leading-tight">
-                            {participantModalView === 'list' ? (
-                                <>
-                                    <Users className="text-indigo-600 mt-0.5 shrink-0" size={22} /> 
-                                    <span className="break-words">{selectedEvent.event_name}</span>
-                                </>
-                            ) : participantModalView === 'edit' ? (
-                                <>
-                                    <Edit className="text-indigo-600" size={24} />
-                                    Edit Participant
-                                </>
-                            ) : (
-                                <>
-                                    <UserPlus className="text-indigo-600" size={24} /> 
-                                    Add Participant
-                                </>
+        <div className="flex-1 min-h-0 flex flex-col animate-in fade-in duration-150">
+            {/* Page header */}
+            <div className="shrink-0 mb-4">
+                <button
+                    onClick={
+                        participantModalView === 'list'
+                            ? closeParticipantsModal
+                            : () => { setParticipantModalView('list'); resetParticipantForm(); }
+                    }
+                    className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors w-fit"
+                >
+                    <ArrowRight size={15} className="rotate-180" />
+                    {participantModalView === 'list' ? 'Events' : 'Back to participants'}
+                </button>
+
+                {participantModalView === 'list' ? (
+                    <>
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mt-4">
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                    {getStatusBadge(selectedEvent.status)}
+                                    {selectedEvent.event_serial && (
+                                        <span className="text-xs text-slate-400 font-mono">#{selectedEvent.event_serial}</span>
+                                    )}
+                                </div>
+                                <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 leading-snug break-words">
+                                    {selectedEvent.event_name}
+                                </h1>
+                            </div>
+                            {canManageParticipants && (
+                                <button
+                                    onClick={openAddParticipantView}
+                                    className="shrink-0 h-9 bg-[#4B3FE4] hover:bg-[#3B30C4] text-white text-sm font-medium rounded-md flex items-center gap-1.5 px-3 transition-colors"
+                                >
+                                    <UserPlus size={15} /> Add Participant
+                                </button>
                             )}
-                        </h3>
-                        {participantModalView === 'list' && (
-                            <p className="text-sm text-slate-500 mt-1">
-                                {formatEventDate(selectedEvent.start_date, selectedEvent.end_date)} • {selectedEvent.venue}
-                            </p>
+                        </div>
+
+                        {/* Info cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                            <div className="bg-white border border-black/[0.08] rounded-lg px-4 py-3">
+                                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium mb-1">Date</p>
+                                <div className="flex items-center gap-1.5 text-sm text-slate-800">
+                                    <Calendar size={14} className="text-slate-400 shrink-0" />
+                                    <span className="font-mono">{formatEventDate(selectedEvent.start_date, selectedEvent.end_date)}</span>
+                                </div>
+                            </div>
+                            <div className="bg-white border border-black/[0.08] rounded-lg px-4 py-3">
+                                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium mb-1">Location</p>
+                                <div className="flex items-center gap-1.5 text-sm text-slate-800">
+                                    <MapPin size={14} className="text-slate-400 shrink-0" />
+                                    <span className="truncate">{selectedEvent.venue}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <h1 className="text-xl font-semibold text-slate-900 mt-4 flex items-center gap-2">
+                        {participantModalView === 'edit' ? (
+                            <><Edit className="text-[#4B3FE4]" size={20} /> Edit Participant</>
+                        ) : (
+                            <><UserPlus className="text-[#4B3FE4]" size={20} /> Add Participant</>
                         )}
-                    </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto sm:justify-end">
-                        {participantModalView !== 'list' && (
-                            <button
-                                onClick={() => { setParticipantModalView('list'); resetParticipantForm(); }}
-                                className="w-full sm:w-auto bg-slate-100 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors shadow-sm"
-                            >
-                                <ArrowRight size={16} className="rotate-180" /> Return to List
-                            </button>
-                        )}
-                        <button onClick={closeParticipantsModal} className="ml-auto sm:ml-0 text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
-                            <X size={24} />
-                        </button>
-                    </div>
-                </div>
+                    </h1>
+                )}
+            </div>
+
+            <div className="bg-white border border-black/[0.08] rounded-lg flex-1 min-h-0 flex flex-col overflow-hidden">
 
                 {participantModalView === 'list' && (
                     <div className="px-4 sm:px-6 py-3 border-b border-slate-100 bg-white shrink-0">
@@ -2947,14 +2898,6 @@ const EventsList: React.FC = () => {
                                     </button>
                                 )}
                             </div>
-                            {canManageParticipants && (
-                                <button
-                                    onClick={openAddParticipantView}
-                                    className="shrink-0 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-sm"
-                                >
-                                    <UserPlus size={16} /> Add
-                                </button>
-                            )}
                             <button
                                 onClick={exportParticipantsToExcel}
                                 disabled={viewingParticipants.length === 0}

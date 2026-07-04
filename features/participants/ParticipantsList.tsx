@@ -1326,45 +1326,39 @@ const AttendanceList: React.FC = () => {
           >
           <button 
             onClick={() => setFilter('Show All')}
-            className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-                ${filter === 'Show All' ? 'ring-2 ring-slate-400 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-slate-300'}
-                bg-white
-            `}
+            className={`min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md border flex flex-col justify-between text-left transition-all duration-150
+                ${filter === 'Show All' ? 'bg-[#E8E5DC]/60 border-black/20' : 'bg-white border-black/[0.08] hover:border-black/20'}`}
           >
               <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">Total</p>
+                  <p className="text-[7px] sm:text-[11px] font-medium text-[#6B6860] uppercase tracking-wide leading-tight">Total</p>
                   <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Show All' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-600'}`}>
                     <Users size={10} className="sm:h-3.5 sm:w-3.5" />
                   </div>
               </div>
-              <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-slate-800">{totalParticipants}</p>
+              <p className="text-[11px] sm:text-base font-medium font-mono text-slate-800">{totalParticipants}</p>
           </button>
 
           <button 
             onClick={() => setFilter('Present')}
-            className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-                ${filter === 'Present' ? 'ring-2 ring-green-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-green-200'}
-                bg-white
-            `}
+            className={`min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md border flex flex-col justify-between text-left transition-all duration-150
+                ${filter === 'Present' ? 'bg-green-50 border-green-300' : 'bg-white border-black/[0.08] hover:border-green-200'}`}
           >
               <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">Present</p>
+                  <p className="text-[7px] sm:text-[11px] font-medium text-[#6B6860] uppercase tracking-wide leading-tight">Present</p>
                   <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Present' ? 'bg-green-200 text-green-700' : 'bg-green-100 text-green-600'}`}>
                     <UserCheck size={10} className="sm:h-3.5 sm:w-3.5" />
                   </div>
               </div>
-              <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-green-600">{presentCount}</p>
+              <p className="text-[11px] sm:text-base font-medium font-mono text-green-600">{presentCount}</p>
           </button>
 
           <button 
             onClick={() => setFilter('No Logs')}
-            className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-                ${filter === 'No Logs' ? 'ring-2 ring-red-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-red-200'}
-                bg-white
-            `}
+            className={`min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md border flex flex-col justify-between text-left transition-all duration-150
+                ${filter === 'No Logs' ? 'bg-red-50 border-red-300' : 'bg-white border-black/[0.08] hover:border-red-200'}`}
           >
               <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
+                  <p className="text-[7px] sm:text-[11px] font-medium text-[#6B6860] uppercase tracking-wide leading-tight">
                     <span className="sm:hidden">Absent</span>
                     <span className="hidden sm:inline">Not Present</span>
                   </p>
@@ -1372,63 +1366,57 @@ const AttendanceList: React.FC = () => {
                     <UserX size={10} className="sm:h-3.5 sm:w-3.5" />
                   </div>
               </div>
-              <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-red-600">{notPresentCount}</p>
+              <p className="text-[11px] sm:text-base font-medium font-mono text-red-600">{notPresentCount}</p>
           </button>
 
           {hasMultipleSessions && (
             <button 
               onClick={() => setFilter('No PM')}
-              className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-                  ${filter === 'No PM' ? 'ring-2 ring-amber-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-amber-200'}
-                  bg-white
-              `}
+              className={`min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md border flex flex-col justify-between text-left transition-all duration-150
+                  ${filter === 'No PM' ? 'bg-amber-50 border-amber-300' : 'bg-white border-black/[0.08] hover:border-amber-200'}`}
             >
                 <div className="flex justify-between items-start mb-0.5 w-full">
-                    <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">No PM</p>
+                    <p className="text-[7px] sm:text-[11px] font-medium text-[#6B6860] uppercase tracking-wide leading-tight">No PM</p>
                     <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'No PM' ? 'bg-amber-200 text-amber-700' : 'bg-amber-100 text-amber-600'}`}>
                       <AlertCircle size={10} className="sm:h-3.5 sm:w-3.5" />
                     </div>
                 </div>
-                <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-amber-600">{noPmCount}</p>
+                <p className="text-[11px] sm:text-base font-medium font-mono text-amber-600">{noPmCount}</p>
             </button>
           )}
 
           {hasMultipleSessions && (
             <button 
               onClick={() => setFilter('Complete Logs')}
-              className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-                  ${filter === 'Complete Logs' ? 'ring-2 ring-indigo-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-indigo-200'}
-                  bg-white
-              `}
+              className={`min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md border flex flex-col justify-between text-left transition-all duration-150
+                  ${filter === 'Complete Logs' ? 'bg-[#4B3FE4]/5 border-[#4B3FE4]/40' : 'bg-white border-black/[0.08] hover:border-[#4B3FE4]/30'}`}
             >
                 <div className="flex justify-between items-start mb-0.5 w-full">
-                    <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">Complete</p>
+                    <p className="text-[7px] sm:text-[11px] font-medium text-[#6B6860] uppercase tracking-wide leading-tight">Complete</p>
                     <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Complete Logs' ? 'bg-indigo-200 text-indigo-700' : 'bg-indigo-100 text-indigo-600'}`}>
                       <CheckCircle size={10} className="sm:h-3.5 sm:w-3.5" />
                     </div>
                 </div>
-                <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-indigo-600">{completeLogsCount}</p>
+                <p className="text-[11px] sm:text-base font-medium font-mono text-indigo-600">{completeLogsCount}</p>
             </button>
           )}
 
           {hasAccommodationFilter && (
             <button
               onClick={() => setFilter('Accommodation')}
-              className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-                  ${filter === 'Accommodation' ? 'ring-2 ring-sky-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-sky-200'}
-                  bg-white
-              `}
+              className={`min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md border flex flex-col justify-between text-left transition-all duration-150
+                  ${filter === 'Accommodation' ? 'bg-purple-50 border-purple-300' : 'bg-white border-black/[0.08] hover:border-purple-200'}`}
             >
                 <div className="flex justify-between items-start mb-0.5 w-full">
-                    <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
+                    <p className="text-[7px] sm:text-[11px] font-medium text-[#6B6860] uppercase tracking-wide leading-tight">
                       <span className="sm:hidden">Accom</span>
                       <span className="hidden sm:inline">Accommodation</span>
                     </p>
-                    <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Accommodation' ? 'bg-purple-100 text-[#9333ea]' : 'bg-purple-50 text-[#9333ea]'}`}>
+                    <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Accommodation' ? 'bg-purple-100 text-[#8B5CF6]' : 'bg-purple-50 text-[#8B5CF6]'}`}>
                       <Bed size={10} className="sm:h-3.5 sm:w-3.5" />
                     </div>
                 </div>
-                <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-[#9333ea]">{accommodationCount}</p>
+                <p className="text-[11px] sm:text-base font-medium font-mono text-[#8B5CF6]">{accommodationCount}</p>
             </button>
           )}
           </div>
@@ -1521,7 +1509,7 @@ const AttendanceList: React.FC = () => {
                                         {row.needs_accommodation && (
                                             <Bed
                                                 size={13}
-                                                className="mt-0.5 shrink-0 text-[#9333ea]"
+                                                className="mt-0.5 shrink-0 text-[#8B5CF6]"
                                                 aria-label="Needs accommodation"
                                             />
                                         )}
@@ -1633,7 +1621,7 @@ const AttendanceList: React.FC = () => {
                                             {row.needs_accommodation && (
                                                 <Bed
                                                     size={13}
-                                                    className="mt-0.5 shrink-0 text-[#9333ea]"
+                                                    className="mt-0.5 shrink-0 text-[#8B5CF6]"
                                                     aria-label="Needs accommodation"
                                                 />
                                             )}
@@ -2324,7 +2312,7 @@ const AttendanceList: React.FC = () => {
               onClick={() => setShowManualBlockedModal(false)}
             ></div>
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="bg-[#4322A7] px-6 py-4 flex justify-between items-center text-white">
+                <div className="bg-[#4B3FE4] px-6 py-4 flex justify-between items-center text-white">
                     <h3 className="font-semibold flex items-center gap-2">
                         <AlertCircle size={20} /> Manual Entry Unavailable
                     </h3>
@@ -2334,7 +2322,7 @@ const AttendanceList: React.FC = () => {
                 </div>
 
                 <div className="p-6 space-y-4">
-                    <div className="bg-indigo-50 text-[#4322A7] p-4 rounded-lg border border-indigo-200 text-sm leading-relaxed">
+                    <div className="bg-indigo-50 text-[#4B3FE4] p-4 rounded-lg border border-indigo-200 text-sm leading-relaxed">
                         {manualBlockedMessage}
                     </div>
 
@@ -2348,7 +2336,7 @@ const AttendanceList: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => setShowManualBlockedModal(false)}
-                        className="w-full bg-[#4322A7] text-white font-bold py-2.5 rounded-lg hover:bg-indigo-800 transition-all"
+                        className="w-full bg-[#4B3FE4] text-white font-bold py-2.5 rounded-lg hover:bg-indigo-800 transition-all"
                     >
                         Close
                     </button>

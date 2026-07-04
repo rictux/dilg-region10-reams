@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Office } from '../../types/database';
-import { Lock, User, Eye, EyeOff, Mail, Briefcase, UserPlus, Building2 } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, Mail, Briefcase, UserPlus, Building2, ChevronDown, Loader2 } from 'lucide-react';
 
 const Signup: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -163,20 +164,22 @@ const Signup: React.FC = () => {
     }
   };
 
+  const inputCls = "w-full pl-9 pr-3 h-10 text-sm rounded-md bg-white border border-black/10 focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors";
+
   if (success) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 text-center animate-in zoom-in-95 duration-200">
-          <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <UserPlus size={32} />
+      <div className="min-h-screen bg-[#F5F3EE] flex items-center justify-center p-4">
+        <div className="bg-white border border-black/[0.08] rounded-lg w-full max-w-sm p-10 text-center animate-in zoom-in-95 duration-200">
+          <div className="w-12 h-12 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <UserPlus size={20} />
           </div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">Account Created!</h2>
-          <p className="text-slate-600 mb-6">
+          <h2 className="text-lg font-semibold text-[#111110] mb-2">Account Created!</h2>
+          <p className="text-sm text-[#6B6860] mb-6">
             Your account has been successfully created. Please contact RICTU personnel to activate your account before logging in.
           </p>
           <button
             onClick={() => navigate('/')}
-            className="text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
+            className="w-full h-9 bg-[#4B3FE4] text-white text-sm font-medium rounded-md hover:bg-[#3B30C4] transition-colors"
           >
             Back to Login
           </button>
@@ -186,58 +189,68 @@ const Signup: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-indigo-600">Create Account</h1>
-          <p className="text-slate-500 mt-2">Join the Regional Event & Attendance Management System</p>
+    <div className="min-h-screen bg-[#F5F3EE] flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md">
+        {/* Logo */}
+        <div className="flex items-center gap-2.5 mb-8">
+          <div className="w-7 h-7 bg-white border border-black/[0.08] rounded flex items-center justify-center overflow-hidden">
+            <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" />
+          </div>
+          <span className="text-[#111110] text-sm font-medium font-mono">REAMS</span>
         </div>
 
+        <h2 className="text-2xl font-semibold text-[#111110] mb-1">Create account</h2>
+        <p className="text-sm text-[#6B6860] mb-8">
+          Join the Regional Event &amp; Attendance Management System
+        </p>
+
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded-md">
+          <div className="mb-6 p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-md">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Full Name</label>
+            <label className="block text-xs font-medium text-[#111110] mb-1.5">Full Name</label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
               <input
                 type="text"
                 value={formData.fullName}
                 onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                 required
-                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                className={inputCls}
                 placeholder="John Doe"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address <span className="text-slate-400">(optional)</span></label>
+            <label className="block text-xs font-medium text-[#111110] mb-1.5">
+              Email Address <span className="text-[#9A9890] font-normal">(optional)</span>
+            </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
               <input
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                className={inputCls}
                 placeholder="john@example.com"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Office / Division</label>
+            <label className="block text-xs font-medium text-[#111110] mb-1.5">Office / Division</label>
             <div className="relative">
-              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
               <select
                 value={formData.office_id}
                 onChange={(e) => setFormData({ ...formData, office_id: e.target.value })}
                 required
-                className="w-full pl-10 pr-8 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all bg-white appearance-none text-slate-600"
+                className="w-full pl-9 pr-8 h-10 text-sm rounded-md bg-white border border-black/10 focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors appearance-none text-[#111110] cursor-pointer"
               >
                 <option value="">Select Office/Division</option>
                 {offices.map((office) => (
@@ -246,39 +259,35 @@ const Signup: React.FC = () => {
                   </option>
                 ))}
               </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </div>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9A9890] pointer-events-none" size={14} />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Position / Title</label>
+            <label className="block text-xs font-medium text-[#111110] mb-1.5">Position / Title</label>
             <div className="relative">
-              <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
               <input
                 type="text"
                 value={formData.position}
                 onChange={(e) => setFormData({ ...formData, position: e.target.value })}
                 required
-                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                className={inputCls}
                 placeholder="Event Organizer"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Username</label>
+            <label className="block text-xs font-medium text-[#111110] mb-1.5">Username</label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
               <input
                 type="text"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 required
-                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                className={inputCls}
                 placeholder="Choose a username"
               />
             </div>
@@ -286,45 +295,45 @@ const Signup: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+              <label className="block text-xs font-medium text-[#111110] mb-1.5">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
-                  className="w-full pl-10 pr-8 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                  className="w-full pl-9 pr-8 h-10 text-sm rounded-md bg-white border border-black/10 focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors"
                   placeholder="••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9A9890] hover:text-[#6B6860] focus:outline-none transition-colors"
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm</label>
+              <label className="block text-xs font-medium text-[#111110] mb-1.5">Confirm</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   required
-                  className="w-full pl-10 pr-8 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                  className="w-full pl-9 pr-8 h-10 text-sm rounded-md bg-white border border-black/10 focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors"
                   placeholder="••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9A9890] hover:text-[#6B6860] focus:outline-none transition-colors"
                 >
-                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
             </div>
@@ -333,13 +342,13 @@ const Signup: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center mt-6"
+            className="w-full h-10 bg-[#4B3FE4] text-white text-sm font-medium rounded-md hover:bg-[#3B30C4] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 mt-6"
           >
             {isLoading ? (
-              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+              <>
+                <Loader2 className="animate-spin" size={16} />
+                Creating account...
+              </>
             ) : (
               'Create Account'
             )}
@@ -347,10 +356,10 @@ const Signup: React.FC = () => {
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-300"></div>
+              <div className="w-full border-t border-black/[0.08]"></div>
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-slate-500">Or sign up with</span>
+            <div className="relative flex justify-center text-xs">
+              <span className="px-2 bg-[#F5F3EE] text-[#6B6860]">Or sign up with</span>
             </div>
           </div>
 
@@ -358,9 +367,9 @@ const Signup: React.FC = () => {
             type="button"
             onClick={handleGoogleSignup}
             disabled={isLoading}
-            className="w-full bg-white border border-slate-300 text-slate-700 font-semibold py-3 rounded-lg hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+            className="w-full h-10 bg-white border border-black/10 text-[#111110] text-sm font-medium rounded-md hover:bg-white/60 hover:border-black/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
                 fill="currentColor"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -381,11 +390,12 @@ const Signup: React.FC = () => {
             Sign up with Google
           </button>
 
-          <div className="text-center mt-4">
-            <Link to="/" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">
-              Already have an account? Log in
+          <p className="text-center text-xs text-[#6B6860] mt-4">
+            Already have an account?{' '}
+            <Link to="/" className="text-[#4B3FE4] hover:underline font-medium">
+              Log in
             </Link>
-          </div>
+          </p>
         </form>
       </div>
     </div>

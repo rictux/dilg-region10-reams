@@ -871,23 +871,33 @@ const EventRegistration: React.FC = () => {
     <div className="min-h-screen bg-slate-50 py-8 sm:py-12 px-4 sm:px-6 lg:px-8 flex justify-center">
         <div className="max-w-3xl w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
             {/* Event Header */}
-            <div className="bg-indigo-600 p-6 sm:p-8 text-white relative overflow-hidden">
+            <div className="bg-[#0F0F0E] p-6 sm:p-8 text-white relative overflow-hidden">
+                {/* Grid texture */}
+                <div
+                    className="absolute inset-0 opacity-[0.03]"
+                    style={{
+                        backgroundImage:
+                            'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
+                        backgroundSize: '40px 40px',
+                    }}
+                />
+                <div className="absolute -top-16 -right-16 w-56 h-56 bg-[#4B3FE4]/25 rounded-full blur-3xl pointer-events-none"></div>
                 <div className="relative z-10">
-                    <span className="inline-block px-2 py-1 bg-white/20 rounded text-xs font-semibold mb-3">Registration Open</span>
-                    <h1 className="text-2xl sm:text-3xl font-bold mb-2">{event.event_name}</h1>
-                    <div className="flex flex-col gap-2 mt-4 text-indigo-100 text-sm font-medium">
-                        <div className="flex items-center gap-2">
-                            <Calendar size={16} />
-                            <span>{formatEventDate(event.start_date, event.end_date)}</span>
+                    <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-medium mb-3 font-mono">
+                        Registration Open
+                    </span>
+                    <h1 className="text-xl sm:text-2xl font-semibold leading-snug mb-3">{event.event_name}</h1>
+                    <div className="flex flex-wrap gap-x-4 gap-y-2 text-white/50 text-sm">
+                        <div className="flex items-center gap-1.5">
+                            <Calendar size={14} />
+                            <span className="font-mono">{formatEventDate(event.start_date, event.end_date)}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <MapPin size={16} />
+                        <div className="flex items-center gap-1.5">
+                            <MapPin size={14} />
                             <span>{event.venue}</span>
                         </div>
                     </div>
                 </div>
-                {/* Decorative circle */}
-                <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
             </div>
 
             {/* Form */}

@@ -5,14 +5,15 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 import { 
-    Calendar as CalendarIcon, 
-    CheckCircle, 
-    Clock, 
-    ChevronLeft, 
+    Calendar as CalendarIcon,
+    CheckCircle,
+    Clock,
+    ChevronLeft,
     ChevronRight,
     Users,
     Briefcase,
-    MapPin
+    MapPin,
+    Radio
 } from 'lucide-react';
 import { 
     format, 
@@ -364,13 +365,13 @@ const Dashboard: React.FC = () => {
   };
 
   const StatCard = ({ icon: Icon, label, value, color }: any) => (
-    <div className={`${color} p-3 sm:p-5 rounded-2xl shadow-sm flex items-center justify-between text-white min-w-0`}>
-      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-        <Icon size={20} className="text-white sm:w-6 sm:h-6" />
+    <div className="bg-white border border-black/[0.08] rounded-lg p-3 sm:p-5 flex items-center gap-3 sm:gap-4 min-w-0">
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
+        <Icon size={18} />
       </div>
-      <div className="text-right min-w-0">
-        <p className="text-white/80 text-[10px] sm:text-xs font-medium mb-1 uppercase tracking-[0.12em] sm:tracking-[0.14em] leading-tight">{label}</p>
-        <p className="text-2xl sm:text-3xl font-bold leading-none">{loading ? '...' : value}</p>
+      <div className="min-w-0">
+        <p className="text-xl sm:text-2xl font-medium text-[#111110] leading-none font-mono">{loading ? '…' : value}</p>
+        <p className="text-[11px] sm:text-xs text-[#6B6860] mt-1 truncate">{label}</p>
       </div>
     </div>
   );
@@ -399,48 +400,51 @@ const Dashboard: React.FC = () => {
     className?: string;
   }) => (
     <div className={`${scrollable ? 'flex min-h-0 flex-1 flex-col' : ''} ${className}`.trim()}>
-      <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-        <Icon className={iconColor} size={18} />
-        {title}
-      </h3>
+      <div className="flex items-center gap-2 pb-3 border-b border-black/[0.06] mb-3">
+        <Icon className={iconColor} size={15} />
+        <h3 className="text-sm font-medium text-[#111110]">{title}</h3>
+        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#E8E5DC]/70 text-[#6B6860] border border-black/[0.06] font-medium font-mono">
+          {events.length}
+        </span>
+      </div>
       {events.length > 0 ? (
         <div className={scrollable ? 'min-h-0 flex-1 overflow-y-auto pr-1' : ''}>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {displayedEvents.map((event) => (
-              <div key={event.event_id} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow">
+              <div key={event.event_id} className="border border-black/[0.08] rounded-lg p-3 bg-white hover:border-[#4B3FE4]/30 transition-colors">
                 <div className="mb-2">
-                  <h4 className="font-bold text-[13px] sm:text-sm text-slate-800 line-clamp-2 leading-tight mb-1.5">{event.event_name}</h4>
-                  <div className={`flex items-center gap-1.5 text-[11px] sm:text-xs font-medium ${accentColor} mb-1`}>
-                    <MapPin size={13} className="shrink-0 sm:w-3.5 sm:h-3.5" />
+                  <h4 className="text-[13px] sm:text-sm font-medium text-[#111110] line-clamp-2 leading-snug mb-1.5">{event.event_name}</h4>
+                  <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-[#6B6860] mb-1">
+                    <MapPin size={12} className="shrink-0" />
                     <span className="truncate">{event.venue}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-500">
-                    <CalendarIcon size={13} className="shrink-0 sm:w-3.5 sm:h-3.5" />
-                    <span>{format(new Date(event.start_date), 'MMM d, yyyy')} - {format(new Date(event.end_date), 'MMM d, yyyy')}</span>
+                  <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-[#6B6860]">
+                    <CalendarIcon size={12} className="shrink-0" />
+                    <span className="font-mono">{format(new Date(event.start_date), 'MMM d, yyyy')} – {format(new Date(event.end_date), 'MMM d, yyyy')}</span>
                   </div>
                 </div>
-                <div className="flex justify-between items-center gap-2 bg-slate-50 px-2.5 py-2 rounded-lg border border-slate-100">
-                  <div className="flex items-center justify-center gap-1.5 flex-1 border-r border-slate-200 pr-2">
-                    <p className="text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-[0.08em] sm:tracking-[0.12em] font-bold">Registered</p>
-                    <p className="font-bold text-[13px] sm:text-sm text-slate-800 leading-none">{event.registered_count}</p>
+                <div className="flex justify-between items-center gap-2 bg-[#F5F3EE] px-2.5 py-1.5 rounded-md border border-black/[0.05]">
+                  <div className="flex items-center justify-center gap-1.5 flex-1 border-r border-black/[0.08] pr-2">
+                    <p className="text-[9px] sm:text-[10px] text-[#6B6860] uppercase tracking-[0.1em] font-medium">Registered</p>
+                    <p className="text-[13px] sm:text-sm text-[#111110] leading-none font-mono font-medium">{event.registered_count}</p>
                   </div>
                   <div className="flex items-center justify-center gap-1.5 flex-1 pl-2">
-                    <p className="text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-[0.08em] sm:tracking-[0.12em] font-bold">Present</p>
-                    <p className={`font-bold text-[13px] sm:text-sm leading-none ${accentColor}`}>{showPresentCount ? event.present_count : '-'}</p>
+                    <p className="text-[9px] sm:text-[10px] text-[#6B6860] uppercase tracking-[0.1em] font-medium">Present</p>
+                    <p className={`text-[13px] sm:text-sm leading-none font-mono font-medium ${accentColor}`}>{showPresentCount ? event.present_count : '—'}</p>
                   </div>
                 </div>
               </div>
             ))}
             {!scrollable && events.length > displayedEvents.length && (
-              <p className="text-xs text-slate-500 text-right">
+              <p className="text-xs text-[#6B6860] text-right font-mono">
                 +{events.length - displayedEvents.length} more {title.toLowerCase().replace(/\s+/g, ' ')}(s)
               </p>
             )}
           </div>
         </div>
       ) : (
-        <div className="text-center py-5 text-slate-400 text-sm bg-slate-50 rounded-2xl border border-slate-100">
-          <Icon className="w-7 h-7 mb-2 mx-auto opacity-20" />
+        <div className="text-center py-6 text-[#9A9890] text-xs bg-[#F5F3EE] rounded-lg border border-black/[0.05]">
+          <Icon className="w-6 h-6 mb-2 mx-auto opacity-25" />
           {emptyText}
         </div>
       )}
@@ -450,43 +454,43 @@ const Dashboard: React.FC = () => {
   return (
     <div className="h-full min-h-0 overflow-y-auto lg:overflow-hidden pr-1 space-y-4">
       {/* Top Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-        <StatCard icon={CalendarIcon} label="Total Events" value={stats.totalEvents} color="bg-[#5C3CCE]" />
-        <StatCard icon={Briefcase} label="On-Going Events" value={stats.activeEvents} color="bg-[#4099FF]" />
-        <StatCard icon={Clock} label="Upcoming Events" value={stats.upcomingEvents} color="bg-[#F59E0B]" />
-        <StatCard icon={Users} label="Completed Events" value={stats.completedEvents} color="bg-[#2ED47A]" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <StatCard icon={CalendarIcon} label="Total Events" value={stats.totalEvents} color="bg-[#4B3FE4]/10 text-[#4B3FE4]" />
+        <StatCard icon={Radio} label="On-Going Events" value={stats.activeEvents} color="bg-emerald-50 text-emerald-600" />
+        <StatCard icon={Clock} label="Upcoming Events" value={stats.upcomingEvents} color="bg-blue-50 text-blue-600" />
+        <StatCard icon={CheckCircle} label="Completed Events" value={stats.completedEvents} color="bg-stone-100 text-stone-500" />
       </div>
 
       <div className="flex flex-col lg:flex-row gap-4 lg:h-[calc(100%-112px)] lg:min-h-0">
         {/* Main Column - Calendar */}
         <div className="w-full lg:w-2/3 flex flex-col gap-4 lg:min-h-0">
-          <div className="lg:hidden bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60">
+          <div className="lg:hidden bg-white rounded-lg p-4 border border-black/[0.08]">
             <EventSection
               title="On-Going Events"
               icon={Clock}
-              iconColor="text-[#4322A7]"
+              iconColor="text-[#4B3FE4]"
               events={ongoingEvents}
               displayedEvents={mobileDisplayedOngoingEvents}
               emptyText="No on-going events."
-              accentColor="text-[#4322A7]"
+              accentColor="text-[#4B3FE4]"
               showPresentCount={true}
             />
           </div>
 
           {/* Calendar */}
-          <div className="hidden lg:flex bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex-col min-h-0 h-full">
+          <div className="hidden lg:flex bg-white rounded-lg p-5 border border-black/[0.08] flex-col min-h-0 h-full">
             <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-slate-800">Event Calendar</h3>
-                <div className="flex items-center gap-4">
-                    <span className="text-slate-600 font-semibold w-32 text-center">
+                <h3 className="text-sm font-medium text-[#111110]">Event Calendar</h3>
+                <div className="flex items-center gap-3">
+                    <span className="text-sm text-[#111110] font-medium w-32 text-center font-mono">
                         {format(currentDate, 'MMMM yyyy')}
                     </span>
-                    <div className="flex gap-2">
-                        <button onClick={prevMonth} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
-                            <ChevronLeft size={20} />
+                    <div className="flex gap-1">
+                        <button onClick={prevMonth} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#E8E5DC] text-[#6B6860] hover:text-[#111110] transition-colors">
+                            <ChevronLeft size={16} />
                         </button>
-                        <button onClick={nextMonth} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
-                            <ChevronRight size={20} />
+                        <button onClick={nextMonth} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#E8E5DC] text-[#6B6860] hover:text-[#111110] transition-colors">
+                            <ChevronRight size={16} />
                         </button>
                     </div>
                 </div>
@@ -495,13 +499,13 @@ const Dashboard: React.FC = () => {
             <div className="flex-1 flex flex-col relative z-0">
                 <div className="grid grid-cols-7 mb-1">
                     {weekDays.map(day => (
-                        <div key={day} className="text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider py-1.5">
+                        <div key={day} className="text-center text-[10px] font-medium text-[#9A9890] uppercase tracking-wider py-1.5 font-mono">
                             {day}
                         </div>
                     ))}
                 </div>
                 
-                <div className="relative grid grid-cols-7 auto-rows-fr gap-px bg-slate-100 border border-slate-100 rounded-2xl overflow-hidden flex-1">
+                <div className="relative grid grid-cols-7 auto-rows-fr gap-px bg-black/[0.06] border border-black/[0.08] rounded-lg overflow-hidden flex-1">
                     {calendarDays.map((day, idx) => {
                         const isCurrentMonth = isSameMonth(day, monthStart);
                         const isTodayDate = isToday(day);
@@ -578,20 +582,20 @@ const Dashboard: React.FC = () => {
                                 key={idx} 
                                 className={`
                                     min-h-[82px] flex flex-col relative group
-                                    ${isCurrentMonth ? 'bg-white' : 'bg-slate-50/50 text-slate-300'}
-                                    ${isTodayDate ? '!bg-indigo-50/30' : ''}
-                                    transition-colors hover:bg-slate-50
+                                    ${isCurrentMonth ? 'bg-white' : 'bg-[#F5F3EE]/60 text-[#C5C2BA]'}
+                                    ${isTodayDate ? '!bg-[#4B3FE4]/[0.04]' : ''}
+                                    transition-colors hover:bg-[#F5F3EE]
                                 `}
                                 style={{ zIndex: calendarDays.length - idx }}
                             >
                                 <div className="text-xs font-medium p-1.5 flex justify-between items-center">
                                     <span className={`
-                                        w-6 h-6 flex items-center justify-center rounded-full transition-all text-[11px]
-                                        ${isTodayDate 
-                                            ? 'bg-[#4322A7] text-white font-bold shadow-md' 
-                                            : hasEvents && isCurrentMonth 
-                                                ? 'bg-indigo-100 text-[#4322A7] font-bold' 
-                                                : 'text-slate-500 group-hover:bg-slate-200'
+                                        w-6 h-6 flex items-center justify-center rounded-full transition-all text-[11px] font-mono
+                                        ${isTodayDate
+                                            ? 'bg-[#4B3FE4] text-white font-semibold'
+                                            : hasEvents && isCurrentMonth
+                                                ? 'bg-[#4B3FE4]/10 text-[#4B3FE4] font-semibold'
+                                                : 'text-[#6B6860] group-hover:bg-[#E8E5DC]'
                                         }
                                     `}>
                                         {format(day, 'd')}
@@ -612,17 +616,17 @@ const Dashboard: React.FC = () => {
 
         {/* Right Column - Event Lists */}
         <div className="w-full lg:w-1/3 flex flex-col gap-4 lg:min-h-0">
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col gap-5 lg:grid lg:grid-rows-2 lg:gap-4 lg:min-h-0 lg:h-full lg:overflow-hidden">
+          <div className="bg-white rounded-lg p-4 border border-black/[0.08] flex flex-col gap-5 lg:grid lg:grid-rows-2 lg:gap-4 lg:min-h-0 lg:h-full lg:overflow-hidden">
             {/* Ongoing Events */}
             <div className="hidden lg:flex lg:min-h-0">
               <EventSection
                 title="On-Going Events"
                 icon={Clock}
-                iconColor="text-[#4322A7]"
+                iconColor="text-[#4B3FE4]"
                 events={ongoingEvents}
                 displayedEvents={ongoingEvents}
                 emptyText="No on-going events."
-                accentColor="text-[#4322A7]"
+                accentColor="text-[#4B3FE4]"
                 showPresentCount={true}
                 scrollable={true}
                 className="flex-1"
@@ -634,11 +638,11 @@ const Dashboard: React.FC = () => {
               <EventSection
                 title="Upcoming Events"
                 icon={CalendarIcon}
-                iconColor="text-[#4099FF]"
+                iconColor="text-blue-600"
                 events={upcomingEvents}
                 displayedEvents={mobileDisplayedUpcomingEvents}
                 emptyText="No upcoming events."
-                accentColor="text-[#4099FF]"
+                accentColor="text-blue-600"
                 showPresentCount={false}
               />
             </div>
@@ -646,11 +650,11 @@ const Dashboard: React.FC = () => {
               <EventSection
                 title="Upcoming Events"
                 icon={CalendarIcon}
-                iconColor="text-[#4099FF]"
+                iconColor="text-blue-600"
                 events={upcomingEvents}
                 displayedEvents={upcomingEvents}
                 emptyText="No upcoming events."
-                accentColor="text-[#4099FF]"
+                accentColor="text-blue-600"
                 showPresentCount={false}
                 scrollable={true}
                 className="flex-1"
@@ -661,7 +665,7 @@ const Dashboard: React.FC = () => {
       </div>
       {hoveredCalendarEvent && createPortal(
         <div
-          className="fixed z-[200] w-[400px] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl"
+          className="fixed z-[200] w-[400px] rounded-lg border border-black/10 bg-white p-4 shadow-xl"
           style={{
             left: hoveredCalendarEvent.left,
             top: hoveredCalendarEvent.top
