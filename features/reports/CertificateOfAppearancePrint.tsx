@@ -75,15 +75,17 @@ const preloadCertificateAssets = async (extraUrls: Array<string | null | undefin
   ].filter((url): url is string => !!url);
 
   await Promise.all(
-    urls.map(
-      (url) =>
-        new Promise<void>((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-          img.src = url;
-        })
-    )
+    urls.map(async (url) => {
+      try {
+        const img = new Image();
+        img.src = url;
+        // decode() waits until the image is fully decoded (not just fetched), so
+        // html-to-image doesn't capture before the bitmap is ready to draw.
+        await img.decode();
+      } catch {
+        /* missing/undecodable image — capture proceeds without it */
+      }
+    })
   );
 };
 

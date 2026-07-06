@@ -257,9 +257,14 @@ const createPdfBlob = async (jpegBlob: Blob, paperSize: CoPPaperSize) => {
 
 const preloadImages = async (urls: Array<string|null|undefined>) => {
   const all = ['/assets/dilg_logo.png','/assets/bagong_pilipinas_logo.png',...urls].filter((u):u is string=>!!u);
-  await Promise.all(all.map(url=>new Promise<void>(res=>{
-    const img=new Image(); img.onload=()=>res(); img.onerror=()=>res(); img.src=url;
-  })));
+  await Promise.all(all.map(async url=>{
+    try {
+      const img=new Image(); img.src=url;
+      // decode() waits until the image is fully decoded (not just fetched), so
+      // html-to-image doesn't capture before the bitmap is ready to draw.
+      await img.decode();
+    } catch { /* missing/undecodable image — capture proceeds without it */ }
+  }));
 };
 
 // ─── Settings Modal ───────────────────────────────────────────────────────────
