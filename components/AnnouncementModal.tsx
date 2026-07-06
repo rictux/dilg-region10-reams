@@ -4,6 +4,88 @@ import { FeatureAnnouncement } from '../types/database';
 import { useAuth } from '../contexts/AuthContext';
 import { AlertCircle, CheckCircle, Info, X } from 'lucide-react';
 
+// Presentational card shared by the real login modal and the admin preview in
+// Settings → Announcements, so the preview always matches what users see.
+export type AnnouncementCardData = Pick<FeatureAnnouncement, 'title' | 'description' | 'type'>;
+
+export const AnnouncementModalCard: React.FC<{
+  announcement: AnnouncementCardData;
+  position: number;
+  total: number;
+  onDismiss: () => void;
+  onNext?: () => void;
+  onPrev?: () => void;
+}> = ({ announcement, position, total, onDismiss, onNext, onPrev }) => {
+  const typeIcon = announcement.type === 'warning' ? (
+    <AlertCircle className="w-8 h-8 text-yellow-500" />
+  ) : announcement.type === 'success' ? (
+    <CheckCircle className="w-8 h-8 text-green-500" />
+  ) : (
+    <Info className="w-8 h-8 text-blue-500" />
+  );
+
+  const bgColor = announcement.type === 'warning' ? 'bg-yellow-50 border-yellow-200' :
+                  announcement.type === 'success' ? 'bg-green-50 border-green-200' :
+                  'bg-blue-50 border-blue-200';
+
+  return (
+    <div className={`${bgColor} border rounded-lg shadow-xl max-w-md w-full`}>
+      {/* Header */}
+      <div className="flex items-center justify-between p-6 border-b">
+        <div className="flex items-center gap-3">
+          {typeIcon}
+          <h2 className="text-xl font-semibold text-gray-900">{announcement.title}</h2>
+        </div>
+        <button
+          onClick={onDismiss}
+          className="text-gray-400 hover:text-gray-600 transition"
+          aria-label="Close"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="p-6">
+        <p className="text-gray-700 whitespace-pre-wrap">{announcement.description}</p>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between px-6 py-4 bg-gray-50 border-t rounded-b-lg">
+        <div className="text-sm text-gray-600">
+          {position} of {total}
+        </div>
+
+        <div className="flex gap-2">
+          {position > 1 && (
+            <button
+              onClick={onPrev}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition"
+            >
+              Previous
+            </button>
+          )}
+          {position < total ? (
+            <button
+              onClick={onNext}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition"
+            >
+              Next
+            </button>
+          ) : (
+            <button
+              onClick={onDismiss}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition"
+            >
+              Got It
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AnnouncementModal: React.FC = () => {
   const { user } = useAuth();
   const [announcements, setAnnouncements] = useState<FeatureAnnouncement[]>([]);
@@ -90,75 +172,16 @@ const AnnouncementModal: React.FC = () => {
     return null;
   }
 
-  const current = announcements[currentIndex];
-  const typeIcon = current.type === 'warning' ? (
-    <AlertCircle className="w-8 h-8 text-yellow-500" />
-  ) : current.type === 'success' ? (
-    <CheckCircle className="w-8 h-8 text-green-500" />
-  ) : (
-    <Info className="w-8 h-8 text-blue-500" />
-  );
-
-  const bgColor = current.type === 'warning' ? 'bg-yellow-50 border-yellow-200' :
-                  current.type === 'success' ? 'bg-green-50 border-green-200' :
-                  'bg-blue-50 border-blue-200';
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className={`${bgColor} border rounded-lg shadow-xl max-w-md w-full`}>
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <div className="flex items-center gap-3">
-            {typeIcon}
-            <h2 className="text-xl font-semibold text-gray-900">{current.title}</h2>
-          </div>
-          <button
-            onClick={handleDismiss}
-            className="text-gray-400 hover:text-gray-600 transition"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6">
-          <p className="text-gray-700 whitespace-pre-wrap">{current.description}</p>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 bg-gray-50 border-t rounded-b-lg">
-          <div className="text-sm text-gray-600">
-            {currentIndex + 1} of {announcements.length}
-          </div>
-
-          <div className="flex gap-2">
-            {currentIndex > 0 && (
-              <button
-                onClick={handlePrev}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition"
-              >
-                Previous
-              </button>
-            )}
-            {currentIndex < announcements.length - 1 ? (
-              <button
-                onClick={handleNext}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition"
-              >
-                Next
-              </button>
-            ) : (
-              <button
-                onClick={handleDismiss}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition"
-              >
-                Got It
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+      <AnnouncementModalCard
+        announcement={announcements[currentIndex]}
+        position={currentIndex + 1}
+        total={announcements.length}
+        onDismiss={handleDismiss}
+        onNext={handleNext}
+        onPrev={handlePrev}
+      />
     </div>
   );
 };
