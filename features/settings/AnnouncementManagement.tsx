@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { FeatureAnnouncement, AnnouncementType } from '../../types/database';
-import { Plus, Trash2, Loader2, CheckCircle, AlertCircle, Eye, X } from 'lucide-react';
+import { Plus, Trash2, Loader2, CheckCircle, AlertCircle, Eye, Power, Pencil } from 'lucide-react';
+import { AnnouncementModalCard, AnnouncementCardData } from '../../components/AnnouncementModal';
 
 const AnnouncementManagement: React.FC = () => {
   const { user } = useAuth();
@@ -13,12 +14,17 @@ const AnnouncementManagement: React.FC = () => {
 
   // Form state
   const [showForm, setShowForm] = useState(false);
+  // Announcement id being edited; null means the form creates a new one
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     type: 'info' as AnnouncementType,
     is_active: true
   });
+
+  // Announcement being previewed (saved item or the current draft), null when closed
+  const [previewData, setPreviewData] = useState<AnnouncementCardData | null>(null);
 
   useEffect(() => {
     fetchAnnouncements();
@@ -42,6 +48,35 @@ const AnnouncementManagement: React.FC = () => {
     }
   };
 
+  const resetForm = () => {
+    setFormData({ title: '', description: '', type: 'info', is_active: true });
+    setEditingId(null);
+    setShowForm(false);
+  };
+
+  const handleStartEdit = (announcement: FeatureAnnouncement) => {
+    setFormData({
+      title: announcement.title,
+      description: announcement.description,
+      type: announcement.type,
+      is_active: announcement.is_active
+    });
+    setEditingId(announcement.id);
+    setShowForm(true);
+    setMessage(null);
+  };
+
+  const handleStartCreate = () => {
+    if (showForm && !editingId) {
+      resetForm();
+      return;
+    }
+    setFormData({ title: '', description: '', type: 'info', is_active: true });
+    setEditingId(null);
+    setShowForm(true);
+    setMessage(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !formData.title.trim() || !formData.description.trim()) {
@@ -51,25 +86,40 @@ const AnnouncementManagement: React.FC = () => {
 
     try {
       setSaving(true);
-      const { error } = await supabase
-        .from('feature_announcements')
-        .insert([{
-          title: formData.title,
-          description: formData.description,
-          type: formData.type,
-          is_active: formData.is_active,
-          created_by: user.user_id
-        }]);
 
-      if (error) throw error;
+      if (editingId) {
+        const { error } = await supabase
+          .from('feature_announcements')
+          .update({
+            title: formData.title,
+            description: formData.description,
+            type: formData.type,
+            is_active: formData.is_active
+          })
+          .eq('id', editingId);
 
-      setMessage({ type: 'success', text: 'Announcement created successfully!' });
-      setFormData({ title: '', description: '', type: 'info', is_active: true });
-      setShowForm(false);
+        if (error) throw error;
+        setMessage({ type: 'success', text: 'Announcement updated successfully!' });
+      } else {
+        const { error } = await supabase
+          .from('feature_announcements')
+          .insert([{
+            title: formData.title,
+            description: formData.description,
+            type: formData.type,
+            is_active: formData.is_active,
+            created_by: user.user_id
+          }]);
+
+        if (error) throw error;
+        setMessage({ type: 'success', text: 'Announcement created successfully!' });
+      }
+
+      resetForm();
       await fetchAnnouncements();
     } catch (err) {
-      console.error('Error creating announcement:', err);
-      setMessage({ type: 'error', text: 'Failed to create announcement' });
+      console.error('Error saving announcement:', err);
+      setMessage({ type: 'error', text: editingId ? 'Failed to update announcement' : 'Failed to create announcement' });
     } finally {
       setSaving(false);
     }
@@ -100,6 +150,7 @@ const AnnouncementManagement: React.FC = () => {
         .eq('id', id);
 
       if (error) throw error;
+      if (id === editingId) resetForm();
       await fetchAnnouncements();
       setMessage({ type: 'success', text: 'Announcement deleted' });
     } catch (err) {
@@ -124,7 +175,7 @@ const AnnouncementManagement: React.FC = () => {
           </p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={handleStartCreate}
           disabled={loading}
           className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
         >
@@ -153,6 +204,9 @@ const AnnouncementManagement: React.FC = () => {
       {/* Form */}
       {showForm && (
         <form onSubmit={handleSubmit} className="mb-4 space-y-3 rounded-lg border border-slate-300 bg-white p-4">
+          <h4 className="text-sm font-semibold text-slate-800">
+            {editingId ? 'Edit Announcement' : 'New Announcement'}
+          </h4>
           <div className="space-y-1">
             <label className="block text-xs font-medium text-slate-700">Title</label>
             <input
@@ -211,15 +265,28 @@ const AnnouncementManagement: React.FC = () => {
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating...
+                  {editingId ? 'Saving...' : 'Creating...'}
                 </>
               ) : (
-                'Create Announcement'
+                editingId ? 'Save Changes' : 'Create Announcement'
               )}
             </button>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={() => setPreviewData({
+                title: formData.title.trim() || 'Untitled announcement',
+                description: formData.description.trim() || 'No description yet.',
+                type: formData.type
+              })}
+              disabled={!formData.title.trim() && !formData.description.trim()}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              <Eye className="h-4 w-4" />
+              Preview
+            </button>
+            <button
+              type="button"
+              onClick={resetForm}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
             >
               Cancel
@@ -261,11 +328,33 @@ const AnnouncementManagement: React.FC = () => {
 
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => handleToggleActive(announcement.id, announcement.is_active)}
-                  title={announcement.is_active ? 'Deactivate' : 'Activate'}
+                  onClick={() => setPreviewData(announcement)}
+                  title="Preview as users will see it"
                   className="rounded p-1.5 text-slate-600 transition-colors hover:bg-slate-200"
                 >
                   <Eye className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => handleStartEdit(announcement)}
+                  title="Edit"
+                  className={`rounded p-1.5 transition-colors ${
+                    editingId === announcement.id
+                      ? 'bg-indigo-100 text-indigo-700'
+                      : 'text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => handleToggleActive(announcement.id, announcement.is_active)}
+                  title={announcement.is_active ? 'Deactivate' : 'Activate'}
+                  className={`rounded p-1.5 transition-colors ${
+                    announcement.is_active
+                      ? 'text-green-600 hover:bg-green-100'
+                      : 'text-slate-400 hover:bg-slate-200'
+                  }`}
+                >
+                  <Power className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => handleDelete(announcement.id)}
@@ -279,6 +368,27 @@ const AnnouncementManagement: React.FC = () => {
           ))
         )}
       </div>
+
+      {/* Preview overlay — renders the same card users see at login */}
+      {previewData && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setPreviewData(null)}
+        >
+          <div className="flex w-full max-w-md flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-700 shadow">
+              <Eye className="h-3.5 w-3.5" />
+              Preview — this is how users will see it at login
+            </span>
+            <AnnouncementModalCard
+              announcement={previewData}
+              position={1}
+              total={1}
+              onDismiss={() => setPreviewData(null)}
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 };
