@@ -1040,7 +1040,8 @@ const CertificateOfAppearancePrint: React.FC = () => {
               'CA',
               event.event_name,
               dateString,
-              event.venue || 'To be announced'
+              event.venue || 'To be announced',
+              event.event_id
             );
 
             if (result.success) {
