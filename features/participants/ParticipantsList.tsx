@@ -1169,7 +1169,7 @@ const AttendanceList: React.FC = () => {
           : 'sm:[grid-template-columns:repeat(3,minmax(0,1fr))]';
 
   return (
-    <div className="attendance-page -mt-4 -mb-6 h-[calc(100%+2.5rem)] min-h-0 flex flex-col gap-2 overflow-y-auto md:-mt-6 md:-mb-8 md:h-[calc(100%+3.5rem)] lg:overflow-visible">
+    <div className="attendance-page min-h-0 flex flex-col gap-2 overflow-y-auto -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16">
       <div className="attendance-toolbar">
         <div className="flex w-full flex-col gap-3 sm:gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3 xl:flex-nowrap xl:gap-4">
             <div className="relative w-full sm:mx-auto sm:max-w-[32rem] lg:mx-0 lg:max-w-[32rem] lg:flex-[1.25] xl:max-w-[36rem]" ref={dropdownRef}>
@@ -1267,158 +1267,87 @@ const AttendanceList: React.FC = () => {
                 </div>
             )}
 
-            <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 lg:ml-auto lg:w-[24rem] lg:max-w-none lg:flex-none xl:w-[28rem]">
-                <div className="relative min-w-0 w-full">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                        <Search size={18} />
-                    </div>
-                    <input
-                        type="text"
-                        placeholder="Search by name or office..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full min-w-0 rounded-lg border border-slate-300 bg-white py-1.5 pl-10 pr-12 text-xs font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 sm:py-2 sm:text-sm lg:py-2"
-                    />
-                    {searchQuery && (
-                        <button
-                            type="button"
-                            onClick={() => setSearchQuery('')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
-                        >
-                            Clear
-                        </button>
-                    )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 sm:contents shrink-0">
-                    <button 
-                        onClick={generateReport}
-                        disabled={!selectedEvent || !selectedDate || data.length === 0}
-                        type="button"
-                        aria-label="Export attendance"
-                        title="Export attendance"
-                        className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:h-10 sm:w-10 lg:h-10 lg:w-auto lg:gap-2 lg:px-4 xl:px-5"
-                    >
-                        <Download size={16} />
-                        <span className="hidden lg:inline text-sm">Export</span>
-                    </button>
-                    <button 
-                        onClick={() => setShowAddParticipantModal(true)}
-                        disabled={!selectedEvent}
-                        type="button"
-                        aria-label="Add participant"
-                        title="Add participant"
-                        className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:h-10 sm:w-10 lg:h-10 lg:w-auto lg:gap-2 lg:px-4 xl:px-5"
-                    >
-                        <UserPlus size={16} />
-                        <span className="hidden lg:inline text-sm">Add</span>
-                    </button>
-                </div>
-            </div>
             </div>
         </div>
       </div>
 
-      {/* Stats Cards as Filters */}
-      <div className="attendance-stats w-full -mt-1.5 md:mt-0">
-          <div
-            className={`grid w-full gap-1 sm:gap-3 lg:gap-4 ${statsGridClassName}`}
-          >
-          <button 
-            onClick={() => setFilter('Show All')}
-            className={`min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md border flex flex-col justify-between text-left transition-all duration-150
-                ${filter === 'Show All' ? 'bg-[#E8E5DC]/60 border-black/20' : 'bg-white border-black/[0.08] hover:border-black/20'}`}
-          >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[7px] sm:text-[11px] font-medium text-[#6B6860] uppercase tracking-wide leading-tight">Total</p>
-                  <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Show All' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-600'}`}>
-                    <Users size={10} className="sm:h-3.5 sm:w-3.5" />
+      {/* Filter tabs + search + actions */}
+      <div className="flex w-full flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1 p-1 bg-[#E8E5DC]/50 border border-black/[0.05] rounded-lg">
+              {[
+                  { value: 'Show All', label: 'All', count: totalParticipants, show: true },
+                  { value: 'Present', label: 'Present', count: presentCount, show: true },
+                  { value: 'No Logs', label: 'Not Present', count: notPresentCount, show: true },
+                  { value: 'No PM', label: 'No PM', count: noPmCount, show: hasMultipleSessions },
+                  { value: 'Complete Logs', label: 'Complete', count: completeLogsCount, show: hasMultipleSessions },
+                  { value: 'Accommodation', label: 'Accommodation', count: accommodationCount, show: hasAccommodationFilter },
+              ].filter(tab => tab.show).map(tab => (
+                  <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => setFilter(tab.value)}
+                      className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-xs transition-all ${
+                          filter === tab.value
+                              ? 'bg-white text-[#111110] shadow-sm font-medium border border-black/[0.06]'
+                              : 'text-[#6B6860] hover:text-[#111110]'
+                      }`}
+                  >
+                      {tab.label}
+                      <span className={`font-mono text-[10px] leading-none ${
+                          filter === tab.value
+                              ? 'bg-[#4B3FE4]/10 text-[#4B3FE4] rounded px-1 py-0.5'
+                              : 'text-[#9A9890]'
+                      }`}>
+                          {tab.count}
+                      </span>
+                  </button>
+              ))}
+          </div>
+
+          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 sm:flex-none">
+              <div className="relative min-w-0 w-full max-w-xs">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]">
+                      <Search size={14} />
                   </div>
+                  <input
+                      type="text"
+                      placeholder="Search by name or office..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full min-w-0 h-9 pl-9 pr-12 bg-[#E8E5DC]/50 border border-black/10 rounded-lg text-sm placeholder-[#9A9890] focus:outline-none focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] transition-all"
+                  />
+                  {searchQuery && (
+                      <button
+                          type="button"
+                          onClick={() => setSearchQuery('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                      >
+                          Clear
+                      </button>
+                  )}
               </div>
-              <p className="text-[11px] sm:text-base font-medium font-mono text-slate-800">{totalParticipants}</p>
-          </button>
-
-          <button 
-            onClick={() => setFilter('Present')}
-            className={`min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md border flex flex-col justify-between text-left transition-all duration-150
-                ${filter === 'Present' ? 'bg-green-50 border-green-300' : 'bg-white border-black/[0.08] hover:border-green-200'}`}
-          >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[7px] sm:text-[11px] font-medium text-[#6B6860] uppercase tracking-wide leading-tight">Present</p>
-                  <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Present' ? 'bg-green-200 text-green-700' : 'bg-green-100 text-green-600'}`}>
-                    <UserCheck size={10} className="sm:h-3.5 sm:w-3.5" />
-                  </div>
-              </div>
-              <p className="text-[11px] sm:text-base font-medium font-mono text-green-600">{presentCount}</p>
-          </button>
-
-          <button 
-            onClick={() => setFilter('No Logs')}
-            className={`min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md border flex flex-col justify-between text-left transition-all duration-150
-                ${filter === 'No Logs' ? 'bg-red-50 border-red-300' : 'bg-white border-black/[0.08] hover:border-red-200'}`}
-          >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[7px] sm:text-[11px] font-medium text-[#6B6860] uppercase tracking-wide leading-tight">
-                    <span className="sm:hidden">Absent</span>
-                    <span className="hidden sm:inline">Not Present</span>
-                  </p>
-                  <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'No Logs' ? 'bg-red-200 text-red-700' : 'bg-red-100 text-red-600'}`}>
-                    <UserX size={10} className="sm:h-3.5 sm:w-3.5" />
-                  </div>
-              </div>
-              <p className="text-[11px] sm:text-base font-medium font-mono text-red-600">{notPresentCount}</p>
-          </button>
-
-          {hasMultipleSessions && (
-            <button 
-              onClick={() => setFilter('No PM')}
-              className={`min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md border flex flex-col justify-between text-left transition-all duration-150
-                  ${filter === 'No PM' ? 'bg-amber-50 border-amber-300' : 'bg-white border-black/[0.08] hover:border-amber-200'}`}
-            >
-                <div className="flex justify-between items-start mb-0.5 w-full">
-                    <p className="text-[7px] sm:text-[11px] font-medium text-[#6B6860] uppercase tracking-wide leading-tight">No PM</p>
-                    <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'No PM' ? 'bg-amber-200 text-amber-700' : 'bg-amber-100 text-amber-600'}`}>
-                      <AlertCircle size={10} className="sm:h-3.5 sm:w-3.5" />
-                    </div>
-                </div>
-                <p className="text-[11px] sm:text-base font-medium font-mono text-amber-600">{noPmCount}</p>
-            </button>
-          )}
-
-          {hasMultipleSessions && (
-            <button 
-              onClick={() => setFilter('Complete Logs')}
-              className={`min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md border flex flex-col justify-between text-left transition-all duration-150
-                  ${filter === 'Complete Logs' ? 'bg-[#4B3FE4]/5 border-[#4B3FE4]/40' : 'bg-white border-black/[0.08] hover:border-[#4B3FE4]/30'}`}
-            >
-                <div className="flex justify-between items-start mb-0.5 w-full">
-                    <p className="text-[7px] sm:text-[11px] font-medium text-[#6B6860] uppercase tracking-wide leading-tight">Complete</p>
-                    <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Complete Logs' ? 'bg-indigo-200 text-indigo-700' : 'bg-indigo-100 text-indigo-600'}`}>
-                      <CheckCircle size={10} className="sm:h-3.5 sm:w-3.5" />
-                    </div>
-                </div>
-                <p className="text-[11px] sm:text-base font-medium font-mono text-indigo-600">{completeLogsCount}</p>
-            </button>
-          )}
-
-          {hasAccommodationFilter && (
-            <button
-              onClick={() => setFilter('Accommodation')}
-              className={`min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md border flex flex-col justify-between text-left transition-all duration-150
-                  ${filter === 'Accommodation' ? 'bg-purple-50 border-purple-300' : 'bg-white border-black/[0.08] hover:border-purple-200'}`}
-            >
-                <div className="flex justify-between items-start mb-0.5 w-full">
-                    <p className="text-[7px] sm:text-[11px] font-medium text-[#6B6860] uppercase tracking-wide leading-tight">
-                      <span className="sm:hidden">Accom</span>
-                      <span className="hidden sm:inline">Accommodation</span>
-                    </p>
-                    <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Accommodation' ? 'bg-purple-100 text-[#8B5CF6]' : 'bg-purple-50 text-[#8B5CF6]'}`}>
-                      <Bed size={10} className="sm:h-3.5 sm:w-3.5" />
-                    </div>
-                </div>
-                <p className="text-[11px] sm:text-base font-medium font-mono text-[#8B5CF6]">{accommodationCount}</p>
-            </button>
-          )}
+              <button
+                  onClick={generateReport}
+                  disabled={!selectedEvent || !selectedDate || data.length === 0}
+                  type="button"
+                  aria-label="Export attendance"
+                  title="Export attendance"
+                  className="flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                  <Download size={16} />
+                  <span className="hidden lg:inline">Export</span>
+              </button>
+              <button
+                  onClick={() => setShowAddParticipantModal(true)}
+                  disabled={!selectedEvent}
+                  type="button"
+                  aria-label="Add participant"
+                  title="Add participant"
+                  className="flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#4B3FE4] px-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#3B30C4] disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                  <UserPlus size={16} />
+                  <span className="hidden lg:inline">Add</span>
+              </button>
           </div>
       </div>
 
@@ -1427,45 +1356,29 @@ const AttendanceList: React.FC = () => {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
         </div>
       ) : (
-        <div className="attendance-table bg-white rounded-xl shadow-sm border border-slate-100 overflow-visible lg:overflow-hidden flex-none lg:flex-1 min-h-0 flex flex-col">
-            <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4 lg:px-6">
-                <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
-                    <input
-                        type="checkbox"
-                        checked={allFilteredSelected}
-                        disabled={filteredManualIds.length === 0}
-                        onChange={toggleAllFilteredManualSelection}
-                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
-                    />
-                    Select visible
-                </label>
-                <div className="flex items-center gap-2">
-                    {filter !== 'Show All' && (
-                        <button
-                            type="button"
-                            onClick={() => setFilter('Show All')}
-                            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-200 hover:text-indigo-700"
-                        >
-                            Clear Filter
-                        </button>
-                    )}
-                    <button
-                        type="button"
-                        onClick={openBulkManualModal}
-                        disabled={selectedManualIds.length === 0}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                    >
-                        <Clock size={14} />
-                        Bulk Manual ({selectedManualIds.length})
-                    </button>
-                </div>
+        <>
+        {selectedManualIds.length > 0 && (
+            <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-slate-500">
+                    <span className="font-semibold text-slate-700">{selectedManualIds.length}</span> row{selectedManualIds.length === 1 ? '' : 's'} selected
+                </p>
+                <button
+                    type="button"
+                    onClick={openBulkManualModal}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#4B3FE4] px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#3B30C4]"
+                >
+                    <Clock size={14} />
+                    Bulk Manual ({selectedManualIds.length})
+                </button>
             </div>
-            
-            <div className="hidden lg:block flex-1 min-h-0 overflow-auto">
+        )}
+        <div className="attendance-table bg-white rounded-xl shadow-sm border border-slate-100 overflow-visible flex-none flex flex-col">
+
+            <div className="hidden lg:block">
                 <table className="datatable w-full table-fixed text-[13px] lg:text-sm text-left">
                     <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                         <tr>
-                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-14 bg-slate-50 text-center">
+                            <th className="pl-3 pr-1 py-1.5 lg:pl-4 lg:py-1.5 w-9 bg-slate-50 text-center">
                                 <input
                                     type="checkbox"
                                     checked={allFilteredSelected}
@@ -1474,10 +1387,10 @@ const AttendanceList: React.FC = () => {
                                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
                                 />
                             </th>
-                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-14 bg-slate-50">#</th>
+                            <th className="px-1 py-1.5 lg:py-1.5 w-9 bg-slate-50 text-center">#</th>
                             <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[28%] bg-slate-50">Name</th>
-                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[18%] bg-slate-50">Position</th>
-                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[16%] bg-slate-50">Office</th>
+                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[22%] bg-slate-50">Position</th>
+                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[22%] bg-slate-50">Office</th>
                             {visibleSessions.map((session) => (
                                 <th key={session} className="px-4 py-1.5 lg:px-5 lg:py-1.5 w-[112px] text-center bg-slate-50">
                                     {session} Time
@@ -1493,7 +1406,7 @@ const AttendanceList: React.FC = () => {
                                 onClick={() => handleRowClick(row.participant)}
                                 className="hover:bg-indigo-50 cursor-pointer transition-colors group"
                             >
-                                <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 text-center">
+                                <td className="pl-3 pr-1 py-1.5 lg:pl-4 lg:py-1.5 text-center">
                                     <input
                                         type="checkbox"
                                         checked={selectedManualIds.includes(row.participant.participant_id)}
@@ -1502,7 +1415,7 @@ const AttendanceList: React.FC = () => {
                                         className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                     />
                                 </td>
-                                <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 text-slate-500 font-mono text-xs lg:text-sm">{index + 1}</td>
+                                <td className="px-1 py-1.5 lg:py-1.5 text-center text-slate-500 font-mono text-xs lg:text-sm">{index + 1}</td>
                                 <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 font-medium text-slate-800 group-hover:text-indigo-600">
                                     <div className="flex items-start gap-1.5 whitespace-normal break-words leading-snug">
                                         <span>{row.participant.full_name}</span>
@@ -1677,23 +1590,29 @@ const AttendanceList: React.FC = () => {
                 )}
             </div>
         </div>
+        </>
       )}
 
       {/* Add Participant Modal */}
       {showAddParticipantModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true">
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddParticipantModal(false)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl p-6 relative z-10 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <UserPlus size={20} className="text-indigo-600" />
-                        Add Participant
-                    </h3>
-                    <button onClick={() => setShowAddParticipantModal(false)} className="text-slate-400 hover:text-slate-600">
-                        <X size={24} />
+            <div className="fixed inset-y-0 right-0 flex w-full max-w-[560px] flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-200">
+                <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+                    <div className="min-w-0">
+                        <h3 className="text-lg font-semibold text-slate-900">Add Participant</h3>
+                        {selectedEvent && (
+                            <p className="text-xs text-slate-500 mt-0.5 truncate">{selectedEvent.event_name}</p>
+                        )}
+                    </div>
+                    <button
+                        onClick={() => setShowAddParticipantModal(false)}
+                        className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-full transition-all shrink-0"
+                    >
+                        <X size={18} />
                     </button>
                 </div>
-                <div className="max-w-2xl mx-auto w-full">
+                <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
                     <form onSubmit={handleAddParticipant} className="space-y-10">
                         {/* SECTION: Personal Information */}
                         <div className="space-y-6">

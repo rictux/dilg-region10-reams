@@ -142,7 +142,7 @@ const EventsList: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [eventView, setEventView] = useState<'active' | 'deleted'>('active');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 9;
   const navigate = useNavigate();
   
   // Modal States
@@ -2000,6 +2000,21 @@ const EventsList: React.FC = () => {
   // Stats Logic
   const totalCount = viewingParticipants.length;
   const delegateCount = viewingParticipants.filter(p => p.role === 'Delegate').length;
+  const needsAccommodationCount = viewingParticipants.filter(p => p.needs_accommodation).length;
+  const noPhotoConsentCount = viewingParticipants.filter(p => !p.accept_photo_video).length;
+  const noStoreConsentCount = viewingParticipants.filter(p => !p.store_to_db).length;
+
+  // Participant list segmented filter (single-select)
+  const activeParticipantFilter =
+    accommodationFilter === 'with' ? 'accommodation'
+    : photoConsentFilter === 'declined' ? 'noPhoto'
+    : storeConsentFilter === 'declined' ? 'noStore'
+    : 'all';
+  const applyParticipantFilter = (value: string) => {
+    setAccommodationFilter(value === 'accommodation' ? 'with' : 'all');
+    setPhotoConsentFilter(value === 'noPhoto' ? 'declined' : 'all');
+    setStoreConsentFilter(value === 'noStore' ? 'declined' : 'all');
+  };
   const secretariatCount = viewingParticipants.filter(p => p.role === 'Secretariat').length;
   const speakerCount = viewingParticipants.filter(p => p.role === 'Speaker').length;
   const guestVipCount = viewingParticipants.filter(p => p.role === 'Guest' || p.role === 'VIP').length;
@@ -2070,22 +2085,34 @@ const EventsList: React.FC = () => {
   const participantTableHead = (
     <thead className="bg-slate-50/70 text-slate-500 text-xs">
       <tr className="border-b border-slate-100">
-        <th className="px-4 sm:px-6 py-3 font-medium">Name</th>
+        <th className="hidden md:table-cell pl-3 sm:pl-4 pr-1 py-3 font-medium w-8 text-center">#</th>
+        <th className="px-3 sm:px-4 py-3 font-medium w-[22%]">Name</th>
         <th className="px-4 py-3 font-medium">Role</th>
-        <th className="hidden md:table-cell px-4 py-3 font-medium">Gender</th>
-        <th className="hidden md:table-cell px-4 py-3 font-medium">Office</th>
-        <th className="hidden lg:table-cell px-4 py-3 font-medium">Registered</th>
+        <th className="hidden md:table-cell px-4 py-3 font-medium w-20">Gender</th>
+        <th className="hidden md:table-cell px-4 py-3 font-medium w-[30%]">Office</th>
+        <th className="hidden lg:table-cell px-4 py-3 font-medium w-28">Registered</th>
         {canManageParticipants && <th className="px-4 sm:px-6 py-3 font-medium text-right">Action</th>}
       </tr>
     </thead>
   );
 
-  const renderParticipantRow = (record: ParticipantModalRecord) => {
+  const renderParticipantRow = (record: ParticipantModalRecord, index: number) => {
     const isEditing = editingRole?.participantId === record.participant_id;
     return (
       <tr key={record.id} className="hover:bg-slate-50/60">
-        <td className="px-4 sm:px-6 py-3">
-          <div className="font-medium text-slate-800">{record.participants?.full_name}</div>
+        <td className="hidden md:table-cell pl-3 sm:pl-4 pr-1 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
+        <td className="px-3 sm:px-4 py-3">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-medium text-slate-800 truncate">{record.participants?.full_name}</span>
+            {record.needs_accommodation && (
+              <span
+                className="shrink-0 rounded-full bg-purple-100 p-1 text-purple-700"
+                title={`Accommodation — ${Math.max(1, record.accommodation_pax || 1)} pax`}
+              >
+                <Bed size={11} />
+              </span>
+            )}
+          </div>
         </td>
         <td className="px-4 py-3">
           {isEditing ? (
@@ -2132,11 +2159,6 @@ const EventsList: React.FC = () => {
                 </button>
               )}
             </div>
-          )}
-          {record.needs_accommodation && (
-            <span className="text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded flex items-center w-fit gap-1 mt-1">
-              <Bed size={8} /> Stay ({Math.max(1, record.accommodation_pax || 1)} pax)
-            </span>
           )}
         </td>
         <td className="hidden md:table-cell px-4 py-3 text-slate-600">{record.participants?.gender || '—'}</td>
@@ -2291,9 +2313,61 @@ const EventsList: React.FC = () => {
 
   return (
     <div className="h-full min-h-0 flex flex-col gap-6">
-      {!(showParticipantsModal && selectedEvent) && (<>
+      {!(showParticipantsModal && selectedEvent) && (
+      <div className="flex-1 min-h-0 overflow-y-auto -m-4 md:-m-6 p-4 md:py-8 md:px-12 lg:px-16 flex flex-col gap-6">
+      {/* Page header */}
+      <div className="flex items-start justify-between gap-3 w-full">
+        <div>
+          <h1 className="text-2xl font-semibold text-[#111110] leading-tight">Events</h1>
+          <p className="text-sm text-[#6B6860] mt-0.5">
+            {eventView === 'deleted'
+              ? `${eventSummary.total} deleted event${eventSummary.total === 1 ? '' : 's'}`
+              : `${eventSummary.total} event${eventSummary.total === 1 ? '' : 's'} total`}
+          </p>
+        </div>
+        <button
+            onClick={openCreateModal}
+            type="button"
+            className="h-9 shrink-0 bg-[#4B3FE4] hover:bg-[#3B30C4] text-white text-sm font-medium rounded-md flex items-center gap-1.5 px-3 transition-colors"
+        >
+            <CalendarPlus size={15} />
+            <span className="hidden sm:inline">New Event</span>
+        </button>
+      </div>
+
+      {/* Filter tabs + search */}
       <div className="flex flex-wrap items-center gap-3 w-full">
-        <div className="relative min-w-[220px] flex-1 lg:flex-none lg:w-[30%]">
+        <div className="flex flex-wrap items-center gap-1 p-1 bg-[#E8E5DC]/50 border border-black/[0.05] rounded-lg">
+          {[
+            { value: 'All', label: 'All', count: eventSummary.total },
+            { value: 'Ongoing', label: 'Ongoing', count: eventSummary.ongoing },
+            { value: 'Scheduled', label: 'Upcoming', count: eventSummary.scheduled },
+            { value: 'Completed', label: 'Completed', count: eventSummary.completed },
+            { value: 'Cancelled', label: 'Cancelled', count: eventSummary.cancelled },
+          ].map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setStatusFilter(tab.value)}
+              className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-xs transition-all ${
+                statusFilter === tab.value
+                  ? 'bg-white text-[#111110] shadow-sm font-medium border border-black/[0.06]'
+                  : 'text-[#6B6860] hover:text-[#111110]'
+              }`}
+            >
+              {tab.label}
+              <span className={`font-mono text-[10px] leading-none ${
+                statusFilter === tab.value
+                  ? 'bg-[#4B3FE4]/10 text-[#4B3FE4] rounded px-1 py-0.5'
+                  : 'text-[#9A9890]'
+              }`}>
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="relative min-w-[220px] flex-1 lg:flex-none lg:w-[30%] ml-auto">
             <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9A9890]">
               <Search size={14} />
             </div>
@@ -2302,7 +2376,7 @@ const EventsList: React.FC = () => {
               placeholder="Filter events..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-8 pr-16 h-9 bg-white border border-black/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] transition-colors"
+              className="w-full pl-8 pr-16 h-9 bg-[#E8E5DC]/50 border border-black/10 rounded-md text-sm placeholder-[#9A9890] focus:outline-none focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] transition-colors"
             />
             {searchTerm && (
               <button
@@ -2348,119 +2422,17 @@ const EventsList: React.FC = () => {
             </button>
           </div>
         )}
-        <button
-            onClick={openCreateModal}
-            type="button"
-            aria-label="Add event"
-            title="Add event"
-            className="ml-auto h-9 w-9 sm:h-9 sm:w-auto shrink-0 bg-[#4B3FE4] hover:bg-[#3B30C4] text-white text-sm font-medium rounded-md flex items-center justify-center gap-1.5 px-0 sm:px-3 transition-colors"
-        >
-            <CalendarPlus size={15} />
-            <span className="hidden sm:inline">New Event</span>
-        </button>
       </div>
 
-      <div className="w-full">
-        <div className="grid grid-cols-5 gap-2 sm:gap-3 w-full">
-          <button
-            onClick={() => setStatusFilter('All')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-md border text-left transition-all min-w-0 ${
-              statusFilter === 'All'
-                ? 'bg-[#E8E5DC]/60 border-black/20'
-                : 'bg-white border-black/[0.08] hover:border-black/20'
-            }`}
-          >
-              <CalendarPlus size={13} className="text-[#6B6860] shrink-0 hidden sm:block" />
-              <span className="text-sm font-medium font-mono text-[#111110]">{eventSummary.total}</span>
-              <span className="text-[10px] sm:text-xs text-[#6B6860] truncate">
-                <span className="sm:hidden">Total</span>
-                <span className="hidden sm:inline">{eventView === 'deleted' ? 'Deleted' : 'Total'}</span>
-              </span>
-          </button>
 
-          <button
-            onClick={() => setStatusFilter('Ongoing')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-md border text-left transition-all min-w-0 ${
-              statusFilter === 'Ongoing'
-                ? 'bg-emerald-50 border-emerald-300'
-                : 'bg-white border-black/[0.08] hover:border-emerald-200'
-            }`}
-          >
-              <Clock size={13} className="text-emerald-600 shrink-0 hidden sm:block" />
-              <span className="text-sm font-medium font-mono text-emerald-700">{eventSummary.ongoing}</span>
-              <span className="text-[10px] sm:text-xs text-[#6B6860] truncate">Ongoing</span>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('Scheduled')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-md border text-left transition-all min-w-0 ${
-              statusFilter === 'Scheduled'
-                ? 'bg-blue-50 border-blue-300'
-                : 'bg-white border-black/[0.08] hover:border-blue-200'
-            }`}
-          >
-              <Calendar size={13} className="text-blue-600 shrink-0 hidden sm:block" />
-              <span className="text-sm font-medium font-mono text-blue-700">{eventSummary.scheduled}</span>
-              <span className="text-[10px] sm:text-xs text-[#6B6860] truncate">
-                <span className="sm:hidden">Sched.</span>
-                <span className="hidden sm:inline">Scheduled</span>
-              </span>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('Completed')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-md border text-left transition-all min-w-0 ${
-              statusFilter === 'Completed'
-                ? 'bg-[#4B3FE4]/5 border-[#4B3FE4]/40'
-                : 'bg-white border-black/[0.08] hover:border-[#4B3FE4]/30'
-            }`}
-          >
-              <Check size={13} className="text-[#4B3FE4] shrink-0 hidden sm:block" />
-              <span className="text-sm font-medium font-mono text-[#4B3FE4]">{eventSummary.completed}</span>
-              <span className="text-[10px] sm:text-xs text-[#6B6860] truncate">
-                <span className="sm:hidden">Done</span>
-                <span className="hidden sm:inline">Completed</span>
-              </span>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('Cancelled')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-md border text-left transition-all min-w-0 ${
-              statusFilter === 'Cancelled'
-                ? 'bg-red-50 border-red-300'
-                : 'bg-white border-black/[0.08] hover:border-red-200'
-            }`}
-          >
-              <XCircle size={13} className="text-red-500 shrink-0 hidden sm:block" />
-              <span className="text-sm font-medium font-mono text-red-600">{eventSummary.cancelled}</span>
-              <span className="text-[10px] sm:text-xs text-[#6B6860] truncate">
-                <span className="sm:hidden">Cancel</span>
-                <span className="hidden sm:inline">Cancelled</span>
-              </span>
-          </button>
-        </div>
-      </div>
-
-      <div className="flex-1 min-h-0 flex flex-col gap-3">
+      <div className="flex flex-col gap-3">
           {eventView === 'deleted' && (
               <div className="px-4 py-3 bg-red-50 border border-red-100 rounded-md flex items-center gap-2 text-sm text-red-700 shrink-0">
                   <Trash2 size={14} />
                   <span>Deleted Events view. Admins can restore events or permanently delete them.</span>
               </div>
           )}
-          {statusFilter !== 'All' && (
-              <div className="px-4 py-3 bg-white border border-black/[0.08] rounded-md flex items-center gap-2 text-sm text-slate-600 shrink-0">
-                  <Clock size={14} />
-                  <span>Filtering by: <span className="font-bold text-slate-800">{statusFilter}</span></span>
-                  <button
-                      onClick={() => setStatusFilter('All')}
-                      className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                  >
-                      Clear Filter
-                  </button>
-              </div>
-          )}
-          <div className="hidden md:block flex-1 min-h-0 overflow-y-auto pr-1">
+          <div className="hidden md:block">
               {loading ? (
                   <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
                       {[...Array(6)].map((_, i) => (
@@ -2642,7 +2614,7 @@ const EventsList: React.FC = () => {
               )}
           </div>
 
-          <div className="md:hidden flex-1 min-h-0 overflow-y-auto space-y-3">
+          <div className="md:hidden space-y-3">
               {loading ? (
                   [...Array(3)].map((_, i) => (
                       <div key={i} className="animate-pulse rounded-xl border border-slate-200 p-4 space-y-3">
@@ -2856,7 +2828,8 @@ const EventsList: React.FC = () => {
               </div>
           )}
       </div>
-      </>)}
+      </div>
+      )}
 
       {/* Share / Registration Modal */}
       {showShareModal && selectedEvent && (
@@ -2928,23 +2901,18 @@ const EventsList: React.FC = () => {
 
       {/* Event Details View (in-page, replaces the old participants modal) */}
       {showParticipantsModal && selectedEvent && (
-        <div className="flex-1 min-h-0 overflow-y-auto animate-in fade-in duration-150">
+        <div className="flex-1 min-h-0 overflow-y-auto animate-in fade-in duration-150 -m-4 md:-m-6 p-4 md:py-8 md:px-12 lg:px-16">
             {/* Page header */}
             <div className="mb-4">
                 <button
-                    onClick={
-                        participantModalView === 'list'
-                            ? closeParticipantsModal
-                            : () => { setParticipantModalView('list'); resetParticipantForm(); }
-                    }
+                    onClick={closeParticipantsModal}
                     className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors w-fit"
                 >
                     <ArrowRight size={15} className="rotate-180" />
-                    {participantModalView === 'list' ? 'Events' : 'Back to participants'}
+                    Events
                 </button>
 
-                {participantModalView === 'list' ? (
-                    <>
+                <>
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mt-4">
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 mb-2">
@@ -3008,65 +2976,40 @@ const EventsList: React.FC = () => {
                                 </span>
                             )}
                         </div>
-                    </>
-                ) : (
-                    <h1 className="text-xl font-semibold text-slate-900 mt-4 flex items-center gap-2">
-                        {participantModalView === 'edit' ? (
-                            <><Edit className="text-[#4B3FE4]" size={20} /> Edit Participant</>
-                        ) : (
-                            <><UserPlus className="text-[#4B3FE4]" size={20} /> Add Participant</>
-                        )}
-                    </h1>
-                )}
+                </>
             </div>
 
             <div>
 
-                {participantModalView === 'list' && (
-                    <div className="bg-white border border-black/[0.08] rounded-lg px-4 sm:px-6 py-3 mb-4">
+                <div className="mb-4">
                         <div className="flex items-center justify-end gap-2 flex-wrap">
-                            <div className="mr-auto flex items-center gap-2 flex-wrap">
-                                {selectedEvent?.has_accommodation && (
+                            <div className="mr-auto flex flex-wrap items-center gap-1 p-1 bg-[#E8E5DC]/50 border border-black/[0.05] rounded-lg">
+                                {[
+                                    { value: 'all', label: 'All', count: totalCount, show: true },
+                                    { value: 'accommodation', label: 'Accommodation', count: needsAccommodationCount, show: !!selectedEvent?.has_accommodation },
+                                    { value: 'noPhoto', label: 'No Photo/Video', count: noPhotoConsentCount, show: true },
+                                    { value: 'noStore', label: 'No Data Storage', count: noStoreConsentCount, show: true },
+                                ].filter(tab => tab.show).map(tab => (
                                     <button
+                                        key={tab.value}
                                         type="button"
-                                        onClick={() => setAccommodationFilter(accommodationFilter === 'with' ? 'all' : 'with')}
-                                        aria-pressed={accommodationFilter === 'with'}
-                                        title="Show only participants needing accommodation"
-                                        className={`shrink-0 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 border transition-colors shadow-sm ${
-                                            accommodationFilter === 'with'
-                                                ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700'
-                                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                        onClick={() => applyParticipantFilter(tab.value)}
+                                        className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-xs transition-all ${
+                                            activeParticipantFilter === tab.value
+                                                ? 'bg-white text-[#111110] shadow-sm font-medium border border-black/[0.06]'
+                                                : 'text-[#6B6860] hover:text-[#111110]'
                                         }`}
                                     >
-                                        <Bed size={16} /> Has Accommodation
+                                        {tab.label}
+                                        <span className={`font-mono text-[10px] leading-none ${
+                                            activeParticipantFilter === tab.value
+                                                ? 'bg-[#4B3FE4]/10 text-[#4B3FE4] rounded px-1 py-0.5'
+                                                : 'text-[#9A9890]'
+                                        }`}>
+                                            {tab.count}
+                                        </span>
                                     </button>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={() => setPhotoConsentFilter(photoConsentFilter === 'declined' ? 'all' : 'declined')}
-                                    aria-pressed={photoConsentFilter === 'declined'}
-                                    title="Show only participants who did not accept photo/video"
-                                    className={`shrink-0 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 border transition-colors shadow-sm ${
-                                        photoConsentFilter === 'declined'
-                                            ? 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700'
-                                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                                    }`}
-                                >
-                                    <CameraOff size={16} /> No Photo/Video
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setStoreConsentFilter(storeConsentFilter === 'declined' ? 'all' : 'declined')}
-                                    aria-pressed={storeConsentFilter === 'declined'}
-                                    title="Show only participants who did not consent to store their data"
-                                    className={`shrink-0 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 border transition-colors shadow-sm ${
-                                        storeConsentFilter === 'declined'
-                                            ? 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700'
-                                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                                    }`}
-                                >
-                                    <DatabaseBackup size={16} /> No Data Storage
-                                </button>
+                                ))}
                             </div>
                             <div className="relative w-full max-w-xs">
                                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
@@ -3077,7 +3020,7 @@ const EventsList: React.FC = () => {
                                     placeholder="Search participant..."
                                     value={participantSearchTerm}
                                     onChange={(e) => setParticipantSearchTerm(e.target.value)}
-                                    className="w-full pl-9 pr-14 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    className="w-full pl-9 pr-14 py-2 bg-[#E8E5DC]/50 border border-black/10 rounded-lg text-sm placeholder-[#9A9890] focus:outline-none focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] transition-all"
                                 />
                                 {participantSearchTerm && (
                                     <button
@@ -3098,13 +3041,11 @@ const EventsList: React.FC = () => {
                                 <Download size={16} /> Export
                             </button>
                         </div>
-                    </div>
-                )}
+                </div>
 
                 {/* Content */}
                 <div>
-                    {participantModalView === 'list' ? (
-                        loadingParticipants ? (
+                    {loadingParticipants ? (
                         <div className="py-16 flex items-center justify-center text-slate-400 gap-2">
                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div> Loading participants...
                         </div>
@@ -3144,8 +3085,33 @@ const EventsList: React.FC = () => {
                                 </div>
                             )}
                         </>
-                    )) : (
-                        <div className="bg-white border border-black/[0.08] rounded-lg p-6 max-w-2xl mx-auto w-full">
+                    )}
+                </div>
+
+                {/* Add / Edit Participant side drawer */}
+                {(participantModalView === 'add' || participantModalView === 'edit') && (
+                <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+                    <div
+                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+                        aria-hidden="true"
+                        onClick={() => { setParticipantModalView('list'); resetParticipantForm(); }}
+                    ></div>
+                    <div className="fixed inset-y-0 right-0 flex w-full max-w-[560px] flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-200">
+                        <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+                            <div className="min-w-0">
+                                <h3 className="text-lg font-semibold text-slate-900">
+                                    {participantModalView === 'edit' ? 'Edit Participant' : 'Add Participant'}
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-0.5 truncate">{selectedEvent.event_name}</p>
+                            </div>
+                            <button
+                                onClick={() => { setParticipantModalView('list'); resetParticipantForm(); }}
+                                className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-full transition-all shrink-0"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
                             <form onSubmit={participantModalView === 'edit' ? handleUpdateParticipantDetails : handleAddParticipant} className="space-y-10">
                                 {/* SECTION: Personal Information */}
                                 <div className="space-y-6">
@@ -3606,12 +3572,12 @@ const EventsList: React.FC = () => {
                                 </div>
                             </form>
                         </div>
-                    )}
+                    </div>
                 </div>
+                )}
                 
                 {/* Footer stats */}
-                {participantModalView === 'list' && (
-                    <div className="p-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 rounded-b-xl grid grid-cols-3 gap-3">
+                <div className="p-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 rounded-b-xl grid grid-cols-3 gap-3">
                          <div className="flex min-w-0 flex-col justify-end">
                             <span className="text-[10px] sm:text-xs uppercase text-slate-400 font-bold leading-tight">Total Participants</span>
                             <span className="text-lg sm:text-xl font-bold text-slate-800">{totalCount}</span>
@@ -3627,8 +3593,7 @@ const EventsList: React.FC = () => {
                                 <span className="text-[10px] sm:text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">Pax Requested</span>
                             </div>
                         </div>
-                    </div>
-                )}
+                </div>
             </div>
         </div>
       )}
