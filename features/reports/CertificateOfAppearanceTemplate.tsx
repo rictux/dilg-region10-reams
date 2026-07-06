@@ -1,6 +1,6 @@
 import React from 'react';
 import QRCode from 'react-qr-code';
-import { eachDayOfInterval, format, parseISO } from 'date-fns';
+import { differenceInCalendarDays, eachDayOfInterval, format, parseISO } from 'date-fns';
 import { Event, Participant } from '../../types/database';
 
 export type CertificateTemplateVariant = 'with_serial' | 'without_serial';
@@ -109,6 +109,83 @@ const formatFoodInclusion = (meals: string[]) => {
   return meals.length > 0 ? meals.join(', ') : '-';
 };
 
+type CertificateTableRow = {
+  key: string;
+  label: string;
+  meals: string[];
+  hasAccommodation: boolean;
+};
+
+// Enumerates grouped dates, e.g. "June 22, 23, 24, and 25, 2026"; the month is
+// repeated only when it changes (e.g. "June 29, 30, and July 1, 2026").
+const formatDateListLabel = (keys: string[]) => {
+  const dates = keys.map((key) => parseISO(key));
+  const parts = dates.map((date, index) => {
+    const previous = dates[index - 1];
+    const monthChanged =
+      !previous ||
+      date.getMonth() !== previous.getMonth() ||
+      date.getFullYear() !== previous.getFullYear();
+    return monthChanged ? format(date, 'MMMM d') : format(date, 'd');
+  });
+  const list =
+    parts.length === 2
+      ? `${parts[0]} and ${parts[1]}`
+      : `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;
+  return `${list}, ${format(dates[dates.length - 1], 'yyyy')}`;
+};
+
+const buildCertificateTableRows = (
+  event: Event,
+  participantRecord: CertificateParticipantRecord,
+  eventFoodInclusionMap: Record<string, string[]>,
+  eventAccommodationDates: Set<string>
+): CertificateTableRow[] => {
+  const baseRows: CertificateTableRow[] = getParticipantDateRows(event, participantRecord).map((row) => ({
+    key: row.key,
+    label: row.label,
+    meals: eventFoodInclusionMap[row.key] || [],
+    hasAccommodation:
+      participantRecord.needs_accommodation &&
+      participantRecord.date_accommodation
+        .filter((date) => eventAccommodationDates.has(date))
+        .includes(row.key)
+  }));
+
+  // Keep one row per day for short tables; only collapse when the table would
+  // otherwise crowd the certificate (more than 3 rows).
+  if (baseRows.length <= 3) return baseRows;
+
+  const groups: CertificateTableRow[][] = [];
+  baseRows.forEach((row) => {
+    const currentGroup = groups[groups.length - 1];
+    const previousRow = currentGroup?.[currentGroup.length - 1];
+    const isConsecutiveDay =
+      !!previousRow && differenceInCalendarDays(parseISO(row.key), parseISO(previousRow.key)) === 1;
+    const hasSameInclusions =
+      !!previousRow &&
+      previousRow.meals.join('|') === row.meals.join('|') &&
+      previousRow.hasAccommodation === row.hasAccommodation;
+
+    if (previousRow && isConsecutiveDay && hasSameInclusions) {
+      currentGroup.push(row);
+    } else {
+      groups.push([row]);
+    }
+  });
+
+  return groups.map((group) => {
+    const first = group[0];
+    if (group.length === 1) return first;
+    const last = group[group.length - 1];
+    return {
+      ...first,
+      key: `${first.key}_${last.key}`,
+      label: formatDateListLabel(group.map((row) => row.key))
+    };
+  });
+};
+
 const DEFAULT_CERTIFICATE_HEADER = 'REGION X - NORTHERN MINDANAO';
 
 const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
@@ -121,13 +198,13 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
   templateVariant,
   showDivider = false
 }) => {
-  const participantDateRows = getParticipantDateRows(event, participantRecord);
-  const tableRowCount = participantDateRows.length + 1;
+  const eventAccommodationDates = new Set(getEventAccommodationDates(event));
+  const tableRows = buildCertificateTableRows(event, participantRecord, eventFoodInclusionMap, eventAccommodationDates);
+  const tableRowCount = tableRows.length + 1;
   const layoutMode = getCertificateLayoutMode(tableRowCount);
   const isDenseLayout = layoutMode !== 'default';
   const isCompactLayout = layoutMode === 'compact' || layoutMode === 'ultraCompact';
   const isUltraCompactLayout = layoutMode === 'ultraCompact';
-  const eventAccommodationDates = new Set(getEventAccommodationDates(event));
   const selectedTemplateVariant = resolveCertificateTemplateVariant(templateVariant ?? signatory?.certificate_template_variant);
   const shouldShowSerialNumber = selectedTemplateVariant === 'with_serial' && !!certificateSerialNumber;
   const certificateHeader = signatory?.header?.trim() || DEFAULT_CERTIFICATE_HEADER;
@@ -325,30 +402,21 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {participantDateRows.map((dateRow) => {
-                  const hasAccommodationOnDate =
-                    participantRecord.needs_accommodation &&
-                    participantRecord.date_accommodation
-                      .filter((date) => eventAccommodationDates.has(date))
-                      .includes(dateRow.key);
-                  const mealsForDate = eventFoodInclusionMap[dateRow.key] || [];
-
-                  return (
-                    <tr key={`${participantRecord.participant.participant_id}-${dateRow.key}`}>
+                {tableRows.map((row) => (
+                  <tr key={`${participantRecord.participant.participant_id}-${row.key}`}>
+                    <td className={`${tableBodyPaddingClass} border border-black ${tableCellPaddingClass} text-center align-top`}>
+                      {row.label}
+                    </td>
+                    <td className={`${tableBodyPaddingClass} border border-black ${tableCellPaddingClass} text-center align-top`}>
+                      {formatFoodInclusion(row.meals)}
+                    </td>
+                    {participantRecord.needs_accommodation && (
                       <td className={`${tableBodyPaddingClass} border border-black ${tableCellPaddingClass} text-center align-top`}>
-                        {dateRow.label}
+                        {row.hasAccommodation ? 'Provided' : '-'}
                       </td>
-                      <td className={`${tableBodyPaddingClass} border border-black ${tableCellPaddingClass} text-center align-top`}>
-                        {formatFoodInclusion(mealsForDate)}
-                      </td>
-                      {participantRecord.needs_accommodation && (
-                        <td className={`${tableBodyPaddingClass} border border-black ${tableCellPaddingClass} text-center align-top`}>
-                          {hasAccommodationOnDate ? 'Provided' : '-'}
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
+                    )}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
