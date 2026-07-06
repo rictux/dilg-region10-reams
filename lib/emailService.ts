@@ -2,13 +2,15 @@ import { supabase } from './supabase';
 
 export const logCertificateEmailSent = async (
   participantId: number,
-  certificateType: 'CA' | 'CoP'
+  certificateType: 'CA' | 'CoP',
+  eventId: number
 ) => {
   try {
     const columnName = certificateType === 'CA' ? 'ca_email_sent_at' : 'cop_email_sent_at';
     const { error } = await supabase
       .from('event_participants')
       .update({ [columnName]: new Date().toISOString() })
+      .eq('event_id', eventId)
       .eq('participant_id', participantId);
 
     if (error) {
@@ -28,7 +30,8 @@ export const sendCertificateEmail = async (
   certificateType?: 'CA' | 'CoP',
   eventName?: string,
   eventDate?: string,
-  eventVenue?: string
+  eventVenue?: string,
+  eventId?: number
 ): Promise<{ success: boolean; error?: string }> => {
   try {
     const pdfBase64 = await blobToBase64(pdfBlob);
@@ -70,9 +73,9 @@ export const sendCertificateEmail = async (
 
     const data = await response.json();
 
-    // Log the email send if participant ID and certificate type provided
-    if (participantId && certificateType) {
-      await logCertificateEmailSent(participantId, certificateType);
+    // Log the email send if participant ID, certificate type, and event ID provided
+    if (participantId && certificateType && eventId) {
+      await logCertificateEmailSent(participantId, certificateType, eventId);
     }
 
     return { success: true };
