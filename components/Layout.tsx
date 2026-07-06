@@ -34,6 +34,7 @@ import {
   Award,
   Gift
 } from 'lucide-react';
+import { Permission } from '../config/permissions';
 
 const REPORT_SUBMENU = [
   { name: 'Attendance Sheet',             icon: BookOpen,   report: 'attendance-sheet' },
@@ -48,13 +49,19 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, signOut, changePassword, hasPermission } = useAuth();
+  const { user, signOut, changePassword, hasPermission, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Header page search (command-palette style, permission-aware)
+  const [pageSearchQuery, setPageSearchQuery] = useState('');
+  const [isPageSearchOpen, setIsPageSearchOpen] = useState(false);
+  const [pageSearchIndex, setPageSearchIndex] = useState(0);
+  const pageSearchRef = useRef<HTMLDivElement>(null);
 
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -92,6 +99,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsProfileDropdownOpen(false);
+      }
+      if (pageSearchRef.current && !pageSearchRef.current.contains(event.target as Node)) {
+        setIsPageSearchOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -620,6 +630,64 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const isScanRoute = location.pathname === '/scan';
 
+  // Pages searchable from the header — gated by the same permissions as the sidebar,
+  // so users only see (and can only search) what they can access.
+  type SearchablePage = {
+    label: string;
+    path: string;
+    icon: React.ElementType;
+    section: string;
+    permission?: Permission;
+  };
+
+  const accessiblePages: SearchablePage[] = ([
+    { label: 'Dashboard',   path: '/dashboard',    icon: LayoutDashboard, section: 'Navigation', permission: 'VIEW_DASHBOARD' },
+    { label: 'Events',      path: '/events',       icon: Calendar,        section: 'Navigation', permission: 'MANAGE_EVENTS' },
+    { label: 'Attendance',  path: '/attendance',   icon: ClipboardList,   section: 'Navigation', permission: 'VIEW_PARTICIPANTS' },
+    { label: 'Name Lookup', path: '/admin/lookup', icon: Search,          section: 'Navigation' },
+    { label: 'Reports',     path: '/reports',      icon: BarChart3,       section: 'Navigation', permission: 'VIEW_REPORTS' },
+    ...REPORT_SUBMENU.map((child) => ({
+      label: child.name,
+      path: `/reports?report=${child.report}`,
+      icon: child.icon,
+      section: 'Reports',
+      permission: 'VIEW_REPORTS' as Permission,
+    })),
+    { label: 'Scan Mode', path: '/scan',     icon: ScanLine, section: 'Navigation', permission: 'SCAN_QR' },
+    { label: 'Users',     path: '/users',    icon: Users,    section: 'System',     permission: 'MANAGE_USERS' },
+    { label: 'Settings',  path: '/settings', icon: Settings, section: 'System',     permission: 'MANAGE_CERTIFICATE_SETTINGS' },
+    { label: 'About',     path: '/about',    icon: Info,     section: 'System' },
+  ] as SearchablePage[]).filter((page) => !page.permission || hasPermission(page.permission));
+
+  const pageSearchResults = accessiblePages.filter((page) =>
+    page.label.toLowerCase().includes(pageSearchQuery.trim().toLowerCase())
+  );
+
+  const handleSelectPage = (path: string) => {
+    navigate(path);
+    setPageSearchQuery('');
+    setIsPageSearchOpen(false);
+    setPageSearchIndex(0);
+  };
+
+  const handlePageSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setIsPageSearchOpen(true);
+      setPageSearchIndex((i) => Math.min(i + 1, pageSearchResults.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setPageSearchIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const page = pageSearchResults[pageSearchIndex];
+      if (page) handleSelectPage(page.path);
+    } else if (e.key === 'Escape') {
+      setIsPageSearchOpen(false);
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-[#F5F3EE] font-sans">
       {/* Mobile overlay */}
@@ -827,17 +895,47 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           <h2 className="md:hidden text-sm font-medium text-[#111110]">{getPageTitle()}</h2>
 
-          <div className="flex-1 max-w-sm ml-auto lg:ml-6 hidden sm:block">
-            <button
-              onClick={() => navigate('/admin/lookup')}
-              className="relative w-full text-left"
-              title="Name Lookup"
-            >
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" />
-              <div className="pl-9 pr-3 h-8 flex items-center text-sm text-[#9A9890] bg-[#E8E5DC]/50 border border-transparent hover:border-black/[0.08] hover:bg-white rounded-md transition-colors">
-                Search participants...
+          <div className="flex-1 max-w-sm ml-auto lg:ml-6 hidden sm:block relative" ref={pageSearchRef}>
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890] pointer-events-none" />
+            <input
+              type="text"
+              value={pageSearchQuery}
+              onChange={(e) => {
+                setPageSearchQuery(e.target.value);
+                setPageSearchIndex(0);
+                setIsPageSearchOpen(true);
+              }}
+              onFocus={() => setIsPageSearchOpen(true)}
+              onKeyDown={handlePageSearchKeyDown}
+              placeholder="Search pages..."
+              className="w-full pl-9 pr-3 h-8 text-sm text-[#111110] placeholder-[#9A9890] bg-[#E8E5DC]/50 border border-transparent hover:border-black/[0.08] hover:bg-white focus:border-black/[0.08] focus:bg-white rounded-md transition-colors outline-none"
+            />
+
+            {isPageSearchOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-black/[0.08] rounded-lg shadow-lg py-1.5 z-50 max-h-80 overflow-y-auto">
+                {pageSearchResults.length === 0 ? (
+                  <p className="px-3 py-2.5 text-xs text-[#9A9890]">No pages match “{pageSearchQuery}”</p>
+                ) : (
+                  pageSearchResults.map((page, index) => {
+                    const PageIcon = page.icon;
+                    return (
+                      <button
+                        key={page.path}
+                        onClick={() => handleSelectPage(page.path)}
+                        onMouseEnter={() => setPageSearchIndex(index)}
+                        className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-left transition-colors ${
+                          index === pageSearchIndex ? 'bg-[#F5F3EE] text-[#111110]' : 'text-[#4A4843]'
+                        }`}
+                      >
+                        <PageIcon size={15} className="text-[#9A9890] shrink-0" />
+                        <span className="flex-1 truncate">{page.label}</span>
+                        <span className="text-[10px] text-[#9A9890] uppercase tracking-wide shrink-0">{page.section}</span>
+                      </button>
+                    );
+                  })
+                )}
               </div>
-            </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 relative" ref={dropdownRef}>
