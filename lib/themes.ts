@@ -20,7 +20,7 @@ export interface ThemeTemplate {
 }
 
 export const THEME_STORAGE_KEY = 'reams-ui-theme';
-export const DEFAULT_THEME_ID: ThemeId = 'paper';
+export const DEFAULT_THEME_ID: ThemeId = 'eventflow';
 
 export const THEMES: ThemeTemplate[] = [
   {

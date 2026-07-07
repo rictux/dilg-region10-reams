@@ -13,7 +13,7 @@
       (function () {
         try {
           var theme = localStorage.getItem('reams-ui-theme');
-          if (theme && theme !== 'paper') {
+          if (theme && theme !== 'eventflow') {
             document.documentElement.setAttribute('data-theme', theme);
           }
           if (localStorage.getItem('reams-ui-mode') === 'dark') {
@@ -27,18 +27,18 @@
          scales consumed by the Tailwind config below. Values are RGB channel triplets so
          Tailwind alpha modifiers (e.g. bg-indigo-600/10) keep working. */
       :root {
-        /* Paper (default): warm sepia reading mode, ivory cards, easy on the eyes */
-        --acc-50: 254 252 232; --acc-100: 254 249 195; --acc-200: 254 240 138;
-        --acc-300: 253 224 71; --acc-400: 234 179 8; --acc-500: 202 138 4;
-        --acc-600: 161 98 7; --acc-700: 133 77 14; --acc-800: 113 63 18;
-        --acc-900: 66 32 6; --acc-950: 66 32 6;
-        --neu-50: 241 235 223; --neu-100: 233 226 211; --neu-200: 221 212 194;
-        --neu-300: 196 187 168; --neu-400: 156 148 132; --neu-500: 125 118 104;
-        --neu-600: 106 99 85; --neu-700: 76 70 57; --neu-800: 66 60 52;
-        --neu-900: 53 48 42; --neu-950: 33 29 22;
-        --sidebar: 33 29 22;
+        /* EventFlow (default): brand indigo + warm stone neutrals */
+        --acc-50: 238 237 252; --acc-100: 223 220 250; --acc-200: 195 190 244;
+        --acc-300: 162 154 236; --acc-400: 139 130 240; --acc-500: 98 85 233;
+        --acc-600: 75 63 228; --acc-700: 59 48 196; --acc-800: 47 38 160;
+        --acc-900: 37 30 124; --acc-950: 23 18 78;
+        --neu-50: 245 243 238; --neu-100: 237 234 226; --neu-200: 224 221 212;
+        --neu-300: 197 194 186; --neu-400: 154 152 144; --neu-500: 124 122 114;
+        --neu-600: 107 104 96; --neu-700: 74 72 67; --neu-800: 42 41 38;
+        --neu-900: 17 17 16; --neu-950: 15 15 14;
+        --sidebar: 15 15 14;
         /* Card/surface color (`bg-card`); comfort themes soften this off pure white */
-        --surface: 251 248 241;
+        --surface: 255 255 255;
         /* Hairline/border base color — black in light mode, white in dark mode */
         --ink: 0 0 0;
       }
