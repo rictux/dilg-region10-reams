@@ -10,6 +10,8 @@ import {
   Search,
   BarChart3,
   Users,
+  UserCog,
+  Contact,
   ScanLine,
   LogOut,
   Menu,
@@ -32,7 +34,9 @@ import {
   BookOpen,
   ScrollText,
   Award,
-  Gift
+  Gift,
+  FileSignature,
+  Megaphone
 } from 'lucide-react';
 import { Permission } from '../config/permissions';
 
@@ -42,6 +46,16 @@ const REPORT_SUBMENU = [
   { name: 'Certificate of Appearance',    icon: ScrollText, report: 'appearance' },
   { name: 'Certificate of Participation', icon: Award,      report: 'participation' },
   { name: 'Giveaway Logs',                icon: Gift,       report: 'giveaways' },
+];
+
+const USERS_SUBMENU = [
+  { name: 'System',      icon: UserCog, view: 'system',       adminOnly: false },
+  { name: 'Participant', icon: Contact, view: 'participants', adminOnly: true },
+];
+
+const SETTINGS_SUBMENU = [
+  { name: 'Signatories',   icon: FileSignature, view: 'signatories',   adminOnly: false },
+  { name: 'Announcements', icon: Megaphone,     view: 'announcements', adminOnly: true },
 ];
 
 interface LayoutProps {
@@ -91,9 +105,44 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const activeReport = new URLSearchParams(location.search).get('report');
   const [reportsOpen, setReportsOpen] = useState(isReportsActive);
 
+  const isUsersActive = location.pathname === '/users';
+  const activeUsersView = new URLSearchParams(location.search).get('view') || 'system';
+  const [usersOpen, setUsersOpen] = useState(isUsersActive);
+  const usersSubmenu = USERS_SUBMENU.filter((child) => !child.adminOnly || user?.role === 'Admin');
+
+  const isSettingsActive = location.pathname === '/settings';
+  const activeSettingsView = new URLSearchParams(location.search).get('view') || 'signatories';
+  const [settingsOpen, setSettingsOpen] = useState(isSettingsActive);
+  const settingsSubmenu = SETTINGS_SUBMENU.filter((child) => !child.adminOnly || user?.role === 'Admin');
+
   useEffect(() => {
     if (isReportsActive) setReportsOpen(true);
   }, [isReportsActive]);
+
+  useEffect(() => {
+    if (isUsersActive) setUsersOpen(true);
+  }, [isUsersActive]);
+
+  useEffect(() => {
+    if (isSettingsActive) setSettingsOpen(true);
+  }, [isSettingsActive]);
+
+  // Flyout submenu shown next to the rail when the sidebar is collapsed
+  const [collapsedFlyout, setCollapsedFlyout] = useState<{ menu: 'reports' | 'users' | 'settings'; top: number } | null>(null);
+
+  useEffect(() => {
+    setCollapsedFlyout(null);
+  }, [location.pathname, location.search, shouldCollapseSidebarContent]);
+
+  useEffect(() => {
+    if (!collapsedFlyout) return;
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as Element | null;
+      if (!target?.closest('[data-flyout-root]')) setCollapsedFlyout(null);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [collapsedFlyout]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -620,9 +669,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       case '/admin/lookup': return 'Name Lookup';
       case '/reports':
         return REPORT_SUBMENU.find((r) => r.report === activeReport)?.name || 'Reports';
-      case '/users': return 'Users';
+      case '/users':
+        return activeUsersView === 'participants' ? 'Participants' : 'Users';
       case '/scan': return 'Scan Mode';
-      case '/settings': return 'Settings';
+      case '/settings':
+        return activeSettingsView === 'announcements' ? 'Announcements' : 'Settings';
       case '/about': return 'About';
       default: return 'Overview';
     }
@@ -654,8 +705,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       permission: 'VIEW_REPORTS' as Permission,
     })),
     { label: 'Scan Mode', path: '/scan',     icon: ScanLine, section: 'Navigation', permission: 'SCAN_QR' },
-    { label: 'Users',     path: '/users',    icon: Users,    section: 'System',     permission: 'MANAGE_USERS' },
-    { label: 'Settings',  path: '/settings', icon: Settings, section: 'System',     permission: 'MANAGE_CERTIFICATE_SETTINGS' },
+    ...usersSubmenu.map((child) => ({
+      label: child.view === 'system' ? 'System Users' : 'Participants',
+      path: child.view === 'system' ? '/users' : `/users?view=${child.view}`,
+      icon: child.icon,
+      section: 'Users',
+      permission: 'MANAGE_USERS' as Permission,
+    })),
+    ...settingsSubmenu.map((child) => ({
+      label: child.name,
+      path: child.view === 'signatories' ? '/settings' : `/settings?view=${child.view}`,
+      icon: child.icon,
+      section: 'Settings',
+      permission: 'MANAGE_CERTIFICATE_SETTINGS' as Permission,
+    })),
     { label: 'About',     path: '/about',    icon: Info,     section: 'System' },
   ] as SearchablePage[]).filter((page) => !page.permission || hasPermission(page.permission));
 
@@ -701,7 +764,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Sidebar */}
       <aside className={`
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-        fixed inset-y-0 left-0 z-50 flex flex-col bg-[#0F0F0E] transition-all duration-200 ease-out
+        fixed inset-y-0 left-0 z-50 flex flex-col bg-sidebar transition-all duration-200 ease-out
         md:translate-x-0 md:static md:inset-auto
         ${shouldCollapseSidebarContent ? 'md:w-14 w-56' : 'w-56'}
       `}>
@@ -747,14 +810,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             {hasPermission('VIEW_REPORTS') && (
                 <div>
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
                       if (shouldCollapseSidebarContent) {
-                        navigate('/reports');
-                        setIsMobileMenuOpen(false);
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setCollapsedFlyout((cur) =>
+                          cur?.menu === 'reports' ? null : { menu: 'reports', top: rect.top }
+                        );
                       } else {
                         setReportsOpen((o) => !o);
                       }
                     }}
+                    data-flyout-root
                     title={shouldCollapseSidebarContent ? 'Reports' : undefined}
                     className={`group flex items-center rounded-md text-sm transition-all duration-150 ${
                       shouldCollapseSidebarContent ? 'justify-center w-10 h-10 mx-auto' : 'gap-3 px-3 py-2 w-full'
@@ -812,6 +878,40 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       })}
                     </div>
                   )}
+
+                  {shouldCollapseSidebarContent && collapsedFlyout?.menu === 'reports' && (
+                    <div
+                      data-flyout-root
+                      className="fixed left-14 z-[60] min-w-[13rem] rounded-lg border border-white/10 bg-sidebar p-1.5 shadow-2xl"
+                      style={{ top: collapsedFlyout.top }}
+                    >
+                      <p className="px-2 pb-1 pt-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-white/25 font-mono">Reports</p>
+                      {REPORT_SUBMENU.map((child) => {
+                        const ChildIcon = child.icon;
+                        const childActive = isReportsActive && activeReport === child.report;
+                        return (
+                          <button
+                            key={child.report}
+                            onClick={() => {
+                              navigate(`/reports?report=${child.report}`);
+                              setCollapsedFlyout(null);
+                            }}
+                            className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-xs w-full text-left transition-all duration-150 ${
+                              childActive
+                                ? 'text-white bg-white/10'
+                                : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                            }`}
+                          >
+                            <ChildIcon
+                              size={14}
+                              className={`shrink-0 ${childActive ? 'text-[#8B82F0]' : 'text-white/25'}`}
+                            />
+                            <span className="leading-snug">{child.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
             )}
             {hasPermission('SCAN_QR') && (
@@ -821,11 +921,219 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           <SidebarSection title="System">
             {hasPermission('MANAGE_USERS') && (
-                <NavItem to="/users" icon={Users} label="Users" />
+                <div>
+                  <button
+                    onClick={(e) => {
+                      if (shouldCollapseSidebarContent) {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setCollapsedFlyout((cur) =>
+                          cur?.menu === 'users' ? null : { menu: 'users', top: rect.top }
+                        );
+                      } else {
+                        setUsersOpen((o) => !o);
+                      }
+                    }}
+                    data-flyout-root
+                    title={shouldCollapseSidebarContent ? 'Users' : undefined}
+                    className={`group flex items-center rounded-md text-sm transition-all duration-150 ${
+                      shouldCollapseSidebarContent ? 'justify-center w-10 h-10 mx-auto' : 'gap-3 px-3 py-2 w-full'
+                    } ${
+                      isUsersActive
+                        ? 'bg-white/10 text-white'
+                        : 'text-white/45 hover:bg-white/[0.06] hover:text-white/80'
+                    }`}
+                  >
+                    <Users
+                      size={16}
+                      className={`shrink-0 transition-colors ${
+                        isUsersActive ? 'text-[#8B82F0]' : 'text-white/30 group-hover:text-white/50'
+                      }`}
+                      aria-hidden="true"
+                    />
+                    {!shouldCollapseSidebarContent && (
+                      <>
+                        <span className="flex-1 text-left">Users</span>
+                        <ChevronRight
+                          size={14}
+                          className={`shrink-0 transition-transform duration-200 text-white/25 ${
+                            usersOpen ? 'rotate-90' : ''
+                          }`}
+                        />
+                      </>
+                    )}
+                  </button>
+
+                  {!shouldCollapseSidebarContent && usersOpen && (
+                    <div className="mt-0.5 ml-3 pl-4 border-l border-white/[0.08] space-y-0.5">
+                      {usersSubmenu.map((child) => {
+                        const ChildIcon = child.icon;
+                        const childActive = isUsersActive && activeUsersView === child.view;
+                        return (
+                          <button
+                            key={child.view}
+                            onClick={() => {
+                              navigate(child.view === 'system' ? '/users' : `/users?view=${child.view}`);
+                              setIsMobileMenuOpen(false);
+                            }}
+                            className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-xs w-full text-left transition-all duration-150 ${
+                              childActive
+                                ? 'text-white bg-white/10'
+                                : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                            }`}
+                          >
+                            <ChildIcon
+                              size={14}
+                              className={`shrink-0 ${childActive ? 'text-[#8B82F0]' : 'text-white/25'}`}
+                            />
+                            <span className="leading-snug">{child.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {shouldCollapseSidebarContent && collapsedFlyout?.menu === 'users' && (
+                    <div
+                      data-flyout-root
+                      className="fixed left-14 z-[60] min-w-[11rem] rounded-lg border border-white/10 bg-sidebar p-1.5 shadow-2xl"
+                      style={{ top: collapsedFlyout.top }}
+                    >
+                      <p className="px-2 pb-1 pt-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-white/25 font-mono">Users</p>
+                      {usersSubmenu.map((child) => {
+                        const ChildIcon = child.icon;
+                        const childActive = isUsersActive && activeUsersView === child.view;
+                        return (
+                          <button
+                            key={child.view}
+                            onClick={() => {
+                              navigate(child.view === 'system' ? '/users' : `/users?view=${child.view}`);
+                              setCollapsedFlyout(null);
+                            }}
+                            className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-xs w-full text-left transition-all duration-150 ${
+                              childActive
+                                ? 'text-white bg-white/10'
+                                : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                            }`}
+                          >
+                            <ChildIcon
+                              size={14}
+                              className={`shrink-0 ${childActive ? 'text-[#8B82F0]' : 'text-white/25'}`}
+                            />
+                            <span className="leading-snug">{child.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
             )}
             <NavItem to="/about" icon={Info} label="About" />
             {hasPermission('MANAGE_CERTIFICATE_SETTINGS') && (
-                <NavItem to="/settings" icon={Settings} label="Settings" />
+                <div>
+                  <button
+                    onClick={(e) => {
+                      if (shouldCollapseSidebarContent) {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setCollapsedFlyout((cur) =>
+                          cur?.menu === 'settings' ? null : { menu: 'settings', top: rect.top }
+                        );
+                      } else {
+                        setSettingsOpen((o) => !o);
+                      }
+                    }}
+                    data-flyout-root
+                    title={shouldCollapseSidebarContent ? 'Settings' : undefined}
+                    className={`group flex items-center rounded-md text-sm transition-all duration-150 ${
+                      shouldCollapseSidebarContent ? 'justify-center w-10 h-10 mx-auto' : 'gap-3 px-3 py-2 w-full'
+                    } ${
+                      isSettingsActive
+                        ? 'bg-white/10 text-white'
+                        : 'text-white/45 hover:bg-white/[0.06] hover:text-white/80'
+                    }`}
+                  >
+                    <Settings
+                      size={16}
+                      className={`shrink-0 transition-colors ${
+                        isSettingsActive ? 'text-[#8B82F0]' : 'text-white/30 group-hover:text-white/50'
+                      }`}
+                      aria-hidden="true"
+                    />
+                    {!shouldCollapseSidebarContent && (
+                      <>
+                        <span className="flex-1 text-left">Settings</span>
+                        <ChevronRight
+                          size={14}
+                          className={`shrink-0 transition-transform duration-200 text-white/25 ${
+                            settingsOpen ? 'rotate-90' : ''
+                          }`}
+                        />
+                      </>
+                    )}
+                  </button>
+
+                  {!shouldCollapseSidebarContent && settingsOpen && (
+                    <div className="mt-0.5 ml-3 pl-4 border-l border-white/[0.08] space-y-0.5">
+                      {settingsSubmenu.map((child) => {
+                        const ChildIcon = child.icon;
+                        const childActive = isSettingsActive && activeSettingsView === child.view;
+                        return (
+                          <button
+                            key={child.view}
+                            onClick={() => {
+                              navigate(child.view === 'signatories' ? '/settings' : `/settings?view=${child.view}`);
+                              setIsMobileMenuOpen(false);
+                            }}
+                            className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-xs w-full text-left transition-all duration-150 ${
+                              childActive
+                                ? 'text-white bg-white/10'
+                                : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                            }`}
+                          >
+                            <ChildIcon
+                              size={14}
+                              className={`shrink-0 ${childActive ? 'text-[#8B82F0]' : 'text-white/25'}`}
+                            />
+                            <span className="leading-snug">{child.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {shouldCollapseSidebarContent && collapsedFlyout?.menu === 'settings' && (
+                    <div
+                      data-flyout-root
+                      className="fixed left-14 z-[60] min-w-[11rem] rounded-lg border border-white/10 bg-sidebar p-1.5 shadow-2xl"
+                      style={{ top: collapsedFlyout.top }}
+                    >
+                      <p className="px-2 pb-1 pt-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-white/25 font-mono">Settings</p>
+                      {settingsSubmenu.map((child) => {
+                        const ChildIcon = child.icon;
+                        const childActive = isSettingsActive && activeSettingsView === child.view;
+                        return (
+                          <button
+                            key={child.view}
+                            onClick={() => {
+                              navigate(child.view === 'signatories' ? '/settings' : `/settings?view=${child.view}`);
+                              setCollapsedFlyout(null);
+                            }}
+                            className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-xs w-full text-left transition-all duration-150 ${
+                              childActive
+                                ? 'text-white bg-white/10'
+                                : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                            }`}
+                          >
+                            <ChildIcon
+                              size={14}
+                              className={`shrink-0 ${childActive ? 'text-[#8B82F0]' : 'text-white/25'}`}
+                            />
+                            <span className="leading-snug">{child.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
             )}
           </SidebarSection>
         </nav>
@@ -961,7 +1269,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </header>
 
         {/* Content */}
-        <main className={`flex-1 overflow-hidden flex flex-col min-w-0 ${isScanRoute ? 'p-0 md:p-6' : 'p-4 md:p-6'}`}>
+        <main className={`flex-1 overflow-hidden flex flex-col min-w-0 ${isScanRoute ? 'p-0 md:py-8 md:px-12 lg:px-16' : 'p-4 md:p-6'}`}>
           <div className="flex-1 min-h-0">
             {children}
           </div>

@@ -7,7 +7,7 @@ import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'da
 import QRCode from 'react-qr-code';
 import ExcelJS from 'exceljs';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   type EventFoodInclusionMap,
@@ -144,7 +144,8 @@ const EventsList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 9;
   const navigate = useNavigate();
-  
+  const location = useLocation();
+
   // Modal States
   const [showEventModal, setShowEventModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -1104,6 +1105,17 @@ const EventsList: React.FC = () => {
       // fetchEventParticipants is called in useEffect when modal opens
   };
 
+  // Deep link: /events?event=<id> (e.g. from the Dashboard) opens that event's participants view
+  useEffect(() => {
+      const idParam = new URLSearchParams(location.search).get('event');
+      if (!idParam || loading) return;
+      const target = events.find((e) => e.event_id === Number(idParam));
+      if (target) {
+          handleRowClick(target);
+      }
+      navigate('/events', { replace: true });
+  }, [loading, events, location.search]);
+
   const resetParticipantForm = () => {
       setNewParticipant(createEmptyParticipantForm());
       setEditingParticipantRecord(null);
@@ -2018,12 +2030,6 @@ const EventsList: React.FC = () => {
   const secretariatCount = viewingParticipants.filter(p => p.role === 'Secretariat').length;
   const speakerCount = viewingParticipants.filter(p => p.role === 'Speaker').length;
   const guestVipCount = viewingParticipants.filter(p => p.role === 'Guest' || p.role === 'VIP').length;
-  const accommodationCount = React.useMemo(() => {
-      return viewingParticipants.reduce((total, participant) => {
-          if (!participant.needs_accommodation) return total;
-          return total + Math.max(1, participant.accommodation_pax || 1);
-      }, 0);
-  }, [viewingParticipants]);
   const canManageParticipants = hasPermission('MANAGE_PARTICIPANTS');
   const canDeleteEvents = hasPermission('DELETE_EVENTS');
   const canEditEventRecord = (event: Event) =>
@@ -2316,15 +2322,7 @@ const EventsList: React.FC = () => {
       {!(showParticipantsModal && selectedEvent) && (
       <div className="flex-1 min-h-0 overflow-y-auto -m-4 md:-m-6 p-4 md:py-8 md:px-12 lg:px-16 flex flex-col gap-6">
       {/* Page header */}
-      <div className="flex items-start justify-between gap-3 w-full">
-        <div>
-          <h1 className="text-2xl font-semibold text-[#111110] leading-tight">Events</h1>
-          <p className="text-sm text-[#6B6860] mt-0.5">
-            {eventView === 'deleted'
-              ? `${eventSummary.total} deleted event${eventSummary.total === 1 ? '' : 's'}`
-              : `${eventSummary.total} event${eventSummary.total === 1 ? '' : 's'} total`}
-          </p>
-        </div>
+      <div className="flex justify-end w-full -mb-3">
         <button
             onClick={openCreateModal}
             type="button"
@@ -2356,7 +2354,7 @@ const EventsList: React.FC = () => {
               }`}
             >
               {tab.label}
-              <span className={`font-mono text-[10px] leading-none ${
+              <span className={`hidden sm:inline font-mono text-[10px] leading-none ${
                 statusFilter === tab.value
                   ? 'bg-[#4B3FE4]/10 text-[#4B3FE4] rounded px-1 py-0.5'
                   : 'text-[#9A9890]'
@@ -2457,7 +2455,7 @@ const EventsList: React.FC = () => {
                       </div>
                   </div>
               ) : (
-                  <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-fr">
                       {paginatedEvents.map((event) => {
                           const canEditCurrentEvent = canEditEventRecord(event);
                           const canDeleteCurrentEvent = canDeleteEventRecord(event);
@@ -2659,7 +2657,7 @@ const EventsList: React.FC = () => {
                       >
                           <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
-                                  <h3 className="font-semibold text-slate-800 leading-tight">{event.event_name}</h3>
+                                  <h3 className="text-sm font-semibold text-slate-800 leading-tight">{event.event_name}</h3>
                                   <div className="flex flex-wrap gap-2 mt-2">
                                       {eventView === 'deleted' && (
                                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100">
@@ -2690,7 +2688,7 @@ const EventsList: React.FC = () => {
                               </div>
                           </div>
 
-                          <div className="mt-4 space-y-2 text-sm text-slate-600">
+                          <div className="mt-4 space-y-2 text-[13px] text-slate-600">
                               <div className="flex items-start gap-2">
                                   <MapPin size={14} className="text-slate-400 shrink-0 mt-0.5" />
                                   <span>{event.venue}</span>
@@ -2706,24 +2704,22 @@ const EventsList: React.FC = () => {
                                   <>
                                       <button
                                           onClick={(e) => handleRestoreEvent(e, event.event_id)}
-                                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100"
                                           title="Restore"
                                           aria-label="Restore"
                                       >
-                                          <RotateCcw size={14} />
-                                          <span>Restore</span>
+                                          <RotateCcw size={16} />
                                       </button>
                                       <button
                                           onClick={(e) => {
                                               e.stopPropagation();
                                               handleDelete(e, event.event_id);
                                           }}
-                                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
+                                          className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition-colors hover:bg-red-100"
                                           title="Permanently delete"
                                           aria-label="Permanently delete"
                                       >
-                                          <Trash2 size={14} />
-                                          <span>Delete Forever</span>
+                                          <Trash2 size={16} />
                                       </button>
                                   </>
                               ) : (
@@ -2733,12 +2729,11 @@ const EventsList: React.FC = () => {
                                               e.stopPropagation();
                                               openShareModal(e, event);
                                           }}
-                                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
+                                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 transition-colors hover:bg-slate-100"
                                           title="Share"
                                           aria-label="Share"
                                       >
-                                          <Share2 size={14} />
-                                          <span>Share</span>
+                                          <Share2 size={16} />
                                       </button>
                                       {canEditCurrentEvent && (
                                       <button
@@ -2746,23 +2741,21 @@ const EventsList: React.FC = () => {
                                               e.stopPropagation();
                                               openEditModal(e, event);
                                           }}
-                                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
+                                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 transition-colors hover:bg-blue-100"
                                           title="Edit"
                                           aria-label="Edit"
                                       >
-                                          <Edit size={14} />
-                                          <span>Edit</span>
+                                          <Edit size={16} />
                                       </button>
                                       )}
                                       {canSetCurrentEventAccess && (
                                           <button
                                               onClick={(e) => openEventAccessModal(e, event)}
-                                              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
+                                              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 transition-colors hover:bg-indigo-100"
                                               title="Access Settings"
                                               aria-label="Access Settings"
                                           >
-                                              <Settings size={14} />
-                                              <span>Access</span>
+                                              <Settings size={16} />
                                           </button>
                                       )}
                                       {canDeleteCurrentEvent && (
@@ -2771,12 +2764,11 @@ const EventsList: React.FC = () => {
                                                   e.stopPropagation();
                                                   handleDelete(e, event.event_id);
                                               }}
-                                              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
+                                              className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition-colors hover:bg-red-100"
                                               title="Delete"
                                               aria-label="Delete"
                                           >
-                                              <Trash2 size={14} />
-                                              <span>Delete</span>
+                                              <Trash2 size={16} />
                                           </button>
                                       )}
                                   </>
@@ -2790,8 +2782,8 @@ const EventsList: React.FC = () => {
           
           {/* Pagination Controls */}
           {!loading && totalPages > 1 && (
-              <div className="pt-1 flex items-center justify-between shrink-0">
-                  <div className="text-sm text-slate-500">
+              <div className="pt-1 flex items-center justify-center sm:justify-between shrink-0">
+                  <div className="hidden sm:block text-sm text-slate-500">
                       Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredEvents.length)}</span> of <span className="font-medium">{filteredEvents.length}</span> results
                   </div>
                   <div className="flex items-center gap-2">
@@ -2909,7 +2901,7 @@ const EventsList: React.FC = () => {
                     className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors w-fit"
                 >
                     <ArrowRight size={15} className="rotate-180" />
-                    Events
+                    Back
                 </button>
 
                 <>
@@ -2935,14 +2927,6 @@ const EventsList: React.FC = () => {
                                     </span>
                                 </div>
                             </div>
-                            {canManageParticipants && (
-                                <button
-                                    onClick={openAddParticipantView}
-                                    className="shrink-0 h-9 bg-[#4B3FE4] hover:bg-[#3B30C4] text-white text-sm font-medium rounded-md flex items-center gap-1.5 px-3 transition-colors"
-                                >
-                                    <UserPlus size={15} /> Add Participant
-                                </button>
-                            )}
                         </div>
 
                         {/* Participants summary */}
@@ -3001,7 +2985,7 @@ const EventsList: React.FC = () => {
                                         }`}
                                     >
                                         {tab.label}
-                                        <span className={`font-mono text-[10px] leading-none ${
+                                        <span className={`hidden sm:inline font-mono text-[10px] leading-none ${
                                             activeParticipantFilter === tab.value
                                                 ? 'bg-[#4B3FE4]/10 text-[#4B3FE4] rounded px-1 py-0.5'
                                                 : 'text-[#9A9890]'
@@ -3036,10 +3020,25 @@ const EventsList: React.FC = () => {
                                 onClick={exportParticipantsToExcel}
                                 disabled={viewingParticipants.length === 0}
                                 type="button"
+                                aria-label="Export participants"
+                                title="Export participants"
                                 className="shrink-0 bg-emerald-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-emerald-700 transition-colors shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
                             >
-                                <Download size={16} /> Export
+                                <Download size={16} />
+                                <span className="hidden sm:inline">Export</span>
                             </button>
+                            {canManageParticipants && (
+                                <button
+                                    onClick={openAddParticipantView}
+                                    type="button"
+                                    aria-label="Add participant"
+                                    title="Add participant"
+                                    className="shrink-0 bg-[#4B3FE4] hover:bg-[#3B30C4] text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
+                                >
+                                    <UserPlus size={16} />
+                                    <span className="hidden sm:inline">Add Participant</span>
+                                </button>
+                            )}
                         </div>
                 </div>
 
@@ -3576,24 +3575,6 @@ const EventsList: React.FC = () => {
                 </div>
                 )}
                 
-                {/* Footer stats */}
-                <div className="p-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 rounded-b-xl grid grid-cols-3 gap-3">
-                         <div className="flex min-w-0 flex-col justify-end">
-                            <span className="text-[10px] sm:text-xs uppercase text-slate-400 font-bold leading-tight">Total Participants</span>
-                            <span className="text-lg sm:text-xl font-bold text-slate-800">{totalCount}</span>
-                        </div>
-                        <div className="flex min-w-0 flex-col justify-end">
-                            <span className="text-[10px] sm:text-xs uppercase text-slate-400 font-bold leading-tight">Total Delegates</span>
-                            <span className="text-lg sm:text-xl font-bold text-slate-800">{delegateCount}</span>
-                        </div>
-                         <div className="flex min-w-0 flex-col justify-end">
-                            <span className="text-[10px] sm:text-xs uppercase text-slate-400 font-bold leading-tight">Accommodation</span>
-                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                                <span className="text-lg sm:text-xl font-bold text-purple-700">{accommodationCount}</span>
-                                <span className="text-[10px] sm:text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">Pax Requested</span>
-                            </div>
-                        </div>
-                </div>
             </div>
         </div>
       )}

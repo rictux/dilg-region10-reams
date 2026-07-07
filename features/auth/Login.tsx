@@ -81,7 +81,7 @@ const Login: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#F5F3EE] flex">
       {/* Left panel — branding */}
-      <div className="hidden lg:flex lg:w-[45%] bg-[#0F0F0E] flex-col justify-between p-12 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-[45%] bg-sidebar flex-col justify-between p-12 relative overflow-hidden">
         {/* Grid texture */}
         <div
           className="absolute inset-0 opacity-[0.03]"

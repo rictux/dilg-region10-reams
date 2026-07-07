@@ -1271,16 +1271,17 @@ const AttendanceList: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter tabs + search + actions */}
-      <div className="flex w-full flex-wrap items-center gap-2">
+      {/* Filter tabs + search + actions. Mobile: stacked rows (filter, then search/actions);
+          sm+: single wrapping row with actions right-aligned. */}
+      <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="flex flex-wrap items-center gap-1 p-1 bg-[#E8E5DC]/50 border border-black/[0.05] rounded-lg">
               {[
-                  { value: 'Show All', label: 'All', count: totalParticipants, show: true },
-                  { value: 'Present', label: 'Present', count: presentCount, show: true },
-                  { value: 'No Logs', label: 'Not Present', count: notPresentCount, show: true },
-                  { value: 'No PM', label: 'No PM', count: noPmCount, show: hasMultipleSessions },
-                  { value: 'Complete Logs', label: 'Complete', count: completeLogsCount, show: hasMultipleSessions },
-                  { value: 'Accommodation', label: 'Accommodation', count: accommodationCount, show: hasAccommodationFilter },
+                  { value: 'Show All', label: 'All', shortLabel: 'All', count: totalParticipants, show: true },
+                  { value: 'Present', label: 'Present', shortLabel: 'Present', count: presentCount, show: true },
+                  { value: 'No Logs', label: 'Not Present', shortLabel: 'Not Present', count: notPresentCount, show: true },
+                  { value: 'No PM', label: 'No PM', shortLabel: 'No PM', count: noPmCount, show: hasMultipleSessions },
+                  { value: 'Complete Logs', label: 'Complete', shortLabel: 'Complete', count: completeLogsCount, show: hasMultipleSessions },
+                  { value: 'Accommodation', label: 'Accommodation', shortLabel: 'Accomm', count: accommodationCount, show: hasAccommodationFilter },
               ].filter(tab => tab.show).map(tab => (
                   <button
                       key={tab.value}
@@ -1292,8 +1293,9 @@ const AttendanceList: React.FC = () => {
                               : 'text-[#6B6860] hover:text-[#111110]'
                       }`}
                   >
-                      {tab.label}
-                      <span className={`font-mono text-[10px] leading-none ${
+                      <span className="sm:hidden">{tab.shortLabel}</span>
+                      <span className="hidden sm:inline">{tab.label}</span>
+                      <span className={`hidden sm:inline font-mono text-[10px] leading-none ${
                           filter === tab.value
                               ? 'bg-[#4B3FE4]/10 text-[#4B3FE4] rounded px-1 py-0.5'
                               : 'text-[#9A9890]'
@@ -1304,8 +1306,8 @@ const AttendanceList: React.FC = () => {
               ))}
           </div>
 
-          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 sm:flex-none">
-              <div className="relative min-w-0 w-full max-w-xs">
+          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:ml-auto sm:flex-none sm:justify-end">
+              <div className="relative min-w-0 w-full sm:max-w-xs">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]">
                       <Search size={14} />
                   </div>
@@ -1499,9 +1501,9 @@ const AttendanceList: React.FC = () => {
                 </table>
             </div>
 
-            <div className="overflow-visible p-3 sm:p-4 lg:hidden">
+            <div className="overflow-visible lg:hidden">
                 {filteredData.length === 0 ? (
-                    <div className="text-center py-12 text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100">
+                    <div className="m-3 text-center py-12 text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100 sm:m-4">
                         {events.length === 0 ? (
                             <div className="flex flex-col items-center">
                                 <Calendar className="w-10 h-10 mb-2 opacity-20" />
@@ -1512,14 +1514,14 @@ const AttendanceList: React.FC = () => {
                         )}
                     </div>
                 ) : (
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                    <div className="grid gap-2 p-2 sm:grid-cols-2 sm:p-3 lg:grid-cols-1">
                         {filteredData.map((row) => (
                             <div
                                 key={row.participant.participant_id}
                                 onClick={() => handleRowClick(row.participant)}
-                                className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm active:scale-[0.99] transition-transform sm:p-4"
+                                className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm active:scale-[0.99] transition-transform sm:p-3"
                             >
-                                <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-start justify-between gap-2.5">
                                     <input
                                         type="checkbox"
                                         checked={selectedManualIds.includes(row.participant.participant_id)}
@@ -1556,14 +1558,14 @@ const AttendanceList: React.FC = () => {
                                     </div>
                                     <button
                                         onClick={(e) => openManualModal(e, row.participant)}
-                                        className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                                        className="-m-1 shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
                                         title="Manual Log Entry"
                                     >
-                                        <PlusCircle size={18} />
+                                        <PlusCircle size={16} />
                                     </button>
                                 </div>
 
-                                <div className={`mt-2.5 grid gap-2 ${hasMultipleSessions ? 'grid-cols-2' : 'grid-cols-1'} sm:mt-3`}>
+                                <div className={`mt-1.5 grid gap-1.5 ${hasMultipleSessions ? 'grid-cols-2' : 'grid-cols-1'}`}>
                                     {visibleSessions.map((session) => {
                                         const sessionLog = session === 'AM' ? row.amLog : row.pmLog;
                                         const valueClassName = session === 'AM'
@@ -1571,12 +1573,12 @@ const AttendanceList: React.FC = () => {
                                             : 'text-indigo-700';
 
                                         return (
-                                            <div key={session} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                                            <div key={session} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1">
                                                 <div className="flex items-center justify-between gap-2">
-                                                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                                                         {session} Time
                                                     </span>
-                                                    <span className={`text-sm font-semibold ${sessionLog ? valueClassName : 'text-slate-300'}`}>
+                                                    <span className={`text-xs font-semibold ${sessionLog ? valueClassName : 'text-slate-300'}`}>
                                                         {sessionLog ? formatLogTime(sessionLog.time) : '-'}
                                                     </span>
                                                 </div>

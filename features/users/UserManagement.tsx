@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { User, Office, UserRole } from '../../types/database';
@@ -29,7 +30,13 @@ const UserManagement: React.FC = () => {
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === 'Admin';
   const isOfficeManager = currentUser?.role === 'OfficeManager';
-  const [activeTab, setActiveTab] = useState<'users' | 'participants'>('users');
+  const location = useLocation();
+  // View is driven by the sidebar submenu (/users vs /users?view=participants);
+  // the Participants view stays admin-only regardless of the URL.
+  const activeView =
+    isAdmin && new URLSearchParams(location.search).get('view') === 'participants'
+      ? 'participants'
+      : 'users';
   const [users, setUsers] = useState<UserWithOffice[]>([]);
   const [offices, setOffices] = useState<Office[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,9 +81,6 @@ const UserManagement: React.FC = () => {
   const isOfficeManagerEditing = isOfficeManager && editingId !== null;
 
   useEffect(() => {
-    if (!isAdmin) {
-      setActiveTab('users');
-    }
     fetchUsers();
     fetchOffices();
   }, [currentUser?.user_id, currentUser?.office_id, currentUser?.role]);
@@ -388,33 +392,8 @@ const UserManagement: React.FC = () => {
   );
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-6">
-      <div className="flex border-b border-slate-200">
-        <button
-          className={`py-3 px-6 font-medium text-sm border-b-2 transition-colors ${
-            activeTab === 'users'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-          }`}
-          onClick={() => setActiveTab('users')}
-        >
-          System Users
-        </button>
-        {isAdmin && (
-          <button
-            className={`py-3 px-6 font-medium text-sm border-b-2 transition-colors ${
-              activeTab === 'participants'
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-            }`}
-            onClick={() => setActiveTab('participants')}
-          >
-            Participants
-          </button>
-        )}
-      </div>
-
-      {activeTab === 'users' ? (
+    <div className="min-h-0 flex flex-col gap-6 -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16">
+      {activeView === 'users' ? (
         <div className="flex-1 min-h-0 flex flex-col gap-6">
           {isOfficeManager && (
             <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">

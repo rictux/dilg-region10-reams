@@ -109,7 +109,7 @@ const About: React.FC = () => {
   ];
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto pr-1 w-full space-y-8 pb-12">
+    <div className="min-h-0 overflow-y-auto -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16 space-y-8 pb-12">
       <div className="flex space-x-1 bg-slate-100/50 p-1 rounded-xl w-fit">
         <button
           type="button"

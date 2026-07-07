@@ -295,7 +295,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
   };
 
   const contentClass = isInternal
-    ? 'w-full h-full min-h-0 flex flex-col gap-6 overflow-y-auto lg:overflow-visible'
+    ? 'min-h-0 flex flex-col gap-6 overflow-y-auto lg:overflow-visible -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16'
     : 'min-h-screen bg-slate-50 flex flex-col items-center w-full px-3 py-5 sm:p-8';
 
   const renderPublicTimeline = () => {

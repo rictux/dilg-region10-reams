@@ -143,7 +143,7 @@ const Reports: React.FC = () => {
   }, [loading, selectedEvent, selectedEventId]);
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto pr-1 space-y-8">
+    <div className="min-h-0 overflow-y-auto -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16 space-y-8">
         {/* Filters */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
             <div className="flex flex-col md:flex-row gap-4 items-end">

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload, Eye, X, Trash2, Plus, Star, FileSignature, Megaphone } from 'lucide-react';
+import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload, Eye, X, Trash2, Plus, Star } from 'lucide-react';
 import { Event, Office } from '../../types/database';
 import AnnouncementManagement from './AnnouncementManagement';
 import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
@@ -123,14 +124,18 @@ type SignatoryRow = SignatoryState & {
   sort_order?: number | null;
 };
 
-type SettingsTab = 'signatories' | 'announcements';
-
 const Settings: React.FC = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'Admin';
   const isOfficeManager = user?.role === 'OfficeManager';
   const canManageCertificateSettings = isAdmin || isOfficeManager;
-  const [activeTab, setActiveTab] = useState<SettingsTab>('signatories');
+  const location = useLocation();
+  // View is driven by the sidebar submenu (/settings vs /settings?view=announcements);
+  // the Announcements view stays admin-only regardless of the URL.
+  const activeView =
+    isAdmin && new URLSearchParams(location.search).get('view') === 'announcements'
+      ? 'announcements'
+      : 'signatories';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -719,38 +724,9 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div className="h-full min-h-0 flex flex-col">
+    <div className="min-h-0 flex flex-col -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16">
       <div className="flex-1 min-h-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-        {isAdmin && (
-          <div className="flex items-center gap-1 border-b border-slate-200 bg-slate-50/70 px-4 pt-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab('signatories')}
-              className={`inline-flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-                activeTab === 'signatories'
-                  ? 'border-indigo-600 bg-white text-indigo-700'
-                  : 'border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-              }`}
-            >
-              <FileSignature className="h-4 w-4" />
-              Signatories
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('announcements')}
-              className={`inline-flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-                activeTab === 'announcements'
-                  ? 'border-indigo-600 bg-white text-indigo-700'
-                  : 'border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-              }`}
-            >
-              <Megaphone className="h-4 w-4" />
-              Announcements
-            </button>
-          </div>
-        )}
-
-        {activeTab === 'signatories' && (
+        {activeView === 'signatories' && (
         <>
         <div className="border-b border-slate-100 p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1085,8 +1061,8 @@ const Settings: React.FC = () => {
         </>
         )}
 
-        {/* Announcements Tab - Admin Only */}
-        {isAdmin && activeTab === 'announcements' && (
+        {/* Announcements view - Admin Only */}
+        {isAdmin && activeView === 'announcements' && (
           <div className="flex-1 min-h-0 overflow-y-auto p-4">
             <AnnouncementManagement />
           </div>

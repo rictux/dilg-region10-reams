@@ -871,7 +871,7 @@ const EventRegistration: React.FC = () => {
     <div className="min-h-screen bg-slate-50 py-8 sm:py-12 px-4 sm:px-6 lg:px-8 flex justify-center">
         <div className="max-w-3xl w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
             {/* Event Header */}
-            <div className="bg-[#0F0F0E] p-6 sm:p-8 text-white relative overflow-hidden">
+            <div className="bg-sidebar p-6 sm:p-8 text-white relative overflow-hidden">
                 {/* Grid texture */}
                 <div
                     className="absolute inset-0 opacity-[0.03]"

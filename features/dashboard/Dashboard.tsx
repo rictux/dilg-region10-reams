@@ -1,40 +1,22 @@
 
-import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
-import { 
+import {
+    Activity,
     Calendar as CalendarIcon,
     CheckCircle,
+    ClipboardList,
     Clock,
-    ChevronLeft,
-    ChevronRight,
     Users,
-    Briefcase,
+    UserPlus,
     MapPin,
-    Radio
+    Radio,
+    ScanLine
 } from 'lucide-react';
-import { 
-    format, 
-    startOfMonth, 
-    endOfMonth, 
-    startOfWeek, 
-    endOfWeek, 
-    eachDayOfInterval, 
-    isSameMonth, 
-    isSameDay, 
-    addMonths, 
-    subMonths,
-    parseISO,
-    isToday,
-    isWithinInterval,
-    startOfDay,
-    endOfDay,
-    isBefore,
-    isAfter,
-    differenceInDays
-} from 'date-fns';
+import { format, formatDistanceToNowStrict, isSameDay, parseISO } from 'date-fns';
 import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
 
 interface DashboardEvent {
@@ -44,18 +26,23 @@ interface DashboardEvent {
   start_date: string;
   end_date: string;
   registered_count: number;
-  present_count?: number; 
+  present_count?: number;
   status?: string;
+  session?: 'AM' | 'PM' | 'All_Day';
 }
 
-interface CalendarHoverCard {
-  event: DashboardEvent;
-  left: number;
-  top: number;
+interface ActivityLogItem {
+  key: string;
+  type: 'scan' | 'registration';
+  name: string;
+  eventName: string;
+  detail: string;
+  timestamp: string;
 }
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalEvents: 0,
     activeEvents: 0,
@@ -64,11 +51,8 @@ const Dashboard: React.FC = () => {
   });
   const [ongoingEvents, setOngoingEvents] = useState<DashboardEvent[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<DashboardEvent[]>([]);
-  const [calendarEvents, setCalendarEvents] = useState<DashboardEvent[]>([]); // Events for the calendar
-  const [currentDate, setCurrentDate] = useState(new Date()); // For Calendar Navigation
-  const [hoveredCalendarEvent, setHoveredCalendarEvent] = useState<CalendarHoverCard | null>(null);
+  const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const hideHoverCardTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -94,18 +78,6 @@ const Dashboard: React.FC = () => {
     };
   }, [user]);
 
-  useEffect(() => {
-    setHoveredCalendarEvent(null);
-  }, [currentDate]);
-
-  useEffect(() => {
-    return () => {
-      if (hideHoverCardTimerRef.current) {
-        window.clearTimeout(hideHoverCardTimerRef.current);
-      }
-    };
-  }, []);
-
   const fetchDashboardData = async () => {
     const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -122,16 +94,16 @@ const Dashboard: React.FC = () => {
             completedEvents: accessibleEvents.filter((event) => event.status === 'Completed').length
         });
 
-        // 2. On-going Events
+        // 2. On-going Events (happening today)
         const ongoingData = accessibleEvents.filter((event) => event.start_date <= today && event.end_date >= today);
-        
+
         const ongoingEventsWithCounts = await Promise.all((ongoingData || []).map(async (e) => {
             const { count: regCount } = await supabase
                 .from('event_participants')
                 .select('*', { count: 'exact', head: true })
                 .eq('event_id', e.event_id)
                 .eq('registration_status', 'Registered');
-            
+
             const { count: amCount } = await supabase
                 .from('attendance_logs')
                 .select('*', { count: 'exact', head: true })
@@ -159,7 +131,7 @@ const Dashboard: React.FC = () => {
                 .select('*', { count: 'exact', head: true })
                 .eq('event_id', e.event_id)
                 .eq('registration_status', 'Registered');
-            
+
             return {
                 ...e,
                 registered_count: regCount || 0
@@ -167,23 +139,52 @@ const Dashboard: React.FC = () => {
         }));
         setUpcomingEvents(upcomingEventsWithCounts);
 
-        // 4. All Events (For Calendar)
-        const allEventsData = accessibleEvents.filter((event) => event.status !== 'Cancelled');
-            
-        const mappedCalendarEvents = await Promise.all((allEventsData || []).map(async (e) => {
-            const { count: regCount } = await supabase
-                .from('event_participants')
-                .select('*', { count: 'exact', head: true })
-                .eq('event_id', e.event_id)
-                .eq('registration_status', 'Registered');
+        // 4. Activity logs: latest scans + registrations across accessible events
+        const accessibleIds = accessibleEvents.map((e) => e.event_id);
+        if (accessibleIds.length > 0) {
+            const [scanRes, regRes] = await Promise.all([
+                supabase
+                    .from('attendance_logs')
+                    .select('attendance_id, scan_time, action_session, participants(full_name), events(event_name)')
+                    .in('event_id', accessibleIds)
+                    .order('scan_time', { ascending: false })
+                    .limit(8),
+                supabase
+                    .from('event_participants')
+                    .select('id, registered_at, participants(full_name), events(event_name)')
+                    .in('event_id', accessibleIds)
+                    .eq('registration_status', 'Registered')
+                    .order('registered_at', { ascending: false })
+                    .limit(8)
+            ]);
 
-            return {
-                ...e,
-                registered_count: regCount || 0
-            };
-        }));
-        setCalendarEvents(mappedCalendarEvents);
+            const joined = (value: any) => (Array.isArray(value) ? value[0] : value);
+            const scans: ActivityLogItem[] = (scanRes.data || []).map((row: any) => ({
+                key: `scan-${row.attendance_id}`,
+                type: 'scan',
+                name: joined(row.participants)?.full_name || 'Unknown participant',
+                eventName: joined(row.events)?.event_name || '',
+                detail: `${row.action_session} check-in`,
+                timestamp: row.scan_time
+            }));
+            const registrations: ActivityLogItem[] = (regRes.data || []).map((row: any) => ({
+                key: `reg-${row.id}`,
+                type: 'registration',
+                name: joined(row.participants)?.full_name || 'Unknown participant',
+                eventName: joined(row.events)?.event_name || '',
+                detail: 'Registered',
+                timestamp: row.registered_at
+            }));
 
+            setActivityLogs(
+                [...scans, ...registrations]
+                    .filter((item) => item.timestamp)
+                    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                    .slice(0, 10)
+            );
+        } else {
+            setActivityLogs([]);
+        }
 
     } catch (e) {
         console.error("Error fetching dashboard data", e);
@@ -192,176 +193,17 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
-  const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
-  const mobileDisplayedOngoingEvents = ongoingEvents.slice(0, 3);
-  const mobileDisplayedUpcomingEvents = upcomingEvents.slice(0, 3);
-
-  // Calendar Generation Logic
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart);
-  const endDate = endOfWeek(monthEnd);
-  const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
-  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  // --- Slot Assignment Logic for Consistent Bar Positions ---
-  const eventPositions = useMemo(() => {
-    if (calendarEvents.length === 0) return {};
-
-    // 1. Filter events overlapping with current view
-    const visibleEvents = calendarEvents.filter(e => {
-        const start = parseISO(e.start_date);
-        const end = parseISO(e.end_date);
-        return start <= endDate && end >= startDate;
-    }).sort((a, b) => {
-        // Sort by start date ASC
-        const startA = parseISO(a.start_date).getTime();
-        const startB = parseISO(b.start_date).getTime();
-        if (startA !== startB) return startA - startB;
-        
-        // Then by duration DESC (Longer events on top usually looks better)
-        const durA = parseISO(a.end_date).getTime() - startA;
-        const durB = parseISO(b.end_date).getTime() - startB;
-        return durB - durA;
-    });
-
-    const positions: Record<number, number> = {};
-    const dayOccupancy: Record<string, boolean[]> = {};
-
-    visibleEvents.forEach(event => {
-        const start = parseISO(event.start_date);
-        const end = parseISO(event.end_date);
-        
-        // Clamp to visible range for calculation
-        const rangeStart = start < startDate ? startDate : start;
-        const rangeEnd = end > endDate ? endDate : end;
-        
-        const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
-        
-        // Find first slot index free for ALL days this event spans
-        let slot = 0;
-        while(true) {
-            let isFree = true;
-            for (const day of days) {
-                const dateKey = format(day, 'yyyy-MM-dd');
-                if (!dayOccupancy[dateKey]) dayOccupancy[dateKey] = [];
-                if (dayOccupancy[dateKey][slot]) {
-                    isFree = false;
-                    break;
-                }
-            }
-            if (isFree) break;
-            slot++;
-        }
-        
-        // Assign slot to event
-        positions[event.event_id] = slot;
-        
-        // Mark slot as occupied for these days
-        for (const day of days) {
-            const dateKey = format(day, 'yyyy-MM-dd');
-            if (!dayOccupancy[dateKey]) dayOccupancy[dateKey] = [];
-            dayOccupancy[dateKey][slot] = true;
-        }
-    });
-
-    return positions;
-  }, [calendarEvents, startDate, endDate]);
-
-  // Helper to determine event styling
-  const getEventStyle = (event: DashboardEvent, day: Date) => {
-      const start = parseISO(event.start_date);
-      const end = parseISO(event.end_date);
-      
-      const isStart = isSameDay(day, start);
-      const isEnd = isSameDay(day, end);
-      
-      // Determine color based on status
-      let baseColor = "bg-indigo-100 text-indigo-700 border-indigo-200";
-      if (event.status === 'Ongoing') baseColor = "bg-green-100 text-green-700 border-green-200";
-      if (event.status === 'Completed') baseColor = "bg-slate-100 text-slate-600 border-slate-200";
-      if (event.status === 'Cancelled') baseColor = "bg-red-50 text-red-600 border-red-100";
-
-      return {
-          className: `
-            ${baseColor}
-            text-xs h-5 mb-1 px-1 flex items-center
-            ${isStart ? 'rounded-l-md ml-1 border-l' : 'border-l-0 -ml-[1px]'}
-            ${isEnd ? 'rounded-r-md mr-1 border-r' : 'border-r-0 -mr-[1px]'}
-            ${!isStart && !isEnd ? 'rounded-none' : ''}
-            border-y cursor-pointer hover:brightness-95 transition-all
-            relative
-          `,
-          isStart,
-          isEnd
-      };
-  };
-
-  const getStatusBadgeClasses = (status?: string) => {
-    if (status === 'Ongoing') return 'bg-green-100 text-green-700 border-green-200';
-    if (status === 'Completed') return 'bg-slate-100 text-slate-600 border-slate-200';
-    if (status === 'Cancelled') return 'bg-red-50 text-red-600 border-red-100';
-    return 'bg-indigo-100 text-indigo-700 border-indigo-200';
-  };
-
-  const formatCalendarEventDateRange = (event: DashboardEvent) => {
+  const formatEventDates = (event: DashboardEvent) => {
     const start = parseISO(event.start_date);
     const end = parseISO(event.end_date);
-
-    if (isSameDay(start, end)) {
-      return format(start, 'MMM d, yyyy');
-    }
-
-    return `${format(start, 'MMM d, yyyy')} - ${format(end, 'MMM d, yyyy')}`;
+    if (isSameDay(start, end)) return format(start, 'yyyy-MM-dd');
+    return `${format(start, 'yyyy-MM-dd')} – ${format(end, 'MMM d')}`;
   };
 
-  const showCalendarEventDetails = (event: DashboardEvent, target: HTMLDivElement) => {
-    const targetRect = target.getBoundingClientRect();
-    const tooltipWidth = 400;
-    const tooltipHeight = 212;
-    const viewportPadding = 16;
-    const gap = 12;
-    const centeredLeft = targetRect.left + (targetRect.width / 2) - (tooltipWidth / 2);
-    const left = Math.min(
-      Math.max(centeredLeft, viewportPadding),
-      Math.max(window.innerWidth - tooltipWidth - viewportPadding, viewportPadding)
-    );
-    const spaceBelow = window.innerHeight - targetRect.bottom;
-    const spaceAbove = targetRect.top;
-    const showAbove = spaceBelow < tooltipHeight + gap && spaceAbove > tooltipHeight + gap;
-    const top = showAbove
-      ? Math.max(targetRect.top - tooltipHeight - gap, viewportPadding)
-      : Math.min(targetRect.bottom + gap, Math.max(window.innerHeight - tooltipHeight - viewportPadding, viewportPadding));
-
-    setHoveredCalendarEvent({
-      event,
-      left,
-      top
-    });
-  };
-
-  const scheduleHideCalendarEventDetails = () => {
-    if (hideHoverCardTimerRef.current) {
-      window.clearTimeout(hideHoverCardTimerRef.current);
-    }
-
-    hideHoverCardTimerRef.current = window.setTimeout(() => {
-      setHoveredCalendarEvent(null);
-      hideHoverCardTimerRef.current = null;
-    }, 100);
-  };
-
-  const cancelHideCalendarEventDetails = () => {
-    if (hideHoverCardTimerRef.current) {
-      window.clearTimeout(hideHoverCardTimerRef.current);
-      hideHoverCardTimerRef.current = null;
-    }
-  };
-
-  const hideCalendarEventDetails = () => {
-    cancelHideCalendarEventDetails();
-    setHoveredCalendarEvent(null);
+  const sessionLabel = (session?: DashboardEvent['session']) => {
+    if (session === 'AM') return 'AM';
+    if (session === 'PM') return 'PM';
+    return 'All Day';
   };
 
   const StatCard = ({ icon: Icon, label, value, color }: any) => (
@@ -376,320 +218,204 @@ const Dashboard: React.FC = () => {
     </div>
   );
 
-  const EventSection = ({
-    title,
-    icon: Icon,
-    iconColor,
-    events,
-    displayedEvents,
-    emptyText,
-    accentColor,
-    showPresentCount,
-    scrollable = false,
-    className = ''
-  }: {
-    title: string;
-    icon: any;
-    iconColor: string;
-    events: DashboardEvent[];
-    displayedEvents: DashboardEvent[];
-    emptyText: string;
-    accentColor: string;
-    showPresentCount: boolean;
-    scrollable?: boolean;
-    className?: string;
-  }) => (
-    <div className={`${scrollable ? 'flex min-h-0 flex-1 flex-col' : ''} ${className}`.trim()}>
-      <div className="flex items-center gap-2 pb-3 border-b border-black/[0.06] mb-3">
-        <Icon className={iconColor} size={15} />
-        <h3 className="text-sm font-medium text-[#111110]">{title}</h3>
-        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#E8E5DC]/70 text-[#6B6860] border border-black/[0.06] font-medium font-mono">
-          {events.length}
-        </span>
-      </div>
-      {events.length > 0 ? (
-        <div className={scrollable ? 'min-h-0 flex-1 overflow-y-auto pr-1' : ''}>
-          <div className="space-y-2">
-            {displayedEvents.map((event) => (
-              <div key={event.event_id} className="border border-black/[0.08] rounded-lg p-3 bg-white hover:border-[#4B3FE4]/30 transition-colors">
-                <div className="mb-2">
-                  <h4 className="text-[13px] sm:text-sm font-medium text-[#111110] line-clamp-2 leading-snug mb-1.5">{event.event_name}</h4>
-                  <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-[#6B6860] mb-1">
-                    <MapPin size={12} className="shrink-0" />
-                    <span className="truncate">{event.venue}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-[#6B6860]">
-                    <CalendarIcon size={12} className="shrink-0" />
-                    <span className="font-mono">{format(new Date(event.start_date), 'MMM d, yyyy')} – {format(new Date(event.end_date), 'MMM d, yyyy')}</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center gap-2 bg-[#F5F3EE] px-2.5 py-1.5 rounded-md border border-black/[0.05]">
-                  <div className="flex items-center justify-center gap-1.5 flex-1 border-r border-black/[0.08] pr-2">
-                    <p className="text-[9px] sm:text-[10px] text-[#6B6860] uppercase tracking-[0.1em] font-medium">Registered</p>
-                    <p className="text-[13px] sm:text-sm text-[#111110] leading-none font-mono font-medium">{event.registered_count}</p>
-                  </div>
-                  <div className="flex items-center justify-center gap-1.5 flex-1 pl-2">
-                    <p className="text-[9px] sm:text-[10px] text-[#6B6860] uppercase tracking-[0.1em] font-medium">Present</p>
-                    <p className={`text-[13px] sm:text-sm leading-none font-mono font-medium ${accentColor}`}>{showPresentCount ? event.present_count : '—'}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {!scrollable && events.length > displayedEvents.length && (
-              <p className="text-xs text-[#6B6860] text-right font-mono">
-                +{events.length - displayedEvents.length} more {title.toLowerCase().replace(/\s+/g, ' ')}(s)
-              </p>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="text-center py-6 text-[#9A9890] text-xs bg-[#F5F3EE] rounded-lg border border-black/[0.05]">
-          <Icon className="w-6 h-6 mb-2 mx-auto opacity-25" />
-          {emptyText}
-        </div>
-      )}
-    </div>
-  );
-
   return (
-    <div className="h-full min-h-0 overflow-y-auto lg:overflow-hidden pr-1 space-y-4">
+    <div className="min-h-0 overflow-y-auto -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16 space-y-4">
       {/* Top Stats Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard icon={CalendarIcon} label="Total Events" value={stats.totalEvents} color="bg-[#4B3FE4]/10 text-[#4B3FE4]" />
-        <StatCard icon={Radio} label="On-Going Events" value={stats.activeEvents} color="bg-emerald-50 text-emerald-600" />
+        <StatCard icon={Radio} label="On-going Events" value={stats.activeEvents} color="bg-emerald-50 text-emerald-600" />
         <StatCard icon={Clock} label="Upcoming Events" value={stats.upcomingEvents} color="bg-blue-50 text-blue-600" />
         <StatCard icon={CheckCircle} label="Completed Events" value={stats.completedEvents} color="bg-stone-100 text-stone-500" />
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4 lg:h-[calc(100%-112px)] lg:min-h-0">
-        {/* Main Column - Calendar */}
-        <div className="w-full lg:w-2/3 flex flex-col gap-4 lg:min-h-0">
-          <div className="lg:hidden bg-white rounded-lg p-4 border border-black/[0.08]">
-            <EventSection
-              title="On-Going Events"
-              icon={Clock}
-              iconColor="text-[#4B3FE4]"
-              events={ongoingEvents}
-              displayedEvents={mobileDisplayedOngoingEvents}
-              emptyText="No on-going events."
-              accentColor="text-[#4B3FE4]"
-              showPresentCount={true}
-            />
-          </div>
-
-          {/* Calendar */}
-          <div className="hidden lg:flex bg-white rounded-lg p-5 border border-black/[0.08] flex-col min-h-0 h-full">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-medium text-[#111110]">Event Calendar</h3>
-                <div className="flex items-center gap-3">
-                    <span className="text-sm text-[#111110] font-medium w-32 text-center font-mono">
-                        {format(currentDate, 'MMMM yyyy')}
-                    </span>
-                    <div className="flex gap-1">
-                        <button onClick={prevMonth} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#E8E5DC] text-[#6B6860] hover:text-[#111110] transition-colors">
-                            <ChevronLeft size={16} />
-                        </button>
-                        <button onClick={nextMonth} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#E8E5DC] text-[#6B6860] hover:text-[#111110] transition-colors">
-                            <ChevronRight size={16} />
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex-1 flex flex-col relative z-0">
-                <div className="grid grid-cols-7 mb-1">
-                    {weekDays.map(day => (
-                        <div key={day} className="text-center text-[10px] font-medium text-[#9A9890] uppercase tracking-wider py-1.5 font-mono">
-                            {day}
-                        </div>
-                    ))}
-                </div>
-                
-                <div className="relative grid grid-cols-7 auto-rows-fr gap-px bg-black/[0.06] border border-black/[0.08] rounded-lg overflow-hidden flex-1">
-                    {calendarDays.map((day, idx) => {
-                        const isCurrentMonth = isSameMonth(day, monthStart);
-                        const isTodayDate = isToday(day);
-                        
-                        const activeEvents = calendarEvents.filter(e => {
-                            const start = startOfDay(parseISO(e.start_date));
-                            const end = endOfDay(parseISO(e.end_date));
-                            return isWithinInterval(day, { start, end });
-                        });
-
-                        const hasEvents = activeEvents.length > 0;
-                        const slots: Record<number, DashboardEvent> = {};
-                        let maxSlotIndex = -1;
-
-                        activeEvents.forEach(e => {
-                            const pos = eventPositions[e.event_id];
-                            if (pos !== undefined) {
-                                slots[pos] = e;
-                                if (pos > maxSlotIndex) maxSlotIndex = pos;
-                            }
-                        });
-
-                        const renderSlots = [];
-                        for (let i = 0; i <= maxSlotIndex; i++) {
-                            const event = slots[i];
-                            if (event) {
-                                const { className, isStart } = getEventStyle(event, day);
-                                const isDisplayStart = isStart || day.getDay() === 0 || day.getDate() === 1;
-                                
-                                let spanWidth = 'calc(100% - 8px)';
-                                if (isDisplayStart) {
-                                    const endOfWeekDay = endOfWeek(day);
-                                    const eventEnd = startOfDay(parseISO(event.end_date));
-                                    const endToUse = isBefore(eventEnd, endOfWeekDay) ? eventEnd : endOfWeekDay;
-                                    const daysSpan = differenceInDays(endToUse, startOfDay(day)) + 1;
-                                    spanWidth = `calc(${daysSpan * 100}% + ${(daysSpan - 1) * 1 - 8}px)`;
-                                }
-
-                                renderSlots.push(
-                                    <div 
-                                        key={`${event.event_id}-${day.toISOString()}`} 
-                                        className={`${className} relative focus:outline-none focus:ring-2 focus:ring-indigo-300`}
-                                        title={`${event.event_name} (${event.status})`}
-                                        onMouseEnter={(e) => {
-                                          cancelHideCalendarEventDetails();
-                                          showCalendarEventDetails(event, e.currentTarget);
-                                        }}
-                                        onMouseLeave={scheduleHideCalendarEventDetails}
-                                        onFocus={(e) => {
-                                          cancelHideCalendarEventDetails();
-                                          showCalendarEventDetails(event, e.currentTarget);
-                                        }}
-                                        onBlur={hideCalendarEventDetails}
-                                        tabIndex={0}
-                                    >
-                                        {isDisplayStart && (
-                                            <span 
-                                                className="absolute left-1 truncate font-medium z-50 pointer-events-none"
-                                                style={{ width: spanWidth }}
-                                            >
-                                                {event.event_name}
-                                            </span>
-                                        )}
-                                        <span className="opacity-0 select-none truncate">{event.event_name}</span>
-                                    </div>
-                                );
-                            } else {
-                                renderSlots.push(<div key={`spacer-${i}`} className="h-5 mb-1"></div>);
-                            }
-                        }
-
-                        return (
-                            <div 
-                                key={idx} 
-                                className={`
-                                    min-h-[82px] flex flex-col relative group
-                                    ${isCurrentMonth ? 'bg-white' : 'bg-[#F5F3EE]/60 text-[#C5C2BA]'}
-                                    ${isTodayDate ? '!bg-[#4B3FE4]/[0.04]' : ''}
-                                    transition-colors hover:bg-[#F5F3EE]
-                                `}
-                                style={{ zIndex: calendarDays.length - idx }}
-                            >
-                                <div className="text-xs font-medium p-1.5 flex justify-between items-center">
-                                    <span className={`
-                                        w-6 h-6 flex items-center justify-center rounded-full transition-all text-[11px] font-mono
-                                        ${isTodayDate
-                                            ? 'bg-[#4B3FE4] text-white font-semibold'
-                                            : hasEvents && isCurrentMonth
-                                                ? 'bg-[#4B3FE4]/10 text-[#4B3FE4] font-semibold'
-                                                : 'text-[#6B6860] group-hover:bg-[#E8E5DC]'
-                                        }
-                                    `}>
-                                        {format(day, 'd')}
-                                    </span>
-                                </div>
-                                
-                                <div className="flex-1 flex flex-col pb-1">
-                                    {renderSlots}
-                                </div>
-                            </div>
-                        );
-                    })}
-
-                </div>
-            </div>
-          </div>
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
+        <div className="w-full lg:flex-1 min-w-0 space-y-4">
+      {/* Happening Today hero */}
+      <div className="bg-white rounded-lg border border-black/[0.08] overflow-hidden">
+        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-black/[0.06] bg-emerald-50/40">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+          </span>
+          <h3 className="text-sm font-semibold text-[#111110] uppercase tracking-[0.08em]">Happening Today</h3>
+          <span className="text-[10px] min-w-[1.25rem] text-center px-1.5 py-0.5 rounded-full font-medium font-mono bg-emerald-100 text-emerald-700">
+            {ongoingEvents.length}
+          </span>
+          <span className="ml-auto text-xs text-[#6B6860] font-mono">{format(new Date(), 'MMMM d, yyyy')}</span>
         </div>
 
-        {/* Right Column - Event Lists */}
-        <div className="w-full lg:w-1/3 flex flex-col gap-4 lg:min-h-0">
-          <div className="bg-white rounded-lg p-4 border border-black/[0.08] flex flex-col gap-5 lg:grid lg:grid-rows-2 lg:gap-4 lg:min-h-0 lg:h-full lg:overflow-hidden">
-            {/* Ongoing Events */}
-            <div className="hidden lg:flex lg:min-h-0">
-              <EventSection
-                title="On-Going Events"
-                icon={Clock}
-                iconColor="text-[#4B3FE4]"
-                events={ongoingEvents}
-                displayedEvents={ongoingEvents}
-                emptyText="No on-going events."
-                accentColor="text-[#4B3FE4]"
-                showPresentCount={true}
-                scrollable={true}
-                className="flex-1"
-              />
-            </div>
+        {ongoingEvents.length > 0 ? (
+          <div className="divide-y divide-black/[0.04]">
+            {ongoingEvents.map((event) => {
+              const attendanceRatio = event.registered_count > 0
+                ? Math.min((event.present_count ?? 0) / event.registered_count, 1)
+                : 0;
 
-            {/* Upcoming Events */}
-            <div className="lg:hidden">
-              <EventSection
-                title="Upcoming Events"
-                icon={CalendarIcon}
-                iconColor="text-blue-600"
-                events={upcomingEvents}
-                displayedEvents={mobileDisplayedUpcomingEvents}
-                emptyText="No upcoming events."
-                accentColor="text-blue-600"
-                showPresentCount={false}
-              />
-            </div>
-            <div className="hidden lg:flex lg:min-h-0">
-              <EventSection
-                title="Upcoming Events"
-                icon={CalendarIcon}
-                iconColor="text-blue-600"
-                events={upcomingEvents}
-                displayedEvents={upcomingEvents}
-                emptyText="No upcoming events."
-                accentColor="text-blue-600"
-                showPresentCount={false}
-                scrollable={true}
-                className="flex-1"
-              />
-            </div>
+              return (
+                <div key={event.event_id} className="p-4 flex flex-col gap-3 md:flex-row md:items-center md:gap-6">
+                  {/* Event identity */}
+                  <div
+                    onClick={() => navigate(`/events?event=${event.event_id}`)}
+                    title="View participants"
+                    className="min-w-0 flex-1 cursor-pointer group"
+                  >
+                    <p className="text-sm font-semibold text-[#111110] leading-snug line-clamp-1 group-hover:text-[#4B3FE4] transition-colors">
+                      {event.event_name}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[#6B6860]">
+                      <span className="flex items-center gap-1.5">
+                        <Clock size={12} className="shrink-0 text-[#9A9890]" />
+                        <span className="font-mono">{formatEventDates(event)}</span>
+                        <span className="text-[#C5C2BA]">·</span>
+                        <span className="font-mono">{sessionLabel(event.session)}</span>
+                      </span>
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <MapPin size={12} className="shrink-0 text-[#9A9890]" />
+                        <span className="truncate max-w-[20rem]">{event.venue}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Live attendance */}
+                  <div className="w-full md:w-56 shrink-0">
+                    <div className="flex items-baseline justify-between gap-2 mb-1">
+                      <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-[#9A9890]">Present</span>
+                      <span className="text-xs font-mono text-[#111110]">
+                        <span className="font-semibold text-emerald-600">{event.present_count ?? 0}</span>
+                        <span className="text-[#9A9890]"> / {event.registered_count} registered</span>
+                      </span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-[#E8E5DC]/60 overflow-hidden">
+                      <div
+                        className="h-full rounded-r-full bg-emerald-500 transition-all duration-300"
+                        style={{ width: `${Math.max(attendanceRatio * 100, 2)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Quick actions */}
+                  <div className="flex gap-2 shrink-0">
+                    {hasPermission('SCAN_QR') && (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/scan')}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#4B3FE4] px-3 text-xs font-medium text-white shadow-sm transition-colors hover:bg-[#3B30C4]"
+                      >
+                        <ScanLine size={13} />
+                        Scan
+                      </button>
+                    )}
+                    {hasPermission('VIEW_PARTICIPANTS') && (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/attendance')}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-black/10 bg-white px-3 text-xs font-medium text-[#111110] shadow-sm transition-colors hover:bg-[#F5F3EE]"
+                      >
+                        <ClipboardList size={13} />
+                        Attendance
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        ) : (
+          <p className="py-10 text-center text-xs text-[#9A9890]">{loading ? 'Loading…' : 'No events happening today.'}</p>
+        )}
+      </div>
+
+      {/* Upcoming Events */}
+      <div className="bg-white rounded-lg border border-black/[0.08]">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-black/[0.06]">
+          <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-blue-50 text-blue-600">
+            <Clock size={13} />
+          </span>
+          <h3 className="text-sm font-semibold text-[#111110]">Upcoming Events</h3>
+          <span className="text-[10px] min-w-[1.25rem] text-center px-1.5 py-0.5 rounded-full font-medium font-mono bg-blue-50 text-blue-700">
+            {upcomingEvents.length}
+          </span>
+          <button
+            type="button"
+            onClick={() => navigate('/events')}
+            className="ml-auto text-xs font-medium text-[#4B3FE4] hover:text-[#3B30C4] hover:underline transition-colors"
+          >
+            View all
+          </button>
+        </div>
+        {upcomingEvents.length > 0 ? (
+          <div className="divide-y divide-black/[0.04] px-4">
+            {upcomingEvents.map((event) => (
+              <div
+                key={event.event_id}
+                onClick={() => navigate(`/events?event=${event.event_id}`)}
+                title="View participants"
+                className="flex items-start gap-2.5 py-3 -mx-4 px-4 cursor-pointer hover:bg-[#F5F3EE]/60 transition-colors"
+              >
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#4B3FE4]" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-semibold text-[#111110] leading-snug line-clamp-1">{event.event_name}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[#6B6860]">
+                    <span className="flex items-center gap-1.5">
+                      <Clock size={12} className="shrink-0 text-[#9A9890]" />
+                      <span className="font-mono">{formatEventDates(event)}</span>
+                      <span className="text-[#C5C2BA]">·</span>
+                      <span className="font-mono">{sessionLabel(event.session)}</span>
+                    </span>
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <MapPin size={12} className="shrink-0 text-[#9A9890]" />
+                      <span className="truncate max-w-[16rem]">{event.venue}</span>
+                    </span>
+                  </div>
+                </div>
+                <span className="flex shrink-0 items-center gap-1.5 text-xs text-[#6B6860]" title="Registered">
+                  <Users size={13} className="text-[#9A9890]" />
+                  <span className="font-mono">{event.registered_count}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="py-10 text-center text-xs text-[#9A9890]">{loading ? 'Loading…' : 'No upcoming events.'}</p>
+        )}
+      </div>
+        </div>
+
+        {/* Activity Logs rail */}
+        <div className="w-full lg:w-[30%] xl:w-[28%] shrink-0 bg-white rounded-lg border border-black/[0.08]">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-black/[0.06]">
+            <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-[#4B3FE4]/10 text-[#4B3FE4]">
+              <Activity size={13} />
+            </span>
+            <h3 className="text-sm font-semibold text-[#111110]">Activity Logs</h3>
+          </div>
+          {activityLogs.length > 0 ? (
+            <div className="divide-y divide-black/[0.04]">
+              {activityLogs.map((item) => (
+                <div key={item.key} className="flex items-start gap-2.5 px-4 py-2.5">
+                  <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
+                    item.type === 'scan' ? 'bg-emerald-50 text-emerald-600' : 'bg-[#4B3FE4]/10 text-[#4B3FE4]'
+                  }`}>
+                    {item.type === 'scan' ? <ScanLine size={12} /> : <UserPlus size={12} />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs leading-snug text-[#111110]">
+                      <span className="font-semibold">{item.name}</span>
+                      <span className="text-[#6B6860]"> · {item.detail}</span>
+                    </p>
+                    <p className="mt-0.5 truncate text-[11px] text-[#9A9890]">{item.eventName}</p>
+                  </div>
+                  <span className="shrink-0 text-[10px] font-mono text-[#9A9890]" title={format(parseISO(item.timestamp), 'MMM d, yyyy h:mm a')}>
+                    {formatDistanceToNowStrict(parseISO(item.timestamp), { addSuffix: true })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="py-10 text-center text-xs text-[#9A9890]">{loading ? 'Loading…' : 'No recent activity.'}</p>
+          )}
         </div>
       </div>
-      {hoveredCalendarEvent && createPortal(
-        <div
-          className="fixed z-[200] w-[400px] rounded-lg border border-black/10 bg-white p-4 shadow-xl"
-          style={{
-            left: hoveredCalendarEvent.left,
-            top: hoveredCalendarEvent.top
-          }}
-          onMouseEnter={cancelHideCalendarEventDetails}
-          onMouseLeave={hideCalendarEventDetails}
-        >
-          <div className="space-y-1.5">
-            <p className="text-[13px] font-semibold leading-5 text-slate-800">
-              {hoveredCalendarEvent.event.event_name}
-            </p>
-            <p className="text-[12px] leading-5 text-slate-600">
-              {hoveredCalendarEvent.event.venue || 'Venue not set'}
-            </p>
-            <p className="text-[12px] leading-5 text-slate-600">
-              {formatCalendarEventDateRange(hoveredCalendarEvent.event)}
-            </p>
-            <p className="text-[12px] font-medium leading-5 text-slate-700">
-              Registered: <span className="font-semibold text-slate-800">{hoveredCalendarEvent.event.registered_count}</span>
-            </p>
-          </div>
-        </div>,
-        document.body
-      )}
     </div>
   );
 };
