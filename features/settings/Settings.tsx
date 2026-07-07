@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload, Eye, X, Trash2, Plus, Star } from 'lucide-react';
+import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload, Eye, X, Trash2, Plus, Star, FileSignature, Megaphone } from 'lucide-react';
 import { Event, Office } from '../../types/database';
 import AnnouncementManagement from './AnnouncementManagement';
 import AppearanceSettings from './AppearanceSettings';
@@ -124,6 +124,8 @@ type SignatoryRow = SignatoryState & {
   active?: boolean | null;
   sort_order?: number | null;
 };
+
+type SettingsTab = 'signatories' | 'announcements';
 
 const Settings: React.FC = () => {
   const { user } = useAuth();
