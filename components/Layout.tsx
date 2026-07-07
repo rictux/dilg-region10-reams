@@ -626,7 +626,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </button>
         <button
             onClick={() => {
-                navigate('/settings');
+                navigate('/settings?view=appearance');
                 setIsProfileDropdownOpen(false);
             }}
             className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
