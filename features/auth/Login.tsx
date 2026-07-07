@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Lock, User, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
+import AuthBrandPanel from './AuthBrandPanel';
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -65,10 +66,10 @@ const Login: React.FC = () => {
 
   if (loading && !isLoading) {
     return (
-      <div className="min-h-screen bg-[#F5F3EE] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <div className="flex flex-col items-center">
-          <Loader2 className="animate-spin h-8 w-8 text-[#4B3FE4] mb-4" />
-          <p className="text-[#6B6860] text-sm">Loading...</p>
+          <Loader2 className="animate-spin h-8 w-8 text-indigo-600 mb-4" />
+          <p className="text-slate-600 text-sm">Loading...</p>
         </div>
       </div>
     );
@@ -79,64 +80,23 @@ const Login: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F3EE] flex">
+    <div className="min-h-screen bg-slate-50 flex">
       {/* Left panel — branding */}
-      <div className="hidden lg:flex lg:w-[45%] bg-sidebar flex-col justify-between p-12 relative overflow-hidden">
-        {/* Grid texture */}
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-          }}
-        />
-        {/* Accent glow */}
-        <div className="absolute top-1/3 -left-24 w-96 h-96 bg-[#4B3FE4]/20 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative">
-          <div className="flex items-center gap-3 mb-16">
-            <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center overflow-hidden">
-              <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" />
-            </div>
-            <span className="text-white text-base font-medium tracking-wide font-mono">REAMS</span>
-          </div>
-
-          <div>
-            <h1 className="text-4xl font-semibold text-white leading-tight mb-4">
-              Manage events<br />with precision.
-            </h1>
-            <p className="text-white/45 text-base leading-relaxed max-w-xs">
-              Regional Event &amp; Attendance Management System — a complete portal for event
-              registration, attendance tracking, and participant management.
-            </p>
-          </div>
-        </div>
-
-        {/* Footer strip */}
-        <div className="relative pt-8 border-t border-white/[0.08]">
-          <p className="text-xs text-white/35">
-            Department of the Interior and Local Government
-          </p>
-          <p className="text-xs text-white/25 mt-1 font-mono">
-            © 2026 · Created by RICTU X
-          </p>
-        </div>
-      </div>
+      <AuthBrandPanel />
 
       {/* Right panel — form */}
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex items-center gap-2.5 mb-10 lg:hidden">
-            <div className="w-7 h-7 bg-white border border-black/[0.08] rounded flex items-center justify-center overflow-hidden">
-              <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" />
+            <div className="w-7 h-7 bg-white border border-[rgb(var(--ink)/0.08)] rounded-full flex items-center justify-center overflow-hidden">
+              <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain rounded-full" />
             </div>
-            <span className="text-[#111110] text-sm font-medium font-mono">REAMS</span>
+            <span className="text-slate-900 text-sm font-medium font-mono">REAMS</span>
           </div>
 
-          <h2 className="text-2xl font-semibold text-[#111110] mb-1">Sign in</h2>
-          <p className="text-sm text-[#6B6860] mb-8">
+          <h2 className="text-2xl font-semibold text-slate-900 mb-1">Sign in</h2>
+          <p className="text-sm text-slate-600 mb-8">
             Enter your credentials to access the portal
           </p>
 
@@ -148,36 +108,36 @@ const Login: React.FC = () => {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-[#111110] mb-1.5">Username</label>
+              <label className="block text-xs font-medium text-slate-900 mb-1.5">Username</label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
-                  className="w-full pl-9 pr-3 h-10 text-sm rounded-md bg-white border border-black/10 focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors"
+                  className="w-full pl-9 pr-3 h-10 text-sm rounded-md bg-card border border-[rgb(var(--ink)/0.10)] focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                   placeholder="Enter your username"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#111110] mb-1.5">Password</label>
+              <label className="block text-xs font-medium text-slate-900 mb-1.5">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full pl-9 pr-10 h-10 text-sm rounded-md bg-white border border-black/10 focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors"
+                  className="w-full pl-9 pr-10 h-10 text-sm rounded-md bg-card border border-[rgb(var(--ink)/0.10)] focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9A9890] hover:text-[#6B6860] focus:outline-none transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -191,9 +151,9 @@ const Login: React.FC = () => {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 accent-[#4B3FE4] border-black/10 rounded"
+                className="h-4 w-4 accent-indigo-600 border-[rgb(var(--ink)/0.10)] rounded"
               />
-              <label htmlFor="remember-me" className="ml-2 block text-xs text-[#4A4843]">
+              <label htmlFor="remember-me" className="ml-2 block text-xs text-slate-700">
                 Remember me
               </label>
             </div>
@@ -201,7 +161,7 @@ const Login: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 h-10 bg-[#4B3FE4] text-white text-sm font-medium rounded-md hover:bg-[#3B30C4] transition-colors mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 h-10 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <>
@@ -218,10 +178,10 @@ const Login: React.FC = () => {
 
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-black/[0.08]"></div>
+                <div className="w-full border-t border-[rgb(var(--ink)/0.08)]"></div>
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="px-2 bg-[#F5F3EE] text-[#6B6860]">Or continue with</span>
+                <span className="px-2 bg-slate-50 text-slate-600">Or continue with</span>
               </div>
             </div>
 
@@ -229,7 +189,7 @@ const Login: React.FC = () => {
               type="button"
               onClick={() => loginWithGoogle()}
               disabled={isLoading}
-              className="w-full h-10 bg-white border border-black/10 text-[#111110] text-sm font-medium rounded-md hover:bg-white/60 hover:border-black/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+              className="w-full h-10 bg-card border border-[rgb(var(--ink)/0.10)] text-slate-900 text-sm font-medium rounded-md hover:bg-card/60 hover:border-[rgb(var(--ink)/0.20)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path
@@ -252,9 +212,9 @@ const Login: React.FC = () => {
               Sign in with Google
             </button>
 
-            <p className="text-center text-xs text-[#6B6860] mt-6">
+            <p className="text-center text-xs text-slate-600 mt-6">
               Don't have an account?{' '}
-              <Link to="/signup" className="text-[#4B3FE4] hover:underline font-medium">
+              <Link to="/signup" className="text-indigo-600 hover:underline font-medium">
                 Sign up
               </Link>
             </p>

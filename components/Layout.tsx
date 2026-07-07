@@ -36,7 +36,8 @@ import {
   Award,
   Gift,
   FileSignature,
-  Megaphone
+  Megaphone,
+  Palette
 } from 'lucide-react';
 import { Permission } from '../config/permissions';
 
@@ -53,9 +54,16 @@ const USERS_SUBMENU = [
   { name: 'Participant', icon: Contact, view: 'participants', adminOnly: true },
 ];
 
-const SETTINGS_SUBMENU = [
-  { name: 'Signatories',   icon: FileSignature, view: 'signatories',   adminOnly: false },
+const SETTINGS_SUBMENU: {
+  name: string;
+  icon: React.ElementType;
+  view: string;
+  adminOnly?: boolean;
+  permission?: Permission;
+}[] = [
+  { name: 'Signatories',   icon: FileSignature, view: 'signatories',   permission: 'MANAGE_CERTIFICATE_SETTINGS' },
   { name: 'Announcements', icon: Megaphone,     view: 'announcements', adminOnly: true },
+  { name: 'Appearance',    icon: Palette,       view: 'appearance' }, // available to every user
 ];
 
 interface LayoutProps {
@@ -71,11 +79,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Header page search (command-palette style, permission-aware)
+  // Header page search (command-palette modal, permission-aware, Ctrl+K)
   const [pageSearchQuery, setPageSearchQuery] = useState('');
   const [isPageSearchOpen, setIsPageSearchOpen] = useState(false);
   const [pageSearchIndex, setPageSearchIndex] = useState(0);
-  const pageSearchRef = useRef<HTMLDivElement>(null);
+  const pageSearchInputRef = useRef<HTMLInputElement>(null);
 
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -113,7 +121,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isSettingsActive = location.pathname === '/settings';
   const activeSettingsView = new URLSearchParams(location.search).get('view') || 'signatories';
   const [settingsOpen, setSettingsOpen] = useState(isSettingsActive);
-  const settingsSubmenu = SETTINGS_SUBMENU.filter((child) => !child.adminOnly || user?.role === 'Admin');
+  const settingsSubmenu = SETTINGS_SUBMENU.filter(
+    (child) =>
+      (!child.adminOnly || user?.role === 'Admin') &&
+      (!child.permission || hasPermission(child.permission))
+  );
 
   useEffect(() => {
     if (isReportsActive) setReportsOpen(true);
@@ -149,13 +161,31 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsProfileDropdownOpen(false);
       }
-      if (pageSearchRef.current && !pageSearchRef.current.contains(event.target as Node)) {
-        setIsPageSearchOpen(false);
-      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Ctrl+K / Cmd+K opens the search palette from anywhere
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setIsPageSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, []);
+
+  // Reset and focus the palette input each time it opens
+  useEffect(() => {
+    if (isPageSearchOpen) {
+      setPageSearchQuery('');
+      setPageSearchIndex(0);
+      requestAnimationFrame(() => pageSearchInputRef.current?.focus());
+    }
+  }, [isPageSearchOpen]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -293,14 +323,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <Icon
           size={16}
           className={`shrink-0 transition-colors ${
-            isActive ? 'text-[#8B82F0]' : 'text-white/30 group-hover:text-white/50'
+            isActive ? 'text-indigo-400' : 'text-white/30 group-hover:text-white/50'
           }`}
           aria-hidden="true"
         />
         {!shouldCollapseSidebarContent && (
           <>
             <span className="app-nav-label flex-1 text-left truncate">{label}</span>
-            {isActive && <div className="w-1 h-1 rounded-full bg-[#8B82F0]" />}
+            {isActive && <div className="w-1 h-1 rounded-full bg-indigo-400" />}
           </>
         )}
       </button>
@@ -326,14 +356,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             className="fixed inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setIsPasswordModalOpen(false)}
         ></div>
-        <div className="bg-white border border-black/10 rounded-lg shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-5 py-4 border-b border-black/[0.06] flex justify-between items-center">
-                <h3 className="text-sm font-medium text-[#111110] flex items-center gap-2">
-                    <KeyRound size={16} className="text-[#4B3FE4]" /> Change Password
+        <div className="bg-card border border-[rgb(var(--ink)/0.10)] rounded-lg shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-5 py-4 border-b border-[rgb(var(--ink)/0.06)] flex justify-between items-center">
+                <h3 className="text-sm font-medium text-slate-900 flex items-center gap-2">
+                    <KeyRound size={16} className="text-indigo-600" /> Change Password
                 </h3>
                 <button
                     onClick={() => setIsPasswordModalOpen(false)}
-                    className="text-[#6B6860] hover:text-[#111110] p-1 hover:bg-[#E8E5DC] rounded-md transition"
+                    className="text-slate-600 hover:text-slate-900 p-1 hover:bg-slate-100 rounded-md transition"
                 >
                     <X size={16} />
                 </button>
@@ -353,38 +383,38 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             </div>
                         )}
                         <div>
-                            <label className="block text-xs font-medium text-[#111110] mb-1.5">New Password</label>
+                            <label className="block text-xs font-medium text-slate-900 mb-1.5">New Password</label>
                             <div className="relative">
                                 <input
                                     type={showNewPw ? "text" : "password"}
                                     required
-                                    className="w-full px-3 py-2 pr-10 text-sm bg-white border border-black/10 rounded-md focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors"
+                                    className="w-full px-3 py-2 pr-10 text-sm bg-card border border-[rgb(var(--ink)/0.10)] rounded-md focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                     value={pwForm.new}
                                     onChange={e => setPwForm({...pwForm, new: e.target.value})}
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowNewPw(!showNewPw)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9A9890] hover:text-[#6B6860] focus:outline-none"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
                                 >
                                     {showNewPw ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
                             </div>
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-[#111110] mb-1.5">Confirm New Password</label>
+                            <label className="block text-xs font-medium text-slate-900 mb-1.5">Confirm New Password</label>
                             <div className="relative">
                                 <input
                                     type={showConfirmPw ? "text" : "password"}
                                     required
-                                    className="w-full px-3 py-2 pr-10 text-sm bg-white border border-black/10 rounded-md focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors"
+                                    className="w-full px-3 py-2 pr-10 text-sm bg-card border border-[rgb(var(--ink)/0.10)] rounded-md focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                     value={pwForm.confirm}
                                     onChange={e => setPwForm({...pwForm, confirm: e.target.value})}
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowConfirmPw(!showConfirmPw)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9A9890] hover:text-[#6B6860] focus:outline-none"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
                                 >
                                     {showConfirmPw ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
@@ -393,7 +423,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         <button
                             type="submit"
                             disabled={pwStatus === 'loading'}
-                            className="w-full h-10 bg-[#4B3FE4] text-white text-sm font-medium rounded-md hover:bg-[#3B30C4] transition-colors flex justify-center items-center gap-2 mt-2"
+                            className="w-full h-10 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors flex justify-center items-center gap-2 mt-2"
                         >
                             {pwStatus === 'loading' && <Loader2 className="animate-spin" size={16} />}
                             Update Password
@@ -414,17 +444,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 setIsEditingProfile(false);
             }}
         ></div>
-        <div className="bg-white border border-black/10 rounded-lg shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-5 py-4 border-b border-black/[0.06] flex justify-between items-center">
-                <h3 className="text-sm font-medium text-[#111110] flex items-center gap-2">
-                    <User size={16} className="text-[#4B3FE4]" /> {isEditingProfile ? 'Edit Profile' : 'User Profile'}
+        <div className="bg-card border border-[rgb(var(--ink)/0.10)] rounded-lg shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-5 py-4 border-b border-[rgb(var(--ink)/0.06)] flex justify-between items-center">
+                <h3 className="text-sm font-medium text-slate-900 flex items-center gap-2">
+                    <User size={16} className="text-indigo-600" /> {isEditingProfile ? 'Edit Profile' : 'User Profile'}
                 </h3>
                 <button
                     onClick={() => {
                         setIsProfileModalOpen(false);
                         setIsEditingProfile(false);
                     }}
-                    className="text-[#6B6860] hover:text-[#111110] p-1 hover:bg-[#E8E5DC] rounded-md transition"
+                    className="text-slate-600 hover:text-slate-900 p-1 hover:bg-slate-100 rounded-md transition"
                 >
                     <X size={16} />
                 </button>
@@ -438,34 +468,34 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </div>
                 ) : !isEditingProfile ? (
                     <div className="flex flex-col items-center">
-                        <div className="w-20 h-20 rounded-full bg-[#4B3FE4]/10 border border-[#4B3FE4]/20 flex items-center justify-center text-[#4B3FE4] font-medium text-2xl overflow-hidden mb-4">
+                        <div className="w-20 h-20 rounded-full bg-indigo-600/10 border border-indigo-600/20 flex items-center justify-center text-indigo-600 font-medium text-2xl overflow-hidden mb-4">
                             {user?.img_link ? (
                                 <img src={user.img_link} alt="User Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                             ) : (
                                 user?.full_name?.charAt(0) || <User size={32} />
                             )}
                         </div>
-                        <h2 className="text-lg font-medium text-[#111110]">{user?.full_name}</h2>
-                        <p className="text-sm text-[#6B6860] mb-6">{user?.position || 'No Position Set'}</p>
+                        <h2 className="text-lg font-medium text-slate-900">{user?.full_name}</h2>
+                        <p className="text-sm text-slate-600 mb-6">{user?.position || 'No Position Set'}</p>
 
                         <div className="w-full space-y-0 mb-6">
-                            <div className="flex justify-between items-center py-2.5 border-b border-black/[0.06]">
-                                <span className="text-xs text-[#6B6860]">Email</span>
-                                <span className="text-sm text-[#111110] font-mono">{user?.email}</span>
+                            <div className="flex justify-between items-center py-2.5 border-b border-[rgb(var(--ink)/0.06)]">
+                                <span className="text-xs text-slate-600">Email</span>
+                                <span className="text-sm text-slate-900 font-mono">{user?.email}</span>
                             </div>
-                            <div className="flex justify-between items-center py-2.5 border-b border-black/[0.06]">
-                                <span className="text-xs text-[#6B6860]">Username</span>
-                                <span className="text-sm text-[#111110] font-mono">{user?.username}</span>
+                            <div className="flex justify-between items-center py-2.5 border-b border-[rgb(var(--ink)/0.06)]">
+                                <span className="text-xs text-slate-600">Username</span>
+                                <span className="text-sm text-slate-900 font-mono">{user?.username}</span>
                             </div>
-                            <div className="flex justify-between items-center py-2.5 border-b border-black/[0.06]">
-                                <span className="text-xs text-[#6B6860]">Role</span>
-                                <span className="text-sm text-[#111110] capitalize font-mono">{user?.role}</span>
+                            <div className="flex justify-between items-center py-2.5 border-b border-[rgb(var(--ink)/0.06)]">
+                                <span className="text-xs text-slate-600">Role</span>
+                                <span className="text-sm text-slate-900 capitalize font-mono">{user?.role}</span>
                             </div>
                         </div>
 
                         <button
                             onClick={() => setIsEditingProfile(true)}
-                            className="w-full h-10 bg-[#EDEAE2] text-[#111110] text-sm font-medium rounded-md hover:bg-[#E0DDD4] transition-colors flex justify-center items-center gap-2"
+                            className="w-full h-10 bg-slate-100 text-slate-900 text-sm font-medium rounded-md hover:bg-slate-200 transition-colors flex justify-center items-center gap-2"
                         >
                             Edit Profile Information
                         </button>
@@ -478,7 +508,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             </div>
                         )}
                         <div className="flex flex-col items-center mb-4">
-                            <div className="relative w-20 h-20 rounded-full bg-[#4B3FE4]/10 border border-[#4B3FE4]/20 flex items-center justify-center text-[#4B3FE4] font-medium text-2xl overflow-hidden group">
+                            <div className="relative w-20 h-20 rounded-full bg-indigo-600/10 border border-indigo-600/20 flex items-center justify-center text-indigo-600 font-medium text-2xl overflow-hidden group">
                                 {profileForm.img_link || user?.img_link ? (
                                     <img src={profileForm.img_link || user?.img_link} alt="User Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                 ) : (
@@ -495,44 +525,44 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                     />
                                 </label>
                             </div>
-                            <p className="text-xs text-[#6B6860] mt-2">Click image to change</p>
+                            <p className="text-xs text-slate-600 mt-2">Click image to change</p>
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-[#111110] mb-1.5">Full Name</label>
+                            <label className="block text-xs font-medium text-slate-900 mb-1.5">Full Name</label>
                             <input
                                 type="text"
                                 required
-                                className="w-full px-3 py-2 text-sm bg-white border border-black/10 rounded-md focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors"
+                                className="w-full px-3 py-2 text-sm bg-card border border-[rgb(var(--ink)/0.10)] rounded-md focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                 value={profileForm.full_name}
                                 onChange={e => setProfileForm({...profileForm, full_name: e.target.value})}
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-[#111110] mb-1.5">Email</label>
+                            <label className="block text-xs font-medium text-slate-900 mb-1.5">Email</label>
                             <input
                                 type="email"
                                 required
-                                className="w-full px-3 py-2 text-sm bg-white border border-black/10 rounded-md focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors"
+                                className="w-full px-3 py-2 text-sm bg-card border border-[rgb(var(--ink)/0.10)] rounded-md focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                 value={profileForm.email}
                                 onChange={e => setProfileForm({...profileForm, email: e.target.value})}
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-[#111110] mb-1.5">Username</label>
+                            <label className="block text-xs font-medium text-slate-900 mb-1.5">Username</label>
                             <input
                                 type="text"
                                 required
-                                className="w-full px-3 py-2 text-sm bg-white border border-black/10 rounded-md focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors"
+                                className="w-full px-3 py-2 text-sm bg-card border border-[rgb(var(--ink)/0.10)] rounded-md focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                 value={profileForm.username}
                                 onChange={e => setProfileForm({...profileForm, username: e.target.value})}
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-[#111110] mb-1.5">Position</label>
+                            <label className="block text-xs font-medium text-slate-900 mb-1.5">Position</label>
                             <input
                                 type="text"
                                 required
-                                className="w-full px-3 py-2 text-sm bg-white border border-black/10 rounded-md focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors"
+                                className="w-full px-3 py-2 text-sm bg-card border border-[rgb(var(--ink)/0.10)] rounded-md focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                 value={profileForm.position}
                                 onChange={e => setProfileForm({...profileForm, position: e.target.value})}
                             />
@@ -541,14 +571,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             <button
                                 type="button"
                                 onClick={() => setIsEditingProfile(false)}
-                                className="flex-1 h-10 bg-white border border-black/10 text-[#111110] text-sm font-medium rounded-md hover:bg-[#F5F3EE] transition-colors flex justify-center items-center"
+                                className="flex-1 h-10 bg-card border border-[rgb(var(--ink)/0.10)] text-slate-900 text-sm font-medium rounded-md hover:bg-slate-50 transition-colors flex justify-center items-center"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
                                 disabled={profileStatus === 'loading'}
-                                className="flex-1 h-10 bg-[#4B3FE4] text-white text-sm font-medium rounded-md hover:bg-[#3B30C4] transition-colors flex justify-center items-center gap-2"
+                                className="flex-1 h-10 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors flex justify-center items-center gap-2"
                             >
                                 {profileStatus === 'loading' && <Loader2 className="animate-spin" size={16} />}
                                 Save Changes
@@ -562,10 +592,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   );
 
   const ProfileDropdown = () => (
-    <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-lg shadow-lg border border-black/10 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
-        <div className="px-4 py-3 border-b border-black/[0.06]">
-            <p className="text-sm font-medium text-[#111110] truncate">{user?.full_name}</p>
-            <p className="text-xs text-[#6B6860] capitalize font-mono">{user?.role}</p>
+    <div className="absolute right-0 top-full mt-2 w-52 bg-card rounded-lg shadow-lg border border-[rgb(var(--ink)/0.10)] overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+        <div className="px-4 py-3 border-b border-[rgb(var(--ink)/0.06)]">
+            <p className="text-sm font-medium text-slate-900 truncate">{user?.full_name}</p>
+            <p className="text-xs text-slate-600 capitalize font-mono">{user?.role}</p>
         </div>
         <button
             onClick={() => {
@@ -579,9 +609,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 setIsProfileModalOpen(true);
                 setIsProfileDropdownOpen(false);
             }}
-            className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-[#4A4843] hover:bg-[#F5F3EE] hover:text-[#111110] transition-colors"
+            className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
         >
-            <User size={15} className="text-[#9A9890]" /> User Profile
+            <User size={15} className="text-slate-400" /> User Profile
         </button>
         <button
             onClick={() => {
@@ -590,22 +620,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 setShowNewPw(false);
                 setShowConfirmPw(false);
             }}
-            className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-[#4A4843] hover:bg-[#F5F3EE] hover:text-[#111110] transition-colors"
+            className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
         >
-            <KeyRound size={15} className="text-[#9A9890]" /> Change Password
+            <KeyRound size={15} className="text-slate-400" /> Change Password
         </button>
-        {hasPermission('MANAGE_CERTIFICATE_SETTINGS') && (
-            <button
-                onClick={() => {
-                    navigate('/settings');
-                    setIsProfileDropdownOpen(false);
-                }}
-                className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-[#4A4843] hover:bg-[#F5F3EE] hover:text-[#111110] transition-colors"
-            >
-                <Settings size={15} className="text-[#9A9890]" /> Settings
-            </button>
-        )}
-        <div className="my-1 border-t border-black/[0.06]" />
+        <button
+            onClick={() => {
+                navigate('/settings');
+                setIsProfileDropdownOpen(false);
+            }}
+            className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+        >
+            <Settings size={15} className="text-slate-400" /> Settings
+        </button>
+        <div className="my-1 border-t border-[rgb(var(--ink)/0.06)]" />
         <button
             onClick={handleSignOut}
             className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
@@ -617,18 +645,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   if (!showSidebar) {
     return (
-      <div className="min-h-screen bg-[#F5F3EE] flex flex-col">
-        <header className="h-14 bg-white border-b border-black/[0.08] px-4 lg:px-6 flex justify-between items-center z-10 sticky top-0">
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <header className="h-14 bg-card border-b border-[rgb(var(--ink)/0.08)] px-4 lg:px-6 flex justify-between items-center z-10 sticky top-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 bg-[#4B3FE4] rounded flex items-center justify-center shrink-0 overflow-hidden">
-              <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain p-0.5" />
+            <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center shrink-0 overflow-hidden">
+              <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain rounded-full p-0.5" />
             </div>
-            <h1 className="text-sm font-medium text-[#111110] tracking-wide font-mono">REAMS</h1>
+            <h1 className="text-sm font-medium text-slate-900 tracking-wide font-mono">REAMS</h1>
           </div>
           <div className="flex items-center gap-2">
              <button
                 onClick={() => navigate('/admin/lookup')}
-                className="w-8 h-8 flex items-center justify-center rounded-md text-[#6B6860] hover:text-[#111110] hover:bg-[#E8E5DC] transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                 title="Name Lookup"
             >
                 <Search size={16} />
@@ -636,16 +664,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="relative" ref={dropdownRef}>
                 <button
                     onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                    className="flex items-center gap-1.5 hover:bg-[#E8E5DC] py-1 px-1.5 rounded-md transition-colors"
+                    className="flex items-center gap-1.5 hover:bg-slate-100 py-1 px-1.5 rounded-md transition-colors"
                 >
-                    <div className="w-7 h-7 rounded-full bg-[#4B3FE4]/10 border border-[#4B3FE4]/20 text-[#4B3FE4] flex items-center justify-center overflow-hidden">
+                    <div className="w-7 h-7 rounded-full bg-indigo-600/10 border border-indigo-600/20 text-indigo-600 flex items-center justify-center overflow-hidden">
                         {user?.img_link ? (
                           <img src={user.img_link} alt="User Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
                           <span className="text-[10px] font-medium font-mono">{userInitials}</span>
                         )}
                     </div>
-                    <ChevronDown size={14} className="text-[#6B6860]" />
+                    <ChevronDown size={14} className="text-slate-600" />
                 </button>
 
                 {isProfileDropdownOpen && <ProfileDropdown />}
@@ -673,7 +701,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         return activeUsersView === 'participants' ? 'Participants' : 'Users';
       case '/scan': return 'Scan Mode';
       case '/settings':
-        return activeSettingsView === 'announcements' ? 'Announcements' : 'Settings';
+        return SETTINGS_SUBMENU.find((s) => s.view === activeSettingsView && s.view !== 'signatories')?.name || 'Settings';
       case '/about': return 'About';
       default: return 'Overview';
     }
@@ -712,12 +740,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       section: 'Users',
       permission: 'MANAGE_USERS' as Permission,
     })),
+    // settingsSubmenu is already permission-filtered above, so no extra gate here
     ...settingsSubmenu.map((child) => ({
       label: child.name,
       path: child.view === 'signatories' ? '/settings' : `/settings?view=${child.view}`,
       icon: child.icon,
       section: 'Settings',
-      permission: 'MANAGE_CERTIFICATE_SETTINGS' as Permission,
     })),
     { label: 'About',     path: '/about',    icon: Info,     section: 'System' },
   ] as SearchablePage[]).filter((page) => !page.permission || hasPermission(page.permission));
@@ -736,7 +764,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const handlePageSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setIsPageSearchOpen(true);
       setPageSearchIndex((i) => Math.min(i + 1, pageSearchResults.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -747,12 +774,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       if (page) handleSelectPage(page.path);
     } else if (e.key === 'Escape') {
       setIsPageSearchOpen(false);
-      (e.target as HTMLInputElement).blur();
     }
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F5F3EE] font-sans">
+    <div className="flex h-screen overflow-hidden bg-slate-50 font-sans">
       {/* Mobile overlay */}
       {isMobileMenuOpen && (
         <div
@@ -774,14 +800,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         }`}>
           {!shouldCollapseSidebarContent ? (
             <div className="flex items-center gap-2.5">
-              <div className="w-6 h-6 bg-white rounded flex items-center justify-center shrink-0 overflow-hidden">
-                <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" />
+              <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shrink-0 overflow-hidden">
+                <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain rounded-full" />
               </div>
               <span className="text-white text-sm font-medium tracking-wide font-mono">REAMS</span>
             </div>
           ) : (
-            <div className="w-6 h-6 bg-white rounded flex items-center justify-center overflow-hidden">
-              <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" />
+            <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center overflow-hidden">
+              <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain rounded-full" />
             </div>
           )}
           <button
@@ -833,7 +859,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <BarChart3
                       size={16}
                       className={`shrink-0 transition-colors ${
-                        isReportsActive ? 'text-[#8B82F0]' : 'text-white/30 group-hover:text-white/50'
+                        isReportsActive ? 'text-indigo-400' : 'text-white/30 group-hover:text-white/50'
                       }`}
                       aria-hidden="true"
                     />
@@ -870,7 +896,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           >
                             <ChildIcon
                               size={14}
-                              className={`shrink-0 ${childActive ? 'text-[#8B82F0]' : 'text-white/25'}`}
+                              className={`shrink-0 ${childActive ? 'text-indigo-400' : 'text-white/25'}`}
                             />
                             <span className="leading-snug">{child.name}</span>
                           </button>
@@ -904,7 +930,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           >
                             <ChildIcon
                               size={14}
-                              className={`shrink-0 ${childActive ? 'text-[#8B82F0]' : 'text-white/25'}`}
+                              className={`shrink-0 ${childActive ? 'text-indigo-400' : 'text-white/25'}`}
                             />
                             <span className="leading-snug">{child.name}</span>
                           </button>
@@ -946,7 +972,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <Users
                       size={16}
                       className={`shrink-0 transition-colors ${
-                        isUsersActive ? 'text-[#8B82F0]' : 'text-white/30 group-hover:text-white/50'
+                        isUsersActive ? 'text-indigo-400' : 'text-white/30 group-hover:text-white/50'
                       }`}
                       aria-hidden="true"
                     />
@@ -983,7 +1009,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           >
                             <ChildIcon
                               size={14}
-                              className={`shrink-0 ${childActive ? 'text-[#8B82F0]' : 'text-white/25'}`}
+                              className={`shrink-0 ${childActive ? 'text-indigo-400' : 'text-white/25'}`}
                             />
                             <span className="leading-snug">{child.name}</span>
                           </button>
@@ -1017,7 +1043,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           >
                             <ChildIcon
                               size={14}
-                              className={`shrink-0 ${childActive ? 'text-[#8B82F0]' : 'text-white/25'}`}
+                              className={`shrink-0 ${childActive ? 'text-indigo-400' : 'text-white/25'}`}
                             />
                             <span className="leading-snug">{child.name}</span>
                           </button>
@@ -1028,7 +1054,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </div>
             )}
             <NavItem to="/about" icon={Info} label="About" />
-            {hasPermission('MANAGE_CERTIFICATE_SETTINGS') && (
                 <div>
                   <button
                     onClick={(e) => {
@@ -1054,7 +1079,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <Settings
                       size={16}
                       className={`shrink-0 transition-colors ${
-                        isSettingsActive ? 'text-[#8B82F0]' : 'text-white/30 group-hover:text-white/50'
+                        isSettingsActive ? 'text-indigo-400' : 'text-white/30 group-hover:text-white/50'
                       }`}
                       aria-hidden="true"
                     />
@@ -1091,7 +1116,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           >
                             <ChildIcon
                               size={14}
-                              className={`shrink-0 ${childActive ? 'text-[#8B82F0]' : 'text-white/25'}`}
+                              className={`shrink-0 ${childActive ? 'text-indigo-400' : 'text-white/25'}`}
                             />
                             <span className="leading-snug">{child.name}</span>
                           </button>
@@ -1125,7 +1150,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           >
                             <ChildIcon
                               size={14}
-                              className={`shrink-0 ${childActive ? 'text-[#8B82F0]' : 'text-white/25'}`}
+                              className={`shrink-0 ${childActive ? 'text-indigo-400' : 'text-white/25'}`}
                             />
                             <span className="leading-snug">{child.name}</span>
                           </button>
@@ -1134,7 +1159,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </div>
                   )}
                 </div>
-            )}
           </SidebarSection>
         </nav>
 
@@ -1158,11 +1182,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           {!shouldCollapseSidebarContent ? (
             <div className="flex items-center gap-3 px-2 py-1.5">
-              <div className="w-7 h-7 rounded-full bg-[#4B3FE4]/20 border border-[#4B3FE4]/30 flex items-center justify-center shrink-0 overflow-hidden">
+              <div className="w-7 h-7 rounded-full bg-indigo-600/20 border border-indigo-600/30 flex items-center justify-center shrink-0 overflow-hidden">
                 {user?.img_link ? (
                   <img src={user.img_link} alt="User Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
-                  <span className="text-[#8B82F0] text-[10px] font-medium font-mono">{userInitials}</span>
+                  <span className="text-indigo-400 text-[10px] font-medium font-mono">{userInitials}</span>
                 )}
               </div>
               <div className="flex-1 min-w-0">
@@ -1172,11 +1196,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
           ) : (
             <div className="flex justify-center">
-              <div className="w-7 h-7 rounded-full bg-[#4B3FE4]/20 border border-[#4B3FE4]/30 flex items-center justify-center overflow-hidden">
+              <div className="w-7 h-7 rounded-full bg-indigo-600/20 border border-indigo-600/30 flex items-center justify-center overflow-hidden">
                 {user?.img_link ? (
                   <img src={user.img_link} alt="User Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
-                  <span className="text-[#8B82F0] text-[10px] font-medium font-mono">{userInitials}</span>
+                  <span className="text-indigo-400 text-[10px] font-medium font-mono">{userInitials}</span>
                 )}
               </div>
             </div>
@@ -1187,81 +1211,44 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Main column */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0 h-screen">
         {/* Top bar */}
-        <header className="h-14 bg-white border-b border-black/[0.08] flex items-center gap-4 px-4 lg:px-6 shrink-0">
+        <header className="h-14 bg-card border-b border-[rgb(var(--ink)/0.08)] flex items-center gap-4 px-4 lg:px-6 shrink-0">
           <button
-            className="md:hidden text-[#6B6860] hover:text-[#111110] transition-colors"
+            className="md:hidden text-slate-600 hover:text-slate-900 transition-colors"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
             <Menu size={20} />
           </button>
 
-          <div className="hidden md:flex items-center gap-1.5 text-sm text-[#6B6860]">
-            <span>REAMS</span>
-            <ChevronRight size={14} />
-            <span className="text-[#111110] font-medium">{getPageTitle()}</span>
-          </div>
+          <h2 className="md:hidden text-sm font-medium text-slate-900">{getPageTitle()}</h2>
 
-          <h2 className="md:hidden text-sm font-medium text-[#111110]">{getPageTitle()}</h2>
+          <button
+            type="button"
+            onClick={() => setIsPageSearchOpen(true)}
+            className="flex-1 max-w-sm hidden sm:flex items-center gap-2 h-8 px-3 rounded-md bg-slate-100/50 border border-transparent hover:border-[rgb(var(--ink)/0.08)] hover:bg-card transition-colors text-sm text-slate-400"
+          >
+            <Search size={14} className="shrink-0" />
+            <span className="flex-1 text-left truncate">Search pages...</span>
+            <kbd className="hidden lg:inline-flex items-center gap-1 rounded border border-[rgb(var(--ink)/0.10)] bg-card px-1.5 py-0.5 text-[10px] font-mono text-slate-400">
+              Ctrl K
+            </kbd>
+          </button>
 
-          <div className="flex-1 max-w-sm ml-auto lg:ml-6 hidden sm:block relative" ref={pageSearchRef}>
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890] pointer-events-none" />
-            <input
-              type="text"
-              value={pageSearchQuery}
-              onChange={(e) => {
-                setPageSearchQuery(e.target.value);
-                setPageSearchIndex(0);
-                setIsPageSearchOpen(true);
-              }}
-              onFocus={() => setIsPageSearchOpen(true)}
-              onKeyDown={handlePageSearchKeyDown}
-              placeholder="Search pages..."
-              className="w-full pl-9 pr-3 h-8 text-sm text-[#111110] placeholder-[#9A9890] bg-[#E8E5DC]/50 border border-transparent hover:border-black/[0.08] hover:bg-white focus:border-black/[0.08] focus:bg-white rounded-md transition-colors outline-none"
-            />
-
-            {isPageSearchOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-black/[0.08] rounded-lg shadow-lg py-1.5 z-50 max-h-80 overflow-y-auto">
-                {pageSearchResults.length === 0 ? (
-                  <p className="px-3 py-2.5 text-xs text-[#9A9890]">No pages match “{pageSearchQuery}”</p>
-                ) : (
-                  pageSearchResults.map((page, index) => {
-                    const PageIcon = page.icon;
-                    return (
-                      <button
-                        key={page.path}
-                        onClick={() => handleSelectPage(page.path)}
-                        onMouseEnter={() => setPageSearchIndex(index)}
-                        className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-left transition-colors ${
-                          index === pageSearchIndex ? 'bg-[#F5F3EE] text-[#111110]' : 'text-[#4A4843]'
-                        }`}
-                      >
-                        <PageIcon size={15} className="text-[#9A9890] shrink-0" />
-                        <span className="flex-1 truncate">{page.label}</span>
-                        <span className="text-[10px] text-[#9A9890] uppercase tracking-wide shrink-0">{page.section}</span>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 relative" ref={dropdownRef}>
+          <div className="flex items-center gap-2 relative ml-auto" ref={dropdownRef}>
             <button
               onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-              className="flex items-center gap-2 hover:bg-[#E8E5DC] py-1 px-1.5 rounded-md transition-colors"
+              className="flex items-center gap-2 hover:bg-slate-100 py-1 px-1.5 rounded-md transition-colors"
             >
-              <div className="w-7 h-7 rounded-full bg-[#4B3FE4]/10 border border-[#4B3FE4]/20 flex items-center justify-center text-[#4B3FE4] overflow-hidden shrink-0">
+              <div className="w-7 h-7 rounded-full bg-indigo-600/10 border border-indigo-600/20 flex items-center justify-center text-indigo-600 overflow-hidden shrink-0">
                 {user?.img_link ? (
                   <img src={user.img_link} alt="User Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
                   <span className="text-[10px] font-medium font-mono">{userInitials}</span>
                 )}
               </div>
-              <span className="hidden sm:block text-sm text-[#111110] font-medium max-w-[120px] truncate">
+              <span className="hidden sm:block text-sm text-slate-900 font-medium max-w-[120px] truncate">
                 {user?.full_name?.split(' ')[0]}
               </span>
-              <ChevronDown size={14} className="text-[#6B6860]" />
+              <ChevronDown size={14} className="text-slate-600" />
             </button>
 
             {isProfileDropdownOpen && <ProfileDropdown />}
@@ -1275,6 +1262,72 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </main>
       </div>
+
+      {/* Search palette (Ctrl+K) */}
+      {isPageSearchOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setIsPageSearchOpen(false)}
+          />
+
+          <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-xl bg-card border border-[rgb(var(--ink)/0.10)] shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 px-4 border-b border-[rgb(var(--ink)/0.06)]">
+              <Search size={16} className="shrink-0 text-slate-400" />
+              <input
+                ref={pageSearchInputRef}
+                type="text"
+                value={pageSearchQuery}
+                onChange={(e) => {
+                  setPageSearchQuery(e.target.value);
+                  setPageSearchIndex(0);
+                }}
+                onKeyDown={handlePageSearchKeyDown}
+                placeholder="Type a page name to search..."
+                className="flex-1 h-12 text-sm text-slate-900 placeholder-slate-400 bg-transparent outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setIsPageSearchOpen(false)}
+                className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto py-1.5">
+              {pageSearchResults.length === 0 ? (
+                <p className="px-4 py-6 text-center text-xs text-slate-400">No pages match “{pageSearchQuery}”</p>
+              ) : (
+                <>
+                  <p className="px-4 pb-1 pt-2 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400 font-mono">
+                    Pages
+                  </p>
+                  {pageSearchResults.map((page, index) => {
+                    const PageIcon = page.icon;
+                    const isHighlighted = index === pageSearchIndex;
+                    return (
+                      <button
+                        key={page.path}
+                        ref={isHighlighted ? (el) => el?.scrollIntoView({ block: 'nearest' }) : undefined}
+                        onClick={() => handleSelectPage(page.path)}
+                        onMouseEnter={() => setPageSearchIndex(index)}
+                        className={`flex items-center gap-3 w-full px-4 py-2.5 text-sm text-left transition-colors ${
+                          isHighlighted ? 'bg-slate-50 text-slate-900' : 'text-slate-700'
+                        }`}
+                      >
+                        <PageIcon size={15} className={`shrink-0 ${isHighlighted ? 'text-indigo-600' : 'text-slate-400'}`} />
+                        <span className="flex-1 truncate">{page.label}</span>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wide shrink-0">{page.section}</span>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {isPasswordModalOpen && <PasswordModal />}
       {isProfileModalOpen && <UserProfileModal />}

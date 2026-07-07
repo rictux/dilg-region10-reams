@@ -102,17 +102,17 @@ const ScanLogsPrint: React.FC = () => {
   const totalPages = logPages.length;
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 print:bg-white">
+    <div className="min-h-screen bg-[#F5F3EE] font-sans text-[#111110] print:bg-white">
         {/* Navigation / Controls (Hidden on Print) */}
-        <div className="fixed top-0 left-0 right-0 bg-white border-b border-slate-200 p-4 shadow-sm z-50 flex justify-between items-center no-print">
-            <button onClick={() => navigate('/reports')} className="flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium">
+        <div className="fixed top-0 left-0 right-0 bg-white border-b border-[#E0DDD4] p-4 shadow-sm z-50 flex justify-between items-center no-print">
+            <button onClick={() => navigate('/reports')} className="flex items-center gap-2 text-[#6B6860] hover:text-[#111110] font-medium">
                 <ArrowLeft size={20} /> Back
             </button>
             <div className="flex items-center gap-3">
-                <span className="text-sm text-slate-500 font-mono bg-slate-100 px-2 py-1 rounded">
+                <span className="text-sm text-[#7C7A72] font-mono bg-[#EDEAE2] px-2 py-1 rounded">
                     Total Records: {logs.length}
                 </span>
-                <button onClick={() => window.print()} className="bg-slate-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-md hover:bg-slate-800 font-bold transition-colors">
+                <button onClick={() => window.print()} className="bg-[#111110] text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-md hover:bg-[#2A2926] font-bold transition-colors">
                     <Printer size={18} /> Print
                 </button>
             </div>
@@ -216,7 +216,7 @@ const ScanLogsPrint: React.FC = () => {
             {logPages.map((pageLogs, pageIndex) => (
                 <div
                     key={`scan-log-page-${pageIndex}`}
-                    className={`${pageIndex < totalPages - 1 ? 'print-page-break ' : ''}mb-6 bg-white shadow-lg rounded-xl overflow-hidden border border-slate-200 print:mb-0 print:shadow-none print:border-none print:rounded-none`}
+                    className={`${pageIndex < totalPages - 1 ? 'print-page-break ' : ''}mb-6 bg-white shadow-lg rounded-xl overflow-hidden border border-[#E0DDD4] print:mb-0 print:shadow-none print:border-none print:rounded-none`}
                 >
                     <div className="overflow-x-auto print-scroll">
                         <table className="w-full text-left border-collapse">
@@ -232,7 +232,7 @@ const ScanLogsPrint: React.FC = () => {
                                 <col className="w-[10%]" />
                                 <col className="w-[7%]" />
                             </colgroup>
-                            <thead className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-black text-slate-700">
+                            <thead className="bg-[#F5F3EE] border-b border-[#E0DDD4] print:bg-[#EDEAE2] print:border-black text-[#4A4843]">
                                 <tr>
                                     <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">#</th>
                                     <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1">Scan Time</th>
@@ -246,12 +246,12 @@ const ScanLogsPrint: React.FC = () => {
                                     <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 print-wrap">Remarks</th>
                                 </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-slate-100 print:divide-y-0">
+                            <tbody className="bg-white divide-y divide-[#EDEAE2] print:divide-y-0">
                                 {pageLogs.map((log, rowIndex) => {
                                     const displayIndex = pageIndex * SCAN_LOG_ROWS_PER_PRINT_PAGE + rowIndex + 1;
                                     return (
-                                        <tr key={log.attendance_id} className="hover:bg-slate-50 transition-colors print:hover:bg-transparent text-slate-600 print:text-black">
-                                            <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 text-center font-mono text-slate-400 print:text-black whitespace-nowrap">{displayIndex}</td>
+                                        <tr key={log.attendance_id} className="hover:bg-[#F5F3EE] transition-colors print:hover:bg-transparent text-[#6B6860] print:text-black">
+                                            <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 text-center font-mono text-[#9A9890] print:text-black whitespace-nowrap">{displayIndex}</td>
                                             <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 font-mono whitespace-nowrap">{formatDateTime(log.scan_time)}</td>
                                             <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 text-center whitespace-nowrap">
                                                 {log.action_session}
@@ -265,7 +265,7 @@ const ScanLogsPrint: React.FC = () => {
                                             <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap print-wrap">
                                                 <div className="flex flex-col">
                                                     <span>{log.participants?.full_name || '-'}</span>
-                                                    <span className="text-[10px] print:text-[6px] text-slate-400 print:text-black">
+                                                    <span className="text-[10px] print:text-[6px] text-[#9A9890] print:text-black">
                                                         {log.participants?.gender ? log.participants.gender.charAt(0).toUpperCase() + log.participants.gender.slice(1) : '-'}
                                                     </span>
                                                 </div>
@@ -273,7 +273,7 @@ const ScanLogsPrint: React.FC = () => {
                                             <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap print-wrap">
                                                 <div className="flex flex-col">
                                                     <span>{log.participants?.email || ''}</span>
-                                                    {log.participants?.mobile_no && <span className="text-[10px] print:text-[6px] text-slate-400 print:text-black">{log.participants.mobile_no}</span>}
+                                                    {log.participants?.mobile_no && <span className="text-[10px] print:text-[6px] text-[#9A9890] print:text-black">{log.participants.mobile_no}</span>}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap print-wrap">
@@ -282,10 +282,10 @@ const ScanLogsPrint: React.FC = () => {
                                             <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap print-wrap">
                                                 <div className="flex flex-col">
                                                     <span>{log.users?.full_name || 'System'}</span>
-                                                    {log.users?.email && <span className="text-[10px] print:text-[6px] text-slate-400 print:text-black">{log.users.email}</span>}
+                                                    {log.users?.email && <span className="text-[10px] print:text-[6px] text-[#9A9890] print:text-black">{log.users.email}</span>}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 italic text-slate-500 print:text-black whitespace-nowrap print-wrap">
+                                            <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 italic text-[#7C7A72] print:text-black whitespace-nowrap print-wrap">
                                                 {log.remarks || ''}
                                             </td>
                                         </tr>
@@ -293,7 +293,7 @@ const ScanLogsPrint: React.FC = () => {
                                 })}
                                 {logs.length === 0 && (
                                     <tr>
-                                        <td colSpan={10} className="px-4 py-8 text-center text-slate-400 italic">
+                                        <td colSpan={10} className="px-4 py-8 text-center text-[#9A9890] italic">
                                             No scan records found.
                                         </td>
                                     </tr>
@@ -301,7 +301,7 @@ const ScanLogsPrint: React.FC = () => {
                             </tbody>
                         </table>
                     </div>
-                    <div className="hidden justify-between border-t border-slate-200 pt-1 text-[8px] text-slate-400 print:flex print:border-none">
+                    <div className="hidden justify-between border-t border-[#E0DDD4] pt-1 text-[8px] text-[#9A9890] print:flex print:border-none">
                         <span>Scan Log Report - {format(new Date(), 'yyyy-MM-dd HH:mm:ss')}</span>
                         <span>Page {pageIndex + 1} of {totalPages}</span>
                     </div>
@@ -311,16 +311,16 @@ const ScanLogsPrint: React.FC = () => {
             {/* Prepared By Section */}
             <div className="mt-8 px-4 print:px-0 break-inside-avoid flex justify-end">
                 <div className="w-64">
-                    <p className="text-[10px] uppercase font-bold text-slate-500 mb-6">Prepared by:</p>
-                    <p className="text-xs text-slate-900 uppercase border-b border-slate-400 inline-block min-w-[200px] pb-1">
+                    <p className="text-[10px] uppercase font-bold text-[#7C7A72] mb-6">Prepared by:</p>
+                    <p className="text-xs text-[#111110] uppercase border-b border-[#9A9890] inline-block min-w-[200px] pb-1">
                         {user?.full_name}
                     </p>
-                    <p className="text-xs text-slate-600 mt-1">{user?.position || 'System Administrator'}</p>
+                    <p className="text-xs text-[#6B6860] mt-1">{user?.position || 'System Administrator'}</p>
                 </div>
             </div>
             
             {/* Minimal Footer for Context */}
-            <div className="mt-4 text-[10px] text-slate-400 flex justify-between border-t border-slate-200 pt-2 print:hidden">
+            <div className="mt-4 text-[10px] text-[#9A9890] flex justify-between border-t border-[#E0DDD4] pt-2 print:hidden">
                 <span>Scan Log Report • {format(new Date(), 'yyyy-MM-dd HH:mm:ss')}</span>
                 <span>{totalPages} page{totalPages === 1 ? '' : 's'}</span>
             </div>

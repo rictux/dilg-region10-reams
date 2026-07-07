@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { User, Office, UserRole } from '../../types/database';
-import { Trash2, UserPlus, Shield, CheckCircle, XCircle, Search, Mail, Briefcase, Lock, X, Loader2, AlertCircle, Edit, Building2, Eye, EyeOff, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { Trash2, UserPlus, Shield, CheckCircle, XCircle, Search, Mail, Briefcase, Lock, X, Loader2, AlertCircle, Edit, Building2, Eye, EyeOff, SlidersHorizontal, ChevronDown, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import bcrypt from 'bcryptjs';
 import ParticipantsList from './ParticipantsList';
@@ -25,6 +25,13 @@ interface UserWithOffice extends User {
     } | null;
     last_login_activity?: UserLoginActivity | null;
 }
+
+const ROLE_BADGE_STYLES: Record<string, string> = {
+    Admin: 'border-purple-200 bg-purple-50 text-purple-700',
+    EventManager: 'border-blue-200 bg-blue-50 text-blue-700',
+    OfficeManager: 'border-teal-200 bg-teal-50 text-teal-700',
+    Scanner: 'border-orange-200 bg-orange-50 text-orange-700'
+};
 
 const UserManagement: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -396,22 +403,22 @@ const UserManagement: React.FC = () => {
       {activeView === 'users' ? (
         <div className="flex-1 min-h-0 flex flex-col gap-6">
           {isOfficeManager && (
-            <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
               You can edit only the email, position, and password of users assigned to your office. Creating users, deleting users, and changing other account details are restricted.
             </div>
           )}
 
           {isOfficeManager && !currentUser?.office_id && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               Your account does not have an office assignment yet, so user management is unavailable.
             </div>
           )}
 
-          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="rounded-lg border border-[rgb(var(--ink)/0.08)] bg-card p-3">
             <div className="flex flex-col gap-3 md:grid md:grid-cols-2 xl:grid-cols-[35%_minmax(260px,1fr)_minmax(200px,240px)_minmax(190px,230px)_auto]">
               <div className="flex min-w-0 gap-2">
                 <div className="relative min-w-0 flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                   <input
                     type="text"
                     placeholder="Search users..."
@@ -420,7 +427,7 @@ const UserManagement: React.FC = () => {
                         setSearchTerm(e.target.value);
                         setCurrentPage(1);
                     }}
-                    className="w-full pl-10 pr-16 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                    className="w-full pl-9 pr-14 h-9 bg-card border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 transition-colors"
                   />
                   {searchTerm && (
                     <button
@@ -439,7 +446,7 @@ const UserManagement: React.FC = () => {
                   type="button"
                   onClick={() => setShowFilters((prev) => !prev)}
                   aria-expanded={showFilters}
-                  className="flex shrink-0 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 md:hidden"
+                  className="flex shrink-0 items-center gap-2 rounded-md border border-[rgb(var(--ink)/0.10)] bg-card px-3 h-9 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 md:hidden"
                 >
                   <SlidersHorizontal size={16} />
                   Filters
@@ -456,22 +463,22 @@ const UserManagement: React.FC = () => {
                     onClick={openCreateModal}
                     aria-label="Add User"
                     title="Add User"
-                    className="flex shrink-0 items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-white shadow-sm transition-colors hover:bg-indigo-700 md:hidden"
+                    className="flex shrink-0 items-center justify-center rounded-md bg-indigo-600 px-3 h-9 text-white transition-colors hover:bg-indigo-700 md:hidden"
                   >
-                    <UserPlus size={20} />
+                    <UserPlus size={16} />
                   </button>
                 )}
               </div>
               <div className={`${showFilters ? 'grid' : 'hidden'} grid-cols-1 gap-3 md:contents`}>
               <div className="relative min-w-0">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                 <select
                   value={officeFilter}
                   onChange={(e) => {
                     setOfficeFilter(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full appearance-none rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-8 text-sm text-slate-700 shadow-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full appearance-none rounded-md border border-[rgb(var(--ink)/0.10)] bg-card h-9 pl-9 pr-8 text-sm text-slate-700 outline-none transition-colors focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/15"
                   aria-label="Filter users by office"
                 >
                   <option value="all">All offices</option>
@@ -484,14 +491,14 @@ const UserManagement: React.FC = () => {
                 </select>
               </div>
               <div className="relative min-w-0">
-                <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+                <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                 <select
                   value={roleFilter}
                   onChange={(e) => {
                     setRoleFilter(e.target.value as 'all' | UserRole);
                     setCurrentPage(1);
                   }}
-                  className="w-full appearance-none rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-8 text-sm text-slate-700 shadow-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full appearance-none rounded-md border border-[rgb(var(--ink)/0.10)] bg-card h-9 pl-9 pr-8 text-sm text-slate-700 outline-none transition-colors focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/15"
                   aria-label="Filter users by role"
                 >
                   <option value="all">All roles</option>
@@ -502,14 +509,14 @@ const UserManagement: React.FC = () => {
                 </select>
               </div>
               <div className="relative min-w-0">
-                <CheckCircle className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+                <CheckCircle className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                 <select
                   value={statusFilter}
                   onChange={(e) => {
                     setStatusFilter(e.target.value as 'all' | 'Active' | 'Inactive');
                     setCurrentPage(1);
                   }}
-                  className="w-full appearance-none rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-8 text-sm text-slate-700 shadow-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full appearance-none rounded-md border border-[rgb(var(--ink)/0.10)] bg-card h-9 pl-9 pr-8 text-sm text-slate-700 outline-none transition-colors focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/15"
                   aria-label="Filter users by status"
                 >
                   <option value="all">All statuses</option>
@@ -521,113 +528,126 @@ const UserManagement: React.FC = () => {
               {canCreateUsers && (
                 <button
                     onClick={openCreateModal}
-                    className="hidden w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 md:flex md:w-auto"
+                    className="hidden w-full items-center justify-center gap-2 whitespace-nowrap rounded-md bg-indigo-600 px-4 h-9 text-sm font-medium text-white transition-colors hover:bg-indigo-700 md:flex md:w-auto"
                 >
-                    <UserPlus size={20} /> Add User
+                    <UserPlus size={16} /> Add User
                 </button>
               )}
             </div>
           </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
+      <div className="bg-card rounded-lg border border-[rgb(var(--ink)/0.08)] overflow-hidden flex-1 min-h-0 flex flex-col">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-[rgb(var(--ink)/0.06)] shrink-0">
+              <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-indigo-600/10 text-indigo-600">
+                  <Users size={13} />
+              </span>
+              <h3 className="text-sm font-semibold text-slate-900">System Users</h3>
+              <span className="text-[10px] min-w-[1.25rem] text-center px-1.5 py-0.5 rounded-full font-medium font-mono bg-indigo-600/10 text-indigo-700">
+                  {filteredUsers.length}
+              </span>
+              {activeFilterCount > 0 && (
+                  <span className="ml-auto text-xs text-slate-500">
+                      {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} applied
+                  </span>
+              )}
+          </div>
+
           <div className="hidden md:block flex-1 min-h-0 overflow-auto">
-              <table className="datatable w-full text-[13px] text-left">
-                  <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+              <table className="w-full text-sm text-left">
+                  <thead className="sticky top-0 z-10 bg-slate-50 border-b border-[rgb(var(--ink)/0.06)]">
                       <tr>
-                          <th className="px-6 py-4 bg-slate-50">User Details</th>
-                          <th className="px-6 py-4 bg-slate-50">Office Code</th>
-                          <th className="px-6 py-4 bg-slate-50">Role & Position</th>
-                          <th className="px-6 py-4 bg-slate-50">Status</th>
-                          <th className="px-6 py-4 bg-slate-50">Last Login</th>
-                          <th className="px-6 py-4 bg-slate-50">Created</th>
-                          <th className="px-6 py-4 text-right bg-slate-50">Actions</th>
+                          <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono">User</th>
+                          <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono">Office</th>
+                          <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono">Role & Position</th>
+                          <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono">Status</th>
+                          <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono">Last Login</th>
+                          <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono">Created</th>
+                          <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono text-right">Actions</th>
                       </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-[rgb(var(--ink)/0.04)]">
                       {loading ? (
-                          <tr><td colSpan={7} className="text-center py-8">Loading users...</td></tr>
+                          <tr><td colSpan={7} className="py-10 text-center text-xs text-slate-400">Loading users…</td></tr>
                       ) : paginatedUsers.length === 0 ? (
-                          <tr><td colSpan={7} className="text-center py-8 text-slate-400">No users found.</td></tr>
+                          <tr><td colSpan={7} className="py-10 text-center text-xs text-slate-400">No users found.</td></tr>
                       ) : (
                           paginatedUsers.map((user) => (
-                              <tr key={user.user_id} className="hover:bg-slate-50 transition-colors">
-                                  <td className="px-6 py-4">
+                              <tr key={user.user_id} className="hover:bg-slate-50/60 transition-colors">
+                                  <td className="px-4 py-3">
                                       <div className="flex items-center gap-3">
-                                          <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg">
-                                              {user.full_name.charAt(0)}
+                                          <div className="w-8 h-8 rounded-full bg-indigo-600/10 border border-indigo-600/20 text-indigo-600 flex items-center justify-center text-[11px] font-medium font-mono shrink-0">
+                                              {user.full_name.charAt(0).toUpperCase()}
                                           </div>
-                                          <div>
-                                              <div className="font-medium text-slate-800">{user.full_name}</div>
-                                              <div className="text-xs text-slate-500">@{user.username}</div>
+                                          <div className="min-w-0">
+                                              <div className="text-sm font-medium text-slate-900 leading-tight">{user.full_name}</div>
+                                              <div className="text-xs text-slate-500 font-mono">@{user.username}</div>
                                           </div>
                                       </div>
                                   </td>
-                                  <td className="px-6 py-4">
+                                  <td className="px-4 py-3">
                                       {user.offices ? (
-                                        <span className="font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold">
+                                        <span
+                                          className="font-mono text-[11px] font-medium px-1.5 py-0.5 rounded border border-[rgb(var(--ink)/0.08)] bg-slate-50 text-slate-600"
+                                          title={user.offices.name}
+                                        >
                                             {user.offices.code}
                                         </span>
                                       ) : (
                                         <span className="text-slate-400 text-xs italic">Unassigned</span>
                                       )}
                                   </td>
-                                  <td className="px-6 py-4">
-                                      <div className="flex flex-col">
-                                          <span className={`inline-flex items-center gap-1.5 w-fit px-2 py-0.5 rounded-full text-xs font-semibold
-                                              ${user.role === 'Admin' ? 'bg-purple-100 text-purple-700' : ''}
-                                              ${user.role === 'Scanner' ? 'bg-orange-100 text-orange-700' : ''}
-                                              ${user.role === 'EventManager' ? 'bg-blue-100 text-blue-700' : ''}
-                                              ${user.role === 'OfficeManager' ? 'bg-teal-100 text-teal-700' : ''}
-                                          `}>
-                                              {user.role === 'Admin' && <Shield size={12} />}
+                                  <td className="px-4 py-3">
+                                      <div className="flex flex-col gap-1">
+                                          <span className={`inline-flex items-center gap-1.5 w-fit px-2 py-0.5 rounded-full text-[11px] font-medium border ${ROLE_BADGE_STYLES[user.role] || 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+                                              {user.role === 'Admin' && <Shield size={11} />}
                                               {user.role}
                                           </span>
-                                          {user.position && <span className="text-xs text-slate-500 mt-1">{user.position}</span>}
+                                          {user.position && <span className="text-xs text-slate-500">{user.position}</span>}
                                       </div>
                                   </td>
-                                  <td className="px-6 py-4">
-                                      <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border
-                                          ${user.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-slate-100 text-slate-600 border-slate-200'}
-                                      `}>
-                                          <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-green-500' : 'bg-slate-400'}`}></span>
+                                  <td className="px-4 py-3">
+                                      <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                                          user.status === 'Active' ? 'text-emerald-700' : 'text-slate-500'
+                                      }`}>
+                                          <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
                                           {user.status}
                                       </span>
                                   </td>
-                                  <td className="px-6 py-4 text-slate-500">
+                                  <td className="px-4 py-3">
                                       <div className="flex flex-col gap-1">
-                                          <span>{formatLastLogin(user.last_login_activity)}</span>
+                                          <span className="text-xs font-mono text-slate-600">{formatLastLogin(user.last_login_activity)}</span>
                                           {getLoginMethodBadge(user.last_login_activity)}
                                       </div>
                                   </td>
-                                  <td className="px-6 py-4 text-slate-500">
-                                      {user.created_at ? format(new Date(user.created_at), 'MMM d, yyyy') : '-'}
+                                  <td className="px-4 py-3 text-xs font-mono text-slate-500">
+                                      {user.created_at ? format(new Date(user.created_at), 'MMM d, yyyy') : '–'}
                                   </td>
-                                  <td className="px-6 py-4 text-right">
-                                      <div className="flex items-center justify-end gap-1">
+                                  <td className="px-4 py-3 text-right">
+                                      <div className="flex items-center justify-end gap-0.5">
                                           <button
                                               onClick={() => openEditModal(user)}
                                               disabled={!canManageUserRecord(user)}
-                                              className={`p-2 rounded-lg transition-colors ${
+                                              className={`p-1.5 rounded-md transition-colors ${
                                                 canManageUserRecord(user)
-                                                  ? 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+                                                  ? 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-600/10'
                                                   : 'text-slate-300 cursor-not-allowed'
                                               }`}
                                               title={canManageUserRecord(user) ? 'Edit User' : 'You cannot edit this user'}
                                           >
-                                              <Edit size={18} />
+                                              <Edit size={16} />
                                           </button>
-                                          <button 
+                                          <button
                                               onClick={() => handleDelete(user)}
                                               disabled={!canDeleteUserRecord(user)}
-                                              className={`p-2 rounded-lg transition-colors
+                                              className={`p-1.5 rounded-md transition-colors
                                                   ${!canDeleteUserRecord(user)
-                                                      ? 'text-slate-300 cursor-not-allowed' 
+                                                      ? 'text-slate-300 cursor-not-allowed'
                                                       : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
                                                   }
                                               `}
                                               title={canDeleteUserRecord(user) ? 'Delete User' : 'Deletion is restricted'}
                                           >
-                                              <Trash2 size={18} />
+                                              <Trash2 size={16} />
                                           </button>
                                       </div>
                                   </td>
@@ -638,55 +658,50 @@ const UserManagement: React.FC = () => {
               </table>
           </div>
 
-          <div className="md:hidden flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+          <div className="md:hidden flex-1 min-h-0 overflow-y-auto p-3 space-y-2.5">
               {loading ? (
                   [...Array(3)].map((_, i) => (
-                      <div key={i} className="animate-pulse rounded-xl border border-slate-200 p-4 space-y-3">
+                      <div key={i} className="animate-pulse rounded-lg border border-[rgb(var(--ink)/0.08)] p-4 space-y-3">
                           <div className="h-5 bg-slate-200 rounded w-2/3"></div>
                           <div className="h-4 bg-slate-100 rounded w-1/2"></div>
                           <div className="h-4 bg-slate-100 rounded w-1/3"></div>
                       </div>
                   ))
               ) : paginatedUsers.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100">
+                  <div className="py-10 text-center text-xs text-slate-400 bg-slate-50/50 rounded-lg border border-[rgb(var(--ink)/0.06)]">
                       No users found.
                   </div>
               ) : (
                   paginatedUsers.map((user) => (
-                      <div key={user.user_id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div key={user.user_id} className="rounded-lg border border-[rgb(var(--ink)/0.08)] bg-card p-4">
                           <div className="flex items-start justify-between gap-3">
                               <div className="flex items-center gap-3 min-w-0">
-                                  <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg shrink-0">
-                                      {user.full_name.charAt(0)}
+                                  <div className="w-8 h-8 rounded-full bg-indigo-600/10 border border-indigo-600/20 text-indigo-600 flex items-center justify-center text-[11px] font-medium font-mono shrink-0">
+                                      {user.full_name.charAt(0).toUpperCase()}
                                   </div>
                                   <div className="min-w-0">
-                                      <div className="font-medium text-slate-800 truncate">{user.full_name}</div>
-                                      <div className="text-xs text-slate-500">@{user.username}</div>
+                                      <div className="text-sm font-medium text-slate-900 truncate">{user.full_name}</div>
+                                      <div className="text-xs text-slate-500 font-mono">@{user.username}</div>
                                   </div>
                               </div>
-                              <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border shrink-0
-                                  ${user.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-slate-100 text-slate-600 border-slate-200'}
-                              `}>
-                                  <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-green-500' : 'bg-slate-400'}`}></span>
+                              <span className={`inline-flex items-center gap-1.5 text-xs font-medium shrink-0 ${
+                                  user.status === 'Active' ? 'text-emerald-700' : 'text-slate-500'
+                              }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
                                   {user.status}
                               </span>
                           </div>
 
-                          <div className="mt-4 space-y-2 text-sm">
-                              <div className="text-slate-700">{user.email || '-'}</div>
-                              <div className="text-slate-500">{user.position || '-'}</div>
-                              <div className="flex flex-wrap gap-2 items-center">
-                                  <span className={`inline-flex items-center gap-1.5 w-fit px-2 py-0.5 rounded-full text-xs font-semibold
-                                      ${user.role === 'Admin' ? 'bg-purple-100 text-purple-700' : ''}
-                                      ${user.role === 'Scanner' ? 'bg-orange-100 text-orange-700' : ''}
-                                      ${user.role === 'EventManager' ? 'bg-blue-100 text-blue-700' : ''}
-                                      ${user.role === 'OfficeManager' ? 'bg-teal-100 text-teal-700' : ''}
-                                  `}>
-                                      {user.role === 'Admin' && <Shield size={12} />}
+                          <div className="mt-3 space-y-1.5">
+                              <div className="text-xs text-slate-600">{user.email || '–'}</div>
+                              <div className="text-xs text-slate-500">{user.position || '–'}</div>
+                              <div className="flex flex-wrap gap-1.5 items-center pt-1">
+                                  <span className={`inline-flex items-center gap-1.5 w-fit px-2 py-0.5 rounded-full text-[11px] font-medium border ${ROLE_BADGE_STYLES[user.role] || 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+                                      {user.role === 'Admin' && <Shield size={11} />}
                                       {user.role}
                                   </span>
                                   {user.offices ? (
-                                      <span className="font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold">
+                                      <span className="font-mono text-[11px] font-medium px-1.5 py-0.5 rounded border border-[rgb(var(--ink)/0.08)] bg-slate-50 text-slate-600">
                                           {user.offices.code}
                                       </span>
                                   ) : (
@@ -695,29 +710,29 @@ const UserManagement: React.FC = () => {
                               </div>
                           </div>
 
-                          <div className="mt-4 flex gap-2">
+                          <div className="mt-3 flex gap-2">
                               <button
                                   onClick={() => openEditModal(user)}
                                   disabled={!canManageUserRecord(user)}
-                                  className={`flex-1 p-2 text-sm rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                                  className={`flex-1 h-8 text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-1.5 ${
                                     canManageUserRecord(user)
-                                      ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                                      ? 'text-indigo-700 bg-indigo-600/10 hover:bg-indigo-600/20'
                                       : 'bg-slate-100 text-slate-300 cursor-not-allowed'
                                   }`}
                               >
-                                  <Edit size={16} /> Edit
+                                  <Edit size={14} /> Edit
                               </button>
                               <button
                                   onClick={() => handleDelete(user)}
                                   disabled={!canDeleteUserRecord(user)}
-                                  className={`flex-1 p-2 text-sm rounded-lg transition-colors flex items-center justify-center gap-2
+                                  className={`flex-1 h-8 text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-1.5
                                       ${!canDeleteUserRecord(user)
                                           ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
                                           : 'bg-red-50 text-red-700 hover:bg-red-100'
                                       }
                                   `}
                               >
-                                  <Trash2 size={16} /> Delete
+                                  <Trash2 size={14} /> Delete
                               </button>
                           </div>
                       </div>
@@ -727,25 +742,25 @@ const UserManagement: React.FC = () => {
 
           {/* Pagination Controls */}
           {!loading && totalPages > 1 && (
-              <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
-                  <div className="text-sm text-slate-500">
-                      Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredUsers.length)}</span> of <span className="font-medium">{filteredUsers.length}</span> results
-                  </div>
+              <div className="px-4 py-3 border-t border-[rgb(var(--ink)/0.06)] flex items-center justify-between gap-3 shrink-0">
+                  <p className="text-xs text-slate-500">
+                      Showing <span className="font-medium text-slate-700">{(currentPage - 1) * itemsPerPage + 1}</span>–<span className="font-medium text-slate-700">{Math.min(currentPage * itemsPerPage, filteredUsers.length)}</span> of <span className="font-medium text-slate-700">{filteredUsers.length}</span>
+                  </p>
                   <div className="flex items-center gap-2">
                       <button
                           onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                           disabled={currentPage === 1}
-                          className="px-3 py-1 border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="h-8 px-3 rounded-md border border-[rgb(var(--ink)/0.10)] bg-card text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                           Previous
                       </button>
-                      <div className="flex items-center gap-1 text-sm font-medium text-slate-700 px-2">
-                          {currentPage} of {totalPages}
-                      </div>
+                      <span className="text-xs font-mono text-slate-600 px-1">
+                          {currentPage} / {totalPages}
+                      </span>
                       <button
                           onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                           disabled={currentPage === totalPages}
-                          className="px-3 py-1 border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="h-8 px-3 rounded-md border border-[rgb(var(--ink)/0.10)] bg-card text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                           Next
                       </button>
@@ -758,25 +773,25 @@ const UserManagement: React.FC = () => {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div 
-                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
                 onClick={() => setShowModal(false)}
             ></div>
 
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
-                    <h3 className="font-semibold flex items-center gap-2">
-                        {editingId ? <Edit size={20} /> : <UserPlus size={20} />}
+            <div className="bg-card border border-[rgb(var(--ink)/0.10)] rounded-lg shadow-2xl w-full max-w-lg relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="px-5 py-4 border-b border-[rgb(var(--ink)/0.06)] flex justify-between items-center">
+                    <h3 className="text-sm font-medium text-slate-900 flex items-center gap-2">
+                        {editingId ? <Edit size={16} className="text-indigo-600" /> : <UserPlus size={16} className="text-indigo-600" />}
                         {editingId ? 'Edit User' : 'Create New User'}
                     </h3>
-                    <button 
-                        onClick={() => setShowModal(false)} 
-                        className="text-indigo-100 hover:text-white p-1 hover:bg-white/20 rounded-full transition"
+                    <button
+                        onClick={() => setShowModal(false)}
+                        className="text-slate-500 hover:text-slate-900 p-1 hover:bg-slate-100 rounded-md transition"
                     >
-                        <X size={20} />
+                        <X size={16} />
                     </button>
                 </div>
-                
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+
+                <form onSubmit={handleSubmit} className="p-5 space-y-4">
                     {formError && (
                         <div className="bg-red-50 text-red-600 p-3 rounded-lg border border-red-100 text-sm flex items-center gap-2">
                             <AlertCircle size={16} /> {formError}
@@ -786,7 +801,7 @@ const UserManagement: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {isOfficeManagerEditing ? (
                             <>
-                                <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                <div className="sm:col-span-2 rounded-lg border border-[rgb(var(--ink)/0.08)] bg-slate-50 p-4">
                                     <p className="text-sm font-semibold text-slate-800">{formData.full_name}</p>
                                     <div className="mt-2 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
                                         <p>Username: <span className="font-medium text-slate-700">@{formData.username}</span></p>
@@ -803,11 +818,11 @@ const UserManagement: React.FC = () => {
                         ) : (
                             <>
                                 <div className="sm:col-span-2">
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+                                    <label className="block text-xs font-medium text-slate-900 mb-1.5">Full Name</label>
                                     <input 
                                         required
                                         type="text"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                         placeholder="John Doe"
                                         value={formData.full_name}
                                         onChange={e => setFormData({...formData, full_name: e.target.value})}
@@ -815,11 +830,11 @@ const UserManagement: React.FC = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
+                                    <label className="block text-xs font-medium text-slate-900 mb-1.5">Username</label>
                                     <input 
                                         required
                                         type="text"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                         placeholder="johndoe"
                                         value={formData.username}
                                         onChange={e => setFormData({...formData, username: e.target.value})}
@@ -829,14 +844,14 @@ const UserManagement: React.FC = () => {
                         )}
 
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                            <label className="block text-xs font-medium text-slate-900 mb-1.5">
                                 {editingId ? 'Password (Optional)' : 'Password'}
                             </label>
                             <div className="relative">
                                 <input 
                                     required={!editingId}
                                     type={showPassword ? "text" : "password"}
-                                    className="w-full px-3 py-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                    className="w-full px-3 py-2 pr-10 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                     placeholder={editingId ? "Leave blank to keep" : "••••••"}
                                     value={formData.password}
                                     onChange={e => setFormData({...formData, password: e.target.value})}
@@ -853,9 +868,9 @@ const UserManagement: React.FC = () => {
 
                         {!isOfficeManagerEditing && (
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
+                                <label className="block text-xs font-medium text-slate-900 mb-1.5">Role</label>
                                 <select
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                    className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors bg-card"
                                     value={formData.role}
                                     onChange={e => setFormData({...formData, role: e.target.value as any})}
                                 >
@@ -868,10 +883,10 @@ const UserManagement: React.FC = () => {
                         )}
 
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Position</label>
+                            <label className="block text-xs font-medium text-slate-900 mb-1.5">Position</label>
                             <input 
                                 type="text"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                 placeholder="e.g. Staff"
                                 value={formData.position}
                                 onChange={e => setFormData({...formData, position: e.target.value})}
@@ -881,11 +896,11 @@ const UserManagement: React.FC = () => {
                         {!isOfficeManagerEditing && (
                             <>
                                 <div className="sm:col-span-2">
-                                     <label className="block text-sm font-medium text-slate-700 mb-1">Office Assignment</label>
+                                     <label className="block text-xs font-medium text-slate-900 mb-1.5">Office Assignment</label>
                                      <div className="relative">
                                         <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                                         <select 
-                                            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white appearance-none"
+                                            className="w-full pl-10 pr-4 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors bg-card appearance-none"
                                             value={formData.office_id || ''}
                                             disabled={isOfficeManager}
                                             onChange={e => setFormData({...formData, office_id: e.target.value ? Number(e.target.value) : null})}
@@ -899,9 +914,9 @@ const UserManagement: React.FC = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                                    <label className="block text-xs font-medium text-slate-900 mb-1.5">Status</label>
                                     <select
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors bg-card"
                                         value={formData.status}
                                         onChange={e => setFormData({...formData, status: e.target.value as any})}
                                     >
@@ -913,10 +928,10 @@ const UserManagement: React.FC = () => {
                         )}
                         
                         <div className="sm:col-span-2">
-                             <label className="block text-sm font-medium text-slate-700 mb-1">Email (Optional)</label>
+                             <label className="block text-xs font-medium text-slate-900 mb-1.5">Email (Optional)</label>
                             <input 
                                 type="email"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                 placeholder="john@example.com"
                                 value={formData.email}
                                 onChange={e => setFormData({...formData, email: e.target.value})}
@@ -925,19 +940,19 @@ const UserManagement: React.FC = () => {
                     </div>
 
                     <div className="pt-2 flex justify-end gap-3">
-                        <button 
+                        <button
                             type="button"
                             onClick={() => setShowModal(false)}
-                            className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            className="h-9 px-4 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
                         >
                             Cancel
                         </button>
-                        <button 
+                        <button
                             type="submit"
                             disabled={submitting}
-                            className="bg-indigo-600 text-white px-6 py-2 rounded-lg shadow-md hover:bg-indigo-700 transition-colors font-medium flex items-center gap-2"
+                            className="h-9 bg-indigo-600 text-white px-5 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50"
                         >
-                            {submitting && <Loader2 className="animate-spin" size={16} />}
+                            {submitting && <Loader2 className="animate-spin" size={15} />}
                             {submitting ? 'Saving...' : (editingId ? 'Save Changes' : 'Create User')}
                         </button>
                     </div>
@@ -950,34 +965,34 @@ const UserManagement: React.FC = () => {
       {showDeleteModal && userToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div 
-                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
                 onClick={() => !deleting && setShowDeleteModal(false)}
             ></div>
 
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-card border border-[rgb(var(--ink)/0.10)] rounded-lg shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="p-6 text-center">
-                    <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <AlertCircle size={32} />
+                    <div className="w-12 h-12 bg-red-50 border border-red-200 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <AlertCircle size={22} />
                     </div>
-                    <h3 className="text-xl font-bold text-slate-800 mb-2">Confirm Deletion</h3>
-                    <p className="text-slate-600 mb-6">
+                    <h3 className="text-base font-semibold text-slate-900 mb-2">Confirm Deletion</h3>
+                    <p className="text-sm text-slate-600 mb-6">
                         Are you sure you want to delete user <strong>"{userToDelete.username}"</strong>? This action cannot be undone.
                     </p>
-                    
+
                     <div className="flex justify-center gap-3">
-                        <button 
+                        <button
                             onClick={() => setShowDeleteModal(false)}
                             disabled={deleting}
-                            className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                            className="h-9 px-4 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-md transition-colors disabled:opacity-50"
                         >
                             Cancel
                         </button>
-                        <button 
+                        <button
                             onClick={confirmDelete}
                             disabled={deleting}
-                            className="bg-red-600 text-white px-6 py-2 rounded-lg shadow-md hover:bg-red-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
+                            className="h-9 bg-red-600 text-white px-5 rounded-md text-sm font-medium hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50"
                         >
-                            {deleting && <Loader2 className="animate-spin" size={16} />}
+                            {deleting && <Loader2 className="animate-spin" size={15} />}
                             {deleting ? 'Deleting...' : 'Yes, Delete User'}
                         </button>
                     </div>

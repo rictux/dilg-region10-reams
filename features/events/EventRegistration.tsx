@@ -758,7 +758,7 @@ const EventRegistration: React.FC = () => {
   if (!event) {
       return (
           <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-              <div className="bg-white p-8 rounded-xl shadow-md text-center max-w-md w-full">
+              <div className="bg-card p-8 rounded-xl shadow-md text-center max-w-md w-full">
                   <div className="text-red-500 mb-4 flex justify-center"><CheckCircle size={48} className="rotate-45" /></div>
                   <h2 className="text-xl font-bold text-slate-800 mb-2">Event Not Found</h2>
                   <p className="text-slate-500">{error || "The event link might be invalid or expired."}</p>
@@ -771,7 +771,7 @@ const EventRegistration: React.FC = () => {
   if (!event.registration_open) {
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-              <div className="bg-white p-8 rounded-xl shadow-md text-center max-w-md w-full border border-slate-100">
+              <div className="bg-card p-8 rounded-xl shadow-md text-center max-w-md w-full border border-slate-100">
                   <div className="bg-red-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Lock size={32} className="text-red-500" />
                   </div>
@@ -791,7 +791,7 @@ const EventRegistration: React.FC = () => {
   if (success && qrToken) {
       return (
           <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 flex justify-center">
-              <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+              <div className="max-w-md w-full bg-card rounded-2xl shadow-xl overflow-hidden">
                   <div className={`${alreadyRegistered ? 'bg-amber-500' : 'bg-green-600'} px-6 py-8 text-center text-white transition-colors`}>
                       <div className="flex justify-center mb-4">
                           <div className="bg-white/20 p-3 rounded-full">
@@ -822,9 +822,9 @@ const EventRegistration: React.FC = () => {
                       {/* Ticket / Pass Container for Image Generation */}
                       <div 
                         ref={ticketRef}
-                        className="bg-white p-6 rounded-xl w-full border-2 border-slate-100"
+                        className="bg-card p-6 rounded-xl w-full border-2 border-slate-100"
                       >
-                          <div className="border-4 border-slate-900 p-4 rounded-xl mb-4 bg-white inline-block">
+                          <div className="border-4 border-[#111110] p-4 rounded-xl mb-4 bg-white inline-block">
                               <div className="relative inline-block">
                                   <QRCode value={qrToken} size={180} fgColor="#000000" bgColor="#FFFFFF" level="H" />
                                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-1">
@@ -869,7 +869,7 @@ const EventRegistration: React.FC = () => {
   return (
     <>
     <div className="min-h-screen bg-slate-50 py-8 sm:py-12 px-4 sm:px-6 lg:px-8 flex justify-center">
-        <div className="max-w-3xl w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
+        <div className="max-w-3xl w-full bg-card rounded-2xl shadow-xl overflow-hidden border border-slate-100">
             {/* Event Header */}
             <div className="bg-sidebar p-6 sm:p-8 text-white relative overflow-hidden">
                 {/* Grid texture */}
@@ -881,7 +881,7 @@ const EventRegistration: React.FC = () => {
                         backgroundSize: '40px 40px',
                     }}
                 />
-                <div className="absolute -top-16 -right-16 w-56 h-56 bg-[#4B3FE4]/25 rounded-full blur-3xl pointer-events-none"></div>
+                <div className="absolute -top-16 -right-16 w-56 h-56 bg-indigo-600/25 rounded-full blur-3xl pointer-events-none"></div>
                 <div className="relative z-10">
                     <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-medium mb-3 font-mono">
                         Registration Open
@@ -997,7 +997,7 @@ const EventRegistration: React.FC = () => {
 
                                 <div className="mt-4 space-y-3">
                                     {inlineMatches.map((match) => (
-                                        <div key={match.participant_id} className="bg-white border border-amber-200 rounded-lg p-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                                        <div key={match.participant_id} className="bg-card border border-amber-200 rounded-lg p-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                                             <div className="flex-1 min-w-0 space-y-1">
                                                 <p className="text-sm font-bold text-slate-900">{getParticipantDisplayName(match)}</p>
                                                 <p className="text-xs text-slate-500">
@@ -1119,7 +1119,7 @@ const EventRegistration: React.FC = () => {
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Gender</label>
                                 <select 
-                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                     value={formData.gender}
                                     onChange={e => setFormData({...formData, gender: e.target.value})}
                                 >
@@ -1131,7 +1131,7 @@ const EventRegistration: React.FC = () => {
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">What age group do you belong?</label>
                                 <select 
-                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                     value={formData.age_group}
                                     onChange={e => setFormData({...formData, age_group: e.target.value})}
                                 >
@@ -1154,7 +1154,7 @@ const EventRegistration: React.FC = () => {
                                     Are you a person with disability (PWD), as defined under RA 7277 (Magna Carta for Persons with Disability)?
                                 </label>
                                 <select 
-                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                     value={formData.pwd}
                                     onChange={e => setFormData({...formData, pwd: e.target.value})}
                                 >
@@ -1168,7 +1168,7 @@ const EventRegistration: React.FC = () => {
                                     Do you identify as a member of an Indigenous Cultural Community / Indigenous People (ICCs/IPs)?
                                 </label>
                                 <select 
-                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                     value={formData.indigenous_people}
                                     onChange={e => setFormData({...formData, indigenous_people: e.target.value})}
                                 >
@@ -1248,7 +1248,7 @@ const EventRegistration: React.FC = () => {
                                             <MapPin className="absolute left-3 top-3 text-slate-400" size={18} />
                                             <select 
                                                 required={affiliationType === 'LGU'}
-                                                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white appearance-none"
+                                                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card appearance-none"
                                                 value={selectedProvince}
                                                 onChange={e => {
                                                     setSelectedProvince(e.target.value);
@@ -1268,7 +1268,7 @@ const EventRegistration: React.FC = () => {
                                             <MapPin className="absolute left-3 top-3 text-slate-400" size={18} />
                                             <select 
                                                 disabled={!selectedProvince}
-                                                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white appearance-none disabled:bg-slate-100 disabled:text-slate-400"
+                                                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card appearance-none disabled:bg-slate-100 disabled:text-slate-400"
                                                 value={selectedCity}
                                                 onChange={e => setSelectedCity(e.target.value)}
                                             >
@@ -1297,8 +1297,8 @@ const EventRegistration: React.FC = () => {
                                 </label>
                                 <div className="flex gap-6">
                                     <label className="flex items-center gap-2 cursor-pointer group">
-                                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${formData.needs_accommodation ? 'border-indigo-600 bg-indigo-600' : 'border-slate-400 bg-white'}`}>
-                                            {formData.needs_accommodation && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${formData.needs_accommodation ? 'border-indigo-600 bg-indigo-600' : 'border-slate-400 bg-card'}`}>
+                                            {formData.needs_accommodation && <div className="w-2 h-2 rounded-full bg-card"></div>}
                                         </div>
                                         <input
                                             type="radio"
@@ -1311,8 +1311,8 @@ const EventRegistration: React.FC = () => {
                                     </label>
 
                                     <label className="flex items-center gap-2 cursor-pointer group">
-                                         <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${!formData.needs_accommodation ? 'border-indigo-600 bg-indigo-600' : 'border-slate-400 bg-white'}`}>
-                                            {!formData.needs_accommodation && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                                         <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${!formData.needs_accommodation ? 'border-indigo-600 bg-indigo-600' : 'border-slate-400 bg-card'}`}>
+                                            {!formData.needs_accommodation && <div className="w-2 h-2 rounded-full bg-card"></div>}
                                         </div>
                                         <input
                                             type="radio"
@@ -1344,7 +1344,7 @@ const EventRegistration: React.FC = () => {
                                             <label
                                               key={date}
                                               className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
-                                                isChecked ? 'border-indigo-400 bg-indigo-100/70 text-indigo-700' : 'border-indigo-100 bg-white text-slate-700 hover:border-indigo-300'
+                                                isChecked ? 'border-indigo-400 bg-indigo-100/70 text-indigo-700' : 'border-indigo-100 bg-card text-slate-700 hover:border-indigo-300'
                                               }`}
                                             >
                                               <input
@@ -1380,7 +1380,7 @@ const EventRegistration: React.FC = () => {
 
                                     {item.type === 'single-select' ? (
                                         <select
-                                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none bg-white"
+                                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none bg-card"
                                             value={(formData.giveaway_selections[item.key] as string) || ''}
                                             onChange={(e) => setGiveawaySelection(item.key, e.target.value)}
                                         >
@@ -1392,8 +1392,8 @@ const EventRegistration: React.FC = () => {
                                     ) : (
                                         <div className="flex gap-6">
                                             <label className="flex items-center gap-2 cursor-pointer group">
-                                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${formData.giveaway_selections[item.key] ? 'border-purple-600 bg-purple-600' : 'border-slate-400 bg-white'}`}>
-                                                    {formData.giveaway_selections[item.key] && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${formData.giveaway_selections[item.key] ? 'border-purple-600 bg-purple-600' : 'border-slate-400 bg-card'}`}>
+                                                    {formData.giveaway_selections[item.key] && <div className="w-2 h-2 rounded-full bg-card"></div>}
                                                 </div>
                                                 <input
                                                     type="radio"
@@ -1406,8 +1406,8 @@ const EventRegistration: React.FC = () => {
                                             </label>
 
                                             <label className="flex items-center gap-2 cursor-pointer group">
-                                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${!formData.giveaway_selections[item.key] ? 'border-purple-600 bg-purple-600' : 'border-slate-400 bg-white'}`}>
-                                                    {!formData.giveaway_selections[item.key] && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${!formData.giveaway_selections[item.key] ? 'border-purple-600 bg-purple-600' : 'border-slate-400 bg-card'}`}>
+                                                    {!formData.giveaway_selections[item.key] && <div className="w-2 h-2 rounded-full bg-card"></div>}
                                                 </div>
                                                 <input
                                                     type="radio"
@@ -1437,8 +1437,8 @@ const EventRegistration: React.FC = () => {
                             </label>
                             <div className="flex gap-6">
                                 <label className="flex items-center gap-2 cursor-pointer group">
-                                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${formData.need_ca ? 'border-emerald-600 bg-emerald-600' : 'border-slate-400 bg-white'}`}>
-                                        {formData.need_ca && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${formData.need_ca ? 'border-emerald-600 bg-emerald-600' : 'border-slate-400 bg-card'}`}>
+                                        {formData.need_ca && <div className="w-2 h-2 rounded-full bg-card"></div>}
                                     </div>
                                     <input
                                         type="radio"
@@ -1451,8 +1451,8 @@ const EventRegistration: React.FC = () => {
                                 </label>
 
                                 <label className="flex items-center gap-2 cursor-pointer group">
-                                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${!formData.need_ca ? 'border-emerald-600 bg-emerald-600' : 'border-slate-400 bg-white'}`}>
-                                        {!formData.need_ca && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${!formData.need_ca ? 'border-emerald-600 bg-emerald-600' : 'border-slate-400 bg-card'}`}>
+                                        {!formData.need_ca && <div className="w-2 h-2 rounded-full bg-card"></div>}
                                     </div>
                                     <input
                                         type="radio"
@@ -1540,8 +1540,8 @@ const EventRegistration: React.FC = () => {
     </div>
     {showMatchPrompt && (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeMatchPrompt}></div>
-        <div className="relative z-10 w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={closeMatchPrompt}></div>
+        <div className="relative z-10 w-full max-w-2xl rounded-2xl bg-card shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
           <div className="px-6 py-5 border-b border-slate-100 bg-slate-50">
             <h3 className="text-xl font-bold text-slate-900">
               {potentialMatches.length === 1 ? 'We found a possible existing record' : 'Possible matches'}
@@ -1575,7 +1575,7 @@ const EventRegistration: React.FC = () => {
                       closeMatchPrompt();
                       await processRegistration({ skipPotentialMatch: true });
                     }}
-                    className="flex-1 bg-white text-slate-700 py-3 rounded-xl font-semibold border border-slate-300 hover:bg-slate-50 transition-colors"
+                    className="flex-1 bg-card text-slate-700 py-3 rounded-xl font-semibold border border-slate-300 hover:bg-slate-50 transition-colors"
                   >
                     No, create new registration
                   </button>
@@ -1614,7 +1614,7 @@ const EventRegistration: React.FC = () => {
                       closeMatchPrompt();
                       await processRegistration({ skipPotentialMatch: true });
                     }}
-                    className="flex-1 bg-white text-slate-700 py-3 rounded-xl font-semibold border border-slate-300 hover:bg-slate-50 transition-colors"
+                    className="flex-1 bg-card text-slate-700 py-3 rounded-xl font-semibold border border-slate-300 hover:bg-slate-50 transition-colors"
                   >
                     None of these, create new record
                   </button>

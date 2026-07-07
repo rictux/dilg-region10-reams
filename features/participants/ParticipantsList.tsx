@@ -1174,7 +1174,7 @@ const AttendanceList: React.FC = () => {
         <div className="flex w-full flex-col gap-3 sm:gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3 xl:flex-nowrap xl:gap-4">
             <div className="relative w-full sm:mx-auto sm:max-w-[32rem] lg:mx-0 lg:max-w-[32rem] lg:flex-[1.25] xl:max-w-[36rem]" ref={dropdownRef}>
                 <div 
-                    className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-1.5 shadow-sm transition-colors hover:border-indigo-400 sm:px-4 sm:py-2 lg:py-2"
+                    className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-slate-300 bg-card px-3 py-1.5 shadow-sm transition-colors hover:border-indigo-400 sm:px-4 sm:py-2 lg:py-2"
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
                     <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -1187,7 +1187,7 @@ const AttendanceList: React.FC = () => {
                 </div>
 
                 {isDropdownOpen && (
-                    <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl animate-in fade-in zoom-in-95 duration-100">
+                    <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-card shadow-xl animate-in fade-in zoom-in-95 duration-100">
                         <div className="p-2 border-b border-slate-100 bg-slate-50 sticky top-0">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
@@ -1241,7 +1241,7 @@ const AttendanceList: React.FC = () => {
                 this wrapper so the day selector and search group are direct toolbar flex children. */}
             <div className="flex w-full items-stretch gap-2 lg:contents">
             {eventDays.length > 1 && (
-                <div className="max-w-[42%] shrink-0 rounded-lg border border-slate-200 bg-white p-0 lg:max-w-none">
+                <div className="max-w-[42%] shrink-0 rounded-lg border border-slate-200 bg-card p-0 lg:max-w-none">
                     <div className="flex gap-0.5 overflow-x-auto no-scrollbar">
                         {eventDays.map((day, idx) => {
                             const dStr = format(day, 'yyyy-MM-dd');
@@ -1274,7 +1274,7 @@ const AttendanceList: React.FC = () => {
       {/* Filter tabs + search + actions. Mobile: stacked rows (filter, then search/actions);
           sm+: single wrapping row with actions right-aligned. */}
       <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="flex flex-wrap items-center gap-1 p-1 bg-[#E8E5DC]/50 border border-black/[0.05] rounded-lg">
+          <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100/50 border border-[rgb(var(--ink)/0.05)] rounded-lg">
               {[
                   { value: 'Show All', label: 'All', shortLabel: 'All', count: totalParticipants, show: true },
                   { value: 'Present', label: 'Present', shortLabel: 'Present', count: presentCount, show: true },
@@ -1290,15 +1290,15 @@ const AttendanceList: React.FC = () => {
                       className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-xs transition-all ${
                           filter === tab.value
                               ? 'bg-white text-[#111110] shadow-sm font-medium border border-black/[0.06]'
-                              : 'text-[#6B6860] hover:text-[#111110]'
+                              : 'text-slate-600 hover:text-slate-900'
                       }`}
                   >
                       <span className="sm:hidden">{tab.shortLabel}</span>
                       <span className="hidden sm:inline">{tab.label}</span>
                       <span className={`hidden sm:inline font-mono text-[10px] leading-none ${
                           filter === tab.value
-                              ? 'bg-[#4B3FE4]/10 text-[#4B3FE4] rounded px-1 py-0.5'
-                              : 'text-[#9A9890]'
+                              ? 'bg-indigo-600/10 text-indigo-600 rounded px-1 py-0.5'
+                              : 'text-slate-400'
                       }`}>
                           {tab.count}
                       </span>
@@ -1308,7 +1308,7 @@ const AttendanceList: React.FC = () => {
 
           <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:ml-auto sm:flex-none sm:justify-end">
               <div className="relative min-w-0 w-full sm:max-w-xs">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                       <Search size={14} />
                   </div>
                   <input
@@ -1316,7 +1316,7 @@ const AttendanceList: React.FC = () => {
                       placeholder="Search by name or office..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full min-w-0 h-9 pl-9 pr-12 bg-[#E8E5DC]/50 border border-black/10 rounded-lg text-sm placeholder-[#9A9890] focus:outline-none focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] transition-all"
+                      className="w-full min-w-0 h-9 pl-9 pr-12 bg-slate-100/50 border border-[rgb(var(--ink)/0.10)] rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 transition-all"
                   />
                   {searchQuery && (
                       <button
@@ -1345,7 +1345,7 @@ const AttendanceList: React.FC = () => {
                   type="button"
                   aria-label="Add participant"
                   title="Add participant"
-                  className="flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#4B3FE4] px-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#3B30C4] disabled:cursor-not-allowed disabled:bg-slate-300"
+                  className="flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                   <UserPlus size={16} />
                   <span className="hidden lg:inline">Add</span>
@@ -1367,14 +1367,14 @@ const AttendanceList: React.FC = () => {
                 <button
                     type="button"
                     onClick={openBulkManualModal}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#4B3FE4] px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#3B30C4]"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-indigo-700"
                 >
                     <Clock size={14} />
                     Bulk Manual ({selectedManualIds.length})
                 </button>
             </div>
         )}
-        <div className="attendance-table bg-white rounded-xl shadow-sm border border-slate-100 overflow-visible flex-none flex flex-col">
+        <div className="attendance-table bg-card rounded-xl shadow-sm border border-slate-100 overflow-visible flex-none flex flex-col">
 
             <div className="hidden lg:block">
                 <table className="datatable w-full table-fixed text-[13px] lg:text-sm text-left">
@@ -1519,7 +1519,7 @@ const AttendanceList: React.FC = () => {
                             <div
                                 key={row.participant.participant_id}
                                 onClick={() => handleRowClick(row.participant)}
-                                className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm active:scale-[0.99] transition-transform sm:p-3"
+                                className="rounded-lg border border-slate-200 bg-card p-2.5 shadow-sm active:scale-[0.99] transition-transform sm:p-3"
                             >
                                 <div className="flex items-start justify-between gap-2.5">
                                     <input
@@ -1598,8 +1598,8 @@ const AttendanceList: React.FC = () => {
       {/* Add Participant Modal */}
       {showAddParticipantModal && (
         <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddParticipantModal(false)}></div>
-            <div className="fixed inset-y-0 right-0 flex w-full max-w-[560px] flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-200">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowAddParticipantModal(false)}></div>
+            <div className="fixed inset-y-0 right-0 flex w-full max-w-[560px] flex-col bg-card shadow-2xl animate-in slide-in-from-right duration-200">
                 <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100 shrink-0">
                     <div className="min-w-0">
                         <h3 className="text-lg font-semibold text-slate-900">Add Participant</h3>
@@ -1637,7 +1637,7 @@ const AttendanceList: React.FC = () => {
                                 autoComplete="off"
                             />
                              {showSuggestions && suggestions.length > 0 && (
-                                <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                                <ul className="absolute z-50 w-full bg-card border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
                                     {suggestions.map((p) => (
                                         <li 
                                             key={p.participant_id}
@@ -1783,7 +1783,7 @@ const AttendanceList: React.FC = () => {
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Province / HUC</label>
                                     <select 
                                         required={affiliationType === 'LGU'}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                         value={selectedProvince}
                                         onChange={e => {
                                             setSelectedProvince(e.target.value);
@@ -1801,7 +1801,7 @@ const AttendanceList: React.FC = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">City / Municipality</label>
                                     <select 
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card disabled:bg-slate-100 disabled:text-slate-400"
                                         value={selectedCity}
                                         onChange={e => {
                                             setSelectedCity(e.target.value);
@@ -1827,7 +1827,7 @@ const AttendanceList: React.FC = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Event Role</label>
                                     <select
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                         value={newParticipant.role}
                                         onChange={e => setNewParticipant({...newParticipant, role: e.target.value as any})}
                                     >
@@ -1841,7 +1841,7 @@ const AttendanceList: React.FC = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
                                     <select 
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                         value={newParticipant.gender}
                                         onChange={e => setNewParticipant({...newParticipant, gender: e.target.value})}
                                     >
@@ -1856,7 +1856,7 @@ const AttendanceList: React.FC = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Age Group</label>
                                     <select
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                         value={newParticipant.age_group}
                                         onChange={e => setNewParticipant({...newParticipant, age_group: e.target.value})}
                                     >
@@ -1871,7 +1871,7 @@ const AttendanceList: React.FC = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">PWD</label>
                                     <select
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                         value={newParticipant.pwd}
                                         onChange={e => setNewParticipant({...newParticipant, pwd: e.target.value})}
                                     >
@@ -1884,7 +1884,7 @@ const AttendanceList: React.FC = () => {
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Indigenous People</label>
                                 <select
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                     value={newParticipant.indigenous_people}
                                     onChange={e => setNewParticipant({...newParticipant, indigenous_people: e.target.value})}
                                 >
@@ -1929,7 +1929,7 @@ const AttendanceList: React.FC = () => {
                                                 <label
                                                     key={date}
                                                     className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
-                                                        isChecked ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300'
+                                                        isChecked ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-card text-slate-700 hover:border-indigo-300'
                                                     }`}
                                                 >
                                                     <input
@@ -1975,7 +1975,7 @@ const AttendanceList: React.FC = () => {
                                     {item.type === 'single-select' ? (
                                         <select
                                             disabled={giveawaysClosed}
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-card focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                                             value={(newParticipant.giveaway_selections[item.key] as string) || ''}
                                             onChange={(e) => setNewParticipant({ ...newParticipant, giveaway_selections: { ...newParticipant.giveaway_selections, [item.key]: e.target.value } })}
                                         >
@@ -2086,8 +2086,8 @@ const AttendanceList: React.FC = () => {
 
       {showManualModal && manualParticipant && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowManualModal(false)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setShowManualModal(false)}></div>
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
                     <h3 className="font-semibold flex items-center gap-2">
                         <Clock size={20} /> Manual Attendance
@@ -2127,7 +2127,7 @@ const AttendanceList: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Session</label>
-                            <select value={manualForm.session} onChange={e => setManualForm({...manualForm, session: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
+                            <select value={manualForm.session} onChange={e => setManualForm({...manualForm, session: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card">
                                 {visibleSessions.map((session) => (
                                     <option key={session} value={session}>{session}</option>
                                 ))}
@@ -2135,7 +2135,7 @@ const AttendanceList: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                            <select value={manualForm.status} onChange={e => setManualForm({...manualForm, status: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
+                            <select value={manualForm.status} onChange={e => setManualForm({...manualForm, status: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card">
                                 <option value="Valid">Valid</option>
                                 <option value="Late">Late</option>
                                 <option value="Excuse">Excuse</option>
@@ -2153,8 +2153,8 @@ const AttendanceList: React.FC = () => {
 
       {showBulkManualModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowBulkManualModal(false)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setShowBulkManualModal(false)}></div>
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
                     <h3 className="font-semibold flex items-center gap-2">
                         <Clock size={20} /> Bulk Manual Attendance
@@ -2202,7 +2202,7 @@ const AttendanceList: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Session</label>
-                            <select value={manualForm.session} onChange={e => setManualForm({...manualForm, session: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
+                            <select value={manualForm.session} onChange={e => setManualForm({...manualForm, session: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card">
                                 {visibleSessions.map((session) => (
                                     <option key={session} value={session}>{session}</option>
                                 ))}
@@ -2210,7 +2210,7 @@ const AttendanceList: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                            <select value={manualForm.status} onChange={e => setManualForm({...manualForm, status: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
+                            <select value={manualForm.status} onChange={e => setManualForm({...manualForm, status: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card">
                                 <option value="Valid">Valid</option>
                                 <option value="Late">Late</option>
                                 <option value="Excuse">Excuse</option>
@@ -2229,11 +2229,11 @@ const AttendanceList: React.FC = () => {
       {showManualBlockedModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
-              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
               onClick={() => setShowManualBlockedModal(false)}
             ></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="bg-[#4B3FE4] px-6 py-4 flex justify-between items-center text-white">
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
                     <h3 className="font-semibold flex items-center gap-2">
                         <AlertCircle size={20} /> Manual Entry Unavailable
                     </h3>
@@ -2243,7 +2243,7 @@ const AttendanceList: React.FC = () => {
                 </div>
 
                 <div className="p-6 space-y-4">
-                    <div className="bg-indigo-50 text-[#4B3FE4] p-4 rounded-lg border border-indigo-200 text-sm leading-relaxed">
+                    <div className="bg-indigo-50 text-indigo-600 p-4 rounded-lg border border-indigo-200 text-sm leading-relaxed">
                         {manualBlockedMessage}
                     </div>
 
@@ -2257,7 +2257,7 @@ const AttendanceList: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => setShowManualBlockedModal(false)}
-                        className="w-full bg-[#4B3FE4] text-white font-bold py-2.5 rounded-lg hover:bg-indigo-800 transition-all"
+                        className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-800 transition-all"
                     >
                         Close
                     </button>
@@ -2268,8 +2268,8 @@ const AttendanceList: React.FC = () => {
 
       {selectedParticipant && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setSelectedParticipant(null)}></div>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setSelectedParticipant(null)}></div>
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 flex justify-between items-center text-white">
                     <h3 className="font-semibold flex items-center gap-2">
                         <User size={20} /> Participant Badge
@@ -2278,14 +2278,14 @@ const AttendanceList: React.FC = () => {
                         <X size={20} />
                     </button>
                 </div>
-                <div className="p-8 flex flex-col items-center text-center" ref={badgeRef}>
+                <div className="p-8 flex flex-col items-center text-center bg-white" ref={badgeRef}>
                      <>
-                        <div className="border-4 border-slate-900 p-3 rounded-xl mb-6 bg-white shadow-sm">
-                            {qrToken && <QRCode value={qrToken} size={160} />}
+                        <div className="border-4 border-[#111110] p-3 rounded-xl mb-6 bg-white shadow-sm">
+                            {qrToken && <QRCode value={qrToken} size={160} fgColor="#000000" bgColor="#FFFFFF" level="H" />}
                         </div>
-                        <h2 className="text-xl font-bold text-slate-800">{selectedParticipant.full_name}</h2>
-                        <p className="text-indigo-600 font-medium mb-1">{selectedParticipant.position}</p>
-                        <p className="text-slate-500 text-sm">{selectedParticipant.office}</p>
+                        <h2 className="text-xl font-bold text-[#111110]">{selectedParticipant.full_name}</h2>
+                        <p className="text-[#4B3FE4] font-medium mb-1">{selectedParticipant.position}</p>
+                        <p className="text-[#6B6860] text-sm">{selectedParticipant.office}</p>
                      </>
                 </div>
                 <div className="px-8 pb-8 pt-0">

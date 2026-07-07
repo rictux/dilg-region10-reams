@@ -207,13 +207,13 @@ const Dashboard: React.FC = () => {
   };
 
   const StatCard = ({ icon: Icon, label, value, color }: any) => (
-    <div className="bg-white border border-black/[0.08] rounded-lg p-3 sm:p-5 flex items-center gap-3 sm:gap-4 min-w-0">
+    <div className="bg-card border border-[rgb(var(--ink)/0.08)] rounded-lg p-3 sm:p-5 flex items-center gap-3 sm:gap-4 min-w-0">
       <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
         <Icon size={18} />
       </div>
       <div className="min-w-0">
-        <p className="text-xl sm:text-2xl font-medium text-[#111110] leading-none font-mono">{loading ? '…' : value}</p>
-        <p className="text-[11px] sm:text-xs text-[#6B6860] mt-1 truncate">{label}</p>
+        <p className="text-xl sm:text-2xl font-medium text-slate-900 leading-none font-mono">{loading ? '…' : value}</p>
+        <p className="text-[11px] sm:text-xs text-slate-600 mt-1 truncate">{label}</p>
       </div>
     </div>
   );
@@ -222,7 +222,7 @@ const Dashboard: React.FC = () => {
     <div className="min-h-0 overflow-y-auto -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16 space-y-4">
       {/* Top Stats Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard icon={CalendarIcon} label="Total Events" value={stats.totalEvents} color="bg-[#4B3FE4]/10 text-[#4B3FE4]" />
+        <StatCard icon={CalendarIcon} label="Total Events" value={stats.totalEvents} color="bg-indigo-600/10 text-indigo-600" />
         <StatCard icon={Radio} label="On-going Events" value={stats.activeEvents} color="bg-emerald-50 text-emerald-600" />
         <StatCard icon={Clock} label="Upcoming Events" value={stats.upcomingEvents} color="bg-blue-50 text-blue-600" />
         <StatCard icon={CheckCircle} label="Completed Events" value={stats.completedEvents} color="bg-stone-100 text-stone-500" />
@@ -231,21 +231,21 @@ const Dashboard: React.FC = () => {
       <div className="flex flex-col lg:flex-row gap-4 items-start">
         <div className="w-full lg:flex-1 min-w-0 space-y-4">
       {/* Happening Today hero */}
-      <div className="bg-white rounded-lg border border-black/[0.08] overflow-hidden">
-        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-black/[0.06] bg-emerald-50/40">
+      <div className="bg-card rounded-lg border border-[rgb(var(--ink)/0.08)] overflow-hidden">
+        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[rgb(var(--ink)/0.06)] bg-emerald-50/40">
           <span className="relative flex h-2.5 w-2.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
           </span>
-          <h3 className="text-sm font-semibold text-[#111110] uppercase tracking-[0.08em]">Happening Today</h3>
+          <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-[0.08em]">Happening Today</h3>
           <span className="text-[10px] min-w-[1.25rem] text-center px-1.5 py-0.5 rounded-full font-medium font-mono bg-emerald-100 text-emerald-700">
             {ongoingEvents.length}
           </span>
-          <span className="ml-auto text-xs text-[#6B6860] font-mono">{format(new Date(), 'MMMM d, yyyy')}</span>
+          <span className="ml-auto text-xs text-slate-600 font-mono">{format(new Date(), 'MMMM d, yyyy')}</span>
         </div>
 
         {ongoingEvents.length > 0 ? (
-          <div className="divide-y divide-black/[0.04]">
+          <div className="divide-y divide-[rgb(var(--ink)/0.04)]">
             {ongoingEvents.map((event) => {
               const attendanceRatio = event.registered_count > 0
                 ? Math.min((event.present_count ?? 0) / event.registered_count, 1)
@@ -259,18 +259,18 @@ const Dashboard: React.FC = () => {
                     title="View participants"
                     className="min-w-0 flex-1 cursor-pointer group"
                   >
-                    <p className="text-sm font-semibold text-[#111110] leading-snug line-clamp-1 group-hover:text-[#4B3FE4] transition-colors">
+                    <p className="text-sm font-semibold text-slate-900 leading-snug line-clamp-1 group-hover:text-indigo-600 transition-colors">
                       {event.event_name}
                     </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[#6B6860]">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-600">
                       <span className="flex items-center gap-1.5">
-                        <Clock size={12} className="shrink-0 text-[#9A9890]" />
+                        <Clock size={12} className="shrink-0 text-slate-400" />
                         <span className="font-mono">{formatEventDates(event)}</span>
-                        <span className="text-[#C5C2BA]">·</span>
+                        <span className="text-slate-300">·</span>
                         <span className="font-mono">{sessionLabel(event.session)}</span>
                       </span>
                       <span className="flex items-center gap-1.5 min-w-0">
-                        <MapPin size={12} className="shrink-0 text-[#9A9890]" />
+                        <MapPin size={12} className="shrink-0 text-slate-400" />
                         <span className="truncate max-w-[20rem]">{event.venue}</span>
                       </span>
                     </div>
@@ -279,13 +279,13 @@ const Dashboard: React.FC = () => {
                   {/* Live attendance */}
                   <div className="w-full md:w-56 shrink-0">
                     <div className="flex items-baseline justify-between gap-2 mb-1">
-                      <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-[#9A9890]">Present</span>
-                      <span className="text-xs font-mono text-[#111110]">
+                      <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-slate-400">Present</span>
+                      <span className="text-xs font-mono text-slate-900">
                         <span className="font-semibold text-emerald-600">{event.present_count ?? 0}</span>
-                        <span className="text-[#9A9890]"> / {event.registered_count} registered</span>
+                        <span className="text-slate-400"> / {event.registered_count} registered</span>
                       </span>
                     </div>
-                    <div className="h-2 w-full rounded-full bg-[#E8E5DC]/60 overflow-hidden">
+                    <div className="h-2 w-full rounded-full bg-slate-100/60 overflow-hidden">
                       <div
                         className="h-full rounded-r-full bg-emerald-500 transition-all duration-300"
                         style={{ width: `${Math.max(attendanceRatio * 100, 2)}%` }}
@@ -299,7 +299,7 @@ const Dashboard: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => navigate('/scan')}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#4B3FE4] px-3 text-xs font-medium text-white shadow-sm transition-colors hover:bg-[#3B30C4]"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
                       >
                         <ScanLine size={13} />
                         Scan
@@ -309,7 +309,7 @@ const Dashboard: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => navigate('/attendance')}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-black/10 bg-white px-3 text-xs font-medium text-[#111110] shadow-sm transition-colors hover:bg-[#F5F3EE]"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[rgb(var(--ink)/0.10)] bg-card px-3 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-50"
                       >
                         <ClipboardList size={13} />
                         Attendance
@@ -321,98 +321,98 @@ const Dashboard: React.FC = () => {
             })}
           </div>
         ) : (
-          <p className="py-10 text-center text-xs text-[#9A9890]">{loading ? 'Loading…' : 'No events happening today.'}</p>
+          <p className="py-10 text-center text-xs text-slate-400">{loading ? 'Loading…' : 'No events happening today.'}</p>
         )}
       </div>
 
       {/* Upcoming Events */}
-      <div className="bg-white rounded-lg border border-black/[0.08]">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-black/[0.06]">
+      <div className="bg-card rounded-lg border border-[rgb(var(--ink)/0.08)]">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[rgb(var(--ink)/0.06)]">
           <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-blue-50 text-blue-600">
             <Clock size={13} />
           </span>
-          <h3 className="text-sm font-semibold text-[#111110]">Upcoming Events</h3>
+          <h3 className="text-sm font-semibold text-slate-900">Upcoming Events</h3>
           <span className="text-[10px] min-w-[1.25rem] text-center px-1.5 py-0.5 rounded-full font-medium font-mono bg-blue-50 text-blue-700">
             {upcomingEvents.length}
           </span>
           <button
             type="button"
             onClick={() => navigate('/events')}
-            className="ml-auto text-xs font-medium text-[#4B3FE4] hover:text-[#3B30C4] hover:underline transition-colors"
+            className="ml-auto text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline transition-colors"
           >
             View all
           </button>
         </div>
         {upcomingEvents.length > 0 ? (
-          <div className="divide-y divide-black/[0.04] px-4">
+          <div className="divide-y divide-[rgb(var(--ink)/0.04)] px-4">
             {upcomingEvents.map((event) => (
               <div
                 key={event.event_id}
                 onClick={() => navigate(`/events?event=${event.event_id}`)}
                 title="View participants"
-                className="flex items-start gap-2.5 py-3 -mx-4 px-4 cursor-pointer hover:bg-[#F5F3EE]/60 transition-colors"
+                className="flex items-start gap-2.5 py-3 -mx-4 px-4 cursor-pointer hover:bg-slate-50/60 transition-colors"
               >
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#4B3FE4]" />
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-600" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold text-[#111110] leading-snug line-clamp-1">{event.event_name}</p>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[#6B6860]">
+                  <p className="text-[13px] font-semibold text-slate-900 leading-snug line-clamp-1">{event.event_name}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-600">
                     <span className="flex items-center gap-1.5">
-                      <Clock size={12} className="shrink-0 text-[#9A9890]" />
+                      <Clock size={12} className="shrink-0 text-slate-400" />
                       <span className="font-mono">{formatEventDates(event)}</span>
-                      <span className="text-[#C5C2BA]">·</span>
+                      <span className="text-slate-300">·</span>
                       <span className="font-mono">{sessionLabel(event.session)}</span>
                     </span>
                     <span className="flex items-center gap-1.5 min-w-0">
-                      <MapPin size={12} className="shrink-0 text-[#9A9890]" />
+                      <MapPin size={12} className="shrink-0 text-slate-400" />
                       <span className="truncate max-w-[16rem]">{event.venue}</span>
                     </span>
                   </div>
                 </div>
-                <span className="flex shrink-0 items-center gap-1.5 text-xs text-[#6B6860]" title="Registered">
-                  <Users size={13} className="text-[#9A9890]" />
+                <span className="flex shrink-0 items-center gap-1.5 text-xs text-slate-600" title="Registered">
+                  <Users size={13} className="text-slate-400" />
                   <span className="font-mono">{event.registered_count}</span>
                 </span>
               </div>
             ))}
           </div>
         ) : (
-          <p className="py-10 text-center text-xs text-[#9A9890]">{loading ? 'Loading…' : 'No upcoming events.'}</p>
+          <p className="py-10 text-center text-xs text-slate-400">{loading ? 'Loading…' : 'No upcoming events.'}</p>
         )}
       </div>
         </div>
 
         {/* Activity Logs rail */}
-        <div className="w-full lg:w-[30%] xl:w-[28%] shrink-0 bg-white rounded-lg border border-black/[0.08]">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-black/[0.06]">
-            <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-[#4B3FE4]/10 text-[#4B3FE4]">
+        <div className="w-full lg:w-[30%] xl:w-[28%] shrink-0 bg-card rounded-lg border border-[rgb(var(--ink)/0.08)]">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-[rgb(var(--ink)/0.06)]">
+            <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-indigo-600/10 text-indigo-600">
               <Activity size={13} />
             </span>
-            <h3 className="text-sm font-semibold text-[#111110]">Activity Logs</h3>
+            <h3 className="text-sm font-semibold text-slate-900">Activity Logs</h3>
           </div>
           {activityLogs.length > 0 ? (
-            <div className="divide-y divide-black/[0.04]">
+            <div className="divide-y divide-[rgb(var(--ink)/0.04)]">
               {activityLogs.map((item) => (
                 <div key={item.key} className="flex items-start gap-2.5 px-4 py-2.5">
                   <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
-                    item.type === 'scan' ? 'bg-emerald-50 text-emerald-600' : 'bg-[#4B3FE4]/10 text-[#4B3FE4]'
+                    item.type === 'scan' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-600/10 text-indigo-600'
                   }`}>
                     {item.type === 'scan' ? <ScanLine size={12} /> : <UserPlus size={12} />}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs leading-snug text-[#111110]">
+                    <p className="text-xs leading-snug text-slate-900">
                       <span className="font-semibold">{item.name}</span>
-                      <span className="text-[#6B6860]"> · {item.detail}</span>
+                      <span className="text-slate-600"> · {item.detail}</span>
                     </p>
-                    <p className="mt-0.5 truncate text-[11px] text-[#9A9890]">{item.eventName}</p>
+                    <p className="mt-0.5 truncate text-[11px] text-slate-400">{item.eventName}</p>
                   </div>
-                  <span className="shrink-0 text-[10px] font-mono text-[#9A9890]" title={format(parseISO(item.timestamp), 'MMM d, yyyy h:mm a')}>
+                  <span className="shrink-0 text-[10px] font-mono text-slate-400" title={format(parseISO(item.timestamp), 'MMM d, yyyy h:mm a')}>
                     {formatDistanceToNowStrict(parseISO(item.timestamp), { addSuffix: true })}
                   </span>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="py-10 text-center text-xs text-[#9A9890]">{loading ? 'Loading…' : 'No recent activity.'}</p>
+            <p className="py-10 text-center text-xs text-slate-400">{loading ? 'Loading…' : 'No recent activity.'}</p>
           )}
         </div>
       </div>

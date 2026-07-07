@@ -145,7 +145,7 @@ const Reports: React.FC = () => {
   return (
     <div className="min-h-0 overflow-y-auto -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16 space-y-8">
         {/* Filters */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+        <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100">
             <div className="flex flex-col md:flex-row gap-4 items-end">
                 <div className="w-full max-w-4xl">
                     <label className="block text-sm font-medium text-slate-700 mb-2">Select Event</label>
@@ -186,7 +186,7 @@ const Reports: React.FC = () => {
                         </div>
 
                         {isDropdownOpen && (
-                            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                                 {/* Search Input */}
                                 <div className="p-2 border-b border-slate-100 bg-slate-50 sticky top-0">
                                     <div className="relative">
@@ -278,7 +278,7 @@ const Reports: React.FC = () => {
             
             {/* Print Scan Logs Card */}
             {showReport('scan-logs') && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
                 <div className="bg-emerald-100 p-3 rounded-lg text-emerald-600 mb-4">
                     <ScrollText size={24} />
                 </div>
@@ -299,7 +299,7 @@ const Reports: React.FC = () => {
 
             {/* Giveaway Claim Logs Card */}
             {showReport('giveaways') && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
                 <div className="bg-fuchsia-100 p-3 rounded-lg text-fuchsia-600 mb-4">
                     <Gift size={24} />
                 </div>
@@ -324,7 +324,7 @@ const Reports: React.FC = () => {
 
             {/* Print Attendance Sheet Card */}
             {showReport('attendance-sheet') && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
                 <div className="bg-indigo-100 p-3 rounded-lg text-indigo-600 mb-4">
                     <Printer size={24} />
                 </div>
@@ -345,7 +345,7 @@ const Reports: React.FC = () => {
 
             {/* Print Certificate of Appearance Card */}
             {showReport('appearance') && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
                 <div className="bg-amber-100 p-3 rounded-lg text-amber-600 mb-4">
                     <ScrollText size={24} />
                 </div>
@@ -366,7 +366,7 @@ const Reports: React.FC = () => {
 
             {/* Certificate of Participation Card */}
             {showReport('participation') && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
                 <div className="bg-violet-100 p-3 rounded-lg text-violet-600 mb-4">
                     <Award size={24} />
                 </div>

@@ -175,16 +175,16 @@ const GiveawayClaimLogsPrint: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 print:bg-white">
-      <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between border-b border-slate-200 bg-white p-4 shadow-sm no-print">
-        <button onClick={() => navigate('/reports')} className="flex items-center gap-2 font-medium text-slate-600 hover:text-slate-900">
+    <div className="min-h-screen bg-[#F5F3EE] font-sans text-[#111110] print:bg-white">
+      <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between border-b border-[#E0DDD4] bg-white p-4 shadow-sm no-print">
+        <button onClick={() => navigate('/reports')} className="flex items-center gap-2 font-medium text-[#6B6860] hover:text-[#111110]">
           <ArrowLeft size={20} /> Back
         </button>
         <div className="flex items-center gap-3">
-          <span className="rounded bg-slate-100 px-2 py-1 font-mono text-sm text-slate-500">
+          <span className="rounded bg-[#EDEAE2] px-2 py-1 font-mono text-sm text-[#7C7A72]">
             Total Claims: {logs.length}
           </span>
-          <button onClick={() => window.print()} className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 font-bold text-white shadow-md transition-colors hover:bg-slate-800">
+          <button onClick={() => window.print()} className="flex items-center gap-2 rounded-lg bg-[#111110] px-4 py-2 font-bold text-white shadow-md transition-colors hover:bg-[#2A2926]">
             <Printer size={18} /> Print
           </button>
         </div>
@@ -241,22 +241,22 @@ const GiveawayClaimLogsPrint: React.FC = () => {
       `}</style>
 
       <div className="print-container min-h-screen w-full px-4 pb-10 pt-24 md:px-8 print:p-0">
-        <div className="mb-5 rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm print:border-none print:shadow-none">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Giveaway Claim Logs</p>
-          <h1 className="mt-2 text-2xl font-black uppercase leading-tight text-slate-950 print:text-xl">
+        <div className="mb-5 rounded-xl border border-[#E0DDD4] bg-white p-5 text-center shadow-sm print:border-none print:shadow-none">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#7C7A72]">Giveaway Claim Logs</p>
+          <h1 className="mt-2 text-2xl font-black uppercase leading-tight text-[#0F0F0E] print:text-xl">
             {event?.event_name || 'Selected Event'}
           </h1>
-          <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-slate-600 md:grid-cols-2 print:grid-cols-2">
+          <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-[#6B6860] md:grid-cols-2 print:grid-cols-2">
             <p>
-              <span className="font-bold text-slate-800">Venue:</span> {event?.venue || '-'}
+              <span className="font-bold text-[#2A2926]">Venue:</span> {event?.venue || '-'}
             </p>
             <p>
-              <span className="font-bold text-slate-800">Date:</span> {formatEventDate(event?.start_date, event?.end_date)}
+              <span className="font-bold text-[#2A2926]">Date:</span> {formatEventDate(event?.start_date, event?.end_date)}
             </p>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg print:rounded-none print:border-none print:shadow-none">
+        <div className="overflow-hidden rounded-xl border border-[#E0DDD4] bg-white shadow-lg print:rounded-none print:border-none print:shadow-none">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left">
               <colgroup>
@@ -274,7 +274,7 @@ const GiveawayClaimLogsPrint: React.FC = () => {
                 )}
                 <col className="w-[13%]" />
               </colgroup>
-              <thead className="bg-slate-100 text-slate-800">
+              <thead className="bg-[#EDEAE2] text-[#2A2926]">
                 <tr>
                   <th className="px-3 py-2 text-xs font-bold">No.</th>
                   <th className="px-3 py-2 text-xs font-bold">Name</th>
@@ -291,11 +291,11 @@ const GiveawayClaimLogsPrint: React.FC = () => {
                   <th className="px-3 py-2 text-xs font-bold">Time Claim</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
+              <tbody className="divide-y divide-[#EDEAE2] bg-white">
                 {logs.map((log, index) => (
-                  <tr key={log.claim_id} className="text-sm text-slate-700 print:text-[9px]">
-                    <td className="px-3 py-2 text-center font-mono text-slate-500">{index + 1}</td>
-                    <td className="px-3 py-2 font-semibold text-slate-900 print-wrap">{log.participants?.full_name || '-'}</td>
+                  <tr key={log.claim_id} className="text-sm text-[#4A4843] print:text-[9px]">
+                    <td className="px-3 py-2 text-center font-mono text-[#7C7A72]">{index + 1}</td>
+                    <td className="px-3 py-2 font-semibold text-[#111110] print-wrap">{log.participants?.full_name || '-'}</td>
                     <td className="px-3 py-2 print-wrap">{log.participants?.position || '-'}</td>
                     <td className="px-3 py-2 print-wrap">{log.participants?.office || '-'}</td>
                     <td className="px-3 py-2">{formatGender(log.participants?.gender)}</td>
@@ -313,7 +313,7 @@ const GiveawayClaimLogsPrint: React.FC = () => {
                 ))}
                 {logs.length === 0 && (
                   <tr>
-                    <td colSpan={totalColumns} className="px-4 py-10 text-center italic text-slate-400">
+                    <td colSpan={totalColumns} className="px-4 py-10 text-center italic text-[#9A9890]">
                       No giveaway claim records found.
                     </td>
                   </tr>
@@ -323,7 +323,7 @@ const GiveawayClaimLogsPrint: React.FC = () => {
           </div>
         </div>
 
-        <div className="mt-4 flex justify-between border-t border-slate-200 pt-2 text-[10px] text-slate-400 print:border-none">
+        <div className="mt-4 flex justify-between border-t border-[#E0DDD4] pt-2 text-[10px] text-[#9A9890] print:border-none">
           <span>Giveaway Claim Log Report - {format(new Date(), 'yyyy-MM-dd HH:mm:ss')}</span>
           <span>Page 1</span>
         </div>

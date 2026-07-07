@@ -2124,7 +2124,7 @@ const EventsList: React.FC = () => {
           {isEditing ? (
             <div className="flex items-center gap-1 sm:gap-2">
               <select
-                className="min-w-0 text-xs border border-slate-300 rounded p-1 bg-white focus:outline-none focus:border-indigo-500"
+                className="min-w-0 text-xs border border-slate-300 rounded p-1 bg-card focus:outline-none focus:border-indigo-500"
                 value={editingRole.role}
                 onChange={(e) => setEditingRole({ ...editingRole, role: e.target.value })}
                 onClick={(e) => e.stopPropagation()}
@@ -2326,7 +2326,7 @@ const EventsList: React.FC = () => {
         <button
             onClick={openCreateModal}
             type="button"
-            className="h-9 shrink-0 bg-[#4B3FE4] hover:bg-[#3B30C4] text-white text-sm font-medium rounded-md flex items-center gap-1.5 px-3 transition-colors"
+            className="h-9 shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md flex items-center gap-1.5 px-3 transition-colors"
         >
             <CalendarPlus size={15} />
             <span className="hidden sm:inline">New Event</span>
@@ -2335,7 +2335,7 @@ const EventsList: React.FC = () => {
 
       {/* Filter tabs + search */}
       <div className="flex flex-wrap items-center gap-3 w-full">
-        <div className="flex flex-wrap items-center gap-1 p-1 bg-[#E8E5DC]/50 border border-black/[0.05] rounded-lg">
+        <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100/50 border border-[rgb(var(--ink)/0.05)] rounded-lg">
           {[
             { value: 'All', label: 'All', count: eventSummary.total },
             { value: 'Ongoing', label: 'Ongoing', count: eventSummary.ongoing },
@@ -2350,14 +2350,14 @@ const EventsList: React.FC = () => {
               className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-xs transition-all ${
                 statusFilter === tab.value
                   ? 'bg-white text-[#111110] shadow-sm font-medium border border-black/[0.06]'
-                  : 'text-[#6B6860] hover:text-[#111110]'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               {tab.label}
               <span className={`hidden sm:inline font-mono text-[10px] leading-none ${
                 statusFilter === tab.value
-                  ? 'bg-[#4B3FE4]/10 text-[#4B3FE4] rounded px-1 py-0.5'
-                  : 'text-[#9A9890]'
+                  ? 'bg-indigo-600/10 text-indigo-600 rounded px-1 py-0.5'
+                  : 'text-slate-400'
               }`}>
                 {tab.count}
               </span>
@@ -2366,7 +2366,7 @@ const EventsList: React.FC = () => {
         </div>
 
         <div className="relative min-w-[220px] flex-1 lg:flex-none lg:w-[30%] ml-auto">
-            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9A9890]">
+            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400">
               <Search size={14} />
             </div>
             <input
@@ -2374,20 +2374,20 @@ const EventsList: React.FC = () => {
               placeholder="Filter events..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-8 pr-16 h-9 bg-[#E8E5DC]/50 border border-black/10 rounded-md text-sm placeholder-[#9A9890] focus:outline-none focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] transition-colors"
+              className="w-full pl-8 pr-16 h-9 bg-slate-100/50 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 transition-colors"
             />
             {searchTerm && (
               <button
                 type="button"
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#6B6860] hover:text-[#4B3FE4] transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-600 hover:text-indigo-600 transition-colors"
               >
                 Clear
               </button>
             )}
         </div>
         {isAdmin && (
-          <div className="flex shrink-0 gap-1 p-1 bg-[#E8E5DC]/50 rounded-md border border-black/[0.05]">
+          <div className="flex shrink-0 gap-1 p-1 bg-slate-100/50 rounded-md border border-[rgb(var(--ink)/0.05)]">
             <button
               type="button"
               onClick={() => {
@@ -2397,7 +2397,7 @@ const EventsList: React.FC = () => {
               className={`inline-flex h-7 items-center gap-1.5 rounded px-3 text-xs transition-all ${
                 eventView === 'active'
                   ? 'bg-white text-[#111110] shadow-sm font-medium border border-black/[0.06]'
-                  : 'text-[#6B6860] hover:text-[#111110]'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Calendar size={12} />
@@ -2411,8 +2411,8 @@ const EventsList: React.FC = () => {
               }}
               className={`inline-flex h-7 items-center gap-1.5 rounded px-3 text-xs transition-all ${
                 eventView === 'deleted'
-                  ? 'bg-white text-red-600 shadow-sm font-medium border border-black/[0.06]'
-                  : 'text-[#6B6860] hover:text-[#111110]'
+                  ? 'bg-card text-red-600 shadow-sm font-medium border border-[rgb(var(--ink)/0.06)]'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Trash2 size={12} />
@@ -2434,7 +2434,7 @@ const EventsList: React.FC = () => {
               {loading ? (
                   <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
                       {[...Array(6)].map((_, i) => (
-                          <div key={i} className="animate-pulse bg-white border border-black/[0.08] rounded-lg p-5 space-y-3">
+                          <div key={i} className="animate-pulse bg-card border border-[rgb(var(--ink)/0.08)] rounded-lg p-5 space-y-3">
                               <div className="h-4 bg-slate-200 rounded w-2/3"></div>
                               <div className="h-3 bg-slate-100 rounded w-1/2"></div>
                               <div className="h-3 bg-slate-100 rounded w-1/3"></div>
@@ -2443,7 +2443,7 @@ const EventsList: React.FC = () => {
                       ))}
                   </div>
               ) : filteredEvents.length === 0 ? (
-                  <div className="text-center py-16 text-slate-400 bg-white border border-black/[0.08] rounded-lg">
+                  <div className="text-center py-16 text-slate-400 bg-card border border-[rgb(var(--ink)/0.08)] rounded-lg">
                       <div className="flex flex-col items-center justify-center">
                         {searchTerm ? <Search className="w-12 h-12 text-slate-300 mb-3" /> : eventView === 'deleted' ? <Trash2 className="w-12 h-12 text-slate-300 mb-3" /> : <Calendar className="w-12 h-12 text-slate-300 mb-3" />}
                         <p className="font-medium text-slate-500">
@@ -2470,7 +2470,7 @@ const EventsList: React.FC = () => {
                               title={eventView === 'active' ? 'Click to view participants' : 'Deleted event'}
                               className={`group flex flex-col rounded-lg border transition-all duration-150 ${
                                   eventView === 'active'
-                                    ? 'bg-white border-black/[0.08] hover:border-[#4B3FE4]/30 hover:shadow-sm cursor-pointer'
+                                    ? 'bg-card border-[rgb(var(--ink)/0.08)] hover:border-indigo-600/30 hover:shadow-sm cursor-pointer'
                                     : 'bg-red-50/20 border-red-100'
                               }`}
                           >
@@ -2478,7 +2478,7 @@ const EventsList: React.FC = () => {
                               <div className="flex-1 p-5">
                                   <div className="flex items-start justify-between gap-3 mb-3">
                                       <h3 className={`text-sm font-medium text-slate-800 leading-snug flex-1 line-clamp-2 ${
-                                          eventView === 'active' ? 'group-hover:text-[#4B3FE4] transition-colors' : ''
+                                          eventView === 'active' ? 'group-hover:text-indigo-600 transition-colors' : ''
                                       }`}>
                                           {event.event_name}
                                       </h3>
@@ -2527,7 +2527,7 @@ const EventsList: React.FC = () => {
                               </div>
 
                               {/* Action bar */}
-                              <div className="flex items-center gap-1 px-4 py-2.5 border-t border-black/[0.06] bg-slate-50/40 rounded-b-lg">
+                              <div className="flex items-center gap-1 px-4 py-2.5 border-t border-[rgb(var(--ink)/0.06)] bg-slate-50/40 rounded-b-lg">
                                   {eventView === 'deleted' && isAdmin ? (
                                       <>
                                           <button
@@ -2651,7 +2651,7 @@ const EventsList: React.FC = () => {
                           }}
                           className={`rounded-xl border p-4 shadow-sm transition-transform ${
                               eventView === 'active'
-                                ? 'border-slate-200 bg-white active:scale-[0.99]'
+                                ? 'border-slate-200 bg-card active:scale-[0.99]'
                                 : 'border-red-100 bg-red-50/40'
                           }`}
                       >
@@ -2826,8 +2826,8 @@ const EventsList: React.FC = () => {
       {/* Share / Registration Modal */}
       {showShareModal && selectedEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowShareModal(false)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative z-10 animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowShareModal(false)}></div>
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-md p-6 relative z-10 animate-in zoom-in-95 duration-200">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-lg font-bold text-slate-800">Event Registration</h3>
                     <button onClick={() => setShowShareModal(false)} className="text-slate-400 hover:text-slate-600">
@@ -2851,7 +2851,7 @@ const EventsList: React.FC = () => {
                             <div ref={qrCodeRef} className="p-4 border-2 border-indigo-100 rounded-lg bg-indigo-50/50">
                                 <div className="relative inline-block">
                                     <QRCode value={getRegistrationLink(selectedEvent.event_id)} size={180} level="H" />
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-1">
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-card rounded-full p-1">
                                         <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-11 h-11 object-contain rounded-full" />
                                     </div>
                                 </div>
@@ -2868,7 +2868,7 @@ const EventsList: React.FC = () => {
                                     <button
                                         onClick={copyToClipboard}
                                         className={`px-3 py-2 rounded-lg border flex items-center gap-2 transition-all
-                                            ${copied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'}
+                                            ${copied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-card border-slate-300 text-slate-700 hover:bg-slate-50'}
                                         `}
                                     >
                                         {copied ? <Check size={18} /> : <Copy size={18} />}
@@ -2967,7 +2967,7 @@ const EventsList: React.FC = () => {
 
                 <div className="mb-4">
                         <div className="flex items-center justify-end gap-2 flex-wrap">
-                            <div className="mr-auto flex flex-wrap items-center gap-1 p-1 bg-[#E8E5DC]/50 border border-black/[0.05] rounded-lg">
+                            <div className="mr-auto flex flex-wrap items-center gap-1 p-1 bg-slate-100/50 border border-[rgb(var(--ink)/0.05)] rounded-lg">
                                 {[
                                     { value: 'all', label: 'All', count: totalCount, show: true },
                                     { value: 'accommodation', label: 'Accommodation', count: needsAccommodationCount, show: !!selectedEvent?.has_accommodation },
@@ -2981,14 +2981,14 @@ const EventsList: React.FC = () => {
                                         className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-xs transition-all ${
                                             activeParticipantFilter === tab.value
                                                 ? 'bg-white text-[#111110] shadow-sm font-medium border border-black/[0.06]'
-                                                : 'text-[#6B6860] hover:text-[#111110]'
+                                                : 'text-slate-600 hover:text-slate-900'
                                         }`}
                                     >
                                         {tab.label}
                                         <span className={`hidden sm:inline font-mono text-[10px] leading-none ${
                                             activeParticipantFilter === tab.value
-                                                ? 'bg-[#4B3FE4]/10 text-[#4B3FE4] rounded px-1 py-0.5'
-                                                : 'text-[#9A9890]'
+                                                ? 'bg-indigo-600/10 text-indigo-600 rounded px-1 py-0.5'
+                                                : 'text-slate-400'
                                         }`}>
                                             {tab.count}
                                         </span>
@@ -3004,7 +3004,7 @@ const EventsList: React.FC = () => {
                                     placeholder="Search participant..."
                                     value={participantSearchTerm}
                                     onChange={(e) => setParticipantSearchTerm(e.target.value)}
-                                    className="w-full pl-9 pr-14 py-2 bg-[#E8E5DC]/50 border border-black/10 rounded-lg text-sm placeholder-[#9A9890] focus:outline-none focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] transition-all"
+                                    className="w-full pl-9 pr-14 py-2 bg-slate-100/50 border border-[rgb(var(--ink)/0.10)] rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 transition-all"
                                 />
                                 {participantSearchTerm && (
                                     <button
@@ -3033,7 +3033,7 @@ const EventsList: React.FC = () => {
                                     type="button"
                                     aria-label="Add participant"
                                     title="Add participant"
-                                    className="shrink-0 bg-[#4B3FE4] hover:bg-[#3B30C4] text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
+                                    className="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
                                 >
                                     <UserPlus size={16} />
                                     <span className="hidden sm:inline">Add Participant</span>
@@ -3053,7 +3053,7 @@ const EventsList: React.FC = () => {
                             {specialParticipants.length > 0 && (
                                 <div className="mb-6">
                                     {renderParticipantSectionHeader('Secretariat · Speaker · Guest / VIP', specialParticipants.length)}
-                                    <div className="bg-white border border-black/[0.08] rounded-lg overflow-hidden">
+                                    <div className="bg-card border border-[rgb(var(--ink)/0.08)] rounded-lg overflow-hidden">
                                         <table className="w-full text-[13px] text-left">
                                             {participantTableHead}
                                             <tbody className="divide-y divide-slate-100">
@@ -3067,7 +3067,7 @@ const EventsList: React.FC = () => {
                             {delegateParticipants.length > 0 && (
                                 <div className="mb-6">
                                     {renderParticipantSectionHeader('Delegates', delegateParticipants.length)}
-                                    <div className="bg-white border border-black/[0.08] rounded-lg overflow-hidden">
+                                    <div className="bg-card border border-[rgb(var(--ink)/0.08)] rounded-lg overflow-hidden">
                                         <table className="w-full text-[13px] text-left">
                                             {participantTableHead}
                                             <tbody className="divide-y divide-slate-100">
@@ -3079,7 +3079,7 @@ const EventsList: React.FC = () => {
                             )}
 
                             {filteredParticipants.length === 0 && (
-                                <div className="bg-white border border-black/[0.08] rounded-lg py-14 text-center text-slate-400 text-sm">
+                                <div className="bg-card border border-[rgb(var(--ink)/0.08)] rounded-lg py-14 text-center text-slate-400 text-sm">
                                     {participantSearchTerm ? 'No participants found matching your search.' : 'No participants registered yet.'}
                                 </div>
                             )}
@@ -3091,11 +3091,11 @@ const EventsList: React.FC = () => {
                 {(participantModalView === 'add' || participantModalView === 'edit') && (
                 <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
                     <div
-                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
                         aria-hidden="true"
                         onClick={() => { setParticipantModalView('list'); resetParticipantForm(); }}
                     ></div>
-                    <div className="fixed inset-y-0 right-0 flex w-full max-w-[560px] flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-200">
+                    <div className="fixed inset-y-0 right-0 flex w-full max-w-[560px] flex-col bg-card shadow-2xl animate-in slide-in-from-right duration-200">
                         <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100 shrink-0">
                             <div className="min-w-0">
                                 <h3 className="text-lg font-semibold text-slate-900">
@@ -3133,7 +3133,7 @@ const EventsList: React.FC = () => {
                                             autoComplete="off"
                                         />
                                         {participantModalView === 'add' && showSuggestions && suggestions.length > 0 && (
-                                            <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                                            <ul className="absolute z-50 w-full bg-card border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
                                                 {suggestions.map((p) => (
                                                     <li 
                                                         key={p.participant_id}
@@ -3323,7 +3323,7 @@ const EventsList: React.FC = () => {
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-1">Event Role</label>
                                             <select 
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                                 value={newParticipant.role}
                                                 onChange={e => setNewParticipant({...newParticipant, role: e.target.value})}
                                             >
@@ -3337,7 +3337,7 @@ const EventsList: React.FC = () => {
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
                                             <select 
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                                 value={newParticipant.gender}
                                                 onChange={e => setNewParticipant({...newParticipant, gender: e.target.value})}
                                             >
@@ -3352,7 +3352,7 @@ const EventsList: React.FC = () => {
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-1">Age Group</label>
                                             <select 
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                                 value={newParticipant.age_group}
                                                 onChange={e => setNewParticipant({...newParticipant, age_group: e.target.value})}
                                             >
@@ -3367,7 +3367,7 @@ const EventsList: React.FC = () => {
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-1">PWD</label>
                                             <select 
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                                 value={newParticipant.pwd}
                                                 onChange={e => setNewParticipant({...newParticipant, pwd: e.target.value})}
                                             >
@@ -3380,7 +3380,7 @@ const EventsList: React.FC = () => {
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Indigenous People</label>
                                         <select 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                             value={newParticipant.indigenous_people}
                                             onChange={e => setNewParticipant({...newParticipant, indigenous_people: e.target.value})}
                                         >
@@ -3419,7 +3419,7 @@ const EventsList: React.FC = () => {
                                                             <label
                                                                 key={date}
                                                                 className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
-                                                                    isChecked ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300'
+                                                                    isChecked ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-card text-slate-700 hover:border-indigo-300'
                                                                 }`}
                                                             >
                                                                 <input
@@ -3460,7 +3460,7 @@ const EventsList: React.FC = () => {
                                                 {item.type === 'single-select' ? (
                                                     <select
                                                         disabled={giveawaysClosed}
-                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-card focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                                                         value={(newParticipant.giveaway_selections[item.key] as string) || ''}
                                                         onChange={(e) => setNewParticipant({ ...newParticipant, giveaway_selections: { ...newParticipant.giveaway_selections, [item.key]: e.target.value } })}
                                                     >
@@ -3582,8 +3582,8 @@ const EventsList: React.FC = () => {
       {/* Delete Confirmation Modal for Participant */}
       {participantToDelete && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setParticipantToDelete(null)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 relative z-20 animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setParticipantToDelete(null)}></div>
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-sm p-6 relative z-20 animate-in zoom-in-95 duration-200">
                 <div className="flex flex-col items-center text-center">
                     <div className="bg-red-100 p-3 rounded-full mb-4">
                         <AlertTriangle className="text-red-600" size={32} />
@@ -3595,7 +3595,7 @@ const EventsList: React.FC = () => {
                     <div className="flex gap-3 w-full">
                         <button 
                             onClick={() => setParticipantToDelete(null)}
-                            className="flex-1 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+                            className="flex-1 px-4 py-2.5 bg-card border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
                         >
                             Cancel
                         </button>
@@ -3615,8 +3615,8 @@ const EventsList: React.FC = () => {
       {/* Delete Confirmation Modal for Event */}
       {eventToDelete && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeDeleteEventModal}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 relative z-20 animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={closeDeleteEventModal}></div>
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-sm p-6 relative z-20 animate-in zoom-in-95 duration-200">
                 <div className="flex flex-col items-center text-center">
                     <div className="bg-red-100 p-3 rounded-full mb-4">
                         <AlertTriangle className="text-red-600" size={32} />
@@ -3654,7 +3654,7 @@ const EventsList: React.FC = () => {
                     <div className="flex gap-3 w-full">
                         <button 
                             onClick={closeDeleteEventModal}
-                            className="flex-1 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+                            className="flex-1 px-4 py-2.5 bg-card border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
                         >
                             Cancel
                         </button>
@@ -3675,8 +3675,8 @@ const EventsList: React.FC = () => {
       {/* Event Access Settings Modal */}
       {showEventAccessModal && selectedAccessEvent && (
         <div className="fixed inset-0 z-[75] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeEventAccessModal}></div>
-            <div className="relative z-20 flex h-[85vh] max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={closeEventAccessModal}></div>
+            <div className="relative z-20 flex h-[85vh] max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-100 bg-card shadow-2xl animate-in zoom-in-95 duration-200">
                 <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
                     <div className="min-w-0">
                         <h3 className="flex items-center gap-2 text-base font-bold text-slate-800">
@@ -3705,7 +3705,7 @@ const EventsList: React.FC = () => {
                                     <button
                                         type="button"
                                         onClick={() => setIsAccessUserDropdownOpen((open) => !open)}
-                                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-900 transition-colors hover:border-indigo-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-300 bg-card px-3 py-2 text-left text-sm text-slate-900 transition-colors hover:border-indigo-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                                         aria-expanded={isAccessUserDropdownOpen}
                                     >
                                         <span className="min-w-0">
@@ -3724,7 +3724,7 @@ const EventsList: React.FC = () => {
                                     </button>
 
                                     {isAccessUserDropdownOpen && (
-                                        <div className="absolute z-[90] mt-2 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                                        <div className="absolute z-[90] mt-2 w-full overflow-hidden rounded-xl border border-slate-200 bg-card shadow-xl">
                                             <div className="border-b border-slate-100 p-2">
                                                 <div className="relative">
                                                     <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -3781,7 +3781,7 @@ const EventsList: React.FC = () => {
                                 <select
                                     value={selectedAccessRole}
                                     onChange={(e) => setSelectedAccessRole(e.target.value as EventAccessRole)}
-                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                    className="w-full rounded-lg border border-slate-300 bg-card px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                                 >
                                     <option value="ManagerScanner">Manager + Scanner</option>
                                     <option value="Manager">Manager only</option>
@@ -3803,7 +3803,7 @@ const EventsList: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
+                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-card">
                         <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
                             <p className="text-sm font-semibold text-slate-800">Assigned Users</p>
                         </div>
@@ -3842,7 +3842,7 @@ const EventsList: React.FC = () => {
                                                         value={editingAccessRole}
                                                         onChange={(e) => setEditingAccessRole(e.target.value as EventAccessRole)}
                                                         disabled={updatingAccessId === access.id}
-                                                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                                        className="rounded-lg border border-slate-300 bg-card px-2.5 py-1 text-xs font-semibold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                                                     >
                                                         <option value="ManagerScanner">Manager + Scanner</option>
                                                         <option value="Manager">Manager only</option>
@@ -3909,8 +3909,8 @@ const EventsList: React.FC = () => {
 
       {showEventCodeInfo && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={() => setShowEventCodeInfo(false)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl relative z-10 animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowEventCodeInfo(false)}></div>
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-3xl relative z-10 animate-in zoom-in-95 duration-200 overflow-hidden">
                 <div className="flex justify-between items-center px-5 py-4 border-b border-slate-100">
                     <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
                         <Info size={18} className="text-indigo-600" />
@@ -3941,13 +3941,13 @@ const EventsList: React.FC = () => {
 
           {/* Backdrop */}
           <div
-              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
               aria-hidden="true"
               onClick={() => setShowEventModal(false)}
           ></div>
 
           {/* Right-side drawer panel */}
-          <div className="fixed inset-y-0 right-0 flex w-full max-w-[500px] flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-200">
+          <div className="fixed inset-y-0 right-0 flex w-full max-w-[500px] flex-col bg-card shadow-2xl animate-in slide-in-from-right duration-200">
 
             {/* Header */}
             <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100 shrink-0">
@@ -3997,7 +3997,7 @@ const EventsList: React.FC = () => {
                                   <Building2 className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                               </div>
                               <select
-                                  className="block w-full pl-10 pr-8 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
+                                  className="block w-full pl-10 pr-8 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-card transition-all appearance-none"
                                   value={formData.organize_by || ''}
                                   onChange={e => setFormData({...formData, organize_by: e.target.value ? Number(e.target.value) : null})}
                               >
@@ -4088,7 +4088,7 @@ const EventsList: React.FC = () => {
                       <div
                         id="venue-suggestions"
                         role="listbox"
-                        className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl animate-in fade-in zoom-in-95 duration-100"
+                        className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-card shadow-xl animate-in fade-in zoom-in-95 duration-100"
                       >
                         {loadingVenueSuggestions && venueSuggestions.length === 0 ? (
                           <div className="flex items-center gap-2 px-4 py-3 text-sm text-slate-500">
@@ -4151,7 +4151,7 @@ const EventsList: React.FC = () => {
                   <label className="block text-xs font-medium text-slate-700 mb-1.5">Event Session</label>
                   <div className="relative">
                     <select
-                        className="block w-full px-3 pr-8 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
+                        className="block w-full px-3 pr-8 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-card transition-all appearance-none"
                         value={formData.session || 'All_Day'}
                         onChange={e => setFormData({...formData, session: e.target.value as Event['session']})}
                     >
@@ -4176,7 +4176,7 @@ const EventsList: React.FC = () => {
                   <span className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${formData.has_accommodation ? 'bg-indigo-600' : 'bg-slate-200'}`}>
                     <span
                         aria-hidden="true"
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${formData.has_accommodation ? 'translate-x-4' : 'translate-x-0'}`}
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-card shadow ring-0 transition duration-200 ease-in-out ${formData.has_accommodation ? 'translate-x-4' : 'translate-x-0'}`}
                     />
                   </span>
                   <input
@@ -4195,7 +4195,7 @@ const EventsList: React.FC = () => {
                                 <p className="text-sm font-semibold text-slate-800">Accommodation Dates</p>
                                 <p className="text-xs text-slate-500">Select which event dates include accommodation.</p>
                             </div>
-                            <span className="text-xs font-semibold text-indigo-700 bg-white border border-indigo-100 px-2 py-1 rounded-full">
+                            <span className="text-xs font-semibold text-indigo-700 bg-card border border-indigo-100 px-2 py-1 rounded-full">
                                 {(formData.dates_with_accom || []).length} day(s)
                             </span>
                         </div>
@@ -4208,7 +4208,7 @@ const EventsList: React.FC = () => {
                                         <label
                                             key={date}
                                             className={`inline-flex w-fit items-center gap-2 rounded-lg border px-2.5 py-2 cursor-pointer transition-colors ${
-                                                isChecked ? 'border-indigo-400 bg-white text-indigo-700' : 'border-slate-200 bg-white/70 text-slate-700 hover:border-indigo-300'
+                                                isChecked ? 'border-indigo-400 bg-card text-indigo-700' : 'border-slate-200 bg-white/70 text-slate-700 hover:border-indigo-300'
                                             }`}
                                         >
                                             <input
@@ -4255,7 +4255,7 @@ const EventsList: React.FC = () => {
                           {formEventDates.map((date) => {
                               const selectedMeals = foodInclusionByDate[date] || [];
                               return (
-                                  <div key={date} className="rounded-xl border border-slate-200 bg-white p-3">
+                                  <div key={date} className="rounded-xl border border-slate-200 bg-card p-3">
                                       <p className="mb-2.5 text-sm font-semibold text-slate-800">
                                           {formatAccommodationDateLabel(date)}
                                       </p>
@@ -4268,7 +4268,7 @@ const EventsList: React.FC = () => {
                                                       className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
                                                           isChecked
                                                             ? 'border-indigo-300 bg-indigo-50/50 text-slate-800'
-                                                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                                                            : 'border-slate-200 bg-card text-slate-700 hover:border-slate-300'
                                                       }`}
                                                   >
                                                       <input
@@ -4296,7 +4296,7 @@ const EventsList: React.FC = () => {
                                       className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors ${
                                           isChecked
                                             ? 'border-indigo-300 bg-indigo-50/50 text-slate-800'
-                                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                                            : 'border-slate-200 bg-card text-slate-700 hover:border-slate-300'
                                       }`}
                                   >
                                       <input
@@ -4334,7 +4334,7 @@ const EventsList: React.FC = () => {
                   <span className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${showGiveawayEditor ? 'bg-indigo-600' : 'bg-slate-200'}`}>
                     <span
                         aria-hidden="true"
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${showGiveawayEditor ? 'translate-x-4' : 'translate-x-0'}`}
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-card shadow ring-0 transition duration-200 ease-in-out ${showGiveawayEditor ? 'translate-x-4' : 'translate-x-0'}`}
                     />
                   </span>
                   <input
@@ -4360,14 +4360,14 @@ const EventsList: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={addGiveaway}
-                                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-[#4B3FE4] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#3B30C4]"
+                                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
                             >
                                 <UserPlus size={13} /> Add item
                             </button>
                         </div>
 
                         {((formData.giveaways as GiveawayItem[]) || []).length > 0 && (
-                            <label className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 cursor-pointer group">
+                            <label className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-card px-3 py-2.5 cursor-pointer group">
                                 <span className="min-w-0">
                                     <span className="block text-sm font-semibold text-slate-800">Giveaway selection {formData.giveaways_open ? 'open' : 'closed'}</span>
                                     <span className="block text-xs text-slate-500">When closed, new registrants can no longer pick sizes / answers — existing choices are kept.</span>
@@ -4375,7 +4375,7 @@ const EventsList: React.FC = () => {
                                 <span className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${formData.giveaways_open ? 'bg-green-500' : 'bg-slate-300'}`}>
                                     <span
                                         aria-hidden="true"
-                                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${formData.giveaways_open ? 'translate-x-4' : 'translate-x-0'}`}
+                                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-card shadow ring-0 transition duration-200 ease-in-out ${formData.giveaways_open ? 'translate-x-4' : 'translate-x-0'}`}
                                     />
                                 </span>
                                 <input
@@ -4392,7 +4392,7 @@ const EventsList: React.FC = () => {
                         ) : (
                             <div className="space-y-3">
                                 {((formData.giveaways as GiveawayItem[]) || []).map((g, idx) => (
-                                    <div key={g.key} className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
+                                    <div key={g.key} className="space-y-3 rounded-xl border border-slate-200 bg-card p-3">
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div>
                                                 <label className="block text-xs font-medium text-slate-600 mb-1">Item label</label>
@@ -4409,7 +4409,7 @@ const EventsList: React.FC = () => {
                                                 <select
                                                     value={g.type}
                                                     onChange={(e) => updateGiveaway(idx, { type: e.target.value as GiveawayItem['type'] })}
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-card focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                                                 >
                                                     <option value="single-select">Choose an option (e.g. size)</option>
                                                     <option value="boolean">Yes / No</option>
@@ -4497,17 +4497,17 @@ const EventsList: React.FC = () => {
               </div>
 
               {/* Footer actions */}
-              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 shrink-0 bg-white">
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 shrink-0 bg-card">
                   <button
                     type="button"
                     onClick={() => setShowEventModal(false)}
-                    className="px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
+                    className="px-4 py-2.5 text-sm font-medium text-slate-700 bg-card border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 text-sm font-medium text-white bg-[#4B3FE4] border border-transparent rounded-lg hover:bg-[#3B30C4] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-all"
+                    className="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-all"
                   >
                     {editingEventId ? 'Save Changes' : 'Create Event'}
                   </button>

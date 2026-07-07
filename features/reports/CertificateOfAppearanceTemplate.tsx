@@ -316,7 +316,7 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
       <div className="relative flex flex-1 flex-col justify-start">
         {shouldShowSerialNumber && (
           <p
-            className={`absolute right-0 top-0 text-right font-medium text-slate-800 ${serialTextClass}`}
+            className={`absolute right-0 top-0 text-right font-medium text-[#2A2926] ${serialTextClass}`}
           >
             {certificateSerialNumber}
           </p>
@@ -327,7 +327,7 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
             value={`${window.location.origin}/lookup?participant=${participantRecord.participant.participant_id}`}
             size={qrSize}
           />
-          <p className={`font-medium text-slate-700 leading-tight ${qrCaptionClass}`}>
+          <p className={`font-medium text-[#4A4843] leading-tight ${qrCaptionClass}`}>
             Scan to verify
           </p>
         </div>
@@ -360,7 +360,7 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
         </div>
 
         {certificateSubHeader && (
-          <p className={`${subHeaderClass} text-center font-serif font-bold uppercase tracking-[0.08em] text-slate-800`}>
+          <p className={`${subHeaderClass} text-center font-serif font-bold uppercase tracking-[0.08em] text-[#2A2926]`}>
             {certificateSubHeader}
           </p>
         )}
@@ -445,7 +445,7 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
             </div>
           </div>
 
-          <div className={`${footerClass} shrink-0 text-center text-slate-800 leading-tight`}>
+          <div className={`${footerClass} shrink-0 text-center text-[#2A2926] leading-tight`}>
             <img
               src="/assets/intensity.png"
               alt="Intensity tagline"
@@ -457,14 +457,14 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
             <p className="italic font-bold">"Matino, Mahusay at Maasahan"</p>
             <p>{certificateFooter}</p>
           </div>
-          <p className={`${disclaimerClass} w-full mt-1 italic text-slate-500 text-left leading-tight`}>
+          <p className={`${disclaimerClass} w-full mt-1 italic text-[#7C7A72] text-left leading-tight`}>
             This document is system-generated and digitally signed. It does not require a wet signature or the Department's official stamp to be considered valid.
           </p>
         </div>
       </div>
 
       {showDivider && (
-        <div className="absolute bottom-0 left-8 right-8 border-b border-dashed border-slate-300 print:border-slate-400"></div>
+        <div className="absolute bottom-0 left-8 right-8 border-b border-dashed border-[#C5C2BA] print:border-[#9A9890]"></div>
       )}
     </div>
   );

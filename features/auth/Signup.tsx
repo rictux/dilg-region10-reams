@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Office } from '../../types/database';
 import { Lock, User, Eye, EyeOff, Mail, Briefcase, UserPlus, Building2, ChevronDown, Loader2 } from 'lucide-react';
+import AuthBrandPanel from './AuthBrandPanel';
 
 const Signup: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -164,43 +165,51 @@ const Signup: React.FC = () => {
     }
   };
 
-  const inputCls = "w-full pl-9 pr-3 h-10 text-sm rounded-md bg-white border border-black/10 focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors";
+  const inputCls = "w-full pl-9 pr-3 h-10 text-sm rounded-md bg-card border border-[rgb(var(--ink)/0.10)] focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors";
 
   if (success) {
     return (
-      <div className="min-h-screen bg-[#F5F3EE] flex items-center justify-center p-4">
-        <div className="bg-white border border-black/[0.08] rounded-lg w-full max-w-sm p-10 text-center animate-in zoom-in-95 duration-200">
+      <div className="min-h-screen bg-slate-50 flex">
+        <AuthBrandPanel />
+        <div className="flex-1 flex items-center justify-center p-4">
+        <div className="bg-card border border-[rgb(var(--ink)/0.08)] rounded-lg w-full max-w-sm p-10 text-center animate-in zoom-in-95 duration-200">
           <div className="w-12 h-12 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <UserPlus size={20} />
           </div>
-          <h2 className="text-lg font-semibold text-[#111110] mb-2">Account Created!</h2>
-          <p className="text-sm text-[#6B6860] mb-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">Account Created!</h2>
+          <p className="text-sm text-slate-600 mb-6">
             Your account has been successfully created. Please contact RICTU personnel to activate your account before logging in.
           </p>
           <button
             onClick={() => navigate('/')}
-            className="w-full h-9 bg-[#4B3FE4] text-white text-sm font-medium rounded-md hover:bg-[#3B30C4] transition-colors"
+            className="w-full h-9 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
           >
             Back to Login
           </button>
+        </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F3EE] flex items-center justify-center px-4 py-10">
+    <div className="min-h-screen bg-slate-50 flex">
+      {/* Left panel — branding (same as Login) */}
+      <AuthBrandPanel />
+
+      {/* Right panel — form */}
+      <div className="flex-1 flex items-center justify-center px-6 py-10">
       <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="flex items-center gap-2.5 mb-8">
-          <div className="w-7 h-7 bg-white border border-black/[0.08] rounded flex items-center justify-center overflow-hidden">
-            <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" />
+        {/* Mobile logo */}
+        <div className="flex items-center gap-2.5 mb-8 lg:hidden">
+          <div className="w-7 h-7 bg-white border border-[rgb(var(--ink)/0.08)] rounded-full flex items-center justify-center overflow-hidden">
+            <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain rounded-full" />
           </div>
-          <span className="text-[#111110] text-sm font-medium font-mono">REAMS</span>
+          <span className="text-slate-900 text-sm font-medium font-mono">REAMS</span>
         </div>
 
-        <h2 className="text-2xl font-semibold text-[#111110] mb-1">Create account</h2>
-        <p className="text-sm text-[#6B6860] mb-8">
+        <h2 className="text-2xl font-semibold text-slate-900 mb-1">Create account</h2>
+        <p className="text-sm text-slate-600 mb-8">
           Join the Regional Event &amp; Attendance Management System
         </p>
 
@@ -212,9 +221,9 @@ const Signup: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-[#111110] mb-1.5">Full Name</label>
+            <label className="block text-xs font-medium text-slate-900 mb-1.5">Full Name</label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="text"
                 value={formData.fullName}
@@ -227,11 +236,11 @@ const Signup: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[#111110] mb-1.5">
-              Email Address <span className="text-[#9A9890] font-normal">(optional)</span>
+            <label className="block text-xs font-medium text-slate-900 mb-1.5">
+              Email Address <span className="text-slate-400 font-normal">(optional)</span>
             </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="email"
                 value={formData.email}
@@ -243,14 +252,14 @@ const Signup: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[#111110] mb-1.5">Office / Division</label>
+            <label className="block text-xs font-medium text-slate-900 mb-1.5">Office / Division</label>
             <div className="relative">
-              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <select
                 value={formData.office_id}
                 onChange={(e) => setFormData({ ...formData, office_id: e.target.value })}
                 required
-                className="w-full pl-9 pr-8 h-10 text-sm rounded-md bg-white border border-black/10 focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors appearance-none text-[#111110] cursor-pointer"
+                className="w-full pl-9 pr-8 h-10 text-sm rounded-md bg-card border border-[rgb(var(--ink)/0.10)] focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors appearance-none text-slate-900 cursor-pointer"
               >
                 <option value="">Select Office/Division</option>
                 {offices.map((office) => (
@@ -259,14 +268,14 @@ const Signup: React.FC = () => {
                   </option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9A9890] pointer-events-none" size={14} />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[#111110] mb-1.5">Position / Title</label>
+            <label className="block text-xs font-medium text-slate-900 mb-1.5">Position / Title</label>
             <div className="relative">
-              <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
+              <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="text"
                 value={formData.position}
@@ -279,9 +288,9 @@ const Signup: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[#111110] mb-1.5">Username</label>
+            <label className="block text-xs font-medium text-slate-900 mb-1.5">Username</label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="text"
                 value={formData.username}
@@ -295,21 +304,21 @@ const Signup: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-[#111110] mb-1.5">Password</label>
+              <label className="block text-xs font-medium text-slate-900 mb-1.5">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
-                  className="w-full pl-9 pr-8 h-10 text-sm rounded-md bg-white border border-black/10 focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors"
+                  className="w-full pl-9 pr-8 h-10 text-sm rounded-md bg-card border border-[rgb(var(--ink)/0.10)] focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                   placeholder="••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9A9890] hover:text-[#6B6860] focus:outline-none transition-colors"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
                 >
                   {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
@@ -317,21 +326,21 @@ const Signup: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#111110] mb-1.5">Confirm</label>
+              <label className="block text-xs font-medium text-slate-900 mb-1.5">Confirm</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   required
-                  className="w-full pl-9 pr-8 h-10 text-sm rounded-md bg-white border border-black/10 focus:ring-2 focus:ring-[#4B3FE4]/15 focus:border-[#4B3FE4] outline-none transition-colors"
+                  className="w-full pl-9 pr-8 h-10 text-sm rounded-md bg-card border border-[rgb(var(--ink)/0.10)] focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                   placeholder="••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9A9890] hover:text-[#6B6860] focus:outline-none transition-colors"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
                 >
                   {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
@@ -342,7 +351,7 @@ const Signup: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full h-10 bg-[#4B3FE4] text-white text-sm font-medium rounded-md hover:bg-[#3B30C4] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 mt-6"
+            className="w-full h-10 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 mt-6"
           >
             {isLoading ? (
               <>
@@ -356,10 +365,10 @@ const Signup: React.FC = () => {
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-black/[0.08]"></div>
+              <div className="w-full border-t border-[rgb(var(--ink)/0.08)]"></div>
             </div>
             <div className="relative flex justify-center text-xs">
-              <span className="px-2 bg-[#F5F3EE] text-[#6B6860]">Or sign up with</span>
+              <span className="px-2 bg-slate-50 text-slate-600">Or sign up with</span>
             </div>
           </div>
 
@@ -367,7 +376,7 @@ const Signup: React.FC = () => {
             type="button"
             onClick={handleGoogleSignup}
             disabled={isLoading}
-            className="w-full h-10 bg-white border border-black/10 text-[#111110] text-sm font-medium rounded-md hover:bg-white/60 hover:border-black/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+            className="w-full h-10 bg-card border border-[rgb(var(--ink)/0.10)] text-slate-900 text-sm font-medium rounded-md hover:bg-card/60 hover:border-[rgb(var(--ink)/0.20)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -390,13 +399,14 @@ const Signup: React.FC = () => {
             Sign up with Google
           </button>
 
-          <p className="text-center text-xs text-[#6B6860] mt-4">
+          <p className="text-center text-xs text-slate-600 mt-4">
             Already have an account?{' '}
-            <Link to="/" className="text-[#4B3FE4] hover:underline font-medium">
+            <Link to="/" className="text-indigo-600 hover:underline font-medium">
               Log in
             </Link>
           </p>
         </form>
+      </div>
       </div>
     </div>
   );

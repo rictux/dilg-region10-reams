@@ -144,9 +144,9 @@ const App: React.FC = () => {
             </ProtectedRoute>
           } />
 
-          {/* Settings Route */}
+          {/* Settings Route — open to all signed-in users; restricted views are gated inside Settings */}
           <Route path="/settings" element={
-            <ProtectedRoute requiredPermission="MANAGE_CERTIFICATE_SETTINGS">
+            <ProtectedRoute>
               <Layout><Settings /></Layout>
             </ProtectedRoute>
           } />
