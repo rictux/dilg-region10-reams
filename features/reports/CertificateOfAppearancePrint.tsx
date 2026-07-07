@@ -1088,17 +1088,17 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="animate-spin text-indigo-600" size={32} />
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F3EE]">
+        <Loader2 className="animate-spin text-[#4B3FE4]" size={32} />
       </div>
     );
   }
 
   if (!event) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-        <p className="text-slate-500 mb-4">Event not found.</p>
-        <button onClick={() => navigate('/reports')} className="text-indigo-600 hover:underline">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F5F3EE]">
+        <p className="text-[#7C7A72] mb-4">Event not found.</p>
+        <button onClick={() => navigate('/reports')} className="text-[#4B3FE4] hover:underline">
           Back to Reports
         </button>
       </div>
@@ -1106,29 +1106,29 @@ const CertificateOfAppearancePrint: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-slate-100 print:block print:min-h-screen print:h-auto print:overflow-visible print:bg-white">
-      <div className="print:hidden w-full border-b border-slate-200 bg-white shadow-sm">
+    <div className="flex h-screen flex-col overflow-hidden bg-[#EDEAE2] print:block print:min-h-screen print:h-auto print:overflow-visible print:bg-white">
+      <div className="print:hidden w-full border-b border-[#E0DDD4] bg-white shadow-sm">
         <div className="mx-auto max-w-full px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/reports')}
-              className="shrink-0 rounded-full p-2 transition-colors hover:bg-slate-100"
+              className="shrink-0 rounded-full p-2 transition-colors hover:bg-[#EDEAE2]"
               title="Back to Reports"
             >
-              <ArrowLeft size={18} className="text-slate-600" />
+              <ArrowLeft size={18} className="text-[#6B6860]" />
             </button>
 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline gap-x-2">
-                <h1 className="text-base font-bold text-slate-800 whitespace-nowrap">
+                <h1 className="text-base font-bold text-[#2A2926] whitespace-nowrap">
                   Certificate of Appearance
                 </h1>
-                <span className="hidden text-slate-300 sm:inline">·</span>
-                <span className="truncate text-sm text-slate-600" title={event.event_name}>
+                <span className="hidden text-[#C5C2BA] sm:inline">·</span>
+                <span className="truncate text-sm text-[#6B6860]" title={event.event_name}>
                   {event.event_name}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-[#7C7A72]">
                 {participants.length} participant{participants.length === 1 ? '' : 's'} with attendance logs
               </p>
             </div>
@@ -1138,7 +1138,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                 <select
                   value={selectedSignatoryId}
                   onChange={(e) => handleSelectSignatory(e.target.value ? Number(e.target.value) : '')}
-                  className="max-w-[220px] rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  className="max-w-[220px] rounded-lg border border-[#C5C2BA] bg-white px-3 py-1.5 text-xs font-medium text-[#4A4843] outline-none transition-all focus:border-[#6255E9] focus:ring-2 focus:ring-[#6255E9]/20"
                   title="Select certificate signatory"
                 >
                   {signatories.map((item) => (
@@ -1190,7 +1190,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
               <button
                 onClick={handlePrint}
                 disabled={printParticipants.length === 0 || isPreparingPrint}
-                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-[#4B3FE4] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#3B30C4] disabled:cursor-not-allowed disabled:bg-[#C5C2BA]"
               >
                 <Printer size={14} />
                 {printPhase === 'opening'
@@ -1219,7 +1219,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
               <select
                 value={selectedSignatoryId}
                 onChange={(e) => handleSelectSignatory(e.target.value ? Number(e.target.value) : '')}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full rounded-lg border border-[#C5C2BA] bg-white px-3 py-2 text-xs font-medium text-[#4A4843] outline-none transition-all focus:border-[#6255E9] focus:ring-2 focus:ring-[#6255E9]/20"
                 title="Select certificate signatory"
               >
                 {signatories.map((item) => (
@@ -1271,7 +1271,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
             <button
               onClick={handlePrint}
               disabled={printParticipants.length === 0 || isPreparingPrint}
-              className="inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-[#4B3FE4] px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-[#3B30C4] disabled:cursor-not-allowed disabled:bg-[#C5C2BA]"
             >
               <Printer size={14} />
               {printPhase === 'opening'
@@ -1306,22 +1306,22 @@ const CertificateOfAppearancePrint: React.FC = () => {
       </div>
 
       <div className="print:hidden mx-auto grid w-full max-w-[1600px] flex-1 min-h-0 gap-6 overflow-hidden px-4 py-6 sm:px-6 lg:grid-cols-[520px_minmax(0,1fr)] lg:px-8">
-        <aside className="flex min-h-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <aside className="flex min-h-0 flex-col rounded-2xl border border-[#E0DDD4] bg-white p-4 shadow-sm">
           <div className="mb-4">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
               <input
                 type="text"
                 value={participantSearch}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setParticipantSearch(e.target.value)}
                 placeholder="Type participant name..."
-                className="w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-14 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full rounded-lg border border-[#C5C2BA] py-2.5 pl-10 pr-14 text-sm text-[#111110] focus:border-[#6255E9] focus:outline-none focus:ring-2 focus:ring-[#6255E9]/20"
               />
               {participantSearch && (
                 <button
                   type="button"
                   onClick={() => setParticipantSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 transition-colors hover:text-indigo-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#7C7A72] transition-colors hover:text-[#4B3FE4]"
                 >
                   Clear
                 </button>
@@ -1329,12 +1329,12 @@ const CertificateOfAppearancePrint: React.FC = () => {
             </div>
           </div>
 
-          <div className="mb-3 flex items-center justify-between text-xs font-medium uppercase tracking-wide text-slate-500">
+          <div className="mb-3 flex items-center justify-between text-xs font-medium uppercase tracking-wide text-[#7C7A72]">
             <span>Participants</span>
             <span>{filteredParticipants.length}</span>
           </div>
 
-          <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="mb-3 rounded-xl border border-[#E0DDD4] bg-[#F5F3EE] px-3 py-2">
             <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
               <div className="flex flex-wrap items-center gap-1.5">
                 {requiresReferenceCode && (
@@ -1344,7 +1344,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                     className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                       showMissingSerialOnly
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                        : 'border-[#E0DDD4] bg-white text-[#4A4843] hover:bg-[#EDEAE2]'
                     }`}
                   >
                     <Hash size={12} />
@@ -1353,7 +1353,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                       className={`rounded-full px-1.5 text-[10px] font-bold leading-4 ${
                         showMissingSerialOnly
                           ? 'bg-emerald-200 text-emerald-800'
-                          : 'bg-slate-100 text-slate-600'
+                          : 'bg-[#EDEAE2] text-[#6B6860]'
                       }`}
                     >
                       {missingSerialCount}
@@ -1366,7 +1366,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                   className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                     showWantsCaOnly
                       ? 'border-amber-200 bg-amber-50 text-amber-800'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                      : 'border-[#E0DDD4] bg-white text-[#4A4843] hover:bg-[#EDEAE2]'
                   }`}
                 >
                   Wants CA
@@ -1374,7 +1374,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                     className={`rounded-full px-1.5 text-[10px] font-bold leading-4 ${
                       showWantsCaOnly
                         ? 'bg-amber-200 text-amber-800'
-                        : 'bg-slate-100 text-slate-600'
+                        : 'bg-[#EDEAE2] text-[#6B6860]'
                     }`}
                   >
                     {wantsCaCount}
@@ -1382,14 +1382,14 @@ const CertificateOfAppearancePrint: React.FC = () => {
                 </button>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-1.5">
-                <span className="px-1 text-[11px] font-medium text-slate-500">
+                <span className="px-1 text-[11px] font-medium text-[#7C7A72]">
                   {selectedDownloadParticipants.length} Selected
                 </span>
                 <button
                   type="button"
                   onClick={handleSelectAll}
                   disabled={filteredParticipants.length === 0}
-                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-md border border-[#E0DDD4] bg-white px-2.5 py-1 text-[11px] font-medium text-[#4A4843] transition-colors hover:bg-[#EDEAE2] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Select All
                 </button>
@@ -1397,7 +1397,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                   type="button"
                   onClick={() => setSelectedDownloadIds([])}
                   disabled={selectedDownloadParticipants.length === 0}
-                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-md border border-[#E0DDD4] bg-white px-2.5 py-1 text-[11px] font-medium text-[#4A4843] transition-colors hover:bg-[#EDEAE2] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Clear All
                 </button>
@@ -1407,7 +1407,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
             {filteredParticipants.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+              <div className="rounded-xl border border-dashed border-[#E0DDD4] px-4 py-8 text-center text-sm text-[#7C7A72]">
                 No participant matched your filters.
               </div>
             ) : (
@@ -1451,8 +1451,8 @@ const CertificateOfAppearancePrint: React.FC = () => {
                             key={record.participant.participant_id}
                             className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${
                               isSelected
-                                ? 'border-indigo-200 bg-indigo-50 text-indigo-900'
-                                : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-slate-50'
+                                ? 'border-[#C3BEF4] bg-[#EEEDFC] text-[#251E7C]'
+                                : 'border-[#E0DDD4] bg-white text-[#4A4843] hover:border-[#C3BEF4] hover:bg-[#F5F3EE]'
                             }`}
                           >
                             <div className="flex items-start gap-2">
@@ -1460,7 +1460,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                                 type="checkbox"
                                 checked={isMarkedForDownload}
                                 onChange={() => toggleDownloadSelection(record.participant.participant_id)}
-                                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                className="mt-0.5 h-4 w-4 shrink-0 rounded border-[#C5C2BA] text-emerald-600 focus:ring-emerald-500"
                               />
                               <button
                                 type="button"
@@ -1487,7 +1487,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                                     )}
                                   </div>
                                 </div>
-                                <p className="mt-0.5 truncate text-[10px] text-slate-500">{record.participant.office || 'No office indicated'}</p>
+                                <p className="mt-0.5 truncate text-[10px] text-[#7C7A72]">{record.participant.office || 'No office indicated'}</p>
                               </button>
                             </div>
                           </div>
@@ -1504,22 +1504,22 @@ const CertificateOfAppearancePrint: React.FC = () => {
         <section className="flex min-w-0 min-h-0 flex-col gap-4 overflow-hidden">
           {selectedParticipant ? (
             <>
-              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <div className="rounded-2xl border border-[#E0DDD4] bg-white px-4 py-3 shadow-sm">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-slate-800">{selectedParticipant.participant.full_name}</p>
+                  <p className="text-sm font-semibold text-[#2A2926]">{selectedParticipant.participant.full_name}</p>
                   {selectedParticipant.need_ca && (
                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
                       Wants CA
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-slate-500">{selectedParticipant.participant.office || 'No office indicated'}</p>
+                <p className="text-sm text-[#7C7A72]">{selectedParticipant.participant.office || 'No office indicated'}</p>
               </div>
 
-              <div className="preview-scroll-area min-h-0 flex-1 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm sm:p-4">
+              <div className="preview-scroll-area min-h-0 flex-1 overflow-auto rounded-2xl border border-[#E0DDD4] bg-[#F5F3EE] p-3 shadow-sm sm:p-4">
                 <div ref={previewWrapperRef} className="mx-auto" style={{ maxWidth: A4_WIDTH_PX }}>
                   <div
-                    className="mx-auto overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md"
+                    className="mx-auto overflow-hidden rounded-xl border border-[#E0DDD4] bg-white shadow-md"
                     style={{
                       width: A4_WIDTH_PX * previewScale,
                       height: CERT_HEIGHT_PX * previewScale
@@ -1546,7 +1546,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
               </div>
             </>
           ) : (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center text-slate-500 shadow-sm">
+            <div className="rounded-2xl border border-dashed border-[#C5C2BA] bg-white px-6 py-16 text-center text-[#7C7A72] shadow-sm">
               Select a participant to preview the certificate.
             </div>
           )}

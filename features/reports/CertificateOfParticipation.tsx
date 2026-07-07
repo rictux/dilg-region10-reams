@@ -320,11 +320,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         onClick={e => e.stopPropagation()}
       >
         {/* Modal header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#EDEAE2]">
+          <h2 className="text-base font-bold text-[#2A2926] flex items-center gap-2">
             <Settings size={16} className="text-violet-600" /> Certificate Settings
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+          <button onClick={onClose} className="text-[#9A9890] hover:text-[#6B6860] transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -333,7 +333,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* ── Title ── */}
           <section>
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-[#4A4843] mb-3 flex items-center gap-2">
               <span className="text-xs font-bold border border-current px-1 rounded-sm">T</span> Certificate Title
             </h3>
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -344,7 +344,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   className={`flex-1 py-3 px-4 rounded-xl border-2 text-sm font-semibold transition-all ${
                     certTitle === title
                       ? 'border-violet-500 bg-violet-50 text-violet-700'
-                      : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                      : 'border-[#E0DDD4] text-[#7C7A72] hover:border-[#C5C2BA]'
                   }`}
                 >
                   {title}
@@ -355,7 +355,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* ── Body text ── */}
           <section>
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-[#4A4843] mb-3 flex items-center gap-2">
               <span className="text-xs font-bold border border-current px-1 rounded-sm">¶</span> Certificate Body Text
             </h3>
             <div className="mb-3 space-y-2">
@@ -369,7 +369,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     className={`w-full rounded-xl border-2 px-3 py-2 text-left transition-all ${
                       isSelected
                         ? 'border-violet-500 bg-violet-50 text-violet-700'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                        : 'border-[#E0DDD4] text-[#6B6860] hover:border-[#C5C2BA] hover:bg-[#F5F3EE]'
                     }`}
                   >
                     <span className="block text-xs font-semibold mb-1">{template.label}</span>
@@ -383,17 +383,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               onChange={e => onChangeBodyText(e.target.value)}
               rows={5}
               placeholder={DEFAULT_COP_BODY_TEXT}
-              className="w-full px-3 py-2.5 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400 resize-y leading-relaxed"
+              className="w-full px-3 py-2.5 text-sm border-2 border-[#E0DDD4] rounded-xl focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400 resize-y leading-relaxed"
             />
             <div className="flex items-center justify-between mt-2">
-              <p className="text-[11px] text-slate-400">
-                Body text shown before the signatory. Use <span className="font-medium text-slate-500">{'{EventName}'}</span>, <span className="font-medium text-slate-500">{'{EventDate}'}</span>, <span className="font-medium text-slate-500">{'{Venue}'}</span>, <span className="font-medium text-slate-500">{'{CreditPhrase}'}</span>, and <span className="font-medium text-slate-500">{'{GivenDate}'}</span> for generated details.
+              <p className="text-[11px] text-[#9A9890]">
+                Body text shown before the signatory. Use <span className="font-medium text-[#7C7A72]">{'{EventName}'}</span>, <span className="font-medium text-[#7C7A72]">{'{EventDate}'}</span>, <span className="font-medium text-[#7C7A72]">{'{Venue}'}</span>, <span className="font-medium text-[#7C7A72]">{'{CreditPhrase}'}</span>, and <span className="font-medium text-[#7C7A72]">{'{GivenDate}'}</span> for generated details.
               </p>
               {bodyText.trim() !== DEFAULT_COP_BODY_TEXT && (
                 <button
                   type="button"
                   onClick={() => onChangeBodyText(DEFAULT_COP_BODY_TEXT)}
-                  className="shrink-0 ml-3 text-xs text-slate-400 hover:text-slate-600 hover:underline"
+                  className="shrink-0 ml-3 text-xs text-[#9A9890] hover:text-[#6B6860] hover:underline"
                 >
                   Reset
                 </button>
@@ -403,7 +403,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* ── Credit hours ── */}
           <section>
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-[#4A4843] mb-3 flex items-center gap-2">
               <span className="text-xs font-bold border border-current px-1 rounded-sm">h</span> Training Credit Hours
             </h3>
             <div className="flex items-center gap-3">
@@ -415,26 +415,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 value={creditHours}
                 onChange={e => onChangeCreditHours(e.target.value)}
                 placeholder="e.g. 4"
-                className="w-28 px-3 py-2.5 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400"
+                className="w-28 px-3 py-2.5 text-sm border-2 border-[#E0DDD4] rounded-xl focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400"
               />
               {creditHours.trim() && (
                 <button
                   type="button"
                   onClick={() => onChangeCreditHours('')}
-                  className="text-xs text-slate-400 hover:text-slate-600 hover:underline"
+                  className="text-xs text-[#9A9890] hover:text-[#6B6860] hover:underline"
                 >
                   Clear
                 </button>
               )}
             </div>
-            <p className="text-[11px] text-slate-400 mt-2">
-              Leave blank to omit. When set, the certificate reads “…with a credit of <span className="font-medium text-slate-500">{(parseInt(creditHours, 10) > 0 ? numberToWords(parseInt(creditHours, 10)) : 'N')} ({parseInt(creditHours, 10) > 0 ? parseInt(creditHours, 10) : 'N'})</span> training hours.”
+            <p className="text-[11px] text-[#9A9890] mt-2">
+              Leave blank to omit. When set, the certificate reads “…with a credit of <span className="font-medium text-[#7C7A72]">{(parseInt(creditHours, 10) > 0 ? numberToWords(parseInt(creditHours, 10)) : 'N')} ({parseInt(creditHours, 10) > 0 ? parseInt(creditHours, 10) : 'N'})</span> training hours.”
             </p>
           </section>
 
           {/* ── Theme ── */}
           <section>
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-[#4A4843] mb-3 flex items-center gap-2">
               <ImageIcon size={14} className="text-violet-500" /> Certificate Theme
             </h3>
 
@@ -444,7 +444,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploadingTheme}
-              className="mb-3 flex items-center gap-2 border border-dashed border-slate-300 hover:border-violet-400 text-slate-500 hover:text-violet-600 text-xs px-4 py-2.5 rounded-lg transition-colors w-full justify-center"
+              className="mb-3 flex items-center gap-2 border border-dashed border-[#C5C2BA] hover:border-violet-400 text-[#7C7A72] hover:text-violet-600 text-xs px-4 py-2.5 rounded-lg transition-colors w-full justify-center"
             >
               {isUploadingTheme ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
               {isUploadingTheme ? 'Uploading…' : 'Upload New Theme Image'}
@@ -457,7 +457,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   className={`relative rounded-lg overflow-hidden border-2 cursor-pointer transition-all group ${
                     themeUrl === theme.url
                       ? 'border-violet-500 ring-2 ring-violet-200'
-                      : 'border-slate-200 hover:border-slate-300'
+                      : 'border-[#E0DDD4] hover:border-[#C5C2BA]'
                   }`}
                   onClick={() => onSelectTheme(theme.url)}
                 >
@@ -473,19 +473,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   >
                     <Trash2 size={10} />
                   </button>
-                  <p className="text-[10px] px-1.5 py-1 bg-white/90 truncate text-slate-600">{theme.name}</p>
+                  <p className="text-[10px] px-1.5 py-1 bg-white/90 truncate text-[#6B6860]">{theme.name}</p>
                 </div>
               ))}
             </div>
 
             {themes.length === 0 && (
-              <p className="text-xs text-slate-400 text-center py-4">No themes uploaded yet. Upload an image to use as the certificate background.</p>
+              <p className="text-xs text-[#9A9890] text-center py-4">No themes uploaded yet. Upload an image to use as the certificate background.</p>
             )}
           </section>
 
           {/* ── Paper size ── */}
           <section>
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-[#4A4843] mb-3 flex items-center gap-2">
               <span className="text-xs font-mono border border-current px-0.5">A</span> Paper Size
             </h3>
             <div className="flex gap-3">
@@ -496,7 +496,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   className={`flex-1 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${
                     paperSize === size
                       ? 'border-violet-500 bg-violet-50 text-violet-700'
-                      : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                      : 'border-[#E0DDD4] text-[#7C7A72] hover:border-[#C5C2BA]'
                   }`}
                 >
                   {size}
@@ -511,13 +511,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* ── Signatory ── */}
           <section>
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-[#4A4843] mb-3 flex items-center gap-2">
               <span>✍</span> Signatory
             </h3>
-            <label className="mb-3 flex items-center justify-between gap-4 rounded-xl border-2 border-slate-200 px-4 py-3 text-sm text-slate-700">
+            <label className="mb-3 flex items-center justify-between gap-4 rounded-xl border-2 border-[#E0DDD4] px-4 py-3 text-sm text-[#4A4843]">
               <span>
                 <span className="block font-semibold">Include signature image</span>
-                <span className="block text-xs text-slate-400">Show the uploaded e-signature on the certificate.</span>
+                <span className="block text-xs text-[#9A9890]">Show the uploaded e-signature on the certificate.</span>
               </span>
               <input
                 type="checkbox"
@@ -527,7 +527,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               />
             </label>
             {signatories.length === 0 ? (
-              <p className="text-xs text-slate-400">No signatories configured. Go to Settings to add one.</p>
+              <p className="text-xs text-[#9A9890]">No signatories configured. Go to Settings to add one.</p>
             ) : (
               <div className="space-y-2">
                 {signatories.map(sig => (
@@ -537,17 +537,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center gap-3 ${
                       (selectedSignatory as any)?.id === sig.id
                         ? 'border-violet-500 bg-violet-50'
-                        : 'border-slate-200 hover:border-slate-300'
+                        : 'border-[#E0DDD4] hover:border-[#C5C2BA]'
                     }`}
                   >
                     {sig.esig_link && (
                       <img src={sig.esig_link} alt="" className="h-8 w-12 object-contain shrink-0" referrerPolicy="no-referrer" />
                     )}
                     <div className="min-w-0">
-                      <p className={`text-sm font-semibold truncate ${(selectedSignatory as any)?.id === sig.id ? 'text-violet-700' : 'text-slate-700'}`}>
+                      <p className={`text-sm font-semibold truncate ${(selectedSignatory as any)?.id === sig.id ? 'text-violet-700' : 'text-[#4A4843]'}`}>
                         {sig.name}{sig.post_nominals ? `, ${sig.post_nominals}` : ''}
                       </p>
-                      <p className="text-xs text-slate-400 truncate">{sig.position}</p>
+                      <p className="text-xs text-[#9A9890] truncate">{sig.position}</p>
                     </div>
                     {(selectedSignatory as any)?.id === sig.id && (
                       <Check size={15} className="text-violet-600 shrink-0 ml-auto" />
@@ -561,7 +561,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Modal footer */}
-        <div className="px-6 py-4 border-t border-slate-100 flex justify-end">
+        <div className="px-6 py-4 border-t border-[#EDEAE2] flex justify-end">
           <button
             onClick={onClose}
             className="bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-6 py-2 rounded-lg transition-colors"
@@ -1069,7 +1069,7 @@ const CertificateOfParticipation: React.FC = () => {
     </div>
   );
   if (!event) return (
-    <div className="h-screen flex items-center justify-center text-slate-500 text-sm">Event not found.</div>
+    <div className="h-screen flex items-center justify-center text-[#7C7A72] text-sm">Event not found.</div>
   );
 
   const creditHoursNum = (() => {
@@ -1084,22 +1084,22 @@ const CertificateOfParticipation: React.FC = () => {
   const renderFarm     = participants.filter(r => selectedIds.includes(r.participant.participant_id));
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
+    <div className="h-screen flex flex-col bg-[#F5F3EE] overflow-hidden">
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-4 px-5 py-3 bg-white border-b border-slate-200 shrink-0">
+      <div className="flex items-center justify-between gap-4 px-5 py-3 bg-white border-b border-[#E0DDD4] shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={() => navigate('/reports')}
-            className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 transition-colors text-sm font-medium shrink-0"
+            className="flex items-center gap-1.5 text-[#7C7A72] hover:text-[#2A2926] transition-colors text-sm font-medium shrink-0"
           >
             <ArrowLeft size={16} /> Back
           </button>
-          <div className="w-px h-5 bg-slate-200 shrink-0" />
+          <div className="w-px h-5 bg-[#E0DDD4] shrink-0" />
           <div className="min-w-0">
-            <p className="text-[11px] text-slate-400 leading-none mb-0.5">Certificate of Participation</p>
-            <p className="text-sm font-semibold text-slate-800 truncate leading-tight">{event.event_name}</p>
-            <p className="text-[11px] text-slate-400 leading-none mt-0.5">{formatEventDate(event)}</p>
+            <p className="text-[11px] text-[#9A9890] leading-none mb-0.5">Certificate of Participation</p>
+            <p className="text-sm font-semibold text-[#2A2926] truncate leading-tight">{event.event_name}</p>
+            <p className="text-[11px] text-[#9A9890] leading-none mt-0.5">{formatEventDate(event)}</p>
           </div>
         </div>
 
@@ -1107,7 +1107,7 @@ const CertificateOfParticipation: React.FC = () => {
           {/* Settings button */}
           <button
             onClick={() => setShowSettings(true)}
-            className="flex items-center gap-1.5 text-slate-600 hover:text-violet-700 hover:bg-violet-50 border border-slate-200 hover:border-violet-300 text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 text-[#6B6860] hover:text-violet-700 hover:bg-violet-50 border border-[#E0DDD4] hover:border-violet-300 text-sm font-medium px-3 py-2 rounded-lg transition-colors"
           >
             <Settings size={15} /> Settings
           </button>
@@ -1116,7 +1116,7 @@ const CertificateOfParticipation: React.FC = () => {
           <button
             onClick={handlePrint}
             disabled={isGenerating || selectedCount === 0}
-            className="flex items-center gap-2 bg-slate-600 hover:bg-slate-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-[#6B6860] hover:bg-[#4A4843] disabled:bg-[#C5C2BA] disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             {isGenerating && isPrintMode ? (
               <><Loader2 size={15} className="animate-spin" />{progress ? `${progress.done}/${progress.total}` : 'Preparing…'}</>
@@ -1129,7 +1129,7 @@ const CertificateOfParticipation: React.FC = () => {
           <button
             onClick={handleExport}
             disabled={isGenerating || selectedCount === 0}
-            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:bg-[#C5C2BA] disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             {isGenerating && !isPrintMode ? (
               <><Loader2 size={15} className="animate-spin" />{progress ? `${progress.done}/${progress.total}` : 'Preparing…'}</>
@@ -1142,7 +1142,7 @@ const CertificateOfParticipation: React.FC = () => {
           <button
             onClick={handleEmailCertificates}
             disabled={isSendingEmails || selectedCount === 0}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-[#C5C2BA] disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             {isSendingEmails ? (
               <><Loader2 size={15} className="animate-spin" />{emailProgress ? `${emailProgress.done}/${emailProgress.total}` : 'Sending…'}</>
@@ -1157,20 +1157,20 @@ const CertificateOfParticipation: React.FC = () => {
       <div className="flex flex-1 min-h-0 overflow-hidden">
 
         {/* ── Left panel: Participants only ── */}
-        <div className="w-72 shrink-0 flex flex-col bg-white border-r border-slate-200 overflow-hidden">
+        <div className="w-72 shrink-0 flex flex-col bg-white border-r border-[#E0DDD4] overflow-hidden">
           {/* List header */}
-          <div className="px-4 py-3 border-b border-slate-100">
+          <div className="px-4 py-3 border-b border-[#EDEAE2]">
             <div className="flex items-center justify-between mb-2.5">
-              <p className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+              <p className="text-xs font-semibold text-[#6B6860] flex items-center gap-1.5">
                 <Users size={13} /> Participants
-                <span className="text-slate-400 font-normal ml-1">({participants.length})</span>
+                <span className="text-[#9A9890] font-normal ml-1">({participants.length})</span>
               </p>
               <div className="flex items-center gap-1 text-[10px]">
                 <button onClick={selectVisible} className="text-violet-600 hover:underline">Visible</button>
-                <span className="text-slate-300">·</span>
+                <span className="text-[#C5C2BA]">·</span>
                 <button onClick={selectRole} className="text-violet-600 hover:underline">Role</button>
-                <span className="text-slate-300">·</span>
-                <button onClick={clearAll} className="text-slate-400 hover:text-slate-600 hover:underline">None</button>
+                <span className="text-[#C5C2BA]">·</span>
+                <button onClick={clearAll} className="text-[#9A9890] hover:text-[#6B6860] hover:underline">None</button>
               </div>
             </div>
 
@@ -1185,11 +1185,11 @@ const CertificateOfParticipation: React.FC = () => {
                     className={`min-w-0 rounded-md border px-2 py-1.5 text-left transition-colors ${
                       isActive
                         ? 'border-violet-300 bg-violet-50 text-violet-700'
-                        : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50'
+                        : 'border-[#E0DDD4] bg-white text-[#7C7A72] hover:border-[#C5C2BA] hover:bg-[#F5F3EE]'
                     }`}
                   >
                     <span className="block truncate text-[10px] font-semibold leading-tight">{option.label}</span>
-                    <span className={`text-[10px] leading-tight ${isActive ? 'text-violet-500' : 'text-slate-400'}`}>
+                    <span className={`text-[10px] leading-tight ${isActive ? 'text-violet-500' : 'text-[#9A9890]'}`}>
                       {roleCounts[option.value]} names
                     </span>
                   </button>
@@ -1198,16 +1198,16 @@ const CertificateOfParticipation: React.FC = () => {
             </div>
 
             <div className="relative">
-              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9A9890]" />
               <input
                 type="text"
                 placeholder="Search…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full pl-7 pr-7 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400"
+                className="w-full pl-7 pr-7 py-1.5 text-xs border border-[#E0DDD4] rounded-md focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400"
               />
               {search && (
-                <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9A9890] hover:text-[#6B6860]">
                   <X size={12} />
                 </button>
               )}
@@ -1215,8 +1215,8 @@ const CertificateOfParticipation: React.FC = () => {
           </div>
 
           {/* Stats bar */}
-          <div className="px-4 py-1.5 bg-slate-50 border-b border-slate-100">
-            <p className="text-[10px] text-slate-400">
+          <div className="px-4 py-1.5 bg-[#F5F3EE] border-b border-[#EDEAE2]">
+            <p className="text-[10px] text-[#9A9890]">
               {selectedCount} selected · {filtered.length} visible · {withLogsCount} with attendance logs
             </p>
           </div>
@@ -1224,7 +1224,7 @@ const CertificateOfParticipation: React.FC = () => {
           {/* List */}
           <div className="overflow-y-auto flex-1">
             {filtered.length === 0 && (
-              <p className="text-xs text-slate-400 text-center py-10">No participants found.</p>
+              <p className="text-xs text-[#9A9890] text-center py-10">No participants found.</p>
             )}
             {filtered.map(record => {
               const pid         = record.participant.participant_id;
@@ -1235,8 +1235,8 @@ const CertificateOfParticipation: React.FC = () => {
               return (
                 <div
                   key={pid}
-                  className={`flex items-start gap-2.5 px-3 py-2.5 border-b border-slate-50 cursor-pointer transition-colors ${
-                    isPreviewing ? 'bg-violet-50' : 'hover:bg-slate-50'
+                  className={`flex items-start gap-2.5 px-3 py-2.5 border-b border-[#F5F3EE] cursor-pointer transition-colors ${
+                    isPreviewing ? 'bg-violet-50' : 'hover:bg-[#F5F3EE]'
                   }`}
                   onClick={() => setPreviewId(pid)}
                 >
@@ -1249,7 +1249,7 @@ const CertificateOfParticipation: React.FC = () => {
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <p className={`text-xs font-medium leading-snug truncate ${isPreviewing ? 'text-violet-700' : 'text-slate-700'}`}>
+                      <p className={`text-xs font-medium leading-snug truncate ${isPreviewing ? 'text-violet-700' : 'text-[#4A4843]'}`}>
                         {buildListName(record.participant)}
                       </p>
                       {record.cop_email_sent_at && (
@@ -1258,13 +1258,13 @@ const CertificateOfParticipation: React.FC = () => {
                         </div>
                       )}
                     </div>
-                    <p className="truncate text-[10px] leading-snug text-slate-400 mt-0.5">
+                    <p className="truncate text-[10px] leading-snug text-[#9A9890] mt-0.5">
                       {record.participant.office || '—'}
                     </p>
                   </div>
                   <button
                     onClick={e => { e.stopPropagation(); setPreviewId(pid); setShowPreviewModal(true); }}
-                    className="shrink-0 text-slate-300 hover:text-violet-500 transition-colors mt-0.5"
+                    className="shrink-0 text-[#C5C2BA] hover:text-violet-500 transition-colors mt-0.5"
                     title="Full preview"
                   >
                     <Eye size={13} />
@@ -1276,23 +1276,23 @@ const CertificateOfParticipation: React.FC = () => {
         </div>
 
         {/* ── Right panel: Live preview ── */}
-        <div className="flex-1 flex flex-col items-center justify-start p-6 overflow-auto bg-slate-100">
+        <div className="flex-1 flex flex-col items-center justify-start p-6 overflow-auto bg-[#EDEAE2]">
           {/* Settings summary strip */}
-          <div className="flex items-center gap-3 mb-4 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg px-4 py-2 w-full max-w-4xl">
-            <span className="font-medium text-slate-600 truncate">
+          <div className="flex items-center gap-3 mb-4 text-xs text-[#7C7A72] bg-white border border-[#E0DDD4] rounded-lg px-4 py-2 w-full max-w-4xl">
+            <span className="font-medium text-[#6B6860] truncate">
               {certTitle}
             </span>
-            <span className="text-slate-300">·</span>
-            <span className="font-medium text-slate-600">
+            <span className="text-[#C5C2BA]">·</span>
+            <span className="font-medium text-[#6B6860]">
               {paperSize} Landscape
             </span>
-            <span className="text-slate-300">·</span>
+            <span className="text-[#C5C2BA]">·</span>
             <span>{creditHoursNum ? `${creditHoursNum} credit hr${creditHoursNum === 1 ? '' : 's'}` : 'No credit hrs'}</span>
-            <span className="text-slate-300">·</span>
+            <span className="text-[#C5C2BA]">·</span>
             <span>{themeUrl ? 'Theme applied' : 'Plain white'}</span>
-            <span className="text-slate-300">·</span>
+            <span className="text-[#C5C2BA]">·</span>
             <span className="truncate">{(selectedSignatory as any)?.name || 'No signatory'}</span>
-            <span className="text-slate-300">/</span>
+            <span className="text-[#C5C2BA]">/</span>
             <span>{includeSignature ? 'Signature included' : 'Signature excluded'}</span>
             <button
               onClick={() => setShowSettings(true)}
@@ -1330,7 +1330,7 @@ const CertificateOfParticipation: React.FC = () => {
               <div style={{ height: Math.round(getCoP_HeightPx(paperSize) * previewScale) }} />
             </div>
           ) : (
-            <p className="text-sm text-slate-400 mt-16">Select a participant on the left to preview their certificate.</p>
+            <p className="text-sm text-[#9A9890] mt-16">Select a participant on the left to preview their certificate.</p>
           )}
         </div>
       </div>

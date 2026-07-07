@@ -1169,12 +1169,12 @@ const AttendanceList: React.FC = () => {
           : 'sm:[grid-template-columns:repeat(3,minmax(0,1fr))]';
 
   return (
-    <div className="attendance-page -mt-4 -mb-6 h-[calc(100%+2.5rem)] min-h-0 flex flex-col gap-2 overflow-y-auto md:-mt-6 md:-mb-8 md:h-[calc(100%+3.5rem)] lg:overflow-visible">
+    <div className="attendance-page min-h-0 flex flex-col gap-2 overflow-y-auto -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16">
       <div className="attendance-toolbar">
         <div className="flex w-full flex-col gap-3 sm:gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3 xl:flex-nowrap xl:gap-4">
             <div className="relative w-full sm:mx-auto sm:max-w-[32rem] lg:mx-0 lg:max-w-[32rem] lg:flex-[1.25] xl:max-w-[36rem]" ref={dropdownRef}>
                 <div 
-                    className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-1.5 shadow-sm transition-colors hover:border-indigo-400 sm:px-4 sm:py-2 lg:py-2"
+                    className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-slate-300 bg-card px-3 py-1.5 shadow-sm transition-colors hover:border-indigo-400 sm:px-4 sm:py-2 lg:py-2"
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
                     <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -1187,7 +1187,7 @@ const AttendanceList: React.FC = () => {
                 </div>
 
                 {isDropdownOpen && (
-                    <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl animate-in fade-in zoom-in-95 duration-100">
+                    <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-card shadow-xl animate-in fade-in zoom-in-95 duration-100">
                         <div className="p-2 border-b border-slate-100 bg-slate-50 sticky top-0">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
@@ -1241,7 +1241,7 @@ const AttendanceList: React.FC = () => {
                 this wrapper so the day selector and search group are direct toolbar flex children. */}
             <div className="flex w-full items-stretch gap-2 lg:contents">
             {eventDays.length > 1 && (
-                <div className="max-w-[42%] shrink-0 rounded-lg border border-slate-200 bg-white p-0 lg:max-w-none">
+                <div className="max-w-[42%] shrink-0 rounded-lg border border-slate-200 bg-card p-0 lg:max-w-none">
                     <div className="flex gap-0.5 overflow-x-auto no-scrollbar">
                         {eventDays.map((day, idx) => {
                             const dStr = format(day, 'yyyy-MM-dd');
@@ -1267,170 +1267,89 @@ const AttendanceList: React.FC = () => {
                 </div>
             )}
 
-            <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 lg:ml-auto lg:w-[24rem] lg:max-w-none lg:flex-none xl:w-[28rem]">
-                <div className="relative min-w-0 w-full">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                        <Search size={18} />
-                    </div>
-                    <input
-                        type="text"
-                        placeholder="Search by name or office..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full min-w-0 rounded-lg border border-slate-300 bg-white py-1.5 pl-10 pr-12 text-xs font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 sm:py-2 sm:text-sm lg:py-2"
-                    />
-                    {searchQuery && (
-                        <button
-                            type="button"
-                            onClick={() => setSearchQuery('')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
-                        >
-                            Clear
-                        </button>
-                    )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 sm:contents shrink-0">
-                    <button 
-                        onClick={generateReport}
-                        disabled={!selectedEvent || !selectedDate || data.length === 0}
-                        type="button"
-                        aria-label="Export attendance"
-                        title="Export attendance"
-                        className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:h-10 sm:w-10 lg:h-10 lg:w-auto lg:gap-2 lg:px-4 xl:px-5"
-                    >
-                        <Download size={16} />
-                        <span className="hidden lg:inline text-sm">Export</span>
-                    </button>
-                    <button 
-                        onClick={() => setShowAddParticipantModal(true)}
-                        disabled={!selectedEvent}
-                        type="button"
-                        aria-label="Add participant"
-                        title="Add participant"
-                        className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:h-10 sm:w-10 lg:h-10 lg:w-auto lg:gap-2 lg:px-4 xl:px-5"
-                    >
-                        <UserPlus size={16} />
-                        <span className="hidden lg:inline text-sm">Add</span>
-                    </button>
-                </div>
-            </div>
             </div>
         </div>
       </div>
 
-      {/* Stats Cards as Filters */}
-      <div className="attendance-stats w-full -mt-1.5 md:mt-0">
-          <div
-            className={`grid w-full gap-1 sm:gap-3 lg:gap-4 ${statsGridClassName}`}
-          >
-          <button 
-            onClick={() => setFilter('Show All')}
-            className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-                ${filter === 'Show All' ? 'ring-2 ring-slate-400 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-slate-300'}
-                bg-white
-            `}
-          >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">Total</p>
-                  <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Show All' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-600'}`}>
-                    <Users size={10} className="sm:h-3.5 sm:w-3.5" />
+      {/* Filter tabs + search + actions. Mobile: stacked rows (filter, then search/actions);
+          sm+: single wrapping row with actions right-aligned. */}
+      <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100/50 border border-[rgb(var(--ink)/0.05)] rounded-lg">
+              {[
+                  { value: 'Show All', label: 'All', shortLabel: 'All', count: totalParticipants, show: true },
+                  { value: 'Present', label: 'Present', shortLabel: 'Present', count: presentCount, show: true },
+                  { value: 'No Logs', label: 'Not Present', shortLabel: 'Not Present', count: notPresentCount, show: true },
+                  { value: 'No PM', label: 'No PM', shortLabel: 'No PM', count: noPmCount, show: hasMultipleSessions },
+                  { value: 'Complete Logs', label: 'Complete', shortLabel: 'Complete', count: completeLogsCount, show: hasMultipleSessions },
+                  { value: 'Accommodation', label: 'Accommodation', shortLabel: 'Accomm', count: accommodationCount, show: hasAccommodationFilter },
+              ].filter(tab => tab.show).map(tab => (
+                  <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => setFilter(tab.value)}
+                      className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-xs transition-all ${
+                          filter === tab.value
+                              ? 'bg-white text-[#111110] shadow-sm font-medium border border-black/[0.06]'
+                              : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                  >
+                      <span className="sm:hidden">{tab.shortLabel}</span>
+                      <span className="hidden sm:inline">{tab.label}</span>
+                      <span className={`hidden sm:inline font-mono text-[10px] leading-none ${
+                          filter === tab.value
+                              ? 'bg-indigo-600/10 text-indigo-600 rounded px-1 py-0.5'
+                              : 'text-slate-400'
+                      }`}>
+                          {tab.count}
+                      </span>
+                  </button>
+              ))}
+          </div>
+
+          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:ml-auto sm:flex-none sm:justify-end">
+              <div className="relative min-w-0 w-full sm:max-w-xs">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                      <Search size={14} />
                   </div>
+                  <input
+                      type="text"
+                      placeholder="Search by name or office..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full min-w-0 h-9 pl-9 pr-12 bg-slate-100/50 border border-[rgb(var(--ink)/0.10)] rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 transition-all"
+                  />
+                  {searchQuery && (
+                      <button
+                          type="button"
+                          onClick={() => setSearchQuery('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                      >
+                          Clear
+                      </button>
+                  )}
               </div>
-              <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-slate-800">{totalParticipants}</p>
-          </button>
-
-          <button 
-            onClick={() => setFilter('Present')}
-            className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-                ${filter === 'Present' ? 'ring-2 ring-green-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-green-200'}
-                bg-white
-            `}
-          >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">Present</p>
-                  <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Present' ? 'bg-green-200 text-green-700' : 'bg-green-100 text-green-600'}`}>
-                    <UserCheck size={10} className="sm:h-3.5 sm:w-3.5" />
-                  </div>
-              </div>
-              <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-green-600">{presentCount}</p>
-          </button>
-
-          <button 
-            onClick={() => setFilter('No Logs')}
-            className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-                ${filter === 'No Logs' ? 'ring-2 ring-red-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-red-200'}
-                bg-white
-            `}
-          >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
-                    <span className="sm:hidden">Absent</span>
-                    <span className="hidden sm:inline">Not Present</span>
-                  </p>
-                  <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'No Logs' ? 'bg-red-200 text-red-700' : 'bg-red-100 text-red-600'}`}>
-                    <UserX size={10} className="sm:h-3.5 sm:w-3.5" />
-                  </div>
-              </div>
-              <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-red-600">{notPresentCount}</p>
-          </button>
-
-          {hasMultipleSessions && (
-            <button 
-              onClick={() => setFilter('No PM')}
-              className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-                  ${filter === 'No PM' ? 'ring-2 ring-amber-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-amber-200'}
-                  bg-white
-              `}
-            >
-                <div className="flex justify-between items-start mb-0.5 w-full">
-                    <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">No PM</p>
-                    <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'No PM' ? 'bg-amber-200 text-amber-700' : 'bg-amber-100 text-amber-600'}`}>
-                      <AlertCircle size={10} className="sm:h-3.5 sm:w-3.5" />
-                    </div>
-                </div>
-                <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-amber-600">{noPmCount}</p>
-            </button>
-          )}
-
-          {hasMultipleSessions && (
-            <button 
-              onClick={() => setFilter('Complete Logs')}
-              className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-                  ${filter === 'Complete Logs' ? 'ring-2 ring-indigo-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-indigo-200'}
-                  bg-white
-              `}
-            >
-                <div className="flex justify-between items-start mb-0.5 w-full">
-                    <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">Complete</p>
-                    <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Complete Logs' ? 'bg-indigo-200 text-indigo-700' : 'bg-indigo-100 text-indigo-600'}`}>
-                      <CheckCircle size={10} className="sm:h-3.5 sm:w-3.5" />
-                    </div>
-                </div>
-                <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-indigo-600">{completeLogsCount}</p>
-            </button>
-          )}
-
-          {hasAccommodationFilter && (
-            <button
-              onClick={() => setFilter('Accommodation')}
-              className={`attendance-stat-card min-w-0 min-h-[44px] sm:min-h-[56px] p-1 sm:p-2.5 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-                  ${filter === 'Accommodation' ? 'ring-2 ring-sky-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-sky-200'}
-                  bg-white
-              `}
-            >
-                <div className="flex justify-between items-start mb-0.5 w-full">
-                    <p className="text-[7px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
-                      <span className="sm:hidden">Accom</span>
-                      <span className="hidden sm:inline">Accommodation</span>
-                    </p>
-                    <div className={`rounded-md p-0.5 sm:p-1 ${filter === 'Accommodation' ? 'bg-purple-100 text-[#9333ea]' : 'bg-purple-50 text-[#9333ea]'}`}>
-                      <Bed size={10} className="sm:h-3.5 sm:w-3.5" />
-                    </div>
-                </div>
-                <p className="attendance-stat-value text-[11px] sm:text-base font-bold text-[#9333ea]">{accommodationCount}</p>
-            </button>
-          )}
+              <button
+                  onClick={generateReport}
+                  disabled={!selectedEvent || !selectedDate || data.length === 0}
+                  type="button"
+                  aria-label="Export attendance"
+                  title="Export attendance"
+                  className="flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                  <Download size={16} />
+                  <span className="hidden lg:inline">Export</span>
+              </button>
+              <button
+                  onClick={() => setShowAddParticipantModal(true)}
+                  disabled={!selectedEvent}
+                  type="button"
+                  aria-label="Add participant"
+                  title="Add participant"
+                  className="flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                  <UserPlus size={16} />
+                  <span className="hidden lg:inline">Add</span>
+              </button>
           </div>
       </div>
 
@@ -1439,45 +1358,29 @@ const AttendanceList: React.FC = () => {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
         </div>
       ) : (
-        <div className="attendance-table bg-white rounded-xl shadow-sm border border-slate-100 overflow-visible lg:overflow-hidden flex-none lg:flex-1 min-h-0 flex flex-col">
-            <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4 lg:px-6">
-                <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
-                    <input
-                        type="checkbox"
-                        checked={allFilteredSelected}
-                        disabled={filteredManualIds.length === 0}
-                        onChange={toggleAllFilteredManualSelection}
-                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
-                    />
-                    Select visible
-                </label>
-                <div className="flex items-center gap-2">
-                    {filter !== 'Show All' && (
-                        <button
-                            type="button"
-                            onClick={() => setFilter('Show All')}
-                            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-200 hover:text-indigo-700"
-                        >
-                            Clear Filter
-                        </button>
-                    )}
-                    <button
-                        type="button"
-                        onClick={openBulkManualModal}
-                        disabled={selectedManualIds.length === 0}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                    >
-                        <Clock size={14} />
-                        Bulk Manual ({selectedManualIds.length})
-                    </button>
-                </div>
+        <>
+        {selectedManualIds.length > 0 && (
+            <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-slate-500">
+                    <span className="font-semibold text-slate-700">{selectedManualIds.length}</span> row{selectedManualIds.length === 1 ? '' : 's'} selected
+                </p>
+                <button
+                    type="button"
+                    onClick={openBulkManualModal}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-indigo-700"
+                >
+                    <Clock size={14} />
+                    Bulk Manual ({selectedManualIds.length})
+                </button>
             </div>
-            
-            <div className="hidden lg:block flex-1 min-h-0 overflow-auto">
+        )}
+        <div className="attendance-table bg-card rounded-xl shadow-sm border border-slate-100 overflow-visible flex-none flex flex-col">
+
+            <div className="hidden lg:block">
                 <table className="datatable w-full table-fixed text-[13px] lg:text-sm text-left">
                     <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                         <tr>
-                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-14 bg-slate-50 text-center">
+                            <th className="pl-3 pr-1 py-1.5 lg:pl-4 lg:py-1.5 w-9 bg-slate-50 text-center">
                                 <input
                                     type="checkbox"
                                     checked={allFilteredSelected}
@@ -1486,10 +1389,10 @@ const AttendanceList: React.FC = () => {
                                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
                                 />
                             </th>
-                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-14 bg-slate-50">#</th>
+                            <th className="px-1 py-1.5 lg:py-1.5 w-9 bg-slate-50 text-center">#</th>
                             <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[28%] bg-slate-50">Name</th>
-                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[18%] bg-slate-50">Position</th>
-                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[16%] bg-slate-50">Office</th>
+                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[22%] bg-slate-50">Position</th>
+                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[22%] bg-slate-50">Office</th>
                             {visibleSessions.map((session) => (
                                 <th key={session} className="px-4 py-1.5 lg:px-5 lg:py-1.5 w-[112px] text-center bg-slate-50">
                                     {session} Time
@@ -1505,7 +1408,7 @@ const AttendanceList: React.FC = () => {
                                 onClick={() => handleRowClick(row.participant)}
                                 className="hover:bg-indigo-50 cursor-pointer transition-colors group"
                             >
-                                <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 text-center">
+                                <td className="pl-3 pr-1 py-1.5 lg:pl-4 lg:py-1.5 text-center">
                                     <input
                                         type="checkbox"
                                         checked={selectedManualIds.includes(row.participant.participant_id)}
@@ -1514,14 +1417,14 @@ const AttendanceList: React.FC = () => {
                                         className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                     />
                                 </td>
-                                <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 text-slate-500 font-mono text-xs lg:text-sm">{index + 1}</td>
+                                <td className="px-1 py-1.5 lg:py-1.5 text-center text-slate-500 font-mono text-xs lg:text-sm">{index + 1}</td>
                                 <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 font-medium text-slate-800 group-hover:text-indigo-600">
                                     <div className="flex items-start gap-1.5 whitespace-normal break-words leading-snug">
                                         <span>{row.participant.full_name}</span>
                                         {row.needs_accommodation && (
                                             <Bed
                                                 size={13}
-                                                className="mt-0.5 shrink-0 text-[#9333ea]"
+                                                className="mt-0.5 shrink-0 text-[#8B5CF6]"
                                                 aria-label="Needs accommodation"
                                             />
                                         )}
@@ -1598,9 +1501,9 @@ const AttendanceList: React.FC = () => {
                 </table>
             </div>
 
-            <div className="overflow-visible p-3 sm:p-4 lg:hidden">
+            <div className="overflow-visible lg:hidden">
                 {filteredData.length === 0 ? (
-                    <div className="text-center py-12 text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100">
+                    <div className="m-3 text-center py-12 text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100 sm:m-4">
                         {events.length === 0 ? (
                             <div className="flex flex-col items-center">
                                 <Calendar className="w-10 h-10 mb-2 opacity-20" />
@@ -1611,14 +1514,14 @@ const AttendanceList: React.FC = () => {
                         )}
                     </div>
                 ) : (
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                    <div className="grid gap-2 p-2 sm:grid-cols-2 sm:p-3 lg:grid-cols-1">
                         {filteredData.map((row) => (
                             <div
                                 key={row.participant.participant_id}
                                 onClick={() => handleRowClick(row.participant)}
-                                className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm active:scale-[0.99] transition-transform sm:p-4"
+                                className="rounded-lg border border-slate-200 bg-card p-2.5 shadow-sm active:scale-[0.99] transition-transform sm:p-3"
                             >
-                                <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-start justify-between gap-2.5">
                                     <input
                                         type="checkbox"
                                         checked={selectedManualIds.includes(row.participant.participant_id)}
@@ -1633,7 +1536,7 @@ const AttendanceList: React.FC = () => {
                                             {row.needs_accommodation && (
                                                 <Bed
                                                     size={13}
-                                                    className="mt-0.5 shrink-0 text-[#9333ea]"
+                                                    className="mt-0.5 shrink-0 text-[#8B5CF6]"
                                                     aria-label="Needs accommodation"
                                                 />
                                             )}
@@ -1655,14 +1558,14 @@ const AttendanceList: React.FC = () => {
                                     </div>
                                     <button
                                         onClick={(e) => openManualModal(e, row.participant)}
-                                        className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                                        className="-m-1 shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
                                         title="Manual Log Entry"
                                     >
-                                        <PlusCircle size={18} />
+                                        <PlusCircle size={16} />
                                     </button>
                                 </div>
 
-                                <div className={`mt-2.5 grid gap-2 ${hasMultipleSessions ? 'grid-cols-2' : 'grid-cols-1'} sm:mt-3`}>
+                                <div className={`mt-1.5 grid gap-1.5 ${hasMultipleSessions ? 'grid-cols-2' : 'grid-cols-1'}`}>
                                     {visibleSessions.map((session) => {
                                         const sessionLog = session === 'AM' ? row.amLog : row.pmLog;
                                         const valueClassName = session === 'AM'
@@ -1670,12 +1573,12 @@ const AttendanceList: React.FC = () => {
                                             : 'text-indigo-700';
 
                                         return (
-                                            <div key={session} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                                            <div key={session} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1">
                                                 <div className="flex items-center justify-between gap-2">
-                                                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                                                         {session} Time
                                                     </span>
-                                                    <span className={`text-sm font-semibold ${sessionLog ? valueClassName : 'text-slate-300'}`}>
+                                                    <span className={`text-xs font-semibold ${sessionLog ? valueClassName : 'text-slate-300'}`}>
                                                         {sessionLog ? formatLogTime(sessionLog.time) : '-'}
                                                     </span>
                                                 </div>
@@ -1689,23 +1592,29 @@ const AttendanceList: React.FC = () => {
                 )}
             </div>
         </div>
+        </>
       )}
 
       {/* Add Participant Modal */}
       {showAddParticipantModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddParticipantModal(false)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl p-6 relative z-10 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <UserPlus size={20} className="text-indigo-600" />
-                        Add Participant
-                    </h3>
-                    <button onClick={() => setShowAddParticipantModal(false)} className="text-slate-400 hover:text-slate-600">
-                        <X size={24} />
+        <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowAddParticipantModal(false)}></div>
+            <div className="fixed inset-y-0 right-0 flex w-full max-w-[560px] flex-col bg-card shadow-2xl animate-in slide-in-from-right duration-200">
+                <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+                    <div className="min-w-0">
+                        <h3 className="text-lg font-semibold text-slate-900">Add Participant</h3>
+                        {selectedEvent && (
+                            <p className="text-xs text-slate-500 mt-0.5 truncate">{selectedEvent.event_name}</p>
+                        )}
+                    </div>
+                    <button
+                        onClick={() => setShowAddParticipantModal(false)}
+                        className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-full transition-all shrink-0"
+                    >
+                        <X size={18} />
                     </button>
                 </div>
-                <div className="max-w-2xl mx-auto w-full">
+                <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
                     <form onSubmit={handleAddParticipant} className="space-y-10">
                         {/* SECTION: Personal Information */}
                         <div className="space-y-6">
@@ -1728,7 +1637,7 @@ const AttendanceList: React.FC = () => {
                                 autoComplete="off"
                             />
                              {showSuggestions && suggestions.length > 0 && (
-                                <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                                <ul className="absolute z-50 w-full bg-card border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
                                     {suggestions.map((p) => (
                                         <li 
                                             key={p.participant_id}
@@ -1874,7 +1783,7 @@ const AttendanceList: React.FC = () => {
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Province / HUC</label>
                                     <select 
                                         required={affiliationType === 'LGU'}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                         value={selectedProvince}
                                         onChange={e => {
                                             setSelectedProvince(e.target.value);
@@ -1892,7 +1801,7 @@ const AttendanceList: React.FC = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">City / Municipality</label>
                                     <select 
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card disabled:bg-slate-100 disabled:text-slate-400"
                                         value={selectedCity}
                                         onChange={e => {
                                             setSelectedCity(e.target.value);
@@ -1918,7 +1827,7 @@ const AttendanceList: React.FC = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Event Role</label>
                                     <select
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                         value={newParticipant.role}
                                         onChange={e => setNewParticipant({...newParticipant, role: e.target.value as any})}
                                     >
@@ -1932,7 +1841,7 @@ const AttendanceList: React.FC = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
                                     <select 
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                         value={newParticipant.gender}
                                         onChange={e => setNewParticipant({...newParticipant, gender: e.target.value})}
                                     >
@@ -1947,7 +1856,7 @@ const AttendanceList: React.FC = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Age Group</label>
                                     <select
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                         value={newParticipant.age_group}
                                         onChange={e => setNewParticipant({...newParticipant, age_group: e.target.value})}
                                     >
@@ -1962,7 +1871,7 @@ const AttendanceList: React.FC = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">PWD</label>
                                     <select
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                         value={newParticipant.pwd}
                                         onChange={e => setNewParticipant({...newParticipant, pwd: e.target.value})}
                                     >
@@ -1975,7 +1884,7 @@ const AttendanceList: React.FC = () => {
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Indigenous People</label>
                                 <select
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                     value={newParticipant.indigenous_people}
                                     onChange={e => setNewParticipant({...newParticipant, indigenous_people: e.target.value})}
                                 >
@@ -2020,7 +1929,7 @@ const AttendanceList: React.FC = () => {
                                                 <label
                                                     key={date}
                                                     className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
-                                                        isChecked ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300'
+                                                        isChecked ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-card text-slate-700 hover:border-indigo-300'
                                                     }`}
                                                 >
                                                     <input
@@ -2066,7 +1975,7 @@ const AttendanceList: React.FC = () => {
                                     {item.type === 'single-select' ? (
                                         <select
                                             disabled={giveawaysClosed}
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-card focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                                             value={(newParticipant.giveaway_selections[item.key] as string) || ''}
                                             onChange={(e) => setNewParticipant({ ...newParticipant, giveaway_selections: { ...newParticipant.giveaway_selections, [item.key]: e.target.value } })}
                                         >
@@ -2177,8 +2086,8 @@ const AttendanceList: React.FC = () => {
 
       {showManualModal && manualParticipant && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowManualModal(false)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setShowManualModal(false)}></div>
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
                     <h3 className="font-semibold flex items-center gap-2">
                         <Clock size={20} /> Manual Attendance
@@ -2218,7 +2127,7 @@ const AttendanceList: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Session</label>
-                            <select value={manualForm.session} onChange={e => setManualForm({...manualForm, session: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
+                            <select value={manualForm.session} onChange={e => setManualForm({...manualForm, session: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card">
                                 {visibleSessions.map((session) => (
                                     <option key={session} value={session}>{session}</option>
                                 ))}
@@ -2226,7 +2135,7 @@ const AttendanceList: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                            <select value={manualForm.status} onChange={e => setManualForm({...manualForm, status: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
+                            <select value={manualForm.status} onChange={e => setManualForm({...manualForm, status: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card">
                                 <option value="Valid">Valid</option>
                                 <option value="Late">Late</option>
                                 <option value="Excuse">Excuse</option>
@@ -2244,8 +2153,8 @@ const AttendanceList: React.FC = () => {
 
       {showBulkManualModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowBulkManualModal(false)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setShowBulkManualModal(false)}></div>
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
                     <h3 className="font-semibold flex items-center gap-2">
                         <Clock size={20} /> Bulk Manual Attendance
@@ -2293,7 +2202,7 @@ const AttendanceList: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Session</label>
-                            <select value={manualForm.session} onChange={e => setManualForm({...manualForm, session: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
+                            <select value={manualForm.session} onChange={e => setManualForm({...manualForm, session: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card">
                                 {visibleSessions.map((session) => (
                                     <option key={session} value={session}>{session}</option>
                                 ))}
@@ -2301,7 +2210,7 @@ const AttendanceList: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                            <select value={manualForm.status} onChange={e => setManualForm({...manualForm, status: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
+                            <select value={manualForm.status} onChange={e => setManualForm({...manualForm, status: e.target.value as any})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card">
                                 <option value="Valid">Valid</option>
                                 <option value="Late">Late</option>
                                 <option value="Excuse">Excuse</option>
@@ -2320,11 +2229,11 @@ const AttendanceList: React.FC = () => {
       {showManualBlockedModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
-              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
               onClick={() => setShowManualBlockedModal(false)}
             ></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="bg-[#4322A7] px-6 py-4 flex justify-between items-center text-white">
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
                     <h3 className="font-semibold flex items-center gap-2">
                         <AlertCircle size={20} /> Manual Entry Unavailable
                     </h3>
@@ -2334,7 +2243,7 @@ const AttendanceList: React.FC = () => {
                 </div>
 
                 <div className="p-6 space-y-4">
-                    <div className="bg-indigo-50 text-[#4322A7] p-4 rounded-lg border border-indigo-200 text-sm leading-relaxed">
+                    <div className="bg-indigo-50 text-indigo-600 p-4 rounded-lg border border-indigo-200 text-sm leading-relaxed">
                         {manualBlockedMessage}
                     </div>
 
@@ -2348,7 +2257,7 @@ const AttendanceList: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => setShowManualBlockedModal(false)}
-                        className="w-full bg-[#4322A7] text-white font-bold py-2.5 rounded-lg hover:bg-indigo-800 transition-all"
+                        className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-800 transition-all"
                     >
                         Close
                     </button>
@@ -2359,8 +2268,8 @@ const AttendanceList: React.FC = () => {
 
       {selectedParticipant && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setSelectedParticipant(null)}></div>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setSelectedParticipant(null)}></div>
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 flex justify-between items-center text-white">
                     <h3 className="font-semibold flex items-center gap-2">
                         <User size={20} /> Participant Badge
@@ -2369,14 +2278,14 @@ const AttendanceList: React.FC = () => {
                         <X size={20} />
                     </button>
                 </div>
-                <div className="p-8 flex flex-col items-center text-center" ref={badgeRef}>
+                <div className="p-8 flex flex-col items-center text-center bg-white" ref={badgeRef}>
                      <>
-                        <div className="border-4 border-slate-900 p-3 rounded-xl mb-6 bg-white shadow-sm">
-                            {qrToken && <QRCode value={qrToken} size={160} />}
+                        <div className="border-4 border-[#111110] p-3 rounded-xl mb-6 bg-white shadow-sm">
+                            {qrToken && <QRCode value={qrToken} size={160} fgColor="#000000" bgColor="#FFFFFF" level="H" />}
                         </div>
-                        <h2 className="text-xl font-bold text-slate-800">{selectedParticipant.full_name}</h2>
-                        <p className="text-indigo-600 font-medium mb-1">{selectedParticipant.position}</p>
-                        <p className="text-slate-500 text-sm">{selectedParticipant.office}</p>
+                        <h2 className="text-xl font-bold text-[#111110]">{selectedParticipant.full_name}</h2>
+                        <p className="text-[#4B3FE4] font-medium mb-1">{selectedParticipant.position}</p>
+                        <p className="text-[#6B6860] text-sm">{selectedParticipant.office}</p>
                      </>
                 </div>
                 <div className="px-8 pb-8 pt-0">

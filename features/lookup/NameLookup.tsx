@@ -295,13 +295,13 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
   };
 
   const contentClass = isInternal
-    ? 'w-full h-full min-h-0 flex flex-col gap-6 overflow-y-auto lg:overflow-visible'
+    ? 'min-h-0 flex flex-col gap-6 overflow-y-auto lg:overflow-visible -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16'
     : 'min-h-screen bg-slate-50 flex flex-col items-center w-full px-3 py-5 sm:p-8';
 
   const renderPublicTimeline = () => {
     if (attendedEvents.length === 0) {
       return (
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 text-center text-slate-400">
+        <div className="bg-card border border-slate-200 rounded-2xl shadow-sm p-8 text-center text-slate-400">
           <Calendar size={32} className="mx-auto mb-3 opacity-20" />
           <p className="text-sm font-medium text-slate-600">No event attendance records found.</p>
           <p className="text-xs mt-1">Attendance might still be syncing or logs are unavailable.</p>
@@ -310,7 +310,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
     }
 
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 md:p-6">
+      <div className="bg-card border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 md:p-6">
         <div className="flex items-center gap-2 mb-4 sm:mb-6">
           <History className="text-indigo-600" size={18} />
           <h4 className="text-base font-bold text-slate-800">Historical View</h4>
@@ -387,7 +387,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
           {attendedEvents.map((event) => (
             <div
               key={event.event_id}
-              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+              className="rounded-xl border border-slate-200 bg-card p-4 shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
                 <h5 className="text-sm font-bold text-slate-900 leading-snug break-words min-w-0">
@@ -461,8 +461,8 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
         <div className="w-full max-w-5xl flex flex-col sm:flex-row items-center justify-between mb-6 sm:mb-8 gap-4">
           <div className="w-full sm:w-auto rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
             <div className="flex items-center justify-center sm:justify-start gap-3 sm:gap-4">
-              <div className="w-11 h-11 sm:w-12 sm:h-12 flex-shrink-0">
-                <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" />
+              <div className="w-11 h-11 sm:w-12 sm:h-12 flex-shrink-0 overflow-hidden rounded-full bg-white">
+                <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain rounded-full" />
               </div>
               <div className="text-left">
                 <h1 className="text-lg font-bold text-slate-900 leading-tight">DILG Region 10</h1>
@@ -479,7 +479,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
 
       <div className={isInternal ? 'w-full lg:flex-1 lg:min-h-0 flex flex-col gap-6' : 'w-full max-w-5xl space-y-4 sm:space-y-6'}>
         {isInternal ? (
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6">
+          <div className="bg-card border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-start gap-3.5">
                 <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
@@ -501,7 +501,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
                   <input
                     type="text"
                     placeholder="Search by name or office..."
-                    className="w-full pl-11 pr-16 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium shadow-sm focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-slate-400"
+                    className="w-full pl-11 pr-16 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium shadow-sm focus:outline-none focus:bg-card focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-slate-400"
                     value={searchTerm}
                     onChange={(e) => {
                       const value = e.target.value;
@@ -530,7 +530,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
                 </div>
 
                 {showSuggestions && suggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-card border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="p-2.5 border-b border-slate-100 bg-slate-50/50">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Suggested Names from Records</span>
                     </div>
@@ -560,7 +560,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
             </div>
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 md:p-6 space-y-4">
+          <div className="bg-card border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 md:p-6 space-y-4">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="space-y-2">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-sm font-medium">
@@ -620,8 +620,8 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
           ) : selectedParticipant ? (
             <div className={isInternal ? 'animate-in fade-in slide-in-from-bottom-4 duration-500 lg:flex-1 lg:min-h-0 flex flex-col gap-6' : 'animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4 sm:space-y-6'}>
               <div className={isInternal
-                ? 'bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-sm flex flex-row items-center gap-3 sm:gap-4'
-                : 'bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 md:p-6 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5'}>
+                ? 'bg-card border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-sm flex flex-row items-center gap-3 sm:gap-4'
+                : 'bg-card border border-slate-200 rounded-2xl p-4 sm:p-5 md:p-6 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5'}>
                 <div className={isInternal
                   ? 'w-11 h-11 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center text-lg font-bold shrink-0'
                   : 'w-14 h-14 sm:w-16 sm:h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-xl sm:text-2xl font-bold shrink-0 mx-auto sm:mx-0'}>
@@ -663,7 +663,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
               </div>
 
               {isInternal ? (
-                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden lg:flex-1 lg:min-h-0 flex flex-col">
+                <div className="bg-card border border-slate-200 rounded-2xl shadow-sm overflow-hidden lg:flex-1 lg:min-h-0 flex flex-col">
                   <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <History className="text-indigo-600" size={18} />
@@ -691,7 +691,7 @@ const NameLookup: React.FC<NameLookupProps> = ({ isInternal = false }) => {
             </div>
           ) : (
             <div className={isInternal
-              ? 'bg-white border border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center py-16 px-6 text-center select-none'
+              ? 'bg-card border border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center py-16 px-6 text-center select-none'
               : 'flex flex-col items-center justify-center py-16 opacity-40 select-none pointer-events-none'}>
               {isInternal ? (
                 <>

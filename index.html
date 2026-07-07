@@ -7,17 +7,189 @@
     <title>Regional Event & Attendance Management System</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,600;0,700;1,400&family=Pinyon+Script&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Poppins:ital,wght@0,400;0,600;0,700;1,400&family=Pinyon+Script&display=swap" rel="stylesheet" />
+    <script>
+      // Apply the saved UI design template before Tailwind evaluates so there is no flash.
+      (function () {
+        try {
+          var theme = localStorage.getItem('reams-ui-theme');
+          if (theme && theme !== 'eventflow') {
+            document.documentElement.setAttribute('data-theme', theme);
+          }
+          if (localStorage.getItem('reams-ui-mode') === 'dark') {
+            document.documentElement.setAttribute('data-mode', 'dark');
+          }
+        } catch (e) { /* storage unavailable — keep default theme */ }
+      })();
+    </script>
+    <style>
+      /* UI design templates — each theme swaps the accent (--acc-*) and neutral (--neu-*)
+         scales consumed by the Tailwind config below. Values are RGB channel triplets so
+         Tailwind alpha modifiers (e.g. bg-indigo-600/10) keep working. */
+      :root {
+        /* EventFlow (default): brand indigo + warm stone neutrals */
+        --acc-50: 238 237 252; --acc-100: 223 220 250; --acc-200: 195 190 244;
+        --acc-300: 162 154 236; --acc-400: 139 130 240; --acc-500: 98 85 233;
+        --acc-600: 75 63 228; --acc-700: 59 48 196; --acc-800: 47 38 160;
+        --acc-900: 37 30 124; --acc-950: 23 18 78;
+        --neu-50: 245 243 238; --neu-100: 237 234 226; --neu-200: 224 221 212;
+        --neu-300: 197 194 186; --neu-400: 154 152 144; --neu-500: 124 122 114;
+        --neu-600: 107 104 96; --neu-700: 74 72 67; --neu-800: 42 41 38;
+        --neu-900: 17 17 16; --neu-950: 15 15 14;
+        --sidebar: 15 15 14;
+        /* Card/surface color (`bg-card`); comfort themes soften this off pure white */
+        --surface: 255 255 255;
+        /* Hairline/border base color — black in light mode, white in dark mode */
+        --ink: 0 0 0;
+      }
+
+      :root[data-theme="eventflow"] {
+        /* EventFlow: brand indigo + warm stone neutrals */
+        --acc-50: 238 237 252; --acc-100: 223 220 250; --acc-200: 195 190 244;
+        --acc-300: 162 154 236; --acc-400: 139 130 240; --acc-500: 98 85 233;
+        --acc-600: 75 63 228; --acc-700: 59 48 196; --acc-800: 47 38 160;
+        --acc-900: 37 30 124; --acc-950: 23 18 78;
+        --neu-50: 245 243 238; --neu-100: 237 234 226; --neu-200: 224 221 212;
+        --neu-300: 197 194 186; --neu-400: 154 152 144; --neu-500: 124 122 114;
+        --neu-600: 107 104 96; --neu-700: 74 72 67; --neu-800: 42 41 38;
+        --neu-900: 17 17 16; --neu-950: 15 15 14;
+        --sidebar: 15 15 14;
+        --surface: 255 255 255;
+        --ink: 0 0 0;
+      }
+
+      :root[data-theme="ocean"] {
+        /* Ocean: classic blue + cool slate neutrals */
+        --acc-50: 239 246 255; --acc-100: 219 234 254; --acc-200: 191 219 254;
+        --acc-300: 147 197 253; --acc-400: 96 165 250; --acc-500: 59 130 246;
+        --acc-600: 37 99 235; --acc-700: 29 78 216; --acc-800: 30 64 175;
+        --acc-900: 30 58 138; --acc-950: 23 37 84;
+        --neu-50: 248 250 252; --neu-100: 241 245 249; --neu-200: 226 232 240;
+        --neu-300: 203 213 225; --neu-400: 148 163 184; --neu-500: 100 116 139;
+        --neu-600: 71 85 105; --neu-700: 51 65 85; --neu-800: 30 41 59;
+        --neu-900: 15 23 42; --neu-950: 2 6 23;
+        --sidebar: 15 23 42;
+      }
+
+      :root[data-theme="forest"] {
+        /* Forest: deep emerald + warm stone neutrals */
+        --acc-50: 236 253 245; --acc-100: 209 250 229; --acc-200: 167 243 208;
+        --acc-300: 110 231 183; --acc-400: 52 211 153; --acc-500: 16 185 129;
+        --acc-600: 4 120 87; --acc-700: 6 95 70; --acc-800: 6 78 59;
+        --acc-900: 2 44 34; --acc-950: 2 44 34;
+        --neu-50: 250 250 249; --neu-100: 245 245 244; --neu-200: 231 229 228;
+        --neu-300: 214 211 209; --neu-400: 168 162 158; --neu-500: 120 113 108;
+        --neu-600: 87 83 78; --neu-700: 68 64 60; --neu-800: 41 37 36;
+        --neu-900: 28 25 23; --neu-950: 12 10 9;
+        --sidebar: 2 44 34;
+      }
+
+      :root[data-theme="sage"] {
+        /* Sage: soft desaturated greens — calm, low-strain comfort theme */
+        --acc-50: 240 245 241; --acc-100: 225 235 228; --acc-200: 197 216 203;
+        --acc-300: 159 190 169; --acc-400: 119 161 135; --acc-500: 87 132 104;
+        --acc-600: 63 108 81; --acc-700: 52 89 67; --acc-800: 42 71 54;
+        --acc-900: 33 56 43; --acc-950: 22 38 29;
+        --neu-50: 238 241 236; --neu-100: 228 232 226; --neu-200: 212 218 210;
+        --neu-300: 183 191 181; --neu-400: 141 149 139; --neu-500: 111 119 109;
+        --neu-600: 94 101 92; --neu-700: 67 74 66; --neu-800: 44 51 44;
+        --neu-900: 31 38 31; --neu-950: 20 27 21;
+        --sidebar: 28 38 32;
+        --surface: 250 251 248;
+      }
+
+      :root[data-theme="paper"] {
+        /* Paper: warm sepia reading mode — cream page, ivory cards, clay accent, coffee sidebar */
+        --acc-50: 254 252 232; --acc-100: 254 249 195; --acc-200: 254 240 138;
+        --acc-300: 253 224 71; --acc-400: 234 179 8; --acc-500: 202 138 4;
+        --acc-600: 161 98 7; --acc-700: 133 77 14; --acc-800: 113 63 18;
+        --acc-900: 66 32 6; --acc-950: 66 32 6;
+        --neu-50: 241 235 223; --neu-100: 233 226 211; --neu-200: 221 212 194;
+        --neu-300: 196 187 168; --neu-400: 156 148 132; --neu-500: 125 118 104;
+        --neu-600: 106 99 85; --neu-700: 76 70 57; --neu-800: 66 60 52;
+        --neu-900: 53 48 42; --neu-950: 33 29 22;
+        --sidebar: 33 29 22;
+        --surface: 251 248 241;
+      }
+
+      :root[data-theme="graphite"] {
+        /* Graphite: monochrome near-black accent + zinc neutrals */
+        --acc-50: 250 250 250; --acc-100: 244 244 245; --acc-200: 228 228 231;
+        --acc-300: 212 212 216; --acc-400: 161 161 170; --acc-500: 113 113 122;
+        --acc-600: 24 24 27; --acc-700: 9 9 11; --acc-800: 9 9 11;
+        --acc-900: 9 9 11; --acc-950: 9 9 11;
+        --neu-50: 250 250 250; --neu-100: 244 244 245; --neu-200: 228 228 231;
+        --neu-300: 212 212 216; --neu-400: 161 161 170; --neu-500: 113 113 122;
+        --neu-600: 82 82 91; --neu-700: 63 63 70; --neu-800: 39 39 42;
+        --neu-900: 24 24 27; --neu-950: 9 9 11;
+        --sidebar: 9 9 11;
+      }
+
+      /* Dark mode — a display mode layered on top of any color template. Placed after
+         the theme blocks so it wins ties: flips the neutral ramp (50=page bg,
+         900=light text), softens card/sidebar surfaces, and inverts hairline borders.
+         Accent scales keep the active template's identity. */
+      :root[data-mode="dark"] {
+        --neu-50: 48 48 54; --neu-100: 58 58 64; --neu-200: 72 72 80;
+        --neu-300: 89 89 98; --neu-400: 134 134 144; --neu-500: 157 157 166;
+        --neu-600: 178 178 186; --neu-700: 207 207 214; --neu-800: 230 230 235;
+        --neu-900: 246 246 248; --neu-950: 255 255 255;
+        --surface: 64 64 72;
+        --sidebar: 52 52 60;
+        --ink: 255 255 255;
+      }
+    </style>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+      const themeVar = (name) => `rgb(var(--${name}) / <alpha-value>)`;
+      const themeScale = (prefix) => Object.fromEntries(
+        [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map((step) => [step, themeVar(`${prefix}-${step}`)])
+      );
+
       tailwind.config = {
         theme: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            serif: ['ui-serif', 'Georgia', 'Cambria', '"Times New Roman"', 'Times', 'serif'],
+            mono: ['"DM Mono"', '"Fira Code"', 'monospace'],
+          },
           extend: {
             colors: {
-              primary: '#4f46e5',
-              secondary: '#10b981',
-              danger: '#ef4444',
-            }
+              primary: themeVar('acc-600'),
+              secondary: themeVar('neu-100'),
+              danger: '#C8182C',
+              // Design tokens — driven by the active UI design template (CSS variables above)
+              background: themeVar('neu-50'),
+              foreground: themeVar('neu-900'),
+              // Card/panel surface — themable (ivory in Paper/Sage, dark in dark mode).
+              // `white` stays true white: it is also button/sidebar text and must not flip.
+              card: themeVar('surface'),
+              muted: { DEFAULT: themeVar('neu-100'), foreground: themeVar('neu-600') },
+              accent: { DEFAULT: themeVar('acc-600'), hover: themeVar('acc-700') },
+              destructive: '#C8182C',
+              sidebar: themeVar('sidebar'),
+              // Remapped indigo scale → active template accent scale
+              indigo: themeScale('acc'),
+              // Remapped slate scale → active template neutral scale
+              slate: themeScale('neu'),
+            },
+            borderColor: {
+              DEFAULT: 'rgb(var(--ink) / 0.08)',
+              border: 'rgb(var(--ink) / 0.08)',
+            },
+            borderRadius: {
+              'xl': '0.5rem',
+              '2xl': '0.625rem',
+              '3xl': '0.75rem',
+            },
+            boxShadow: {
+              sm: '0 1px 2px 0 rgba(0, 0, 0, 0.04)',
+              DEFAULT: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
+              md: '0 2px 8px -1px rgba(0, 0, 0, 0.06)',
+              lg: '0 4px 16px -2px rgba(0, 0, 0, 0.08)',
+              xl: '0 8px 24px -4px rgba(0, 0, 0, 0.10)',
+              '2xl': '0 16px 40px -8px rgba(0, 0, 0, 0.14)',
+            },
           }
         }
       }
@@ -36,6 +208,26 @@
 
       html {
           font-size: 16px;
+      }
+
+      body {
+          font-family: 'Inter', system-ui, sans-serif;
+          background-color: rgb(var(--neu-50));
+          color: rgb(var(--neu-900));
+      }
+
+      :root[data-mode="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+      :root[data-mode="dark"] select,
+      :root[data-mode="dark"] textarea {
+          background-color: rgb(var(--surface));
+          color: rgb(var(--neu-900));
+          border-color: rgb(var(--ink) / 0.14);
+          color-scheme: dark;
+      }
+
+      :root[data-mode="dark"] input::placeholder,
+      :root[data-mode="dark"] textarea::placeholder {
+          color: rgb(var(--neu-500));
       }
 
       /* Slightly scale down rem-based text and spacing on smaller desktop/laptop screens */
@@ -161,6 +353,11 @@
           scrollbar-width: none;  /* Firefox */
       }
       @media print {
+        /* Certificates and reports must print on true white regardless of theme/mode */
+        :root, :root[data-theme], :root[data-mode] {
+          --surface: 255 255 255;
+          --ink: 0 0 0;
+        }
         .no-print {
           display: none !important;
         }

@@ -21,7 +21,7 @@ const About: React.FC = () => {
   const tabButtonClass = (tab: AboutTab) =>
     `flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium text-sm transition-all ${
       activeTab === tab
-        ? 'bg-white text-indigo-600 shadow-sm'
+        ? 'bg-card text-indigo-600 shadow-sm'
         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
     }`;
 
@@ -109,7 +109,7 @@ const About: React.FC = () => {
   ];
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto pr-1 w-full space-y-8 pb-12">
+    <div className="min-h-0 overflow-y-auto -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16 space-y-8 pb-12">
       <div className="flex space-x-1 bg-slate-100/50 p-1 rounded-xl w-fit">
         <button
           type="button"
@@ -131,7 +131,7 @@ const About: React.FC = () => {
 
       {activeTab === 'instructions' ? (
         <div className="space-y-8">
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+          <div className="bg-card p-8 rounded-2xl shadow-sm border border-slate-100">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-sm font-medium mb-4">
               <BookOpen size={16} />
               <span>User Guide</span>
@@ -162,7 +162,7 @@ const About: React.FC = () => {
 
           <div className="grid grid-cols-1 gap-5">
             {workflowSteps.map((step, index) => (
-              <div key={step.title} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+              <div key={step.title} className="bg-card p-6 rounded-2xl shadow-sm border border-slate-100">
                 <div className="flex items-start gap-4">
                   <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-lg shrink-0">
                     {index + 1}
@@ -191,7 +191,7 @@ const About: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+          <div className="bg-card p-8 rounded-2xl shadow-sm border border-slate-100">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-sm font-medium mb-4">
               <Wrench size={16} />
               <span>Tools</span>
@@ -203,7 +203,7 @@ const About: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+            <div className="bg-card p-5 rounded-2xl shadow-sm border border-slate-100">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch">
                 <div className="flex-1 space-y-4">
                   <div className="flex items-center gap-3">
@@ -240,7 +240,7 @@ const About: React.FC = () => {
                 </div>
 
                 <div className="flex w-full flex-col items-center justify-center rounded-2xl bg-indigo-50 p-5 text-center lg:w-[180px]">
-                  <div className="bg-white p-3 rounded-xl shadow-sm">
+                  <div className="bg-card p-3 rounded-xl shadow-sm">
                     <QRCode value={downloadLink} size={116} />
                   </div>
                   <p className="mt-3 text-xs font-medium text-indigo-900">Scan to download</p>
@@ -248,7 +248,7 @@ const About: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+            <div className="bg-card p-5 rounded-2xl shadow-sm border border-slate-100">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch">
                 <div className="flex-1 space-y-4">
                   <div className="flex items-center gap-3">
@@ -286,7 +286,7 @@ const About: React.FC = () => {
                 </div>
 
                 <div className="flex w-full flex-col items-center justify-center rounded-2xl bg-emerald-50 p-5 text-center lg:w-[180px]">
-                  <div className="bg-white p-3 rounded-xl shadow-sm">
+                  <div className="bg-card p-3 rounded-xl shadow-sm">
                     <QRCode value={caBatchSignerLink} size={116} />
                   </div>
                   <p className="mt-3 text-xs font-medium text-emerald-900">Scan to download</p>

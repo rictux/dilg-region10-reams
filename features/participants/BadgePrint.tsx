@@ -51,30 +51,30 @@ const BadgePrint: React.FC = () => {
   if (!participant) return <div>Participant not found</div>;
 
   return (
-    <div className="min-h-screen bg-slate-100 p-8 flex flex-col items-center">
+    <div className="min-h-screen bg-[#EDEAE2] p-8 flex flex-col items-center">
       
       {/* Controls - Hidden on Print */}
       <div className="w-full max-w-2xl flex justify-between mb-8 no-print">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-600 hover:text-slate-900">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-[#6B6860] hover:text-[#111110]">
             <ArrowLeft size={20} /> Back
         </button>
-        <button onClick={handleSaveBadge} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-md">
+        <button onClick={handleSaveBadge} className="bg-[#4B3FE4] text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-md">
             <Download size={20} /> Save Badge
         </button>
       </div>
 
       {/* Badge Card */}
-      <div ref={badgeRef} className="bg-white w-[350px] h-[500px] shadow-2xl rounded-xl border border-slate-200 flex flex-col items-center justify-between p-8 text-center">
-          <div className="w-full border-b-2 border-indigo-600 pb-4 mb-4">
-              <h1 className="text-2xl font-bold text-indigo-800 uppercase tracking-widest">Event Pass</h1>
-              <p className="text-slate-400 text-xs mt-1">AUTHORIZED PERSONNEL</p>
+      <div ref={badgeRef} className="bg-white w-[350px] h-[500px] shadow-2xl rounded-xl border border-[#E0DDD4] flex flex-col items-center justify-between p-8 text-center">
+          <div className="w-full border-b-2 border-[#4B3FE4] pb-4 mb-4">
+              <h1 className="text-2xl font-bold text-[#2F26A0] uppercase tracking-widest">Event Pass</h1>
+              <p className="text-[#9A9890] text-xs mt-1">AUTHORIZED PERSONNEL</p>
           </div>
 
           <div className="flex-1 flex flex-col items-center justify-center space-y-4">
-              <div className="border-4 border-slate-900 p-2 rounded-lg">
+              <div className="border-4 border-[#111110] bg-white p-2 rounded-lg">
                 {qrToken && (
                   <div className="relative inline-block">
-                    <QRCode value={qrToken} size={150} level="H" />
+                    <QRCode value={qrToken} size={150} fgColor="#000000" bgColor="#FFFFFF" level="H" />
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-1">
                       <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-9 h-9 object-contain rounded-full" />
                     </div>
@@ -82,9 +82,9 @@ const BadgePrint: React.FC = () => {
                 )}
               </div>
               <div>
-                  <h2 className="text-xl font-bold text-slate-900 mt-4">{participant.full_name}</h2>
-                  <p className="text-slate-500 font-medium">{participant.position}</p>
-                  <p className="text-slate-400 text-sm mt-1">{participant.office}</p>
+                  <h2 className="text-xl font-bold text-[#111110] mt-4">{participant.full_name}</h2>
+                  <p className="text-[#7C7A72] font-medium">{participant.position}</p>
+                  <p className="text-[#9A9890] text-sm mt-1">{participant.office}</p>
               </div>
           </div>
       </div>

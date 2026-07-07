@@ -203,7 +203,7 @@ const AnnouncementManagement: React.FC = () => {
 
       {/* Form */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="mb-4 space-y-3 rounded-lg border border-slate-300 bg-white p-4">
+        <form onSubmit={handleSubmit} className="mb-4 space-y-3 rounded-lg border border-slate-300 bg-card p-4">
           <h4 className="text-sm font-semibold text-slate-800">
             {editingId ? 'Edit Announcement' : 'New Announcement'}
           </h4>
@@ -235,7 +235,7 @@ const AnnouncementManagement: React.FC = () => {
               <select
                 value={formData.type}
                 onChange={(e) => setFormData({ ...formData, type: e.target.value as AnnouncementType })}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full rounded-lg border border-slate-300 bg-card px-3 py-2 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
               >
                 <option value="info">Info</option>
                 <option value="success">Success</option>
@@ -248,7 +248,7 @@ const AnnouncementManagement: React.FC = () => {
               <select
                 value={formData.is_active ? 'active' : 'inactive'}
                 onChange={(e) => setFormData({ ...formData, is_active: e.target.value === 'active' })}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full rounded-lg border border-slate-300 bg-card px-3 py-2 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>

@@ -2,12 +2,12 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Event, Participant, Office, GiveawayItem, EventAccessRole, EventUserAccess, User } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift, Settings, ChevronDown } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift, Settings, ChevronDown, Hash, Utensils } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import ExcelJS from 'exceljs';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   type EventFoodInclusionMap,
@@ -60,6 +60,15 @@ type ParticipantModalRecord = {
   giveaway_selections: Record<string, string | boolean> | null;
   participants: Participant | null;
 };
+
+const getRoleChipClass = (role: string) => {
+  if (role === 'Secretariat') return 'bg-indigo-50 text-indigo-600 border-indigo-100';
+  if (role === 'Speaker') return 'bg-amber-50 text-amber-600 border-amber-100';
+  if (role === 'Guest' || role === 'VIP') return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+  return 'bg-slate-100 text-slate-600 border-slate-200';
+};
+
+const getRoleChipLabel = (role: string) => (role === 'Guest' || role === 'VIP' ? 'Guest/VIP' : role);
 
 type EventAccessUser = Pick<User, 'user_id' | 'full_name' | 'username' | 'office_id' | 'status'> & {
   offices?: Pick<Office, 'code' | 'name'> | null;
@@ -133,9 +142,10 @@ const EventsList: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [eventView, setEventView] = useState<'active' | 'deleted'>('active');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 9;
   const navigate = useNavigate();
-  
+  const location = useLocation();
+
   // Modal States
   const [showEventModal, setShowEventModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -221,6 +231,8 @@ const EventsList: React.FC = () => {
   const [foodInclusionByDate, setFoodInclusionByDate] = useState<EventFoodInclusionMap>({});
   const [hasEventCode, setHasEventCode] = useState(false);
   const [showEventCodeInfo, setShowEventCodeInfo] = useState(false);
+  const [giveawaysEnabled, setGiveawaysEnabled] = useState(false);
+  const [customizeMealsPerDay, setCustomizeMealsPerDay] = useState(false);
   const [venueSuggestions, setVenueSuggestions] = useState<string[]>([]);
   const [showVenueSuggestions, setShowVenueSuggestions] = useState(false);
   const [loadingVenueSuggestions, setLoadingVenueSuggestions] = useState(false);
@@ -289,6 +301,8 @@ const EventsList: React.FC = () => {
         setVenueSuggestions([]);
         setShowVenueSuggestions(false);
         setLoadingVenueSuggestions(false);
+        setGiveawaysEnabled(false);
+        setCustomizeMealsPerDay(false);
         return;
     }
 
@@ -661,6 +675,39 @@ const EventsList: React.FC = () => {
             validDates
           );
       });
+  };
+
+  const isMealOnAllDates = (meal: FoodMealOption) => {
+      const dates = getFormEventDateOptions();
+      return dates.length > 0 && dates.every((date) => (foodInclusionByDate[date] || []).includes(meal));
+  };
+
+  const toggleMealForAllDates = (meal: FoodMealOption) => {
+      const dates = getFormEventDateOptions();
+      if (dates.length === 0) return;
+      const shouldRemove = isMealOnAllDates(meal);
+      setFoodInclusionByDate((prev) => {
+          const next: EventFoodInclusionMap = { ...prev };
+          dates.forEach((date) => {
+              const meals = new Set<FoodMealOption>(next[date] || []);
+              if (shouldRemove) {
+                  meals.delete(meal);
+              } else {
+                  meals.add(meal);
+              }
+              next[date] = Array.from(meals);
+          });
+          return normalizeFoodInclusionMap(next, dates);
+      });
+  };
+
+  const selectAllMealsForAllDates = () => {
+      const dates = getFormEventDateOptions();
+      if (dates.length === 0) return;
+      setFoodInclusionByDate(normalizeFoodInclusionMap(
+          Object.fromEntries(dates.map((date) => [date, [...FOOD_MEAL_OPTIONS]])),
+          dates
+      ));
   };
 
   // --- Handlers ---
@@ -1057,6 +1104,17 @@ const EventsList: React.FC = () => {
       setShowParticipantsModal(true);
       // fetchEventParticipants is called in useEffect when modal opens
   };
+
+  // Deep link: /events?event=<id> (e.g. from the Dashboard) opens that event's participants view
+  useEffect(() => {
+      const idParam = new URLSearchParams(location.search).get('event');
+      if (!idParam || loading) return;
+      const target = events.find((e) => e.event_id === Number(idParam));
+      if (target) {
+          handleRowClick(target);
+      }
+      navigate('/events', { replace: true });
+  }, [loading, events, location.search]);
 
   const resetParticipantForm = () => {
       setNewParticipant(createEmptyParticipantForm());
@@ -1954,12 +2012,24 @@ const EventsList: React.FC = () => {
   // Stats Logic
   const totalCount = viewingParticipants.length;
   const delegateCount = viewingParticipants.filter(p => p.role === 'Delegate').length;
-  const accommodationCount = React.useMemo(() => {
-      return viewingParticipants.reduce((total, participant) => {
-          if (!participant.needs_accommodation) return total;
-          return total + Math.max(1, participant.accommodation_pax || 1);
-      }, 0);
-  }, [viewingParticipants]);
+  const needsAccommodationCount = viewingParticipants.filter(p => p.needs_accommodation).length;
+  const noPhotoConsentCount = viewingParticipants.filter(p => !p.accept_photo_video).length;
+  const noStoreConsentCount = viewingParticipants.filter(p => !p.store_to_db).length;
+
+  // Participant list segmented filter (single-select)
+  const activeParticipantFilter =
+    accommodationFilter === 'with' ? 'accommodation'
+    : photoConsentFilter === 'declined' ? 'noPhoto'
+    : storeConsentFilter === 'declined' ? 'noStore'
+    : 'all';
+  const applyParticipantFilter = (value: string) => {
+    setAccommodationFilter(value === 'accommodation' ? 'with' : 'all');
+    setPhotoConsentFilter(value === 'noPhoto' ? 'declined' : 'all');
+    setStoreConsentFilter(value === 'noStore' ? 'declined' : 'all');
+  };
+  const secretariatCount = viewingParticipants.filter(p => p.role === 'Secretariat').length;
+  const speakerCount = viewingParticipants.filter(p => p.role === 'Speaker').length;
+  const guestVipCount = viewingParticipants.filter(p => p.role === 'Guest' || p.role === 'VIP').length;
   const canManageParticipants = hasPermission('MANAGE_PARTICIPANTS');
   const canDeleteEvents = hasPermission('DELETE_EVENTS');
   const canEditEventRecord = (event: Event) =>
@@ -1992,20 +2062,137 @@ const EventsList: React.FC = () => {
   // Helper for status badges
   const getStatusBadge = (status: string) => {
     const styles = {
-      'Ongoing': 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-500/20',
-      'Scheduled': 'bg-blue-50 text-blue-700 border-blue-200 ring-blue-500/20',
-      'Completed': 'bg-slate-50 text-slate-600 border-slate-200 ring-slate-500/20',
-      'Cancelled': 'bg-red-50 text-red-700 border-red-200 ring-red-500/20',
+      'Ongoing': 'bg-emerald-50 text-emerald-700 border-emerald-100',
+      'Scheduled': 'bg-blue-50 text-blue-700 border-blue-100',
+      'Completed': 'bg-stone-100 text-stone-600 border-stone-200',
+      'Cancelled': 'bg-red-50 text-red-600 border-red-100',
     };
-    
+
     // @ts-ignore
     const activeStyle = styles[status] || styles['Completed'];
 
     return (
-      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium border inline-flex items-center gap-1.5 ring-1 ring-inset ${activeStyle}`}>
-         <span className={`w-1.5 h-1.5 rounded-full ${status === 'Ongoing' ? 'animate-pulse bg-emerald-500' : 'bg-current opacity-60'}`}></span>
-         {status.toUpperCase()}
+      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border inline-flex items-center gap-1.5 font-mono ${activeStyle}`}>
+         {status === 'Ongoing' && <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-emerald-500"></span>}
+         {status}
       </span>
+    );
+  };
+
+  // Participant table pieces shared by the grouped sections
+  const renderParticipantSectionHeader = (label: string, count: number) => (
+    <div className="flex items-center gap-3 mb-2">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shrink-0">{label}</span>
+      <div className="flex-1 h-px bg-slate-200" />
+      <span className="text-xs font-mono text-slate-400">{count}</span>
+    </div>
+  );
+
+  const participantTableHead = (
+    <thead className="bg-slate-50/70 text-slate-500 text-xs">
+      <tr className="border-b border-slate-100">
+        <th className="hidden md:table-cell pl-3 sm:pl-4 pr-1 py-3 font-medium w-8 text-center">#</th>
+        <th className="px-3 sm:px-4 py-3 font-medium w-[22%]">Name</th>
+        <th className="px-4 py-3 font-medium">Role</th>
+        <th className="hidden md:table-cell px-4 py-3 font-medium w-20">Gender</th>
+        <th className="hidden md:table-cell px-4 py-3 font-medium w-[30%]">Office</th>
+        <th className="hidden lg:table-cell px-4 py-3 font-medium w-28">Registered</th>
+        {canManageParticipants && <th className="px-4 sm:px-6 py-3 font-medium text-right">Action</th>}
+      </tr>
+    </thead>
+  );
+
+  const renderParticipantRow = (record: ParticipantModalRecord, index: number) => {
+    const isEditing = editingRole?.participantId === record.participant_id;
+    return (
+      <tr key={record.id} className="hover:bg-slate-50/60">
+        <td className="hidden md:table-cell pl-3 sm:pl-4 pr-1 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
+        <td className="px-3 sm:px-4 py-3">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-medium text-slate-800 truncate">{record.participants?.full_name}</span>
+            {record.needs_accommodation && (
+              <span
+                className="shrink-0 rounded-full bg-purple-100 p-1 text-purple-700"
+                title={`Accommodation — ${Math.max(1, record.accommodation_pax || 1)} pax`}
+              >
+                <Bed size={11} />
+              </span>
+            )}
+          </div>
+        </td>
+        <td className="px-4 py-3">
+          {isEditing ? (
+            <div className="flex items-center gap-1 sm:gap-2">
+              <select
+                className="min-w-0 text-xs border border-slate-300 rounded p-1 bg-card focus:outline-none focus:border-indigo-500"
+                value={editingRole.role}
+                onChange={(e) => setEditingRole({ ...editingRole, role: e.target.value })}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <option value="Delegate">Delegate</option>
+                <option value="Speaker">Speaker</option>
+                <option value="Secretariat">Secretariat</option>
+                <option value="Guest">Guest</option>
+                <option value="VIP">VIP</option>
+              </select>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleUpdateRole(); }}
+                className="text-green-600 hover:text-green-800 p-1 hover:bg-green-50 rounded"
+                title="Save Role"
+              >
+                <Save size={16}/>
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setEditingRole(null); }}
+                className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
+                title="Cancel Edit"
+              >
+                <XCircle size={16}/>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${getRoleChipClass(record.role)}`}>
+                {getRoleChipLabel(record.role)}
+              </span>
+              {canManageParticipants && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participant_id, role: record.role }); }}
+                  className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1 rounded"
+                  title="Edit Role"
+                >
+                  <Edit size={12} />
+                </button>
+              )}
+            </div>
+          )}
+        </td>
+        <td className="hidden md:table-cell px-4 py-3 text-slate-600">{record.participants?.gender || '—'}</td>
+        <td className="hidden md:table-cell px-4 py-3 text-slate-600">{record.participants?.office || '—'}</td>
+        <td className="hidden lg:table-cell px-4 py-3 text-slate-600 font-mono text-xs">
+          {record.registered_at ? format(parseISO(record.registered_at), 'yyyy-MM-dd') : '—'}
+        </td>
+        {canManageParticipants && (
+          <td className="px-4 sm:px-6 py-3 text-right">
+            <div className="flex items-center justify-end gap-1">
+              <button
+                onClick={() => openEditParticipantView(record)}
+                className="text-slate-400 hover:text-indigo-600 transition-colors p-1"
+                title="Edit Participant"
+              >
+                <Edit size={16} />
+              </button>
+              <button
+                onClick={() => initiateRemoveParticipant(record.participant_id)}
+                className="text-slate-400 hover:text-red-600 transition-colors p-1"
+                title="Remove Participant"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </td>
+        )}
+      </tr>
     );
   };
 
@@ -2122,45 +2309,98 @@ const EventsList: React.FC = () => {
     }
   }, [currentPage, totalPages]);
 
+  // New Event drawer derived state
+  const formEventDates = getFormEventDateOptions();
+  const mealsDifferAcrossDates = formEventDates.length > 1 && formEventDates.some((date) =>
+    (foodInclusionByDate[date] || []).join('|') !== (foodInclusionByDate[formEventDates[0]] || []).join('|')
+  );
+  const showPerDayMeals = customizeMealsPerDay || mealsDifferAcrossDates;
+  const showGiveawayEditor = giveawaysEnabled || ((formData.giveaways as GiveawayItem[]) || []).length > 0;
+
   return (
     <div className="h-full min-h-0 flex flex-col gap-6">
+      {!(showParticipantsModal && selectedEvent) && (
+      <div className="flex-1 min-h-0 overflow-y-auto -m-4 md:-m-6 p-4 md:py-8 md:px-12 lg:px-16 flex flex-col gap-6">
+      {/* Page header */}
+      <div className="flex justify-end w-full -mb-3">
+        <button
+            onClick={openCreateModal}
+            type="button"
+            className="h-9 shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md flex items-center gap-1.5 px-3 transition-colors"
+        >
+            <CalendarPlus size={15} />
+            <span className="hidden sm:inline">New Event</span>
+        </button>
+      </div>
+
+      {/* Filter tabs + search */}
       <div className="flex flex-wrap items-center gap-3 w-full">
-        <div className="relative min-w-[220px] flex-1 lg:flex-none lg:w-[30%]">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-              <Search size={18} />
+        <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100/50 border border-[rgb(var(--ink)/0.05)] rounded-lg">
+          {[
+            { value: 'All', label: 'All', count: eventSummary.total },
+            { value: 'Ongoing', label: 'Ongoing', count: eventSummary.ongoing },
+            { value: 'Scheduled', label: 'Upcoming', count: eventSummary.scheduled },
+            { value: 'Completed', label: 'Completed', count: eventSummary.completed },
+            { value: 'Cancelled', label: 'Cancelled', count: eventSummary.cancelled },
+          ].map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setStatusFilter(tab.value)}
+              className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-xs transition-all ${
+                statusFilter === tab.value
+                  ? 'bg-white text-[#111110] shadow-sm font-medium border border-black/[0.06]'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {tab.label}
+              <span className={`hidden sm:inline font-mono text-[10px] leading-none ${
+                statusFilter === tab.value
+                  ? 'bg-indigo-600/10 text-indigo-600 rounded px-1 py-0.5'
+                  : 'text-slate-400'
+              }`}>
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="relative min-w-[220px] flex-1 lg:flex-none lg:w-[30%] ml-auto">
+            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400">
+              <Search size={14} />
             </div>
-            <input 
-              type="text" 
-              placeholder="Search events..." 
+            <input
+              type="text"
+              placeholder="Filter events..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-16 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+              className="w-full pl-8 pr-16 h-9 bg-slate-100/50 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 transition-colors"
             />
             {searchTerm && (
               <button
                 type="button"
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-600 hover:text-indigo-600 transition-colors"
               >
                 Clear
               </button>
             )}
         </div>
         {isAdmin && (
-          <div className="flex shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+          <div className="flex shrink-0 gap-1 p-1 bg-slate-100/50 rounded-md border border-[rgb(var(--ink)/0.05)]">
             <button
               type="button"
               onClick={() => {
                 setEventView('active');
                 setStatusFilter('All');
               }}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors ${
+              className={`inline-flex h-7 items-center gap-1.5 rounded px-3 text-xs transition-all ${
                 eventView === 'active'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  ? 'bg-white text-[#111110] shadow-sm font-medium border border-black/[0.06]'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Calendar size={14} />
+              <Calendar size={12} />
               Active
             </button>
             <button
@@ -2169,388 +2409,210 @@ const EventsList: React.FC = () => {
                 setEventView('deleted');
                 setStatusFilter('All');
               }}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors ${
+              className={`inline-flex h-7 items-center gap-1.5 rounded px-3 text-xs transition-all ${
                 eventView === 'deleted'
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  ? 'bg-card text-red-600 shadow-sm font-medium border border-[rgb(var(--ink)/0.06)]'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Trash2 size={14} />
+              <Trash2 size={12} />
               Deleted
             </button>
           </div>
         )}
-        <button 
-            onClick={openCreateModal}
-            type="button"
-            aria-label="Add event"
-            title="Add event"
-            className="ml-auto h-10 w-10 sm:h-auto sm:w-auto shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center justify-center gap-2 px-0 sm:px-4 py-2 shadow-sm transition-colors"
-        >
-            <CalendarPlus size={20} />
-            <span className="hidden sm:inline">New Event</span>
-        </button>
       </div>
 
-      <div className="w-full">
-        <div className="grid grid-cols-5 gap-2 sm:gap-3 w-full">
-          <button
-            onClick={() => setStatusFilter('All')}
-            className={`events-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-              ${statusFilter === 'All' ? 'ring-2 ring-slate-400 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-slate-300'}
-              bg-white
-            `}
-          >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
-                    <span className="sm:hidden">Total</span>
-                    <span className="hidden sm:inline">{eventView === 'deleted' ? 'Deleted Events' : 'Total Events'}</span>
-                  </p>
-                  <div className={`p-1 rounded-lg ${statusFilter === 'All' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-600'}`}>
-                    <CalendarPlus size={12} className="sm:h-3.5 sm:w-3.5" />
-                  </div>
-              </div>
-              <p className="events-stat-value text-sm sm:text-base font-bold text-slate-800">{eventSummary.total}</p>
-          </button>
 
-          <button
-            onClick={() => setStatusFilter('Ongoing')}
-            className={`events-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-              ${statusFilter === 'Ongoing' ? 'ring-2 ring-emerald-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-emerald-200'}
-              bg-white
-            `}
-          >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">Ongoing</p>
-                  <div className={`p-1 rounded-lg ${statusFilter === 'Ongoing' ? 'bg-emerald-200 text-emerald-700' : 'bg-emerald-100 text-emerald-600'}`}>
-                    <Clock size={12} className="sm:h-3.5 sm:w-3.5" />
-                  </div>
-              </div>
-              <p className="events-stat-value text-sm sm:text-base font-bold text-emerald-600">{eventSummary.ongoing}</p>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('Scheduled')}
-            className={`events-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-              ${statusFilter === 'Scheduled' ? 'ring-2 ring-blue-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-blue-200'}
-              bg-white
-            `}
-          >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
-                    <span className="sm:hidden">Sched.</span>
-                    <span className="hidden sm:inline">Scheduled</span>
-                  </p>
-                  <div className={`p-1 rounded-lg ${statusFilter === 'Scheduled' ? 'bg-blue-200 text-blue-700' : 'bg-blue-100 text-blue-600'}`}>
-                    <Calendar size={12} className="sm:h-3.5 sm:w-3.5" />
-                  </div>
-              </div>
-              <p className="events-stat-value text-sm sm:text-base font-bold text-blue-600">{eventSummary.scheduled}</p>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('Completed')}
-            className={`events-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-              ${statusFilter === 'Completed' ? 'ring-2 ring-indigo-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-indigo-200'}
-              bg-white
-            `}
-          >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
-                    <span className="sm:hidden">Done</span>
-                    <span className="hidden sm:inline">Completed</span>
-                  </p>
-                  <div className={`p-1 rounded-lg ${statusFilter === 'Completed' ? 'bg-indigo-200 text-indigo-700' : 'bg-indigo-100 text-indigo-600'}`}>
-                    <Check size={12} className="sm:h-3.5 sm:w-3.5" />
-                  </div>
-              </div>
-              <p className="events-stat-value text-sm sm:text-base font-bold text-indigo-600">{eventSummary.completed}</p>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('Cancelled')}
-            className={`events-stat-card min-w-0 min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-xl shadow-sm border flex flex-col justify-between text-left transition-all duration-200
-              ${statusFilter === 'Cancelled' ? 'ring-2 ring-red-500 border-transparent transform scale-[1.02]' : 'bg-white border-slate-100 hover:border-red-200'}
-              bg-white
-            `}
-          >
-              <div className="flex justify-between items-start mb-0.5 w-full">
-                  <p className="text-[9px] sm:text-xs font-semibold text-slate-500 uppercase leading-tight">
-                    <span className="sm:hidden">Cancel</span>
-                    <span className="hidden sm:inline">Cancelled</span>
-                  </p>
-                  <div className={`p-1 rounded-lg ${statusFilter === 'Cancelled' ? 'bg-red-200 text-red-700' : 'bg-red-100 text-red-600'}`}>
-                    <XCircle size={12} className="sm:h-3.5 sm:w-3.5" />
-                  </div>
-              </div>
-              <p className="events-stat-value text-sm sm:text-base font-bold text-red-600">{eventSummary.cancelled}</p>
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
+      <div className="flex flex-col gap-3">
           {eventView === 'deleted' && (
-              <div className="px-6 py-3 bg-red-50 border-b border-red-100 flex items-center gap-2 text-sm text-red-700">
+              <div className="px-4 py-3 bg-red-50 border border-red-100 rounded-md flex items-center gap-2 text-sm text-red-700 shrink-0">
                   <Trash2 size={14} />
                   <span>Deleted Events view. Admins can restore events or permanently delete them.</span>
               </div>
           )}
-          {statusFilter !== 'All' && (
-              <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2 text-sm text-slate-600">
-                  <Clock size={14} />
-                  <span>Filtering by: <span className="font-bold text-slate-800">{statusFilter}</span></span>
-                  <button
-                      onClick={() => setStatusFilter('All')}
-                      className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                  >
-                      Clear Filter
-                  </button>
-              </div>
-          )}
-          <div className="hidden md:block flex-1 min-h-0 overflow-auto">
-              <table className="datatable w-full text-[13px] text-left">
-                  <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
-                      <tr>
-                          <th className="px-6 py-4 text-left bg-slate-50">Event Details</th>
-                          <th className="px-6 py-4 text-left bg-slate-50">Venue</th>
-                          <th className="px-6 py-4 text-left bg-slate-50">Date</th>
-                          <th className="px-6 py-4 text-center bg-slate-50">
-                              {eventView === 'deleted' ? 'Deleted Date' : 'Status'}
-                          </th>
-                          <th className="px-6 py-4 text-center bg-slate-50">Actions</th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                      {loading ? (
-                          // Skeleton Rows
-                          [...Array(5)].map((_, i) => (
-                              <tr key={i} className="animate-pulse">
-                                  <td className="px-6 py-4">
-                                      <div className="h-5 bg-slate-200 rounded w-48 mb-2 mx-auto"></div>
-                                      <div className="h-3 bg-slate-100 rounded w-24 mx-auto"></div>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                      <div className="h-4 bg-slate-200 rounded w-32"></div>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                      <div className="h-4 bg-slate-200 rounded w-24"></div>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                      <div className="h-6 bg-slate-200 rounded-full w-20 mx-auto"></div>
-                                  </td>
-                                  <td className="px-6 py-4 flex gap-2 justify-center">
-                                      <div className="h-8 w-8 bg-slate-200 rounded"></div>
-                                      <div className="h-8 w-8 bg-slate-200 rounded"></div>
-                                      <div className="h-8 w-8 bg-slate-200 rounded"></div>
-                                  </td>
-                              </tr>
-                          ))
-                      ) : (
-                          <>
-                              {paginatedEvents.map((event, index) => {
-                                  const forceMenuUp = index >= Math.max(paginatedEvents.length - 2, 0);
-                                  const canEditCurrentEvent = canEditEventRecord(event);
-                                  const canDeleteCurrentEvent = canDeleteEventRecord(event);
-                                  const canSetCurrentEventAccess = canSetEventAccess(event);
-                                  const showEventActionMenuForRow = canEditCurrentEvent || canDeleteCurrentEvent || canSetCurrentEventAccess;
+          <div className="hidden md:block">
+              {loading ? (
+                  <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {[...Array(6)].map((_, i) => (
+                          <div key={i} className="animate-pulse bg-card border border-[rgb(var(--ink)/0.08)] rounded-lg p-5 space-y-3">
+                              <div className="h-4 bg-slate-200 rounded w-2/3"></div>
+                              <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                              <div className="h-3 bg-slate-100 rounded w-1/3"></div>
+                              <div className="h-8 bg-slate-100 rounded mt-4"></div>
+                          </div>
+                      ))}
+                  </div>
+              ) : filteredEvents.length === 0 ? (
+                  <div className="text-center py-16 text-slate-400 bg-card border border-[rgb(var(--ink)/0.08)] rounded-lg">
+                      <div className="flex flex-col items-center justify-center">
+                        {searchTerm ? <Search className="w-12 h-12 text-slate-300 mb-3" /> : eventView === 'deleted' ? <Trash2 className="w-12 h-12 text-slate-300 mb-3" /> : <Calendar className="w-12 h-12 text-slate-300 mb-3" />}
+                        <p className="font-medium text-slate-500">
+                          {searchTerm ? `No results for "${searchTerm}"` : eventView === 'deleted' ? 'No deleted events found' : 'No events found'}
+                        </p>
+                        <p className="text-xs mt-1">
+                          {searchTerm ? 'Try adjusting your search terms' : eventView === 'deleted' ? 'Deleted events will appear here for Admin recovery.' : 'Create a new event to get started'}
+                        </p>
+                      </div>
+                  </div>
+              ) : (
+                  <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-fr">
+                      {paginatedEvents.map((event) => {
+                          const canEditCurrentEvent = canEditEventRecord(event);
+                          const canDeleteCurrentEvent = canDeleteEventRecord(event);
+                          const canSetCurrentEventAccess = canSetEventAccess(event);
 
-                                  return (
-                                  <tr 
-                                      key={event.event_id} 
-                                      onClick={() => {
-                                          if (eventView === 'active') handleRowClick(event);
-                                      }}
-                                      className={`group transition-all duration-200 ${
-                                          eventView === 'active'
-                                            ? 'cursor-pointer hover:bg-indigo-50/30 hover:shadow-sm'
-                                            : 'bg-red-50/20 hover:bg-red-50/40'
-                                      }`}
-                                      title={eventView === 'active' ? 'Click to view participants' : 'Deleted event'}
-                                  >
-                                      <td className="px-6 py-4 text-left border-l-2 border-l-transparent group-hover:border-l-indigo-500">
-                                          <div className="font-semibold text-sm text-slate-800 group-hover:text-indigo-700 transition-colors">
-                                            {event.event_name}
-                                          </div>
-                                          <div className="flex gap-2 mt-1.5 justify-start">
-                                            {eventView === 'deleted' && (
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100">
-                                                    <Trash2 size={10} className="mr-1" /> Deleted
-                                                </span>
-                                            )}
-                                            {event.has_accommodation && (
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
-                                                    <Bed size={10} className="mr-1" /> Accommodation
-                                                </span>
-                                            )}
-                                            {!event.registration_open && (
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100">
-                                                    <Lock size={10} className="mr-1" /> Closed
-                                                </span>
-                                            )}
-                                          </div>
-                                      </td>
-                                      <td className="px-6 py-4 text-slate-600 text-left">
-                                          <div className="flex items-center justify-start gap-1.5 text-xs">
-                                            <MapPin size={12} className="text-slate-400" />
-                                            {event.venue}
-                                          </div>
-                                      </td>
-                                      <td className="px-6 py-4 text-slate-600 font-medium text-left">
-                                          <div className="flex items-center justify-start gap-1.5 text-xs">
-                                            <Calendar size={12} className="text-slate-400" />
-                                            {formatEventDate(event.start_date, event.end_date)}
-                                          </div>
-                                      </td>
-                                      <td className="px-6 py-4 text-center">
+                          return (
+                          <div
+                              key={event.event_id}
+                              onClick={() => {
+                                  if (eventView === 'active') handleRowClick(event);
+                              }}
+                              title={eventView === 'active' ? 'Click to view participants' : 'Deleted event'}
+                              className={`group flex flex-col rounded-lg border transition-all duration-150 ${
+                                  eventView === 'active'
+                                    ? 'bg-card border-[rgb(var(--ink)/0.08)] hover:border-indigo-600/30 hover:shadow-sm cursor-pointer'
+                                    : 'bg-red-50/20 border-red-100'
+                              }`}
+                          >
+                              {/* Card body */}
+                              <div className="flex-1 p-5">
+                                  <div className="flex items-start justify-between gap-3 mb-3">
+                                      <h3 className={`text-sm font-medium text-slate-800 leading-snug flex-1 line-clamp-2 ${
+                                          eventView === 'active' ? 'group-hover:text-indigo-600 transition-colors' : ''
+                                      }`}>
+                                          {event.event_name}
+                                      </h3>
+                                      <div className="shrink-0">
                                           {eventView === 'deleted' ? (
-                                              <div className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
-                                                  <Clock size={12} />
+                                              <span className="inline-flex items-center gap-1 rounded border border-red-100 bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-700 font-mono">
+                                                  <Clock size={10} />
                                                   {formatDeletedDate(event.deleted_at)}
-                                              </div>
+                                              </span>
                                           ) : (
                                               getStatusBadge(event.status)
                                           )}
-                                      </td>
-                                      <td className="px-6 py-4">
-                                          <div className="flex items-center justify-center gap-2 relative">
-                                            {eventView === 'active' && (
-                                                <button
-                                                    onClick={(e) => openShareModal(e, event)}
-                                                    className="inline-flex items-center justify-center p-2 text-sm rounded-lg border border-slate-200 text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors"
-                                                    title="Share"
-                                                    aria-label="Share"
-                                                >
-                                                    <Share2 size={14} />
-                                                </button>
-                                            )}
+                                      </div>
+                                  </div>
 
-                                            {eventView === 'deleted' && isAdmin ? (
-                                                <>
-                                                    <button
-                                                        onClick={(e) => handleRestoreEvent(e, event.event_id)}
-                                                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
-                                                        title="Restore"
-                                                        aria-label="Restore"
-                                                    >
-                                                        <RotateCcw size={14} />
-                                                        Restore
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleDelete(e, event.event_id);
-                                                        }}
-                                                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
-                                                        title="Permanently delete"
-                                                        aria-label="Permanently delete"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                        Delete Forever
-                                                    </button>
-                                                </>
-                                            ) : showEventActionMenuForRow ? (
-                                                <>
-                                                    <button 
-                                                        onClick={(e) => toggleActionMenu(e, event.event_id, forceMenuUp ? 'up' : undefined)}
-                                                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                                        title="Actions"
-                                                    >
-                                                        <MoreVertical size={18} />
-                                                    </button>
-                                                    
-                                                    {openActionMenuId === event.event_id && (
-                                                        <>
-                                                            <div 
-                                                                className="fixed inset-0 z-40"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setOpenActionMenuId(null);
-                                                                    setActionMenuPosition(null);
-                                                                }}
-                                                            />
-                                                            <div
-                                                                className={`fixed w-52 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100 ${actionMenuPlacementClass}`}
-                                                                style={{
-                                                                    top: actionMenuPosition?.top ?? 0,
-                                                                    left: actionMenuPosition?.left ?? 0
-                                                                }}
-                                                            >
-                                                                {canEditCurrentEvent && (
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            setOpenActionMenuId(null);
-                                                                            openEditModal(e, event);
-                                                                        }}
-                                                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors text-left"
-                                                                    >
-                                                                        <Edit size={16} /> Edit
-                                                                    </button>
-                                                                )}
-                                                                {canSetCurrentEventAccess && (
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            setOpenActionMenuId(null);
-                                                                            openEventAccessModal(e, event);
-                                                                        }}
-                                                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors text-left"
-                                                                    >
-                                                                        <Settings size={16} /> Access Settings
-                                                                    </button>
-                                                                )}
-                                                                {canDeleteCurrentEvent && (
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            setOpenActionMenuId(null);
-                                                                            handleDelete(e, event.event_id);
-                                                                        }}
-                                                                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                                                                    >
-                                                                        <Trash2 size={16} /> Delete
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                eventView === 'active' && canEditCurrentEvent && (
-                                                    <button
-                                                        onClick={(e) => openEditModal(e, event)}
-                                                        className="inline-flex items-center justify-center p-2 text-sm rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
-                                                        title="Edit"
-                                                        aria-label="Edit"
-                                                    >
-                                                        <Edit size={14} />
-                                                    </button>
-                                                )
-                                            )}
-                                          </div>
-                                      </td>
-                                  </tr>
-                                  );
-                              })}
-                              {filteredEvents.length === 0 && (
-                                  <tr>
-                                      <td colSpan={5} className="text-center py-12 text-slate-400 bg-slate-50/50">
-                                          <div className="flex flex-col items-center justify-center">
-                                            {searchTerm ? <Search className="w-12 h-12 text-slate-300 mb-3" /> : eventView === 'deleted' ? <Trash2 className="w-12 h-12 text-slate-300 mb-3" /> : <Calendar className="w-12 h-12 text-slate-300 mb-3" />}
-                                            <p className="font-medium text-slate-500">
-                                              {searchTerm ? `No results for "${searchTerm}"` : eventView === 'deleted' ? 'No deleted events found' : 'No events found'}
-                                            </p>
-                                            <p className="text-xs mt-1">
-                                              {searchTerm ? 'Try adjusting your search terms' : eventView === 'deleted' ? 'Deleted events will appear here for Admin recovery.' : 'Create a new event to get started'}
-                                            </p>
-                                          </div>
-                                      </td>
-                                  </tr>
-                              )}
-                          </>
-                      )}
-                  </tbody>
-              </table>
+                                  {(eventView === 'deleted' || event.has_accommodation || !event.registration_open) && (
+                                      <div className="flex flex-wrap gap-1.5 mb-3">
+                                          {eventView === 'deleted' && (
+                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100">
+                                                  <Trash2 size={10} className="mr-1" /> Deleted
+                                              </span>
+                                          )}
+                                          {event.has_accommodation && (
+                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
+                                                  <Bed size={10} className="mr-1" /> Accommodation
+                                              </span>
+                                          )}
+                                          {!event.registration_open && (
+                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100">
+                                                  <Lock size={10} className="mr-1" /> Closed
+                                              </span>
+                                          )}
+                                      </div>
+                                  )}
+
+                                  <div className="space-y-1.5">
+                                      <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                          <Calendar size={12} className="shrink-0 text-slate-400" />
+                                          <span className="font-mono">{formatEventDate(event.start_date, event.end_date)}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                          <MapPin size={12} className="shrink-0 text-slate-400" />
+                                          <span className="truncate">{event.venue}</span>
+                                      </div>
+                                  </div>
+                              </div>
+
+                              {/* Action bar */}
+                              <div className="flex items-center gap-1 px-4 py-2.5 border-t border-[rgb(var(--ink)/0.06)] bg-slate-50/40 rounded-b-lg">
+                                  {eventView === 'deleted' && isAdmin ? (
+                                      <>
+                                          <button
+                                              onClick={(e) => handleRestoreEvent(e, event.event_id)}
+                                              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors"
+                                              title="Restore"
+                                          >
+                                              <RotateCcw size={13} />
+                                              <span>Restore</span>
+                                          </button>
+                                          <button
+                                              onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleDelete(e, event.event_id);
+                                              }}
+                                              className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                              title="Permanently delete"
+                                          >
+                                              <Trash2 size={13} />
+                                              <span>Delete Forever</span>
+                                          </button>
+                                      </>
+                                  ) : (
+                                      <>
+                                          <button
+                                              onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  openShareModal(e, event);
+                                              }}
+                                              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                                              title="Share"
+                                          >
+                                              <Share2 size={13} />
+                                              <span>Share</span>
+                                          </button>
+                                          {canEditCurrentEvent && (
+                                              <button
+                                                  onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      openEditModal(e, event);
+                                                  }}
+                                                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                                                  title="Edit"
+                                              >
+                                                  <Edit size={13} />
+                                                  <span>Edit</span>
+                                              </button>
+                                          )}
+                                          {canSetCurrentEventAccess && (
+                                              <button
+                                                  onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      openEventAccessModal(e, event);
+                                                  }}
+                                                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                                                  title="Access Settings"
+                                              >
+                                                  <Settings size={13} />
+                                                  <span>Access</span>
+                                              </button>
+                                          )}
+                                          {canDeleteCurrentEvent && (
+                                              <button
+                                                  onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleDelete(e, event.event_id);
+                                                  }}
+                                                  className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                  title="Delete"
+                                              >
+                                                  <Trash2 size={13} />
+                                                  <span>Delete</span>
+                                              </button>
+                                          )}
+                                      </>
+                                  )}
+                              </div>
+                          </div>
+                          );
+                      })}
+                  </div>
+              )}
           </div>
 
-          <div className="md:hidden flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+          <div className="md:hidden space-y-3">
               {loading ? (
                   [...Array(3)].map((_, i) => (
                       <div key={i} className="animate-pulse rounded-xl border border-slate-200 p-4 space-y-3">
@@ -2589,13 +2651,13 @@ const EventsList: React.FC = () => {
                           }}
                           className={`rounded-xl border p-4 shadow-sm transition-transform ${
                               eventView === 'active'
-                                ? 'border-slate-200 bg-white active:scale-[0.99]'
+                                ? 'border-slate-200 bg-card active:scale-[0.99]'
                                 : 'border-red-100 bg-red-50/40'
                           }`}
                       >
                           <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
-                                  <h3 className="font-semibold text-slate-800 leading-tight">{event.event_name}</h3>
+                                  <h3 className="text-sm font-semibold text-slate-800 leading-tight">{event.event_name}</h3>
                                   <div className="flex flex-wrap gap-2 mt-2">
                                       {eventView === 'deleted' && (
                                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100">
@@ -2626,7 +2688,7 @@ const EventsList: React.FC = () => {
                               </div>
                           </div>
 
-                          <div className="mt-4 space-y-2 text-sm text-slate-600">
+                          <div className="mt-4 space-y-2 text-[13px] text-slate-600">
                               <div className="flex items-start gap-2">
                                   <MapPin size={14} className="text-slate-400 shrink-0 mt-0.5" />
                                   <span>{event.venue}</span>
@@ -2642,24 +2704,22 @@ const EventsList: React.FC = () => {
                                   <>
                                       <button
                                           onClick={(e) => handleRestoreEvent(e, event.event_id)}
-                                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100"
                                           title="Restore"
                                           aria-label="Restore"
                                       >
-                                          <RotateCcw size={14} />
-                                          <span>Restore</span>
+                                          <RotateCcw size={16} />
                                       </button>
                                       <button
                                           onClick={(e) => {
                                               e.stopPropagation();
                                               handleDelete(e, event.event_id);
                                           }}
-                                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
+                                          className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition-colors hover:bg-red-100"
                                           title="Permanently delete"
                                           aria-label="Permanently delete"
                                       >
-                                          <Trash2 size={14} />
-                                          <span>Delete Forever</span>
+                                          <Trash2 size={16} />
                                       </button>
                                   </>
                               ) : (
@@ -2669,12 +2729,11 @@ const EventsList: React.FC = () => {
                                               e.stopPropagation();
                                               openShareModal(e, event);
                                           }}
-                                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
+                                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 transition-colors hover:bg-slate-100"
                                           title="Share"
                                           aria-label="Share"
                                       >
-                                          <Share2 size={14} />
-                                          <span>Share</span>
+                                          <Share2 size={16} />
                                       </button>
                                       {canEditCurrentEvent && (
                                       <button
@@ -2682,23 +2741,21 @@ const EventsList: React.FC = () => {
                                               e.stopPropagation();
                                               openEditModal(e, event);
                                           }}
-                                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
+                                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 transition-colors hover:bg-blue-100"
                                           title="Edit"
                                           aria-label="Edit"
                                       >
-                                          <Edit size={14} />
-                                          <span>Edit</span>
+                                          <Edit size={16} />
                                       </button>
                                       )}
                                       {canSetCurrentEventAccess && (
                                           <button
                                               onClick={(e) => openEventAccessModal(e, event)}
-                                              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
+                                              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 transition-colors hover:bg-indigo-100"
                                               title="Access Settings"
                                               aria-label="Access Settings"
                                           >
-                                              <Settings size={14} />
-                                              <span>Access</span>
+                                              <Settings size={16} />
                                           </button>
                                       )}
                                       {canDeleteCurrentEvent && (
@@ -2707,12 +2764,11 @@ const EventsList: React.FC = () => {
                                                   e.stopPropagation();
                                                   handleDelete(e, event.event_id);
                                               }}
-                                              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
+                                              className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition-colors hover:bg-red-100"
                                               title="Delete"
                                               aria-label="Delete"
                                           >
-                                              <Trash2 size={14} />
-                                              <span>Delete</span>
+                                              <Trash2 size={16} />
                                           </button>
                                       )}
                                   </>
@@ -2726,8 +2782,8 @@ const EventsList: React.FC = () => {
           
           {/* Pagination Controls */}
           {!loading && totalPages > 1 && (
-              <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
-                  <div className="text-sm text-slate-500">
+              <div className="pt-1 flex items-center justify-center sm:justify-between shrink-0">
+                  <div className="hidden sm:block text-sm text-slate-500">
                       Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredEvents.length)}</span> of <span className="font-medium">{filteredEvents.length}</span> results
                   </div>
                   <div className="flex items-center gap-2">
@@ -2764,12 +2820,14 @@ const EventsList: React.FC = () => {
               </div>
           )}
       </div>
+      </div>
+      )}
 
       {/* Share / Registration Modal */}
       {showShareModal && selectedEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowShareModal(false)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative z-10 animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowShareModal(false)}></div>
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-md p-6 relative z-10 animate-in zoom-in-95 duration-200">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-lg font-bold text-slate-800">Event Registration</h3>
                     <button onClick={() => setShowShareModal(false)} className="text-slate-400 hover:text-slate-600">
@@ -2793,7 +2851,7 @@ const EventsList: React.FC = () => {
                             <div ref={qrCodeRef} className="p-4 border-2 border-indigo-100 rounded-lg bg-indigo-50/50">
                                 <div className="relative inline-block">
                                     <QRCode value={getRegistrationLink(selectedEvent.event_id)} size={180} level="H" />
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-1">
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-card rounded-full p-1">
                                         <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-11 h-11 object-contain rounded-full" />
                                     </div>
                                 </div>
@@ -2810,7 +2868,7 @@ const EventsList: React.FC = () => {
                                     <button
                                         onClick={copyToClipboard}
                                         className={`px-3 py-2 rounded-lg border flex items-center gap-2 transition-all
-                                            ${copied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'}
+                                            ${copied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-card border-slate-300 text-slate-700 hover:bg-slate-50'}
                                         `}
                                     >
                                         {copied ? <Check size={18} /> : <Copy size={18} />}
@@ -2833,98 +2891,109 @@ const EventsList: React.FC = () => {
         </div>
       )}
 
-      {/* Participants List Modal */}
+      {/* Event Details View (in-page, replaces the old participants modal) */}
       {showParticipantsModal && selectedEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeParticipantsModal}></div>
-            <div className={`bg-white rounded-xl shadow-2xl w-full ${participantModalView === 'list' ? 'max-w-[95vw] lg:max-w-screen-2xl' : 'max-w-3xl'} ${participantModalView === 'list' ? 'h-[92vh]' : 'h-[85vh] sm:h-[80vh]'} flex flex-col relative z-10 animate-in zoom-in-95 duration-200`}>
-                {/* Header */}
-                <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start bg-slate-50/50 rounded-t-xl shrink-0">
-                    <div className="min-w-0 flex-1">
-                        <h3 className="text-lg sm:text-xl font-bold text-slate-800 flex items-start gap-2 leading-tight">
-                            {participantModalView === 'list' ? (
-                                <>
-                                    <Users className="text-indigo-600 mt-0.5 shrink-0" size={22} /> 
-                                    <span className="break-words">{selectedEvent.event_name}</span>
-                                </>
-                            ) : participantModalView === 'edit' ? (
-                                <>
-                                    <Edit className="text-indigo-600" size={24} />
-                                    Edit Participant
-                                </>
-                            ) : (
-                                <>
-                                    <UserPlus className="text-indigo-600" size={24} /> 
-                                    Add Participant
-                                </>
-                            )}
-                        </h3>
-                        {participantModalView === 'list' && (
-                            <p className="text-sm text-slate-500 mt-1">
-                                {formatEventDate(selectedEvent.start_date, selectedEvent.end_date)} • {selectedEvent.venue}
-                            </p>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto sm:justify-end">
-                        {participantModalView !== 'list' && (
-                            <button
-                                onClick={() => { setParticipantModalView('list'); resetParticipantForm(); }}
-                                className="w-full sm:w-auto bg-slate-100 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors shadow-sm"
-                            >
-                                <ArrowRight size={16} className="rotate-180" /> Return to List
-                            </button>
-                        )}
-                        <button onClick={closeParticipantsModal} className="ml-auto sm:ml-0 text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
-                            <X size={24} />
-                        </button>
-                    </div>
-                </div>
+        <div className="flex-1 min-h-0 overflow-y-auto animate-in fade-in duration-150 -m-4 md:-m-6 p-4 md:py-8 md:px-12 lg:px-16">
+            {/* Page header */}
+            <div className="mb-4">
+                <button
+                    onClick={closeParticipantsModal}
+                    className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors w-fit"
+                >
+                    <ArrowRight size={15} className="rotate-180" />
+                    Back
+                </button>
 
-                {participantModalView === 'list' && (
-                    <div className="px-4 sm:px-6 py-3 border-b border-slate-100 bg-white shrink-0">
+                <>
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mt-4">
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                    {getStatusBadge(selectedEvent.status)}
+                                    {selectedEvent.event_serial && (
+                                        <span className="text-xs text-slate-400 font-mono">#{selectedEvent.event_serial}</span>
+                                    )}
+                                </div>
+                                <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 leading-snug break-words">
+                                    {selectedEvent.event_name}
+                                </h1>
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-slate-500">
+                                    <span className="flex items-center gap-1.5 min-w-0">
+                                        <MapPin size={14} className="text-slate-400 shrink-0" />
+                                        <span className="truncate">{selectedEvent.venue}</span>
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                        <Calendar size={14} className="text-slate-400 shrink-0" />
+                                        <span className="font-mono">{formatEventDate(selectedEvent.start_date, selectedEvent.end_date)}</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Participants summary */}
+                        <div className="flex flex-wrap items-center gap-2 mt-4">
+                            <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                                <Users size={15} className="text-slate-500" /> Participants
+                            </span>
+                            <span className="text-xs font-mono bg-indigo-50 text-indigo-600 border border-indigo-100 rounded px-1.5 py-0.5">{totalCount}</span>
+                            {secretariatCount > 0 && (
+                                <span className="flex items-center gap-1.5 text-xs text-slate-500 ml-1">
+                                    <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${getRoleChipClass('Secretariat')}`}>Secretariat</span>
+                                    {secretariatCount}
+                                </span>
+                            )}
+                            {speakerCount > 0 && (
+                                <span className="flex items-center gap-1.5 text-xs text-slate-500 ml-1">
+                                    <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${getRoleChipClass('Speaker')}`}>Speaker</span>
+                                    {speakerCount}
+                                </span>
+                            )}
+                            {guestVipCount > 0 && (
+                                <span className="flex items-center gap-1.5 text-xs text-slate-500 ml-1">
+                                    <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${getRoleChipClass('Guest')}`}>Guest/VIP</span>
+                                    {guestVipCount}
+                                </span>
+                            )}
+                            {delegateCount > 0 && (
+                                <span className="flex items-center gap-1.5 text-xs text-slate-500 ml-1">
+                                    <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${getRoleChipClass('Delegate')}`}>Delegate</span>
+                                    {delegateCount}
+                                </span>
+                            )}
+                        </div>
+                </>
+            </div>
+
+            <div>
+
+                <div className="mb-4">
                         <div className="flex items-center justify-end gap-2 flex-wrap">
-                            <div className="mr-auto flex items-center gap-2 flex-wrap">
-                                {selectedEvent?.has_accommodation && (
+                            <div className="mr-auto flex flex-wrap items-center gap-1 p-1 bg-slate-100/50 border border-[rgb(var(--ink)/0.05)] rounded-lg">
+                                {[
+                                    { value: 'all', label: 'All', count: totalCount, show: true },
+                                    { value: 'accommodation', label: 'Accommodation', count: needsAccommodationCount, show: !!selectedEvent?.has_accommodation },
+                                    { value: 'noPhoto', label: 'No Photo/Video', count: noPhotoConsentCount, show: true },
+                                    { value: 'noStore', label: 'No Data Storage', count: noStoreConsentCount, show: true },
+                                ].filter(tab => tab.show).map(tab => (
                                     <button
+                                        key={tab.value}
                                         type="button"
-                                        onClick={() => setAccommodationFilter(accommodationFilter === 'with' ? 'all' : 'with')}
-                                        aria-pressed={accommodationFilter === 'with'}
-                                        title="Show only participants needing accommodation"
-                                        className={`shrink-0 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 border transition-colors shadow-sm ${
-                                            accommodationFilter === 'with'
-                                                ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700'
-                                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                        onClick={() => applyParticipantFilter(tab.value)}
+                                        className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-xs transition-all ${
+                                            activeParticipantFilter === tab.value
+                                                ? 'bg-white text-[#111110] shadow-sm font-medium border border-black/[0.06]'
+                                                : 'text-slate-600 hover:text-slate-900'
                                         }`}
                                     >
-                                        <Bed size={16} /> Has Accommodation
+                                        {tab.label}
+                                        <span className={`hidden sm:inline font-mono text-[10px] leading-none ${
+                                            activeParticipantFilter === tab.value
+                                                ? 'bg-indigo-600/10 text-indigo-600 rounded px-1 py-0.5'
+                                                : 'text-slate-400'
+                                        }`}>
+                                            {tab.count}
+                                        </span>
                                     </button>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={() => setPhotoConsentFilter(photoConsentFilter === 'declined' ? 'all' : 'declined')}
-                                    aria-pressed={photoConsentFilter === 'declined'}
-                                    title="Show only participants who did not accept photo/video"
-                                    className={`shrink-0 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 border transition-colors shadow-sm ${
-                                        photoConsentFilter === 'declined'
-                                            ? 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700'
-                                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                                    }`}
-                                >
-                                    <CameraOff size={16} /> No Photo/Video
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setStoreConsentFilter(storeConsentFilter === 'declined' ? 'all' : 'declined')}
-                                    aria-pressed={storeConsentFilter === 'declined'}
-                                    title="Show only participants who did not consent to store their data"
-                                    className={`shrink-0 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 border transition-colors shadow-sm ${
-                                        storeConsentFilter === 'declined'
-                                            ? 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700'
-                                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                                    }`}
-                                >
-                                    <DatabaseBackup size={16} /> No Data Storage
-                                </button>
+                                ))}
                             </div>
                             <div className="relative w-full max-w-xs">
                                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
@@ -2935,7 +3004,7 @@ const EventsList: React.FC = () => {
                                     placeholder="Search participant..."
                                     value={participantSearchTerm}
                                     onChange={(e) => setParticipantSearchTerm(e.target.value)}
-                                    className="w-full pl-9 pr-14 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    className="w-full pl-9 pr-14 py-2 bg-slate-100/50 border border-[rgb(var(--ink)/0.10)] rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 transition-all"
                                 />
                                 {participantSearchTerm && (
                                     <button
@@ -2947,249 +3016,101 @@ const EventsList: React.FC = () => {
                                     </button>
                                 )}
                             </div>
-                            {canManageParticipants && (
-                                <button
-                                    onClick={openAddParticipantView}
-                                    className="shrink-0 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-sm"
-                                >
-                                    <UserPlus size={16} /> Add
-                                </button>
-                            )}
                             <button
                                 onClick={exportParticipantsToExcel}
                                 disabled={viewingParticipants.length === 0}
                                 type="button"
+                                aria-label="Export participants"
+                                title="Export participants"
                                 className="shrink-0 bg-emerald-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-emerald-700 transition-colors shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
                             >
-                                <Download size={16} /> Export
+                                <Download size={16} />
+                                <span className="hidden sm:inline">Export</span>
                             </button>
+                            {canManageParticipants && (
+                                <button
+                                    onClick={openAddParticipantView}
+                                    type="button"
+                                    aria-label="Add participant"
+                                    title="Add participant"
+                                    className="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
+                                >
+                                    <UserPlus size={16} />
+                                    <span className="hidden sm:inline">Add Participant</span>
+                                </button>
+                            )}
                         </div>
-                    </div>
-                )}
+                </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-auto p-0">
-                    {participantModalView === 'list' ? (
-                        loadingParticipants ? (
-                        <div className="h-full flex items-center justify-center text-slate-400 gap-2">
+                <div>
+                    {loadingParticipants ? (
+                        <div className="py-16 flex items-center justify-center text-slate-400 gap-2">
                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div> Loading participants...
                         </div>
                     ) : (
-                        <table className="datatable w-full text-[13px] text-left">
-                            <thead className="bg-slate-50 text-slate-500 font-semibold sticky top-0 shadow-sm z-10">
-                                <tr>
-                                    <th className="hidden md:table-cell px-6 py-4 w-16 text-center">#</th>
-                                    <th className="px-4 sm:px-6 py-4">Participant Name</th>
-                                    <th className="px-4 sm:px-6 py-4">Role</th>
-                                    <th className="hidden md:table-cell px-6 py-4">Office</th>
-                                    <th className="hidden md:table-cell px-6 py-4">Date Registered</th>
-                                    {canManageParticipants && <th className="px-4 sm:px-6 py-4 text-right">Action</th>}
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {specialParticipants.length > 0 && (
-                                    <>
-                                        <tr className="bg-indigo-50/50">
-                                            <td colSpan={canManageParticipants ? 6 : 5} className="px-4 sm:px-6 py-2 text-xs font-bold text-indigo-800 uppercase tracking-wider">
-                                                Event Officials & Guests ({specialParticipants.length})
-                                            </td>
-                                        </tr>
-                                        {specialParticipants.map((record, index) => {
-                                            const isEditing = editingRole?.participantId === record.participant_id;
-                                            return (
-                                            <tr key={record.id} className="hover:bg-slate-50">
-                                                <td className="hidden md:table-cell px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
-                                                <td className="px-4 sm:px-6 py-3">
-                                                    <div className="font-medium text-slate-800">{record.participants?.full_name}</div>
-                                                    <div className="hidden sm:block text-xs text-slate-500">{record.participants?.email}</div>
-                                                </td>
-                                                <td className="px-4 sm:px-6 py-3 text-slate-600">
-                                                    {isEditing ? (
-                                                        <div className="flex items-center gap-1 sm:gap-2">
-                                                            <select
-                                                                className="min-w-0 text-xs border border-slate-300 rounded p-1 bg-white focus:outline-none focus:border-indigo-500"
-                                                                value={editingRole.role}
-                                                                onChange={(e) => setEditingRole({ ...editingRole, role: e.target.value })}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                            >
-                                                                <option value="Delegate">Delegate</option>
-                                                                <option value="Speaker">Speaker</option>
-                                                                <option value="Secretariat">Secretariat</option>
-                                                                <option value="Guest">Guest</option>
-                                                                <option value="VIP">VIP</option>
-                                                            </select>
-                                                            <button 
-                                                                onClick={(e) => { e.stopPropagation(); handleUpdateRole(); }} 
-                                                                className="text-green-600 hover:text-green-800 p-1 hover:bg-green-50 rounded"
-                                                                title="Save Role"
-                                                            >
-                                                                <Save size={16}/>
-                                                            </button>
-                                                            <button 
-                                                                onClick={(e) => { e.stopPropagation(); setEditingRole(null); }} 
-                                                                className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
-                                                                title="Cancel Edit"
-                                                            >
-                                                                <XCircle size={16}/>
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex items-center gap-1 sm:gap-2">
-                                                            <span className="font-medium text-indigo-600">{record.role}</span>
-                                                            {canManageParticipants && (
-                                                                <button 
-                                                                    onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participant_id, role: record.role }); }}
-                                                                    className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1 rounded"
-                                                                    title="Edit Role"
-                                                                >
-                                                                    <Edit size={12} />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                    {record.needs_accommodation && (
-                                                        <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded flex items-center w-fit gap-1 mt-0.5">
-                                                            <Bed size={8} /> Stay ({Math.max(1, record.accommodation_pax || 1)} pax)
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="hidden md:table-cell px-6 py-3 text-slate-600">{record.participants?.office}</td>
-                                                <td className="hidden md:table-cell px-6 py-3 text-slate-600">
-                                                    {record.registered_at ? format(parseISO(record.registered_at), 'MMM d, yyyy h:mm a') : '—'}
-                                                </td>
-                                                {canManageParticipants && (
-                                                    <td className="px-4 sm:px-6 py-3 text-right">
-                                                        <div className="flex items-center justify-end gap-1">
-                                                            <button
-                                                                onClick={() => openEditParticipantView(record)}
-                                                                className="text-slate-400 hover:text-indigo-600 transition-colors p-1"
-                                                                title="Edit Participant"
-                                                            >
-                                                                <Edit size={16} />
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => initiateRemoveParticipant(record.participant_id)}
-                                                                className="text-slate-400 hover:text-red-600 transition-colors p-1"
-                                                                title="Remove Participant"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                )}
-                                            </tr>
-                                        );
-                                        })}
-                                    </>
-                                )}
+                        <>
+                            {specialParticipants.length > 0 && (
+                                <div className="mb-6">
+                                    {renderParticipantSectionHeader('Secretariat · Speaker · Guest / VIP', specialParticipants.length)}
+                                    <div className="bg-card border border-[rgb(var(--ink)/0.08)] rounded-lg overflow-hidden">
+                                        <table className="w-full text-[13px] text-left">
+                                            {participantTableHead}
+                                            <tbody className="divide-y divide-slate-100">
+                                                {specialParticipants.map(renderParticipantRow)}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
 
-                                {delegateParticipants.length > 0 && (
-                                    <>
-                                         <tr className="bg-slate-50/80">
-                                            <td colSpan={canManageParticipants ? 6 : 5} className="px-4 sm:px-6 py-2 text-xs font-bold text-slate-600 uppercase tracking-wider">
-                                                Delegates ({delegateParticipants.length})
-                                            </td>
-                                        </tr>
-                                        {delegateParticipants.map((record, index) => {
-                                            const isEditing = editingRole?.participantId === record.participant_id;
-                                            return (
-                                            <tr key={record.id} className="hover:bg-slate-50">
-                                                <td className="hidden md:table-cell px-6 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
-                                                <td className="px-4 sm:px-6 py-3">
-                                                    <div className="font-medium text-slate-800">{record.participants?.full_name}</div>
-                                                    <div className="hidden sm:block text-xs text-slate-500">{record.participants?.email}</div>
-                                                </td>
-                                                <td className="px-4 sm:px-6 py-3 text-slate-600">
-                                                    {isEditing ? (
-                                                        <div className="flex items-center gap-1 sm:gap-2">
-                                                            <select
-                                                                className="min-w-0 text-xs border border-slate-300 rounded p-1 bg-white focus:outline-none focus:border-indigo-500"
-                                                                value={editingRole.role}
-                                                                onChange={(e) => setEditingRole({ ...editingRole, role: e.target.value })}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                            >
-                                                                <option value="Delegate">Delegate</option>
-                                                                <option value="Speaker">Speaker</option>
-                                                                <option value="Secretariat">Secretariat</option>
-                                                                <option value="Guest">Guest</option>
-                                                                <option value="VIP">VIP</option>
-                                                            </select>
-                                                            <button 
-                                                                onClick={(e) => { e.stopPropagation(); handleUpdateRole(); }} 
-                                                                className="text-green-600 hover:text-green-800 p-1 hover:bg-green-50 rounded"
-                                                                title="Save Role"
-                                                            >
-                                                                <Save size={16}/>
-                                                            </button>
-                                                            <button 
-                                                                onClick={(e) => { e.stopPropagation(); setEditingRole(null); }} 
-                                                                className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
-                                                                title="Cancel Edit"
-                                                            >
-                                                                <XCircle size={16}/>
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex items-center gap-1 sm:gap-2">
-                                                            <span className="font-medium text-indigo-600">{record.role}</span>
-                                                            {canManageParticipants && (
-                                                                <button 
-                                                                    onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participant_id, role: record.role }); }}
-                                                                    className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1 rounded"
-                                                                    title="Edit Role"
-                                                                >
-                                                                    <Edit size={12} />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                    {record.needs_accommodation && (
-                                                        <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded flex items-center w-fit gap-1 mt-0.5">
-                                                            <Bed size={8} /> Stay ({Math.max(1, record.accommodation_pax || 1)} pax)
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="hidden md:table-cell px-6 py-3 text-slate-600">{record.participants?.office}</td>
-                                                <td className="hidden md:table-cell px-6 py-3 text-slate-600">
-                                                    {record.registered_at ? format(parseISO(record.registered_at), 'MMM d, yyyy h:mm a') : '—'}
-                                                </td>
-                                                {canManageParticipants && (
-                                                    <td className="px-4 sm:px-6 py-3 text-right">
-                                                        <div className="flex items-center justify-end gap-1">
-                                                            <button
-                                                                onClick={() => openEditParticipantView(record)}
-                                                                className="text-slate-400 hover:text-indigo-600 transition-colors p-1"
-                                                                title="Edit Participant"
-                                                            >
-                                                                <Edit size={16} />
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => initiateRemoveParticipant(record.participant_id)}
-                                                                className="text-slate-400 hover:text-red-600 transition-colors p-1"
-                                                                title="Remove Participant"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                )}
-                                            </tr>
-                                            );
-                                        })}
-                                    </>
-                                )}
+                            {delegateParticipants.length > 0 && (
+                                <div className="mb-6">
+                                    {renderParticipantSectionHeader('Delegates', delegateParticipants.length)}
+                                    <div className="bg-card border border-[rgb(var(--ink)/0.08)] rounded-lg overflow-hidden">
+                                        <table className="w-full text-[13px] text-left">
+                                            {participantTableHead}
+                                            <tbody className="divide-y divide-slate-100">
+                                                {delegateParticipants.map(renderParticipantRow)}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
 
-                                {filteredParticipants.length === 0 && (
-                                    <tr>
-                                        <td colSpan={canManageParticipants ? 6 : 5} className="text-center py-10 text-slate-400">
-                                            {participantSearchTerm ? 'No participants found matching your search.' : 'No participants registered yet.'}
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    )) : (
-                        <div className="p-6 max-w-2xl mx-auto w-full">
+                            {filteredParticipants.length === 0 && (
+                                <div className="bg-card border border-[rgb(var(--ink)/0.08)] rounded-lg py-14 text-center text-slate-400 text-sm">
+                                    {participantSearchTerm ? 'No participants found matching your search.' : 'No participants registered yet.'}
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                {/* Add / Edit Participant side drawer */}
+                {(participantModalView === 'add' || participantModalView === 'edit') && (
+                <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+                    <div
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+                        aria-hidden="true"
+                        onClick={() => { setParticipantModalView('list'); resetParticipantForm(); }}
+                    ></div>
+                    <div className="fixed inset-y-0 right-0 flex w-full max-w-[560px] flex-col bg-card shadow-2xl animate-in slide-in-from-right duration-200">
+                        <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+                            <div className="min-w-0">
+                                <h3 className="text-lg font-semibold text-slate-900">
+                                    {participantModalView === 'edit' ? 'Edit Participant' : 'Add Participant'}
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-0.5 truncate">{selectedEvent.event_name}</p>
+                            </div>
+                            <button
+                                onClick={() => { setParticipantModalView('list'); resetParticipantForm(); }}
+                                className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-full transition-all shrink-0"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
                             <form onSubmit={participantModalView === 'edit' ? handleUpdateParticipantDetails : handleAddParticipant} className="space-y-10">
                                 {/* SECTION: Personal Information */}
                                 <div className="space-y-6">
@@ -3212,7 +3133,7 @@ const EventsList: React.FC = () => {
                                             autoComplete="off"
                                         />
                                         {participantModalView === 'add' && showSuggestions && suggestions.length > 0 && (
-                                            <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                                            <ul className="absolute z-50 w-full bg-card border border-slate-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
                                                 {suggestions.map((p) => (
                                                     <li 
                                                         key={p.participant_id}
@@ -3402,7 +3323,7 @@ const EventsList: React.FC = () => {
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-1">Event Role</label>
                                             <select 
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                                 value={newParticipant.role}
                                                 onChange={e => setNewParticipant({...newParticipant, role: e.target.value})}
                                             >
@@ -3416,7 +3337,7 @@ const EventsList: React.FC = () => {
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
                                             <select 
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                                 value={newParticipant.gender}
                                                 onChange={e => setNewParticipant({...newParticipant, gender: e.target.value})}
                                             >
@@ -3431,7 +3352,7 @@ const EventsList: React.FC = () => {
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-1">Age Group</label>
                                             <select 
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                                 value={newParticipant.age_group}
                                                 onChange={e => setNewParticipant({...newParticipant, age_group: e.target.value})}
                                             >
@@ -3446,7 +3367,7 @@ const EventsList: React.FC = () => {
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-1">PWD</label>
                                             <select 
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                                 value={newParticipant.pwd}
                                                 onChange={e => setNewParticipant({...newParticipant, pwd: e.target.value})}
                                             >
@@ -3459,7 +3380,7 @@ const EventsList: React.FC = () => {
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Indigenous People</label>
                                         <select 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                             value={newParticipant.indigenous_people}
                                             onChange={e => setNewParticipant({...newParticipant, indigenous_people: e.target.value})}
                                         >
@@ -3498,7 +3419,7 @@ const EventsList: React.FC = () => {
                                                             <label
                                                                 key={date}
                                                                 className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
-                                                                    isChecked ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300'
+                                                                    isChecked ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-card text-slate-700 hover:border-indigo-300'
                                                                 }`}
                                                             >
                                                                 <input
@@ -3539,7 +3460,7 @@ const EventsList: React.FC = () => {
                                                 {item.type === 'single-select' ? (
                                                     <select
                                                         disabled={giveawaysClosed}
-                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-card focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                                                         value={(newParticipant.giveaway_selections[item.key] as string) || ''}
                                                         onChange={(e) => setNewParticipant({ ...newParticipant, giveaway_selections: { ...newParticipant.giveaway_selections, [item.key]: e.target.value } })}
                                                     >
@@ -3650,29 +3571,10 @@ const EventsList: React.FC = () => {
                                 </div>
                             </form>
                         </div>
-                    )}
-                </div>
-                
-                {/* Footer stats */}
-                {participantModalView === 'list' && (
-                    <div className="p-4 border-t border-slate-100 text-sm text-slate-500 bg-slate-50 rounded-b-xl grid grid-cols-3 gap-3">
-                         <div className="flex min-w-0 flex-col justify-end">
-                            <span className="text-[10px] sm:text-xs uppercase text-slate-400 font-bold leading-tight">Total Participants</span>
-                            <span className="text-lg sm:text-xl font-bold text-slate-800">{totalCount}</span>
-                        </div>
-                        <div className="flex min-w-0 flex-col justify-end">
-                            <span className="text-[10px] sm:text-xs uppercase text-slate-400 font-bold leading-tight">Total Delegates</span>
-                            <span className="text-lg sm:text-xl font-bold text-slate-800">{delegateCount}</span>
-                        </div>
-                         <div className="flex min-w-0 flex-col justify-end">
-                            <span className="text-[10px] sm:text-xs uppercase text-slate-400 font-bold leading-tight">Accommodation</span>
-                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                                <span className="text-lg sm:text-xl font-bold text-purple-700">{accommodationCount}</span>
-                                <span className="text-[10px] sm:text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">Pax Requested</span>
-                            </div>
-                        </div>
                     </div>
+                </div>
                 )}
+                
             </div>
         </div>
       )}
@@ -3680,8 +3582,8 @@ const EventsList: React.FC = () => {
       {/* Delete Confirmation Modal for Participant */}
       {participantToDelete && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setParticipantToDelete(null)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 relative z-20 animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setParticipantToDelete(null)}></div>
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-sm p-6 relative z-20 animate-in zoom-in-95 duration-200">
                 <div className="flex flex-col items-center text-center">
                     <div className="bg-red-100 p-3 rounded-full mb-4">
                         <AlertTriangle className="text-red-600" size={32} />
@@ -3693,7 +3595,7 @@ const EventsList: React.FC = () => {
                     <div className="flex gap-3 w-full">
                         <button 
                             onClick={() => setParticipantToDelete(null)}
-                            className="flex-1 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+                            className="flex-1 px-4 py-2.5 bg-card border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
                         >
                             Cancel
                         </button>
@@ -3713,8 +3615,8 @@ const EventsList: React.FC = () => {
       {/* Delete Confirmation Modal for Event */}
       {eventToDelete && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeDeleteEventModal}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 relative z-20 animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={closeDeleteEventModal}></div>
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-sm p-6 relative z-20 animate-in zoom-in-95 duration-200">
                 <div className="flex flex-col items-center text-center">
                     <div className="bg-red-100 p-3 rounded-full mb-4">
                         <AlertTriangle className="text-red-600" size={32} />
@@ -3752,7 +3654,7 @@ const EventsList: React.FC = () => {
                     <div className="flex gap-3 w-full">
                         <button 
                             onClick={closeDeleteEventModal}
-                            className="flex-1 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+                            className="flex-1 px-4 py-2.5 bg-card border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
                         >
                             Cancel
                         </button>
@@ -3773,8 +3675,8 @@ const EventsList: React.FC = () => {
       {/* Event Access Settings Modal */}
       {showEventAccessModal && selectedAccessEvent && (
         <div className="fixed inset-0 z-[75] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeEventAccessModal}></div>
-            <div className="relative z-20 flex h-[85vh] max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={closeEventAccessModal}></div>
+            <div className="relative z-20 flex h-[85vh] max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-100 bg-card shadow-2xl animate-in zoom-in-95 duration-200">
                 <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
                     <div className="min-w-0">
                         <h3 className="flex items-center gap-2 text-base font-bold text-slate-800">
@@ -3803,7 +3705,7 @@ const EventsList: React.FC = () => {
                                     <button
                                         type="button"
                                         onClick={() => setIsAccessUserDropdownOpen((open) => !open)}
-                                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-900 transition-colors hover:border-indigo-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-300 bg-card px-3 py-2 text-left text-sm text-slate-900 transition-colors hover:border-indigo-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                                         aria-expanded={isAccessUserDropdownOpen}
                                     >
                                         <span className="min-w-0">
@@ -3822,7 +3724,7 @@ const EventsList: React.FC = () => {
                                     </button>
 
                                     {isAccessUserDropdownOpen && (
-                                        <div className="absolute z-[90] mt-2 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                                        <div className="absolute z-[90] mt-2 w-full overflow-hidden rounded-xl border border-slate-200 bg-card shadow-xl">
                                             <div className="border-b border-slate-100 p-2">
                                                 <div className="relative">
                                                     <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -3879,7 +3781,7 @@ const EventsList: React.FC = () => {
                                 <select
                                     value={selectedAccessRole}
                                     onChange={(e) => setSelectedAccessRole(e.target.value as EventAccessRole)}
-                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                    className="w-full rounded-lg border border-slate-300 bg-card px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                                 >
                                     <option value="ManagerScanner">Manager + Scanner</option>
                                     <option value="Manager">Manager only</option>
@@ -3901,7 +3803,7 @@ const EventsList: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
+                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-card">
                         <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
                             <p className="text-sm font-semibold text-slate-800">Assigned Users</p>
                         </div>
@@ -3940,7 +3842,7 @@ const EventsList: React.FC = () => {
                                                         value={editingAccessRole}
                                                         onChange={(e) => setEditingAccessRole(e.target.value as EventAccessRole)}
                                                         disabled={updatingAccessId === access.id}
-                                                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                                        className="rounded-lg border border-slate-300 bg-card px-2.5 py-1 text-xs font-semibold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                                                     >
                                                         <option value="ManagerScanner">Manager + Scanner</option>
                                                         <option value="Manager">Manager only</option>
@@ -4007,8 +3909,8 @@ const EventsList: React.FC = () => {
 
       {showEventCodeInfo && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={() => setShowEventCodeInfo(false)}></div>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl relative z-10 animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowEventCodeInfo(false)}></div>
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-3xl relative z-10 animate-in zoom-in-95 duration-200 overflow-hidden">
                 <div className="flex justify-between items-center px-5 py-4 border-b border-slate-100">
                     <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
                         <Info size={18} className="text-indigo-600" />
@@ -4035,135 +3937,67 @@ const EventsList: React.FC = () => {
 
       {/* Create/Edit Event Modal */}
       {showEventModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            
-            {/* Backdrop */}
-            <div 
-                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
-                aria-hidden="true"
-                onClick={() => setShowEventModal(false)}
-            ></div>
+        <div className="fixed inset-0 z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
 
-            {/* Modal Panel */}
-            <div className="relative flex max-h-[calc(100vh-1rem)] w-full max-w-[calc(100vw-1rem)] transform flex-col overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:max-h-[calc(100vh-3rem)] sm:max-w-5xl border border-slate-100">
-              
-              {/* Header */}
-              <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-4 sm:px-6 flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2" id="modal-title">
-                  <CalendarPlus className="h-5 w-5 text-indigo-100" />
-                  {editingEventId ? 'Edit Event' : 'Create New Event'}
+          {/* Backdrop */}
+          <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+              aria-hidden="true"
+              onClick={() => setShowEventModal(false)}
+          ></div>
+
+          {/* Right-side drawer panel */}
+          <div className="fixed inset-y-0 right-0 flex w-full max-w-[500px] flex-col bg-card shadow-2xl animate-in slide-in-from-right duration-200">
+
+            {/* Header */}
+            <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900" id="modal-title">
+                  {editingEventId ? 'Edit Event' : 'New Event'}
                 </h3>
-                <button 
-                  onClick={() => setShowEventModal(false)}
-                  className="text-indigo-100 hover:text-white hover:bg-white/10 p-1 rounded-full transition-all"
-                >
-                  <X size={20} />
-                </button>
+                <p className="text-xs text-slate-500 mt-0.5">Fill in the details below</p>
               </div>
+              <button
+                onClick={() => setShowEventModal(false)}
+                className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-full transition-all"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-              {/* Form body */}
-              <form onSubmit={handleSaveEvent} className="overflow-y-auto p-4 sm:p-6 space-y-5">
-                
+            <form onSubmit={handleSaveEvent} className="flex-1 min-h-0 flex flex-col">
+
+              {/* Scrollable body */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
                 {/* Event Name */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Event Name</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1.5">Event Name<span className="text-red-500">*</span></label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <Type className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                     </div>
-                    <input 
-                      required 
-                      className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all" 
+                    <input
+                      required
+                      className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all"
                       placeholder="e.g. Trainings on Crisis Management for LGUs (Batch 1)"
-                      value={formData.event_name} 
-                      onChange={e => setFormData({...formData, event_name: e.target.value})} 
+                      value={formData.event_name}
+                      onChange={e => setFormData({...formData, event_name: e.target.value})}
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  {/* Venue */}
-                  <div className={user?.role === 'Admin' ? '' : 'lg:col-span-2'}>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Venue Location</label>
-                    <div className="relative group">
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <MapPin className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                        </div>
-                        <input 
-                          required 
-                          className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all" 
-                          placeholder="e.g. Apple Tree Resort and Hotel, Taboc, Opol, Misamis Oriental"
-                          value={formData.venue} 
-                          onChange={e => {
-                              setFormData({...formData, venue: e.target.value});
-                              setShowVenueSuggestions(e.target.value.trim().length >= 2 && venueSuggestions.length > 0);
-                          }}
-                          onFocus={() => {
-                              venueInputFocusedRef.current = true;
-                              if (venueSuggestions.length > 0 || loadingVenueSuggestions) {
-                                  setShowVenueSuggestions(true);
-                              }
-                          }}
-                          onBlur={() => {
-                              venueInputFocusedRef.current = false;
-                              window.setTimeout(() => setShowVenueSuggestions(false), 150);
-                          }}
-                          onKeyDown={(e) => {
-                              if (e.key === 'Escape') {
-                                  setShowVenueSuggestions(false);
-                              }
-                          }}
-                          autoComplete="off"
-                          aria-autocomplete="list"
-                          aria-expanded={showVenueSuggestions}
-                          aria-controls="venue-suggestions"
-                        />
-                      </div>
-                      {showVenueSuggestions && (loadingVenueSuggestions || venueSuggestions.length > 0) && (
-                        <div
-                          id="venue-suggestions"
-                          role="listbox"
-                          className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl animate-in fade-in zoom-in-95 duration-100"
-                        >
-                          {loadingVenueSuggestions && venueSuggestions.length === 0 ? (
-                            <div className="flex items-center gap-2 px-4 py-3 text-sm text-slate-500">
-                              <Loader2 size={14} className="animate-spin text-indigo-500" />
-                              Searching venues...
-                            </div>
-                          ) : (
-                            venueSuggestions.map((venue) => (
-                              <button
-                                key={venue}
-                                type="button"
-                                role="option"
-                                onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    selectVenueSuggestion(venue);
-                                }}
-                                className="flex w-full items-start gap-2 px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-700 focus:bg-indigo-50 focus:text-indigo-700 focus:outline-none"
-                              >
-                                <MapPin size={15} className="mt-0.5 shrink-0 text-slate-400" />
-                                <span className="min-w-0 break-words">{venue}</span>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Organized By - Admin Only */}
+                {/* Organized By + Event Code */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {user?.role === 'Admin' && (
                       <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1.5">Organized By</label>
+                          <label className="block text-xs font-medium text-slate-700 mb-1.5">Organized By<span className="text-red-500">*</span></label>
                           <div className="relative group">
                               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                   <Building2 className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                               </div>
-                              <select 
-                                  className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
+                              <select
+                                  className="block w-full pl-10 pr-8 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-card transition-all appearance-none"
                                   value={formData.organize_by || ''}
                                   onChange={e => setFormData({...formData, organize_by: e.target.value ? Number(e.target.value) : null})}
                               >
@@ -4175,43 +4009,149 @@ const EventsList: React.FC = () => {
                                   ))}
                               </select>
                               <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                                  <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                  <ChevronDown className="w-4 h-4 text-slate-400" />
                               </div>
                           </div>
                       </div>
                   )}
+
+                  <div className={user?.role === 'Admin' ? '' : 'sm:col-span-2'}>
+                      <label className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1.5">
+                          Event Code
+                          <button
+                              type="button"
+                              onClick={() => setShowEventCodeInfo(true)}
+                              aria-label="View Event Code reference"
+                              title="View Event Code reference"
+                              className="text-slate-400 hover:text-indigo-600 transition-colors"
+                          >
+                              <Info size={13} />
+                          </button>
+                      </label>
+                      <div className="relative group">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <Hash className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                          </div>
+                          <input
+                              maxLength={12}
+                              className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all"
+                              placeholder="Example: RGM"
+                              value={formData.event_serial || ''}
+                              onChange={e => {
+                                  setFormData({...formData, event_serial: e.target.value});
+                                  setHasEventCode(!!e.target.value.trim());
+                              }}
+                          />
+                      </div>
+                  </div>
                 </div>
 
-                {/* Dates and Session Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Start Date</label>
-                    <div className="relative group">
-                      <input 
-                        type="date" 
-                        required 
-                        className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all" 
-                        value={formData.start_date} 
-                        onChange={e => updateEventDates('start_date', e.target.value)} 
+                {/* Venue */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1.5">Venue<span className="text-red-500">*</span></label>
+                  <div className="relative group">
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <MapPin className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                      </div>
+                      <input
+                        required
+                        className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all"
+                        placeholder="e.g. Apple Tree Resort and Hotel, Taboc, Opol, Misamis Oriental"
+                        value={formData.venue}
+                        onChange={e => {
+                            setFormData({...formData, venue: e.target.value});
+                            setShowVenueSuggestions(e.target.value.trim().length >= 2 && venueSuggestions.length > 0);
+                        }}
+                        onFocus={() => {
+                            venueInputFocusedRef.current = true;
+                            if (venueSuggestions.length > 0 || loadingVenueSuggestions) {
+                                setShowVenueSuggestions(true);
+                            }
+                        }}
+                        onBlur={() => {
+                            venueInputFocusedRef.current = false;
+                            window.setTimeout(() => setShowVenueSuggestions(false), 150);
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                                setShowVenueSuggestions(false);
+                            }
+                        }}
+                        autoComplete="off"
+                        aria-autocomplete="list"
+                        aria-expanded={showVenueSuggestions}
+                        aria-controls="venue-suggestions"
                       />
                     </div>
+                    {showVenueSuggestions && (loadingVenueSuggestions || venueSuggestions.length > 0) && (
+                      <div
+                        id="venue-suggestions"
+                        role="listbox"
+                        className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-card shadow-xl animate-in fade-in zoom-in-95 duration-100"
+                      >
+                        {loadingVenueSuggestions && venueSuggestions.length === 0 ? (
+                          <div className="flex items-center gap-2 px-4 py-3 text-sm text-slate-500">
+                            <Loader2 size={14} className="animate-spin text-indigo-500" />
+                            Searching venues...
+                          </div>
+                        ) : (
+                          venueSuggestions.map((venue) => (
+                            <button
+                              key={venue}
+                              type="button"
+                              role="option"
+                              onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  selectVenueSuggestion(venue);
+                              }}
+                              className="flex w-full items-start gap-2 px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-700 focus:bg-indigo-50 focus:text-indigo-700 focus:outline-none"
+                            >
+                              <MapPin size={15} className="mt-0.5 shrink-0 text-slate-400" />
+                              <span className="min-w-0 break-words">{venue}</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Schedule ── */}
+                <div className="flex items-center gap-2 pt-2">
+                  <Calendar size={14} className="text-indigo-600 shrink-0" />
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shrink-0">Schedule</span>
+                  <div className="flex-1 h-px bg-slate-200" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1.5">Start Date<span className="text-red-500">*</span></label>
+                    <input
+                      type="date"
+                      required
+                      className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all"
+                      value={formData.start_date}
+                      onChange={e => updateEventDates('start_date', e.target.value)}
+                    />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">End Date</label>
-                    <div className="relative group">
-                      <input 
-                        type="date" 
-                        required 
-                        className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all" 
-                        value={formData.end_date} 
-                        onChange={e => updateEventDates('end_date', e.target.value)} 
-                      />
-                    </div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1.5">End Date<span className="text-red-500">*</span></label>
+                    <input
+                      type="date"
+                      required
+                      className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition-all"
+                      value={formData.end_date}
+                      onChange={e => updateEventDates('end_date', e.target.value)}
+                    />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Event Session</label>
-                    <select 
-                        className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1.5">Event Session</label>
+                  <div className="relative">
+                    <select
+                        className="block w-full px-3 pr-8 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-card transition-all appearance-none"
                         value={formData.session || 'All_Day'}
                         onChange={e => setFormData({...formData, session: e.target.value as Event['session']})}
                     >
@@ -4219,127 +4159,56 @@ const EventsList: React.FC = () => {
                         <option value="PM">PM Only</option>
                         <option value="All_Day">All Day</option>
                     </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    {/* Status - Hidden during creation/editing, defaults to Scheduled */}
-                    <div className="hidden">
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
-                        <div className="relative group">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <Clock className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                            </div>
-                            <select 
-                                className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-white transition-all appearance-none"
-                                value={formData.status}
-                                onChange={e => setFormData({...formData, status: e.target.value as any})}
-                            >
-                                <option value="Scheduled">Scheduled</option>
-                                <option value="Ongoing">Ongoing</option>
-                                <option value="Completed">Completed</option>
-                                <option value="Cancelled">Cancelled</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-row items-center gap-6 pt-2 sm:col-span-2">
-                         {/* Registration Open Toggle */}
-                         <label className="flex items-center gap-2 cursor-pointer group">
-                             <div className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${formData.registration_open ? 'bg-green-500' : 'bg-slate-200'}`}>
-                                <span
-                                    aria-hidden="true"
-                                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${formData.registration_open ? 'translate-x-4' : 'translate-x-0'}`}
-                                />
-                             </div>
-                             <input 
-                                type="checkbox"
-                                className="hidden"
-                                checked={formData.registration_open}
-                                onChange={e => setFormData({...formData, registration_open: e.target.checked})}
-                            />
-                            <span className="text-sm font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">Registration Open</span>
-                        </label>
-
-                        {/* Accommodation Checkbox */}
-                        <label className="flex items-center gap-2 cursor-pointer group">
-                            <input 
-                                type="checkbox"
-                                className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
-                                checked={formData.has_accommodation || false}
-                                onChange={e => toggleFormAccommodation(e.target.checked)}
-                            />
-                            <span className="text-sm font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">Offers Accommodation</span>
-                        </label>
-
-                        <div className="flex items-center gap-3">
-                            <label className="flex items-center gap-2 cursor-pointer group">
-                                <input
-                                    type="checkbox"
-                                    className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
-                                    checked={hasEventCode}
-                                    onChange={e => {
-                                        const checked = e.target.checked;
-                                        setHasEventCode(checked);
-                                        if (!checked) {
-                                            setFormData({...formData, event_serial: ''});
-                                        }
-                                    }}
-                                />
-                                <span className="text-sm font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">Event Code</span>
-                            </label>
-                            <button
-                                type="button"
-                                onClick={() => setShowEventCodeInfo(true)}
-                                aria-label="View Event Code reference"
-                                title="View Event Code reference"
-                                className="text-slate-400 hover:text-indigo-600 transition-colors p-1 rounded-full hover:bg-indigo-50"
-                            >
-                                <Info size={16} />
-                            </button>
-
-                            <div className="relative group w-[360px] max-w-full">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Type className={`h-4 w-4 transition-colors ${hasEventCode ? 'text-slate-400 group-focus-within:text-indigo-500' : 'text-slate-300'}`} />
-                                </div>
-                                <input
-                                    disabled={!hasEventCode}
-                                    maxLength={12}
-                                    className={`block w-full pl-10 pr-3 py-2.5 border rounded-lg sm:text-sm transition-all ${
-                                        hasEventCode
-                                          ? 'border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500'
-                                          : 'border-slate-200 bg-slate-50 text-slate-400 placeholder-slate-400 cursor-not-allowed'
-                                    }`}
-                                    placeholder={hasEventCode ? 'Example: RGM' : 'Note: This event code is used for serial no. in CA.'}
-                                    value={formData.event_serial || ''}
-                                    onChange={e => setFormData({...formData, event_serial: e.target.value})}
-                                />
-                            </div>
-                        </div>
-                    </div>
+                {/* ── Accommodation ── */}
+                <div className="flex items-center gap-2 pt-2">
+                  <Bed size={14} className="text-indigo-600 shrink-0" />
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shrink-0">Accommodation</span>
+                  <div className="flex-1 h-px bg-slate-200" />
                 </div>
 
+                <label className="flex items-center gap-3 cursor-pointer w-fit group">
+                  <span className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${formData.has_accommodation ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                    <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-card shadow ring-0 transition duration-200 ease-in-out ${formData.has_accommodation ? 'translate-x-4' : 'translate-x-0'}`}
+                    />
+                  </span>
+                  <input
+                      type="checkbox"
+                      className="hidden"
+                      checked={formData.has_accommodation || false}
+                      onChange={e => toggleFormAccommodation(e.target.checked)}
+                  />
+                  <span className="text-sm text-slate-700 group-hover:text-slate-900 transition-colors">Include accommodation</span>
+                </label>
+
                 {formData.has_accommodation && (
-                    <div className="space-y-3 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+                    <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
                         <div className="flex items-center justify-between gap-3">
                             <div>
-                                <p className="text-sm font-semibold text-indigo-900">Accommodation Dates</p>
-                                <p className="text-xs text-indigo-700">Select which event dates include accommodation.</p>
+                                <p className="text-sm font-semibold text-slate-800">Accommodation Dates</p>
+                                <p className="text-xs text-slate-500">Select which event dates include accommodation.</p>
                             </div>
-                            <span className="text-xs font-semibold text-indigo-700 bg-white/80 border border-indigo-100 px-2 py-1 rounded-full">
+                            <span className="text-xs font-semibold text-indigo-700 bg-card border border-indigo-100 px-2 py-1 rounded-full">
                                 {(formData.dates_with_accom || []).length} day(s)
                             </span>
                         </div>
 
-                        {getFormEventDateOptions().length > 0 ? (
+                        {formEventDates.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
-                                {getFormEventDateOptions().map((date) => {
+                                {formEventDates.map((date) => {
                                     const isChecked = (formData.dates_with_accom || []).includes(date);
                                     return (
                                         <label
                                             key={date}
                                             className={`inline-flex w-fit items-center gap-2 rounded-lg border px-2.5 py-2 cursor-pointer transition-colors ${
-                                                isChecked ? 'border-indigo-400 bg-white text-indigo-700' : 'border-indigo-100 bg-white/70 text-slate-700 hover:border-indigo-300'
+                                                isChecked ? 'border-indigo-400 bg-card text-indigo-700' : 'border-slate-200 bg-white/70 text-slate-700 hover:border-indigo-300'
                                             }`}
                                         >
                                             <input
@@ -4359,194 +4228,292 @@ const EventsList: React.FC = () => {
                     </div>
                 )}
 
-                <div className="space-y-3 rounded-xl border border-amber-100 bg-amber-50/70 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                        <div>
-                            <p className="text-sm font-semibold text-amber-900">Meals Included</p>
-                            <p className="text-xs text-amber-800">Choose the meals provided for each event date.</p>
-                        </div>
-                    </div>
-
-                    {getFormEventDateOptions().length > 0 ? (
-                        <div className="space-y-3">
-                            {getFormEventDateOptions().map((date) => {
-                                const selectedMeals = foodInclusionByDate[date] || [];
-
-                                return (
-                                    <div key={date} className="rounded-xl border border-amber-100 bg-white/90 p-3">
-                                        <p className="mb-3 text-sm font-semibold text-slate-800">
-                                            {formatAccommodationDateLabel(date)}
-                                        </p>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                                            {FOOD_MEAL_OPTIONS.map((meal) => {
-                                                const isChecked = selectedMeals.includes(meal);
-
-                                                return (
-                                                    <label
-                                                        key={`${date}-${meal}`}
-                                                        className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
-                                                            isChecked
-                                                              ? 'border-amber-300 bg-amber-50 text-amber-900'
-                                                              : 'border-slate-200 bg-white text-slate-700 hover:border-amber-200'
-                                                        }`}
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isChecked}
-                                                            onChange={() => toggleFoodInclusionMeal(date, meal)}
-                                                            className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500"
-                                                        />
-                                                        <span className="text-sm font-medium">{meal}</span>
-                                                    </label>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    ) : (
-                        <p className="text-xs text-slate-500">Select the event start and end dates first.</p>
-                    )}
+                {/* ── Meals Included ── */}
+                <div className="flex items-center gap-2 pt-2">
+                  <Utensils size={14} className="text-indigo-600 shrink-0" />
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shrink-0">Meals Included</span>
+                  <div className="flex-1 h-px bg-slate-200" />
                 </div>
 
-                {/* Giveaways / Freebies (optional) */}
-                <div className="space-y-3 rounded-xl border border-purple-100 bg-purple-50/60 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-start gap-2">
-                            <Gift size={16} className="mt-0.5 text-purple-700" />
-                            <div>
-                                <p className="text-sm font-semibold text-purple-900">Giveaways / Freebies</p>
-                                <p className="text-xs text-purple-700">Items participants can request at registration (e.g. T-shirt size). Leave empty if this event has none.</p>
-                            </div>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={addGiveaway}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-purple-700"
-                        >
-                            <UserPlus size={14} /> Add item
-                        </button>
-                    </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-slate-500">Select meals provided at this event</p>
+                    <button
+                        type="button"
+                        onClick={selectAllMealsForAllDates}
+                        disabled={formEventDates.length === 0}
+                        className="text-xs font-medium text-indigo-600 hover:underline disabled:text-slate-300 disabled:no-underline"
+                    >
+                        Select all
+                    </button>
+                  </div>
 
-                    {((formData.giveaways as GiveawayItem[]) || []).length > 0 && (
-                        <label className="flex items-center justify-between gap-3 rounded-lg border border-purple-100 bg-white/90 px-3 py-2.5 cursor-pointer group">
-                            <span className="min-w-0">
-                                <span className="block text-sm font-semibold text-purple-900">Giveaway selection {formData.giveaways_open ? 'open' : 'closed'}</span>
-                                <span className="block text-xs text-purple-700">When closed, new registrants can no longer pick sizes / answers — existing choices are kept.</span>
-                            </span>
-                            <span className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${formData.giveaways_open ? 'bg-green-500' : 'bg-slate-300'}`}>
-                                <span
-                                    aria-hidden="true"
-                                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${formData.giveaways_open ? 'translate-x-4' : 'translate-x-0'}`}
+                  {formEventDates.length === 0 ? (
+                      <p className="text-xs text-slate-400">Select the event start and end dates first.</p>
+                  ) : showPerDayMeals ? (
+                      <div className="space-y-3">
+                          {formEventDates.map((date) => {
+                              const selectedMeals = foodInclusionByDate[date] || [];
+                              return (
+                                  <div key={date} className="rounded-xl border border-slate-200 bg-card p-3">
+                                      <p className="mb-2.5 text-sm font-semibold text-slate-800">
+                                          {formatAccommodationDateLabel(date)}
+                                      </p>
+                                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                          {FOOD_MEAL_OPTIONS.map((meal) => {
+                                              const isChecked = selectedMeals.includes(meal);
+                                              return (
+                                                  <label
+                                                      key={`${date}-${meal}`}
+                                                      className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
+                                                          isChecked
+                                                            ? 'border-indigo-300 bg-indigo-50/50 text-slate-800'
+                                                            : 'border-slate-200 bg-card text-slate-700 hover:border-slate-300'
+                                                      }`}
+                                                  >
+                                                      <input
+                                                          type="checkbox"
+                                                          checked={isChecked}
+                                                          onChange={() => toggleFoodInclusionMeal(date, meal)}
+                                                          className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                      />
+                                                      <span className="text-sm font-medium">{meal}</span>
+                                                  </label>
+                                              );
+                                          })}
+                                      </div>
+                                  </div>
+                              );
+                          })}
+                      </div>
+                  ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {FOOD_MEAL_OPTIONS.map((meal) => {
+                              const isChecked = isMealOnAllDates(meal);
+                              return (
+                                  <label
+                                      key={meal}
+                                      className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors ${
+                                          isChecked
+                                            ? 'border-indigo-300 bg-indigo-50/50 text-slate-800'
+                                            : 'border-slate-200 bg-card text-slate-700 hover:border-slate-300'
+                                      }`}
+                                  >
+                                      <input
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          onChange={() => toggleMealForAllDates(meal)}
+                                          className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                      />
+                                      <span className="text-sm font-medium">{meal}</span>
+                                  </label>
+                              );
+                          })}
+                      </div>
+                  )}
+
+                  {formEventDates.length > 1 && !mealsDifferAcrossDates && (
+                      <button
+                          type="button"
+                          onClick={() => setCustomizeMealsPerDay(v => !v)}
+                          className="text-xs text-slate-400 hover:text-indigo-600 hover:underline"
+                      >
+                          {customizeMealsPerDay ? 'Apply the same meals to all days' : 'Customize per day'}
+                      </button>
+                  )}
+                </div>
+
+                {/* ── Giveaways ── */}
+                <div className="flex items-center gap-2 pt-2">
+                  <Gift size={14} className="text-indigo-600 shrink-0" />
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shrink-0">Giveaways</span>
+                  <div className="flex-1 h-px bg-slate-200" />
+                </div>
+
+                <label className="flex items-center gap-3 cursor-pointer w-fit group">
+                  <span className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${showGiveawayEditor ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                    <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-card shadow ring-0 transition duration-200 ease-in-out ${showGiveawayEditor ? 'translate-x-4' : 'translate-x-0'}`}
+                    />
+                  </span>
+                  <input
+                      type="checkbox"
+                      className="hidden"
+                      checked={showGiveawayEditor}
+                      onChange={e => {
+                          if (e.target.checked) {
+                              setGiveawaysEnabled(true);
+                          } else {
+                              setGiveawaysEnabled(false);
+                              setFormData({ ...formData, giveaways: [] });
+                          }
+                      }}
+                  />
+                  <span className="text-sm text-slate-700 group-hover:text-slate-900 transition-colors">Include giveaways</span>
+                </label>
+
+                {showGiveawayEditor && (
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs text-slate-500">Items participants can request at registration (e.g. T-shirt size).</p>
+                            <button
+                                type="button"
+                                onClick={addGiveaway}
+                                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
+                            >
+                                <UserPlus size={13} /> Add item
+                            </button>
+                        </div>
+
+                        {((formData.giveaways as GiveawayItem[]) || []).length > 0 && (
+                            <label className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-card px-3 py-2.5 cursor-pointer group">
+                                <span className="min-w-0">
+                                    <span className="block text-sm font-semibold text-slate-800">Giveaway selection {formData.giveaways_open ? 'open' : 'closed'}</span>
+                                    <span className="block text-xs text-slate-500">When closed, new registrants can no longer pick sizes / answers — existing choices are kept.</span>
+                                </span>
+                                <span className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${formData.giveaways_open ? 'bg-green-500' : 'bg-slate-300'}`}>
+                                    <span
+                                        aria-hidden="true"
+                                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-card shadow ring-0 transition duration-200 ease-in-out ${formData.giveaways_open ? 'translate-x-4' : 'translate-x-0'}`}
+                                    />
+                                </span>
+                                <input
+                                    type="checkbox"
+                                    className="hidden"
+                                    checked={formData.giveaways_open ?? true}
+                                    onChange={e => setFormData({ ...formData, giveaways_open: e.target.checked })}
                                 />
-                            </span>
-                            <input
-                                type="checkbox"
-                                className="hidden"
-                                checked={formData.giveaways_open ?? true}
-                                onChange={e => setFormData({ ...formData, giveaways_open: e.target.checked })}
-                            />
-                        </label>
-                    )}
+                            </label>
+                        )}
 
-                    {((formData.giveaways as GiveawayItem[]) || []).length === 0 ? (
-                        <p className="text-xs text-slate-500">No giveaways configured for this event.</p>
-                    ) : (
-                        <div className="space-y-3">
-                            {((formData.giveaways as GiveawayItem[]) || []).map((g, idx) => (
-                                <div key={g.key} className="space-y-3 rounded-xl border border-purple-100 bg-white/90 p-3">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-xs font-medium text-slate-600 mb-1">Item label</label>
-                                            <input
-                                                type="text"
-                                                value={g.label}
-                                                onChange={(e) => updateGiveaway(idx, { label: e.target.value })}
-                                                placeholder="e.g. Event T-shirt"
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                                            />
+                        {((formData.giveaways as GiveawayItem[]) || []).length === 0 ? (
+                            <p className="text-xs text-slate-400">No giveaways configured yet. Click "Add item" to create one.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {((formData.giveaways as GiveawayItem[]) || []).map((g, idx) => (
+                                    <div key={g.key} className="space-y-3 rounded-xl border border-slate-200 bg-card p-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-600 mb-1">Item label</label>
+                                                <input
+                                                    type="text"
+                                                    value={g.label}
+                                                    onChange={(e) => updateGiveaway(idx, { label: e.target.value })}
+                                                    placeholder="e.g. Event T-shirt"
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-600 mb-1">Response type</label>
+                                                <select
+                                                    value={g.type}
+                                                    onChange={(e) => updateGiveaway(idx, { type: e.target.value as GiveawayItem['type'] })}
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-card focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                                >
+                                                    <option value="single-select">Choose an option (e.g. size)</option>
+                                                    <option value="boolean">Yes / No</option>
+                                                </select>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-slate-600 mb-1">Response type</label>
-                                            <select
-                                                value={g.type}
-                                                onChange={(e) => updateGiveaway(idx, { type: e.target.value as GiveawayItem['type'] })}
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+
+                                        {g.type === 'single-select' && (
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-600 mb-1">Options (comma-separated)</label>
+                                                <input
+                                                    type="text"
+                                                    value={(g.options || []).join(',')}
+                                                    onChange={(e) => updateGiveaway(idx, { options: e.target.value.split(',') })}
+                                                    placeholder="XS, S, M, L, XL, 2XL"
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                                />
+                                            </div>
+                                        )}
+
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <div className="flex flex-wrap items-center gap-4">
+                                            <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={g.required || false}
+                                                    onChange={(e) => updateGiveaway(idx, { required: e.target.checked })}
+                                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                />
+                                                Required at registration
+                                            </label>
+                                            <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={g.include_in_attendance || false}
+                                                    onChange={(e) => updateGiveaway(idx, { include_in_attendance: e.target.checked })}
+                                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                />
+                                                Add to attendance sheet
+                                            </label>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeGiveaway(idx)}
+                                                className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700"
                                             >
-                                                <option value="single-select">Choose an option (e.g. size)</option>
-                                                <option value="boolean">Yes / No</option>
-                                            </select>
+                                                <Trash2 size={14} /> Remove
+                                            </button>
                                         </div>
                                     </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
-                                    {g.type === 'single-select' && (
-                                        <div>
-                                            <label className="block text-xs font-medium text-slate-600 mb-1">Options (comma-separated)</label>
-                                            <input
-                                                type="text"
-                                                value={(g.options || []).join(',')}
-                                                onChange={(e) => updateGiveaway(idx, { options: e.target.value.split(',') })}
-                                                placeholder="XS, S, M, L, XL, 2XL"
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                                            />
-                                        </div>
-                                    )}
-
-                                    <div className="flex flex-wrap items-center justify-between gap-3">
-                                        <div className="flex flex-wrap items-center gap-4">
-                                        <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={g.required || false}
-                                                onChange={(e) => updateGiveaway(idx, { required: e.target.checked })}
-                                                className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
-                                            />
-                                            Required at registration
-                                        </label>
-                                        <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={g.include_in_attendance || false}
-                                                onChange={(e) => updateGiveaway(idx, { include_in_attendance: e.target.checked })}
-                                                className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
-                                            />
-                                            Add to attendance sheet
-                                        </label>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => removeGiveaway(idx)}
-                                            className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700"
-                                        >
-                                            <Trash2 size={14} /> Remove
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                {/* ── Registration ── */}
+                <div className="flex items-center gap-2 pt-2">
+                  <Users size={14} className="text-indigo-600 shrink-0" />
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shrink-0">Registration</span>
+                  <div className="flex-1 h-px bg-slate-200" />
                 </div>
 
-                {/* Footer Actions */}
-                <div className="mt-8 flex justify-end gap-3 pt-5 border-t border-slate-100">
-                    <button 
-                      type="button" 
-                      onClick={() => setShowEventModal(false)} 
-                      className="px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all shadow-sm"
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      type="submit" 
-                      className="px-6 py-2.5 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-md hover:shadow-lg transition-all"
-                    >
-                      {editingEventId ? 'Save Changes' : 'Create Event'}
-                    </button>
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3.5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-800">Registration Status</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {formData.registration_open ? 'Participants can register for this event' : 'Registration is closed for this event'}
+                    </p>
+                  </div>
+                  <button
+                      type="button"
+                      onClick={() => setFormData({...formData, registration_open: !formData.registration_open})}
+                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                          formData.registration_open
+                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100'
+                            : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
+                      }`}
+                  >
+                      <span className={`w-1.5 h-1.5 rounded-full ${formData.registration_open ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                      {formData.registration_open ? 'Open' : 'Closed'}
+                  </button>
                 </div>
 
-              </form>
-            </div>
+              </div>
+
+              {/* Footer actions */}
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 shrink-0 bg-card">
+                  <button
+                    type="button"
+                    onClick={() => setShowEventModal(false)}
+                    className="px-4 py-2.5 text-sm font-medium text-slate-700 bg-card border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-all"
+                  >
+                    {editingEventId ? 'Save Changes' : 'Create Event'}
+                  </button>
+              </div>
+
+            </form>
           </div>
         </div>
       )}

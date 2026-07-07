@@ -151,18 +151,18 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure }) =
 
   return (
     <div className="w-full max-w-sm mx-auto space-y-2">
-      <div className="relative w-full overflow-hidden rounded-xl shadow-sm border border-slate-200 bg-black min-h-[300px]">
+      <div className="relative w-full overflow-hidden rounded-xl shadow-sm border border-[#E0DDD4] bg-black min-h-[300px]">
         {isInitializing && !error && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 z-10 text-white">
-            <Loader2 className="w-8 h-8 text-indigo-400 animate-spin mb-3" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#111110]/90 z-10 text-white">
+            <Loader2 className="w-8 h-8 text-[#8B82F0] animate-spin mb-3" />
             <p className="text-sm font-medium">Starting camera...</p>
           </div>
         )}
 
         {error && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-10 p-6 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#F5F3EE] z-10 p-6 text-center">
             <AlertCircle className="w-10 h-10 text-red-500 mb-3" />
-            <p className="text-sm text-slate-700">{error}</p>
+            <p className="text-sm text-[#4A4843]">{error}</p>
           </div>
         )}
 
@@ -172,12 +172,12 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure }) =
       </div>
 
       {cameras.length > 1 && (
-        <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
+        <label className="flex items-center gap-2 text-xs font-medium text-[#7C7A72]">
           <Camera size={14} className="shrink-0" />
           <select
             value={selectedCameraId ?? ''}
             onChange={(e) => setSelectedCameraId(e.target.value)}
-            className="flex-1 min-w-0 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="flex-1 min-w-0 bg-white border border-[#E0DDD4] rounded-lg px-2 py-1.5 text-xs text-[#4A4843] focus:outline-none focus:border-[#6255E9] focus:ring-2 focus:ring-[#6255E9]/20"
           >
             {cameras.map((cam) => (
               <option key={cam.id} value={cam.id}>

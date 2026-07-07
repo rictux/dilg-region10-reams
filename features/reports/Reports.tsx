@@ -2,14 +2,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Printer, Calendar, ScrollText, Search, ChevronDown, Check, X, Award, Gift } from 'lucide-react';
 import { Event } from '../../types/database';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
 
 const Reports: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
+
+  // Which report was picked from the sidebar submenu (null = show all)
+  const activeReport = new URLSearchParams(location.search).get('report');
+  const showReport = (key: string) => !activeReport || activeReport === key;
+  const reportLabels: Record<string, string> = {
+    'attendance-sheet': 'Attendance Sheet',
+    'scan-logs': 'Scan Logs',
+    'appearance': 'Certificate of Appearance',
+    'participation': 'Certificate of Participation',
+    'giveaways': 'Giveaway Logs'
+  };
   const [events, setEvents] = useState<Event[]>([]);
   
   // Initialize from session storage if available
@@ -131,9 +143,9 @@ const Reports: React.FC = () => {
   }, [loading, selectedEvent, selectedEventId]);
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto pr-1 space-y-8">
+    <div className="min-h-0 overflow-y-auto -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16 space-y-8">
         {/* Filters */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+        <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100">
             <div className="flex flex-col md:flex-row gap-4 items-end">
                 <div className="w-full max-w-4xl">
                     <label className="block text-sm font-medium text-slate-700 mb-2">Select Event</label>
@@ -174,7 +186,7 @@ const Reports: React.FC = () => {
                         </div>
 
                         {isDropdownOpen && (
-                            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                                 {/* Search Input */}
                                 <div className="p-2 border-b border-slate-100 bg-slate-50 sticky top-0">
                                     <div className="relative">
@@ -248,11 +260,25 @@ const Reports: React.FC = () => {
             </div>
         </div>
 
+        {/* Selected report header */}
+        {activeReport && reportLabels[activeReport] && (
+            <div className="flex items-center justify-between gap-4">
+                <h2 className="text-sm font-medium text-slate-800">{reportLabels[activeReport]}</h2>
+                <button
+                    onClick={() => navigate('/reports')}
+                    className="text-xs text-indigo-600 hover:underline"
+                >
+                    Show all reports
+                </button>
+            </div>
+        )}
+
         {/* Actions Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             
             {/* Print Scan Logs Card */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+            {showReport('scan-logs') && (
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
                 <div className="bg-emerald-100 p-3 rounded-lg text-emerald-600 mb-4">
                     <ScrollText size={24} />
                 </div>
@@ -269,9 +295,11 @@ const Reports: React.FC = () => {
                     <Printer size={18} /> Print Scan Logs
                 </button>
             </div>
+            )}
 
             {/* Giveaway Claim Logs Card */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+            {showReport('giveaways') && (
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
                 <div className="bg-fuchsia-100 p-3 rounded-lg text-fuchsia-600 mb-4">
                     <Gift size={24} />
                 </div>
@@ -292,9 +320,11 @@ const Reports: React.FC = () => {
                     <Printer size={18} /> Print Giveaway Claims
                 </button>
             </div>
+            )}
 
             {/* Print Attendance Sheet Card */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+            {showReport('attendance-sheet') && (
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
                 <div className="bg-indigo-100 p-3 rounded-lg text-indigo-600 mb-4">
                     <Printer size={24} />
                 </div>
@@ -311,9 +341,11 @@ const Reports: React.FC = () => {
                     <Printer size={18} /> Print Attendance Sheet
                 </button>
             </div>
+            )}
 
             {/* Print Certificate of Appearance Card */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+            {showReport('appearance') && (
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
                 <div className="bg-amber-100 p-3 rounded-lg text-amber-600 mb-4">
                     <ScrollText size={24} />
                 </div>
@@ -330,9 +362,11 @@ const Reports: React.FC = () => {
                     <Printer size={18} /> Print Certificates
                 </button>
             </div>
+            )}
 
             {/* Certificate of Participation Card */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+            {showReport('participation') && (
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
                 <div className="bg-violet-100 p-3 rounded-lg text-violet-600 mb-4">
                     <Award size={24} />
                 </div>
@@ -349,6 +383,7 @@ const Reports: React.FC = () => {
                     <Award size={18} /> Generate Certificates
                 </button>
             </div>
+            )}
 
         </div>
     </div>

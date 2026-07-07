@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Participant } from '../../types/database';
-import { Search, Edit, Loader2, X, Save, User, Mail, Briefcase, Phone, AlertCircle } from 'lucide-react';
+import { Search, Edit, Loader2, X, Save, User, Mail, Briefcase, Phone, AlertCircle, Contact } from 'lucide-react';
 
 const ParticipantsList: React.FC = () => {
     const { user: currentUser } = useAuth();
@@ -98,17 +98,17 @@ const ParticipantsList: React.FC = () => {
     return (
         <div className="h-full min-h-0 flex flex-col gap-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="relative w-full sm:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input 
-                        type="text" 
-                        placeholder="Search participants..." 
+                <div className="relative w-full sm:w-72">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                    <input
+                        type="text"
+                        placeholder="Search participants..."
                         value={searchTerm}
                         onChange={(e) => {
                             setSearchTerm(e.target.value);
                             setCurrentPage(1);
                         }}
-                        className="w-full pl-10 pr-16 py-2 bg-white border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        className="w-full pl-9 pr-14 h-9 bg-card border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 transition-colors"
                     />
                     {searchTerm && (
                         <button
@@ -125,63 +125,72 @@ const ParticipantsList: React.FC = () => {
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
+            <div className="bg-card rounded-lg border border-[rgb(var(--ink)/0.08)] overflow-hidden flex-1 min-h-0 flex flex-col">
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-[rgb(var(--ink)/0.06)] shrink-0">
+                    <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-indigo-600/10 text-indigo-600">
+                        <Contact size={13} />
+                    </span>
+                    <h3 className="text-sm font-semibold text-slate-900">Participants</h3>
+                    <span className="text-[10px] min-w-[1.25rem] text-center px-1.5 py-0.5 rounded-full font-medium font-mono bg-indigo-600/10 text-indigo-700">
+                        {filteredParticipants.length}
+                    </span>
+                </div>
+
                 <div className="hidden md:block flex-1 min-h-0 overflow-auto">
-                    <table className="datatable w-full text-[13px] text-left">
-                        <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                    <table className="w-full text-sm text-left">
+                        <thead className="sticky top-0 z-10 bg-slate-50 border-b border-[rgb(var(--ink)/0.06)]">
                             <tr>
-                                <th className="px-6 py-4 bg-slate-50">Participant Name</th>
-                                <th className="px-6 py-4 bg-slate-50">Contact</th>
-                                <th className="px-6 py-4 bg-slate-50">Office & Position</th>
-                                <th className="px-6 py-4 bg-slate-50">Demographics</th>
-                                {currentUser?.role === 'Admin' && <th className="px-6 py-4 text-right bg-slate-50">Actions</th>}
+                                <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono">Participant</th>
+                                <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono">Contact</th>
+                                <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono">Office & Position</th>
+                                <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono">Demographics</th>
+                                {currentUser?.role === 'Admin' && <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono text-right">Actions</th>}
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-[rgb(var(--ink)/0.04)]">
                             {loading ? (
-                                <tr><td colSpan={5} className="text-center py-8">Loading participants...</td></tr>
+                                <tr><td colSpan={5} className="py-10 text-center text-xs text-slate-400">Loading participants…</td></tr>
                             ) : paginatedParticipants.length === 0 ? (
-                                <tr><td colSpan={5} className="text-center py-8 text-slate-400">No participants found.</td></tr>
+                                <tr><td colSpan={5} className="py-10 text-center text-xs text-slate-400">No participants found.</td></tr>
                             ) : (
                                 paginatedParticipants.map((participant) => (
-                                    <tr key={participant.participant_id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4">
+                                    <tr key={participant.participant_id} className="hover:bg-slate-50/60 transition-colors">
+                                        <td className="px-4 py-3">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg">
-                                                    {participant.f_name?.charAt(0) || <User size={20} />}
+                                                <div className="w-8 h-8 rounded-full bg-indigo-600/10 border border-indigo-600/20 text-indigo-600 flex items-center justify-center text-[11px] font-medium font-mono shrink-0">
+                                                    {participant.f_name?.charAt(0)?.toUpperCase() || <User size={14} />}
                                                 </div>
-                                                <div>
-                                                    <div className="font-medium text-slate-800">{participant.full_name}</div>
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-medium text-slate-900 leading-tight">{participant.full_name}</div>
                                                     <div className="text-xs text-slate-500 font-mono">{participant.participant_code}</div>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-slate-800">{participant.email || '-'}</div>
-                                            <div className="text-xs text-slate-500">{participant.mobile_no || '-'}</div>
+                                        <td className="px-4 py-3">
+                                            <div className="text-xs text-slate-700">{participant.email || '–'}</div>
+                                            <div className="text-xs text-slate-500 font-mono mt-0.5">{participant.mobile_no || '–'}</div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-slate-800">{participant.office || '-'}</div>
-                                            <div className="text-xs text-slate-500">{participant.position || '-'}</div>
+                                        <td className="px-4 py-3">
+                                            <div className="text-xs text-slate-700">{participant.office || '–'}</div>
+                                            <div className="text-xs text-slate-500 mt-0.5">{participant.position || '–'}</div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-xs text-slate-600">
-                                                <div>Gender: {participant.gender || '-'}</div>
-                                                <div>Age: {participant.age_group || '-'}</div>
-                                                <div className="flex gap-2 mt-1">
-                                                    {participant.pwd === 'Yes' && <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-medium">PWD</span>}
-                                                    {participant.indigenous_people === 'Yes' && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px] font-medium">IP</span>}
-                                                </div>
+                                        <td className="px-4 py-3">
+                                            <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                                                <span>{participant.gender || '–'}</span>
+                                                <span className="text-slate-300">·</span>
+                                                <span className="font-mono">{participant.age_group || '–'}</span>
+                                                {participant.pwd === 'Yes' && <span className="border border-blue-200 bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-medium">PWD</span>}
+                                                {participant.indigenous_people === 'Yes' && <span className="border border-emerald-200 bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-medium">IP</span>}
                                             </div>
                                         </td>
                                         {currentUser?.role === 'Admin' && (
-                                            <td className="px-6 py-4 text-right">
-                                                <button 
+                                            <td className="px-4 py-3 text-right">
+                                                <button
                                                     onClick={() => handleEdit(participant)}
-                                                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-600/10 rounded-md transition-colors"
                                                     title="Edit Participant"
                                                 >
-                                                    <Edit size={18} />
+                                                    <Edit size={16} />
                                                 </button>
                                             </td>
                                         )}
@@ -192,64 +201,63 @@ const ParticipantsList: React.FC = () => {
                     </table>
                 </div>
 
-                <div className="md:hidden flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+                <div className="md:hidden flex-1 min-h-0 overflow-y-auto p-3 space-y-2.5">
                     {loading ? (
                         [...Array(3)].map((_, i) => (
-                            <div key={i} className="animate-pulse rounded-xl border border-slate-200 p-4 space-y-3">
+                            <div key={i} className="animate-pulse rounded-lg border border-[rgb(var(--ink)/0.08)] p-4 space-y-3">
                                 <div className="h-5 bg-slate-200 rounded w-2/3"></div>
                                 <div className="h-4 bg-slate-100 rounded w-1/2"></div>
                                 <div className="h-4 bg-slate-100 rounded w-1/3"></div>
                             </div>
                         ))
                     ) : paginatedParticipants.length === 0 ? (
-                        <div className="text-center py-8 text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100">No participants found.</div>
+                        <div className="py-10 text-center text-xs text-slate-400 bg-slate-50/50 rounded-lg border border-[rgb(var(--ink)/0.06)]">No participants found.</div>
                     ) : (
                         paginatedParticipants.map((participant) => (
-                            <div key={participant.participant_id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <div key={participant.participant_id} className="rounded-lg border border-[rgb(var(--ink)/0.08)] bg-card p-4">
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex items-center gap-3 min-w-0">
-                                        <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg shrink-0">
-                                            {participant.f_name?.charAt(0) || <User size={20} />}
+                                        <div className="w-8 h-8 rounded-full bg-indigo-600/10 border border-indigo-600/20 text-indigo-600 flex items-center justify-center text-[11px] font-medium font-mono shrink-0">
+                                            {participant.f_name?.charAt(0)?.toUpperCase() || <User size={14} />}
                                         </div>
                                         <div className="min-w-0">
-                                            <div className="font-medium text-slate-800 truncate">{participant.full_name}</div>
+                                            <div className="text-sm font-medium text-slate-900 truncate">{participant.full_name}</div>
                                             <div className="text-xs text-slate-500 font-mono">{participant.participant_code}</div>
                                         </div>
                                     </div>
                                     {currentUser?.role === 'Admin' && (
                                         <button
                                             onClick={() => handleEdit(participant)}
-                                            className="shrink-0 p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                            className="shrink-0 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-600/10 rounded-md transition-colors"
                                             title="Edit Participant"
                                         >
-                                            <Edit size={18} />
+                                            <Edit size={16} />
                                         </button>
                                     )}
                                 </div>
 
-                                <div className="mt-4 space-y-3 text-sm">
-                                    <div className="flex items-start gap-2 text-slate-600">
-                                        <Mail size={14} className="text-slate-400 shrink-0 mt-0.5" />
-                                        <span>{participant.email || '-'}</span>
+                                <div className="mt-3 space-y-2">
+                                    <div className="flex items-start gap-2 text-xs text-slate-600">
+                                        <Mail size={13} className="text-slate-400 shrink-0 mt-0.5" />
+                                        <span>{participant.email || '–'}</span>
                                     </div>
-                                    <div className="flex items-start gap-2 text-slate-600">
-                                        <Phone size={14} className="text-slate-400 shrink-0 mt-0.5" />
-                                        <span>{participant.mobile_no || '-'}</span>
+                                    <div className="flex items-start gap-2 text-xs text-slate-600">
+                                        <Phone size={13} className="text-slate-400 shrink-0 mt-0.5" />
+                                        <span className="font-mono">{participant.mobile_no || '–'}</span>
                                     </div>
-                                    <div className="flex items-start gap-2 text-slate-600">
-                                        <Briefcase size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                                    <div className="flex items-start gap-2 text-xs text-slate-600">
+                                        <Briefcase size={13} className="text-slate-400 shrink-0 mt-0.5" />
                                         <div>
-                                            <div>{participant.office || '-'}</div>
-                                            <div className="text-xs text-slate-500 mt-1">{participant.position || '-'}</div>
+                                            <div>{participant.office || '–'}</div>
+                                            <div className="text-slate-500 mt-0.5">{participant.position || '–'}</div>
                                         </div>
                                     </div>
-                                    <div className="text-xs text-slate-600 rounded-lg bg-slate-50 border border-slate-200 p-3">
-                                        <div>Gender: {participant.gender || '-'}</div>
-                                        <div>Age: {participant.age_group || '-'}</div>
-                                        <div className="flex gap-2 mt-2">
-                                            {participant.pwd === 'Yes' && <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-medium">PWD</span>}
-                                            {participant.indigenous_people === 'Yes' && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px] font-medium">IP</span>}
-                                        </div>
+                                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600 rounded-md bg-slate-50 border border-[rgb(var(--ink)/0.06)] px-3 py-2">
+                                        <span>{participant.gender || '–'}</span>
+                                        <span className="text-slate-300">·</span>
+                                        <span className="font-mono">{participant.age_group || '–'}</span>
+                                        {participant.pwd === 'Yes' && <span className="border border-blue-200 bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-medium">PWD</span>}
+                                        {participant.indigenous_people === 'Yes' && <span className="border border-emerald-200 bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-medium">IP</span>}
                                     </div>
                                 </div>
                             </div>
@@ -259,25 +267,25 @@ const ParticipantsList: React.FC = () => {
 
                 {/* Pagination Controls */}
                 {!loading && totalPages > 1 && (
-                    <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
-                        <div className="text-sm text-slate-500">
-                            Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredParticipants.length)}</span> of <span className="font-medium">{filteredParticipants.length}</span> results
-                        </div>
+                    <div className="px-4 py-3 border-t border-[rgb(var(--ink)/0.06)] flex items-center justify-between gap-3 shrink-0">
+                        <p className="text-xs text-slate-500">
+                            Showing <span className="font-medium text-slate-700">{(currentPage - 1) * itemsPerPage + 1}</span>–<span className="font-medium text-slate-700">{Math.min(currentPage * itemsPerPage, filteredParticipants.length)}</span> of <span className="font-medium text-slate-700">{filteredParticipants.length}</span>
+                        </p>
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                                 disabled={currentPage === 1}
-                                className="px-3 py-1 border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="h-8 px-3 rounded-md border border-[rgb(var(--ink)/0.10)] bg-card text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
                                 Previous
                             </button>
-                            <div className="flex items-center gap-1 text-sm font-medium text-slate-700 px-2">
-                                {currentPage} of {totalPages}
-                            </div>
+                            <span className="text-xs font-mono text-slate-600 px-1">
+                                {currentPage} / {totalPages}
+                            </span>
                             <button
                                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                                 disabled={currentPage === totalPages}
-                                className="px-3 py-1 border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="h-8 px-3 rounded-md border border-[rgb(var(--ink)/0.10)] bg-card text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
                                 Next
                             </button>
@@ -289,21 +297,24 @@ const ParticipantsList: React.FC = () => {
             {/* Edit Modal */}
             {showEditModal && editingParticipant && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !submitting && setShowEditModal(false)}></div>
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 relative z-10 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                <Edit className="text-indigo-600" size={24} />
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !submitting && setShowEditModal(false)}></div>
+                    <div className="bg-card border border-[rgb(var(--ink)/0.10)] rounded-lg shadow-2xl w-full max-w-2xl p-5 relative z-10 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-5 pb-4 border-b border-[rgb(var(--ink)/0.06)]">
+                            <h3 className="text-sm font-medium text-slate-900 flex items-center gap-2">
+                                <Edit className="text-indigo-600" size={16} />
                                 Edit Participant
                             </h3>
-                            <button onClick={() => !submitting && setShowEditModal(false)} className="text-slate-400 hover:text-slate-600">
-                                <X size={24} />
+                            <button
+                                onClick={() => !submitting && setShowEditModal(false)}
+                                className="text-slate-500 hover:text-slate-900 p-1 hover:bg-slate-100 rounded-md transition"
+                            >
+                                <X size={16} />
                             </button>
                         </div>
-                        
+
                         {formError && (
-                            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
-                                <AlertCircle size={20} className="shrink-0 mt-0.5" />
+                            <div className="mb-5 p-3 bg-red-50 border border-red-100 rounded-md flex items-start gap-2.5 text-red-600">
+                                <AlertCircle size={16} className="shrink-0 mt-0.5" />
                                 <p className="text-sm">{formError}</p>
                             </div>
                         )}
@@ -311,21 +322,21 @@ const ParticipantsList: React.FC = () => {
                         <form onSubmit={handleSave} className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">First Name</label>
+                                    <label className="block text-xs font-medium text-slate-900 mb-1.5">First Name</label>
                                     <input 
                                         required
                                         type="text"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                         value={editingParticipant.f_name}
                                         onChange={e => setEditingParticipant({...editingParticipant, f_name: e.target.value})}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Last Name</label>
+                                    <label className="block text-xs font-medium text-slate-900 mb-1.5">Last Name</label>
                                     <input 
                                         required
                                         type="text"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                         value={editingParticipant.l_name}
                                         onChange={e => setEditingParticipant({...editingParticipant, l_name: e.target.value})}
                                     />
@@ -333,20 +344,20 @@ const ParticipantsList: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Middle Initial</label>
+                                    <label className="block text-xs font-medium text-slate-900 mb-1.5">Middle Initial</label>
                                     <input 
                                         type="text"
                                         maxLength={1}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                         value={editingParticipant.m_initial || ''}
                                         onChange={e => setEditingParticipant({...editingParticipant, m_initial: e.target.value.toUpperCase()})}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Suffix</label>
+                                    <label className="block text-xs font-medium text-slate-900 mb-1.5">Suffix</label>
                                     <input 
                                         type="text"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                         value={editingParticipant.suffix || ''}
                                         onChange={e => setEditingParticipant({...editingParticipant, suffix: e.target.value})}
                                     />
@@ -354,19 +365,19 @@ const ParticipantsList: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                                    <label className="block text-xs font-medium text-slate-900 mb-1.5">Email</label>
                                     <input 
                                         type="email"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                         value={editingParticipant.email || ''}
                                         onChange={e => setEditingParticipant({...editingParticipant, email: e.target.value})}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Mobile No.</label>
+                                    <label className="block text-xs font-medium text-slate-900 mb-1.5">Mobile No.</label>
                                     <input 
                                         type="tel"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                         value={editingParticipant.mobile_no || ''}
                                         onChange={e => setEditingParticipant({...editingParticipant, mobile_no: e.target.value})}
                                     />
@@ -374,19 +385,19 @@ const ParticipantsList: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Office</label>
+                                    <label className="block text-xs font-medium text-slate-900 mb-1.5">Office</label>
                                     <input 
                                         type="text"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                         value={editingParticipant.office || ''}
                                         onChange={e => setEditingParticipant({...editingParticipant, office: e.target.value})}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Position</label>
+                                    <label className="block text-xs font-medium text-slate-900 mb-1.5">Position</label>
                                     <input 
                                         type="text"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                         value={editingParticipant.position || ''}
                                         onChange={e => setEditingParticipant({...editingParticipant, position: e.target.value})}
                                     />
@@ -394,9 +405,9 @@ const ParticipantsList: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
+                                    <label className="block text-xs font-medium text-slate-900 mb-1.5">Gender</label>
                                     <select 
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                         value={editingParticipant.gender || ''}
                                         onChange={e => setEditingParticipant({...editingParticipant, gender: e.target.value})}
                                     >
@@ -405,9 +416,9 @@ const ParticipantsList: React.FC = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Age Group</label>
+                                    <label className="block text-xs font-medium text-slate-900 mb-1.5">Age Group</label>
                                     <select 
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                         value={editingParticipant.age_group || ''}
                                         onChange={e => setEditingParticipant({...editingParticipant, age_group: e.target.value})}
                                     >
@@ -422,9 +433,9 @@ const ParticipantsList: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">PWD</label>
+                                    <label className="block text-xs font-medium text-slate-900 mb-1.5">PWD</label>
                                     <select 
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                         value={editingParticipant.pwd || 'No'}
                                         onChange={e => setEditingParticipant({...editingParticipant, pwd: e.target.value})}
                                     >
@@ -433,9 +444,9 @@ const ParticipantsList: React.FC = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Indigenous People</label>
+                                    <label className="block text-xs font-medium text-slate-900 mb-1.5">Indigenous People</label>
                                     <select 
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        className="w-full px-3 py-2 border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 outline-none transition-colors"
                                         value={editingParticipant.indigenous_people || 'No'}
                                         onChange={e => setEditingParticipant({...editingParticipant, indigenous_people: e.target.value})}
                                     >
@@ -445,20 +456,20 @@ const ParticipantsList: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-slate-100">
-                                <button 
+                            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[rgb(var(--ink)/0.06)]">
+                                <button
                                     type="button"
                                     onClick={() => setShowEditModal(false)}
-                                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+                                    className="h-9 px-4 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
                                 >
                                     Cancel
                                 </button>
-                                <button 
+                                <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium flex items-center gap-2"
+                                    className="h-9 px-5 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50"
                                 >
-                                    {submitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                                    {submitting ? <Loader2 className="animate-spin" size={15} /> : <Save size={15} />}
                                     Save Changes
                                 </button>
                             </div>

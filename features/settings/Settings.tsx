@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload, Eye, X, Trash2, Plus, Star, FileSignature, Megaphone } from 'lucide-react';
 import { Event, Office } from '../../types/database';
 import AnnouncementManagement from './AnnouncementManagement';
+import AppearanceSettings from './AppearanceSettings';
 import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
 import CertificateOfAppearanceCard, {
   buildEventDateString,
@@ -130,7 +132,19 @@ const Settings: React.FC = () => {
   const isAdmin = user?.role === 'Admin';
   const isOfficeManager = user?.role === 'OfficeManager';
   const canManageCertificateSettings = isAdmin || isOfficeManager;
-  const [activeTab, setActiveTab] = useState<SettingsTab>('signatories');
+  const location = useLocation();
+  // View is driven by the sidebar submenu (/settings, ?view=announcements, ?view=appearance).
+  // Appearance is open to every user; Signatories/Announcements stay permission-gated,
+  // so users without certificate access land on Appearance by default.
+  const viewParam = new URLSearchParams(location.search).get('view');
+  const activeView =
+    viewParam === 'appearance'
+      ? 'appearance'
+      : isAdmin && viewParam === 'announcements'
+        ? 'announcements'
+        : canManageCertificateSettings
+          ? 'signatories'
+          : 'appearance';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -643,7 +657,7 @@ const Settings: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (loading && activeView !== 'appearance') {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
@@ -651,17 +665,17 @@ const Settings: React.FC = () => {
     );
   }
 
-  if (!canManageCertificateSettings) {
+  if (!canManageCertificateSettings && activeView !== 'appearance') {
     return (
-      <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200">
+      <div className="p-6 bg-card rounded-xl shadow-sm border border-slate-200">
         <p className="text-slate-500">You do not have permission to view this page.</p>
       </div>
     );
   }
 
-  if (isOfficeManager && !user?.office_id) {
+  if (isOfficeManager && !user?.office_id && activeView === 'signatories') {
     return (
-      <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200">
+      <div className="p-6 bg-card rounded-xl shadow-sm border border-slate-200">
         <p className="text-slate-500">Your account does not have an office assignment yet, so certificate settings cannot be managed.</p>
       </div>
     );
@@ -691,7 +705,7 @@ const Settings: React.FC = () => {
 
     return (
       <div
-        className="mx-auto overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_24px_60px_-32px_rgba(15,23,42,0.35)]"
+        className="mx-auto overflow-hidden rounded-[20px] border border-slate-200 bg-card shadow-[0_24px_60px_-32px_rgba(15,23,42,0.35)]"
         style={{
           width: `${previewWidthPx}px`,
           height: `${previewHeightPx}px`
@@ -719,38 +733,9 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div className="h-full min-h-0 flex flex-col">
-      <div className="flex-1 min-h-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-        {isAdmin && (
-          <div className="flex items-center gap-1 border-b border-slate-200 bg-slate-50/70 px-4 pt-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab('signatories')}
-              className={`inline-flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-                activeTab === 'signatories'
-                  ? 'border-indigo-600 bg-white text-indigo-700'
-                  : 'border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-              }`}
-            >
-              <FileSignature className="h-4 w-4" />
-              Signatories
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('announcements')}
-              className={`inline-flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-                activeTab === 'announcements'
-                  ? 'border-indigo-600 bg-white text-indigo-700'
-                  : 'border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-              }`}
-            >
-              <Megaphone className="h-4 w-4" />
-              Announcements
-            </button>
-          </div>
-        )}
-
-        {activeTab === 'signatories' && (
+    <div className="min-h-0 flex flex-col -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16">
+      <div className="flex-1 min-h-0 bg-card rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+        {activeView === 'signatories' && (
         <>
         <div className="border-b border-slate-100 p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -771,7 +756,7 @@ const Settings: React.FC = () => {
                 type="button"
                 onClick={() => setIsPreviewModalOpen(true)}
                 disabled={!selectedOfficeId}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-card px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
               >
                 <Eye className="h-4 w-4" />
                 Show Template Preview
@@ -830,7 +815,7 @@ const Settings: React.FC = () => {
                           value={selectedOfficeId}
                           onChange={(e) => setSelectedOfficeId(e.target.value ? Number(e.target.value) : '')}
                           disabled={!isAdmin}
-                          className="w-full appearance-none rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-4 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                          className="w-full appearance-none rounded-lg border border-slate-300 bg-card py-2 pl-9 pr-4 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                         >
                           <option value="" disabled>Select an office...</option>
                           {offices.map((office) => (
@@ -849,7 +834,7 @@ const Settings: React.FC = () => {
                           value={selectedSignatoryId}
                           onChange={(e) => handleSelectSignatory(e.target.value ? Number(e.target.value) : '')}
                           disabled={!selectedOfficeId || signatories.length === 0}
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                          className="w-full rounded-lg border border-slate-300 bg-card px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
                         >
                           {signatories.length === 0 ? (
                             <option value="">No signatories yet</option>
@@ -892,11 +877,11 @@ const Settings: React.FC = () => {
                         value={signatory.label}
                         onChange={(e) => setSignatory({ ...signatory, label: e.target.value })}
                         placeholder="e.g. Regional Director"
-                        className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                        className="w-full min-w-0 rounded-lg border border-slate-300 bg-card px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
                       />
                     </div>
 
-                    <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
+                    <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-card px-3 py-2 text-sm font-medium text-slate-700">
                       <input
                         type="checkbox"
                         checked={signatory.is_default || signatories.length === 0}
@@ -917,7 +902,7 @@ const Settings: React.FC = () => {
                         value={signatory.name}
                         onChange={(e) => handleSignatoryNameChange(e.target.value)}
                         placeholder="e.g. Bruce A. Colao"
-                        className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                        className="w-full min-w-0 rounded-lg border border-slate-300 bg-card px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
                       />
                     </div>
 
@@ -929,7 +914,7 @@ const Settings: React.FC = () => {
                         value={signatory.post_nominals}
                         onChange={(e) => setSignatory({ ...signatory, post_nominals: e.target.value })}
                         placeholder="e.g. CESO V"
-                        className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                        className="w-full min-w-0 rounded-lg border border-slate-300 bg-card px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
                       />
                     </div>
 
@@ -942,14 +927,14 @@ const Settings: React.FC = () => {
                         value={signatory.position}
                         onChange={(e) => setSignatory({ ...signatory, position: e.target.value })}
                         placeholder="e.g. Regional Director"
-                        className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                        className="w-full min-w-0 rounded-lg border border-slate-300 bg-card px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
                       />
                     </div>
 
                   </div>
                 </section>
 
-                <section className="rounded-lg border border-slate-200 bg-white p-3">
+                <section className="rounded-lg border border-slate-200 bg-card p-3">
                   <div className="mb-3">
                     <h3 className="text-sm font-semibold text-slate-800">Signature Image</h3>
                     <p className="mt-1 text-xs text-slate-500">Upload a transparent PNG for the cleanest printed result.</p>
@@ -992,7 +977,7 @@ const Settings: React.FC = () => {
                             : 'Current E-Signature'
                           : 'Signature Preview'}
                       </p>
-                      <div className="flex h-24 items-center justify-center rounded-lg bg-white px-4">
+                      <div className="flex h-24 items-center justify-center rounded-lg bg-card px-4">
                         {signaturePreviewUrl ? (
                           <img
                             src={signaturePreviewUrl}
@@ -1012,7 +997,7 @@ const Settings: React.FC = () => {
                 </section>
               </div>
 
-              <section className="rounded-lg border border-slate-200 bg-white p-4">
+              <section className="rounded-lg border border-slate-200 bg-card p-4">
                 <div className="mb-4">
                   <h3 className="text-sm font-semibold text-slate-800">Certificate Header and Footer Content</h3>
                 </div>
@@ -1026,7 +1011,7 @@ const Settings: React.FC = () => {
                       value={signatory.header}
                       onChange={(e) => setSignatory({ ...signatory, header: e.target.value })}
                       placeholder="e.g. REGION X - NORTHERN MINDANAO"
-                      className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                      className="w-full min-w-0 rounded-lg border border-slate-300 bg-card px-3 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
                     />
                   </div>
 
@@ -1038,7 +1023,7 @@ const Settings: React.FC = () => {
                       value={signatory.sub_header}
                       onChange={(e) => setSignatory({ ...signatory, sub_header: e.target.value })}
                       placeholder="Optional line above Certificate of Appearance"
-                      className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                      className="w-full min-w-0 rounded-lg border border-slate-300 bg-card px-3 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
                     />
                   </div>
 
@@ -1050,7 +1035,7 @@ const Settings: React.FC = () => {
                       value={signatory.address}
                       onChange={(e) => setSignatory({ ...signatory, address: e.target.value })}
                       placeholder="e.g. Km 3 Fr. W.F. Masterson Avenue, Upper Carmen, Cagayan de Oro City"
-                      className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                      className="w-full min-w-0 rounded-lg border border-slate-300 bg-card px-3 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
                     />
                   </div>
 
@@ -1062,7 +1047,7 @@ const Settings: React.FC = () => {
                       value={signatory.website}
                       onChange={(e) => setSignatory({ ...signatory, website: e.target.value })}
                       placeholder="e.g. www.region10.dilg.gov.ph"
-                      className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                      className="w-full min-w-0 rounded-lg border border-slate-300 bg-card px-3 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
                     />
                   </div>
 
@@ -1074,7 +1059,7 @@ const Settings: React.FC = () => {
                       value={signatory.footer}
                       onChange={(e) => setSignatory({ ...signatory, footer: e.target.value })}
                       placeholder="e.g. T: (088) 859-4181 E: records.dilg10@gmail.com FB: www.facebook.com/DILGX"
-                      className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                      className="w-full min-w-0 rounded-lg border border-slate-300 bg-card px-3 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
                     />
                   </div>
                 </div>
@@ -1085,10 +1070,17 @@ const Settings: React.FC = () => {
         </>
         )}
 
-        {/* Announcements Tab - Admin Only */}
-        {isAdmin && activeTab === 'announcements' && (
+        {/* Announcements view - Admin Only */}
+        {isAdmin && activeView === 'announcements' && (
           <div className="flex-1 min-h-0 overflow-y-auto p-4">
             <AnnouncementManagement />
+          </div>
+        )}
+
+        {/* Appearance view - UI design templates */}
+        {activeView === 'appearance' && (
+          <div className="flex-1 min-h-0 overflow-y-auto p-4">
+            <AppearanceSettings />
           </div>
         )}
       </div>
@@ -1098,12 +1090,12 @@ const Settings: React.FC = () => {
           <button
             type="button"
             aria-label="Close certificate preview"
-            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setIsPreviewModalOpen(false)}
           />
 
           <div
-            className="relative z-10 flex max-h-[96vh] w-full flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl sm:rounded-[28px]"
+            className="relative z-10 flex max-h-[96vh] w-full flex-col overflow-hidden rounded-[24px] bg-card shadow-2xl sm:rounded-[28px]"
             style={{ maxWidth: `${certificatePreviewModalLayout.modalMaxWidth}px` }}
           >
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-3 py-3 sm:px-4 lg:px-5">

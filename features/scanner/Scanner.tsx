@@ -875,11 +875,11 @@ const Scanner: React.FC = () => {
   };
 
   return (
-    <div className="h-full w-full flex flex-col bg-black p-0 lg:flex-row lg:gap-0 lg:bg-slate-900 overflow-hidden">
+    <div className="h-full w-full flex flex-col bg-black p-0 lg:flex-row lg:gap-0 lg:bg-[#111110] overflow-hidden">
         
         {/* LEFT/TOP: Controls + Camera Section */}
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-none border-0 bg-slate-950 shadow-none lg:rounded-none">
-            <div className="shrink-0 border-b border-slate-800 bg-slate-950/95 p-1 sm:p-2 lg:p-3">
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-none border-0 bg-[#0F0F0E] shadow-none lg:rounded-none">
+            <div className="shrink-0 border-b border-[#2A2926] bg-[#0F0F0E]/95 p-1 sm:p-2 lg:p-3">
                  <div className="flex flex-col gap-1 max-w-5xl mx-auto">
                     {(!isOnline || offlineQueue.length > 0) && (
                         <div className="flex justify-end gap-2">
@@ -901,13 +901,13 @@ const Scanner: React.FC = () => {
                             ? 'md:grid-cols-[minmax(0,1fr)_220px] xl:grid-cols-[minmax(0,1fr)_240px]'
                             : 'md:grid-cols-[minmax(0,1fr)_220px_220px] xl:grid-cols-[minmax(0,1fr)_240px_240px]'
                     }`}>
-                        <div className="col-span-2 md:col-span-1 flex-1 w-full rounded-none sm:rounded-xl lg:rounded-2xl border border-slate-800 bg-slate-900/70 p-0.5 sm:p-1.5">
-                            <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-slate-500">Event</p>
+                        <div className="col-span-2 md:col-span-1 flex-1 w-full rounded-none sm:rounded-xl lg:rounded-2xl border border-[#2A2926] bg-[#111110]/70 p-0.5 sm:p-1.5">
+                            <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-[#7C7A72]">Event</p>
                             {loadingEvents ? (
-                                <div className="h-9 sm:h-12 bg-slate-800 rounded-none sm:rounded-xl animate-pulse"></div>
+                                <div className="h-9 sm:h-12 bg-[#2A2926] rounded-none sm:rounded-xl animate-pulse"></div>
                             ) : (
                                 <div className="relative">
-                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9890]" size={16} />
                                     <select 
                                         value={selectedEventId}
                                         onChange={(e) => {
@@ -920,7 +920,7 @@ const Scanner: React.FC = () => {
                                                 setSession(getDefaultSessionForEvent(nextEvent));
                                             }
                                         }}
-                                        className="w-full bg-slate-950 text-white text-[11px] sm:text-xs font-medium rounded-none sm:rounded-xl pl-9 pr-8 py-2 sm:py-2.5 border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm appearance-none"
+                                        className="w-full bg-[#0F0F0E] text-white text-[11px] sm:text-xs font-medium rounded-none sm:rounded-xl pl-9 pr-8 py-2 sm:py-2.5 border border-[#4A4843] focus:ring-2 focus:ring-[#6255E9] focus:border-[#6255E9] shadow-sm appearance-none"
                                     >
                                         {events.length === 0 ? (
                                             <option className="text-[11px] sm:text-xs" style={eventOptionTextStyle} value="">No Events Today</option>
@@ -932,14 +932,14 @@ const Scanner: React.FC = () => {
                                         )}
                                     </select>
                                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                        <svg className="w-4 h-4 text-[#9A9890]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                                     </div>
                                 </div>
                             )}
                         </div>
 
-                        <div className={`${scanMode === 'giveaway' ? 'col-span-2 md:col-span-1' : 'col-span-1'} w-full xl:w-auto rounded-none sm:rounded-xl lg:rounded-2xl border border-slate-800 bg-slate-900/70 p-0.5 sm:p-1.5 shadow-sm`}>
-                            <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-slate-500">Mode</p>
+                        <div className={`${scanMode === 'giveaway' ? 'col-span-2 md:col-span-1' : 'col-span-1'} w-full xl:w-auto rounded-none sm:rounded-xl lg:rounded-2xl border border-[#2A2926] bg-[#111110]/70 p-0.5 sm:p-1.5 shadow-sm`}>
+                            <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-[#7C7A72]">Mode</p>
                             <div className="grid grid-cols-2 gap-1">
                                 <button
                                     type="button"
@@ -948,7 +948,7 @@ const Scanner: React.FC = () => {
                                     className={`px-2 py-2 sm:px-3 sm:py-2.5 rounded-none sm:rounded-xl text-[11px] sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
                                         ${scanMode === 'attendance'
                                             ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-                                            : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-emerald-500/10'
+                                            : 'bg-[#0F0F0E]/60 border-[#2A2926] text-[#C5C2BA] hover:bg-emerald-500/10'
                                         }`}
                                 >
                                     <CheckCircle size={14} className="sm:w-4 sm:h-4" />
@@ -963,11 +963,11 @@ const Scanner: React.FC = () => {
                                     className={`px-2 py-2 sm:px-3 sm:py-2.5 rounded-none sm:rounded-xl text-[11px] sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
                                         ${scanMode === 'giveaway'
                                             ? 'bg-fuchsia-500/20 border-fuchsia-400/60 text-fuchsia-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-                                            : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                                            : 'bg-[#0F0F0E]/60 border-[#2A2926] text-[#C5C2BA]'
                                         }
                                         ${selectedEventHasGiveaways && isOnline
                                             ? 'hover:bg-fuchsia-500/10'
-                                            : 'opacity-40 cursor-not-allowed text-slate-500'
+                                            : 'opacity-40 cursor-not-allowed text-[#7C7A72]'
                                         }`}
                                 >
                                     <Gift size={14} className="sm:w-4 sm:h-4" />
@@ -977,8 +977,8 @@ const Scanner: React.FC = () => {
                         </div>
                         
                         {scanMode === 'attendance' && (
-                            <div className="col-span-1 w-full xl:w-auto rounded-none sm:rounded-xl lg:rounded-2xl border border-slate-800 bg-slate-900/70 p-0.5 sm:p-1.5 shadow-sm">
-                                <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-slate-500">Session</p>
+                            <div className="col-span-1 w-full xl:w-auto rounded-none sm:rounded-xl lg:rounded-2xl border border-[#2A2926] bg-[#111110]/70 p-0.5 sm:p-1.5 shadow-sm">
+                                <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-[#7C7A72]">Session</p>
                                 <div className="grid grid-cols-2 gap-1">
                                     <button
                                         type="button"
@@ -988,11 +988,11 @@ const Scanner: React.FC = () => {
                                         className={`px-2 py-2 sm:px-3 sm:py-2.5 rounded-none sm:rounded-xl text-[11px] sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
                                             ${session === 'AM'
                                                 ? 'bg-amber-500/20 border-amber-400/60 text-amber-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-                                                : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                                                : 'bg-[#0F0F0E]/60 border-[#2A2926] text-[#C5C2BA]'
                                             }
                                             ${isSessionEnabled('AM')
                                                 ? 'hover:bg-amber-500/10'
-                                                : 'opacity-40 cursor-not-allowed text-slate-500'
+                                                : 'opacity-40 cursor-not-allowed text-[#7C7A72]'
                                             }`}
                                     >
                                         <Sun size={14} className="fill-current sm:w-4 sm:h-4" />
@@ -1005,12 +1005,12 @@ const Scanner: React.FC = () => {
                                         aria-pressed={session === 'PM'}
                                         className={`px-2 py-2 sm:px-3 sm:py-2.5 rounded-none sm:rounded-xl text-[11px] sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
                                             ${session === 'PM'
-                                                ? 'bg-indigo-600/20 border-indigo-500/60 text-indigo-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-                                                : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                                                ? 'bg-[#4B3FE4]/20 border-[#6255E9]/60 text-[#A29AEC] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                                                : 'bg-[#0F0F0E]/60 border-[#2A2926] text-[#C5C2BA]'
                                             }
                                             ${isSessionEnabled('PM')
-                                                ? 'hover:bg-indigo-600/10'
-                                                : 'opacity-40 cursor-not-allowed text-slate-500'
+                                                ? 'hover:bg-[#4B3FE4]/10'
+                                                : 'opacity-40 cursor-not-allowed text-[#7C7A72]'
                                             }`}
                                     >
                                         <Moon size={14} className="fill-current sm:w-4 sm:h-4" />
@@ -1029,7 +1029,7 @@ const Scanner: React.FC = () => {
                             className={`inline-flex items-center justify-center gap-1.5 rounded-none sm:rounded-xl border px-3 py-1.5 text-[11px] sm:text-xs font-bold transition-colors ${
                                 cameraPaused
                                     ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25'
-                                    : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
+                                    : 'border-[#4A4843] bg-[#111110] text-[#C5C2BA] hover:bg-[#2A2926]'
                             } ${(!selectedEventId || !!scanResult) ? 'cursor-not-allowed opacity-45' : ''}`}
                         >
                             {cameraPaused ? <Play size={15} /> : <Pause size={15} />}
@@ -1046,10 +1046,10 @@ const Scanner: React.FC = () => {
                                 <AlertTriangle size={48} className="text-red-500" />
                             </div>
                             <h3 className="text-xl font-bold mb-2">Camera Access Error</h3>
-                            <p className="text-slate-400 mb-6 font-medium text-sm leading-relaxed">{cameraError}</p>
+                            <p className="text-[#9A9890] mb-6 font-medium text-sm leading-relaxed">{cameraError}</p>
                             <button 
                                 onClick={() => startScanner()} 
-                                className="bg-white text-black px-8 py-3 rounded-full font-bold hover:bg-slate-200 transition-colors"
+                                className="bg-white text-black px-8 py-3 rounded-full font-bold hover:bg-[#E0DDD4] transition-colors"
                             >
                                 Retry Camera
                             </button>
@@ -1073,7 +1073,7 @@ const Scanner: React.FC = () => {
                                         <div className="absolute bottom-0 left-0 w-9 h-9 sm:w-10 sm:h-10 border-b-4 border-l-4 border-white -mb-1 -ml-1 sm:rounded-bl-xl"></div>
                                         <div className="absolute bottom-0 right-0 w-9 h-9 sm:w-10 sm:h-10 border-b-4 border-r-4 border-white -mb-1 -mr-1 sm:rounded-br-xl"></div>
                                         <div className="absolute left-1/2 top-full mt-3 sm:mt-5 -translate-x-1/2 bg-black/75 backdrop-blur-md px-4 py-2 sm:px-6 sm:py-3 rounded-full text-white text-xs sm:text-sm font-bold border border-white/20 tracking-wide flex items-center justify-center gap-2 shadow-lg whitespace-nowrap min-w-[210px] sm:min-w-0">
-                                            <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
+                                            <div className="w-2 h-2 bg-[#6255E9] rounded-full animate-pulse"></div>
                                             {scanMode === 'giveaway' ? 'Scan Giveaway Claim' : 'Focusing on QR Code...'}
                                         </div>
                                     </div>
@@ -1088,13 +1088,13 @@ const Scanner: React.FC = () => {
                                                 <Play size={52} />
                                             </div>
                                             <h3 className="text-2xl font-black text-white">Camera Paused</h3>
-                                            <p className="mt-2 max-w-xs text-sm font-medium leading-relaxed text-slate-400">
+                                            <p className="mt-2 max-w-xs text-sm font-medium leading-relaxed text-[#9A9890]">
                                                 The camera is off to reduce heat and battery use.
                                             </p>
                                             <button
                                                 type="button"
                                                 onClick={resumeCamera}
-                                                className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-3 text-sm font-black text-slate-950 transition-colors hover:bg-slate-200"
+                                                className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-3 text-sm font-black text-[#0F0F0E] transition-colors hover:bg-[#E0DDD4]"
                                             >
                                                 <Play size={18} />
                                                 Scan Again
@@ -1102,9 +1102,9 @@ const Scanner: React.FC = () => {
                                         </>
                                     ) : !selectedEventId ? (
                                         <>
-                                            <Calendar className="w-16 h-16 text-slate-500 mb-4" />
-                                            <h3 className="text-xl font-bold text-slate-300">No Event Selected</h3>
-                                            <p className="text-slate-500 mt-2">Please select an ongoing event to start scanning.</p>
+                                            <Calendar className="w-16 h-16 text-[#7C7A72] mb-4" />
+                                            <h3 className="text-xl font-bold text-[#C5C2BA]">No Event Selected</h3>
+                                            <p className="text-[#7C7A72] mt-2">Please select an ongoing event to start scanning.</p>
                                         </>
                                     ) : (
                                         <>
@@ -1165,14 +1165,14 @@ const Scanner: React.FC = () => {
                             {getResultTitle()}
                         </h2>
                         
-                        <p className="text-slate-500 font-medium mb-6">{resultMessage}</p>
+                        <p className="text-[#7C7A72] font-medium mb-6">{resultMessage}</p>
 
                         {participantDetails && (scanResult === 'Valid' || scanResult === 'Duplicate' || scanResult === 'Offline-Saved' || resultRequiresAck) && (
-                            <div className="w-full bg-slate-50 rounded-xl p-4 border border-slate-100">
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Participant</p>
-                                <p className="text-xl font-bold text-slate-900 leading-tight">{participantDetails.name}</p>
-                                <p className="text-indigo-600 font-medium text-sm mt-1">{participantDetails.position}</p>
-                                <p className="text-slate-500 text-xs">{participantDetails.office}</p>
+                            <div className="w-full bg-[#F5F3EE] rounded-xl p-4 border border-[#EDEAE2]">
+                                <p className="text-xs font-bold text-[#9A9890] uppercase tracking-widest mb-1">Participant</p>
+                                <p className="text-xl font-bold text-[#111110] leading-tight">{participantDetails.name}</p>
+                                <p className="text-[#4B3FE4] font-medium text-sm mt-1">{participantDetails.position}</p>
+                                <p className="text-[#7C7A72] text-xs">{participantDetails.office}</p>
                             </div>
                         )}
 
@@ -1191,8 +1191,8 @@ const Scanner: React.FC = () => {
                                 <div className="space-y-3">
                                     {giveawayClaimDetails.items.map((item) => (
                                         <div key={item.key} className="flex items-start justify-between gap-4 rounded-xl bg-white/90 px-4 py-3 text-base shadow-sm">
-                                            <span className="font-medium text-slate-600">{item.label}</span>
-                                            <span className="text-lg font-black text-slate-900 text-right">{item.value}</span>
+                                            <span className="font-medium text-[#6B6860]">{item.label}</span>
+                                            <span className="text-lg font-black text-[#111110] text-right">{item.value}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -1203,14 +1203,14 @@ const Scanner: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => clearScanResult({ resumeCamera: true })}
-                                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2"
+                                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#111110] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-[#2A2926] focus:outline-none focus:ring-2 focus:ring-[#7C7A72] focus:ring-offset-2"
                             >
                                 <Play size={16} />
                                 Scan Again
                             </button>
                         ) : (
-                            <div className="w-full bg-slate-100 h-1.5 rounded-full mt-6 overflow-hidden">
-                                 <div className="h-full bg-slate-300 animate-[progress_2s_linear_forwards]"></div>
+                            <div className="w-full bg-[#EDEAE2] h-1.5 rounded-full mt-6 overflow-hidden">
+                                 <div className="h-full bg-[#C5C2BA] animate-[progress_2s_linear_forwards]"></div>
                             </div>
                         )}
                     </div>
@@ -1219,36 +1219,36 @@ const Scanner: React.FC = () => {
         </div>
 
         {/* RIGHT/BOTTOM: Recent Scans History */}
-        <div className="hidden lg:flex lg:w-96 w-full bg-white rounded-[28px] border border-slate-200 shadow-[0_12px_30px_rgba(15,23,42,0.08)] lg:rounded-none lg:border-l lg:border-t-0 lg:border-r-0 lg:border-b-0 lg:border-slate-800 lg:h-full flex-col z-10 lg:z-auto max-h-[34vh] lg:max-h-full overflow-hidden">
-            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                    <History size={18} className="text-indigo-600"/> 
+        <div className="hidden lg:flex lg:w-96 w-full bg-white rounded-[28px] border border-[#E0DDD4] shadow-[0_12px_30px_rgba(15,23,42,0.08)] lg:rounded-none lg:border-l lg:border-t-0 lg:border-r-0 lg:border-b-0 lg:border-[#2A2926] lg:h-full flex-col z-10 lg:z-auto max-h-[34vh] lg:max-h-full overflow-hidden">
+            <div className="p-4 border-b border-[#EDEAE2] flex justify-between items-center bg-[#F5F3EE]">
+                <h3 className="font-bold text-[#2A2926] flex items-center gap-2">
+                    <History size={18} className="text-[#4B3FE4]"/> 
                     Recent Scans
                 </h3>
-                <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded-full">{recentScans.length}</span>
+                <span className="text-xs bg-[#E0DDD4] text-[#6B6860] px-2 py-1 rounded-full">{recentScans.length}</span>
             </div>
             
             <div className="flex-1 overflow-y-auto p-0">
                 {recentScans.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-48 text-slate-400 text-sm">
-                        <div className="bg-slate-50 p-4 rounded-full mb-3">
+                    <div className="flex flex-col items-center justify-center h-48 text-[#9A9890] text-sm">
+                        <div className="bg-[#F5F3EE] p-4 rounded-full mb-3">
                             <User size={24} className="opacity-30" />
                         </div>
                         <p>No scans yet.</p>
                         <p className="text-xs opacity-70">Ready to scan attendees.</p>
                     </div>
                 ) : (
-                    <div className="divide-y divide-slate-100">
+                    <div className="divide-y divide-[#EDEAE2]">
                         {recentScans.map((scan) => (
-                            <div key={scan.id} className="p-4 hover:bg-slate-50 transition-colors animate-in slide-in-from-left-4 duration-300">
+                            <div key={scan.id} className="p-4 hover:bg-[#F5F3EE] transition-colors animate-in slide-in-from-left-4 duration-300">
                                 <div className="flex justify-between items-start mb-1">
-                                    <p className="font-bold text-slate-800 text-sm truncate pr-2">{scan.name}</p>
-                                    <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap">
+                                    <p className="font-bold text-[#2A2926] text-sm truncate pr-2">{scan.name}</p>
+                                    <span className="text-[10px] text-[#9A9890] font-mono whitespace-nowrap">
                                         {format(scan.timestamp, 'h:mm:ss a')}
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <p className="text-xs text-slate-500 truncate max-w-[150px]">{scan.position || 'Unknown Position'}</p>
+                                    <p className="text-xs text-[#7C7A72] truncate max-w-[150px]">{scan.position || 'Unknown Position'}</p>
                                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase
                                         ${scan.status === 'Valid' ? 'bg-emerald-50 text-emerald-700' : ''}
                                         ${scan.status === 'Offline-Saved' ? 'bg-blue-50 text-blue-700' : ''}

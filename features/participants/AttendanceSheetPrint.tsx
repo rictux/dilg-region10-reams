@@ -169,13 +169,13 @@ const AttendanceSheetPrint: React.FC = () => {
   const totalColumnCount = 8 + attendanceGiveaways.length + visibleSessions.length;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8 font-serif print:p-0 print:bg-white">
+    <div className="min-h-screen bg-[#F5F3EE] p-8 font-serif print:p-0 print:bg-white">
         <div className="max-w-[297mm] mx-auto mb-8 flex justify-between no-print">
-            <button onClick={() => navigate('/reports')} className="flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium">
+            <button onClick={() => navigate('/reports')} className="flex items-center gap-2 text-[#6B6860] hover:text-[#111110] font-medium">
                 <ArrowLeft size={20} /> Back to Portal
             </button>
             <div className="flex items-center gap-4">
-                <p className="text-sm text-slate-500">{eventDates.length} Page(s)</p>
+                <p className="text-sm text-[#7C7A72]">{eventDates.length} Page(s)</p>
                 <button onClick={() => window.print()} className="bg-blue-600 text-white px-6 py-2 rounded-lg flex items-center gap-2 shadow-md hover:bg-blue-700 font-bold">
                     <Printer size={20} /> Print Sheets
                 </button>
@@ -193,14 +193,14 @@ const AttendanceSheetPrint: React.FC = () => {
                             <img src="/assets/dilg_logo.png" alt="DILG Logo" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/6/6f/DILG_Seal.svg'; }} />
                         </div>
                         <div className="flex flex-col justify-center">
-                            <h1 className="text-xs font-bold font-sans text-slate-900">DILG Region 10 - Northern Mindanao</h1>
+                            <h1 className="text-xs font-bold font-sans text-[#111110]">DILG Region 10 - Northern Mindanao</h1>
                             <h2 className="text-lg font-black text-black tracking-wide uppercase font-sans">ATTENDANCE SHEET</h2>
                         </div>
                     </div>
                     <div className="flex flex-col items-center justify-center text-center w-full mb-2">
                         <div className="text-[12px] leading-tight font-bold font-serif mb-0.5 uppercase tracking-wide max-w-[260mm] line-clamp-2">{event.event_name}</div>
-                        <div className="text-[10px] leading-tight font-sans text-slate-700">{event.venue}</div>
-                        <div className="text-[10px] leading-tight font-sans text-slate-900 mt-0.5">{format(date, 'MMMM d, yyyy')}</div>
+                        <div className="text-[10px] leading-tight font-sans text-[#4A4843]">{event.venue}</div>
+                        <div className="text-[10px] leading-tight font-sans text-[#111110] mt-0.5">{format(date, 'MMMM d, yyyy')}</div>
                     </div>
                     <div className="px-6 pb-1 flex-1 min-h-0 overflow-hidden">
                         <table className="w-full text-[10px] table-fixed">
@@ -232,13 +232,13 @@ const AttendanceSheetPrint: React.FC = () => {
                             <tbody className="font-sans text-[10px]">
                                 {rows.length === 0 ? (
                                     <tr>
-                                        <td colSpan={totalColumnCount} className="text-center py-12 text-slate-500 italic">No attendance recorded for this date.</td>
+                                        <td colSpan={totalColumnCount} className="text-center py-12 text-[#7C7A72] italic">No attendance recorded for this date.</td>
                                     </tr>
                                 ) : (
                                     rows.map((row, index) => {
                                         const globalIndex = chunkIndex * ROWS_PER_PAGE + index + 1;
                                         return (
-                                            <tr key={row.participant.participant_id} className="text-center hover:bg-slate-50 print:hover:bg-transparent overflow-hidden" style={{ height: COMPACT_ROW_HEIGHT_PX }}>
+                                            <tr key={row.participant.participant_id} className="text-center hover:bg-[#F5F3EE] print:hover:bg-transparent overflow-hidden" style={{ height: COMPACT_ROW_HEIGHT_PX }}>
                                                 <td className="px-1 py-px border border-black">{globalIndex}</td>
                                                 <td className="px-2 py-0.5 text-left capitalize border border-black">
                                                     {renderCellText(row.participant.full_name, 25, 40)}
@@ -272,8 +272,8 @@ const AttendanceSheetPrint: React.FC = () => {
                             </tbody>
                         </table>
                     </div>
-                    <div className="w-full shrink-0 px-6 pb-1 pt-0.5 flex flex-col text-[8px] text-slate-600 font-sans">
-                        <div className="text-slate-400">System Generated Report - Page {chunkIndex + 1} of {rowChunks.length}</div>
+                    <div className="w-full shrink-0 px-6 pb-1 pt-0.5 flex flex-col text-[8px] text-[#6B6860] font-sans">
+                        <div className="text-[#9A9890]">System Generated Report - Page {chunkIndex + 1} of {rowChunks.length}</div>
                     </div>
                 </div>
             ));
