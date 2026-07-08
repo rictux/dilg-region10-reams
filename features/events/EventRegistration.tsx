@@ -215,6 +215,21 @@ const EventRegistration: React.FC = () => {
   };
 
   const normalizeNamePart = (value: string) => value.trim().toLowerCase();
+
+  // Hyphenated married surnames (e.g. "Cruz-Santos") should match records stored
+  // under either segment ("Cruz" or "Santos") and vice versa.
+  const splitLastNameSegments = (value: string) =>
+    normalizeNamePart(value)
+      .split('-')
+      .map((segment) => segment.trim())
+      .filter(Boolean);
+
+  const lastNamesShareSegment = (a: string, b: string) => {
+    const aSegments = splitLastNameSegments(a);
+    const bSegments = splitLastNameSegments(b);
+    return aSegments.some((segment) => bSegments.includes(segment));
+  };
+
   const closeMatchPrompt = () => {
     setShowMatchPrompt(false);
     setPotentialMatches([]);
@@ -402,19 +417,35 @@ const EventRegistration: React.FC = () => {
       return [];
     }
 
+    const lastNameSegments = splitLastNameSegments(formData.l_name)
+      .map((segment) => segment.replace(/[(),]/g, ''))
+      .filter(Boolean);
+
+    if (lastNameSegments.length === 0) {
+      return [];
+    }
+
     const { data, error } = await supabase
       .from('participants')
       .select('participant_id, participant_code, full_name, f_name, l_name, m_initial, suffix, email, mobile_no, office, position')
       .ilike('f_name', formData.f_name.trim())
-      .ilike('l_name', formData.l_name.trim())
-      .limit(10);
+      .or(lastNameSegments.map((segment) => `l_name.ilike.%${segment}%`).join(','))
+      .limit(25);
 
     if (error) throw error;
 
     const baseMatches = (data || []).filter((participant) =>
       normalizeNamePart(participant.f_name || '') === normalizedFirstName &&
-      normalizeNamePart(participant.l_name || '') === normalizedLastName
+      (normalizeNamePart(participant.l_name || '') === normalizedLastName ||
+        lastNamesShareSegment(participant.l_name || '', formData.l_name))
     );
+
+    // Exact last-name matches appear before hyphen-segment matches.
+    baseMatches.sort((a, b) => {
+      const aExact = normalizeNamePart(a.l_name || '') === normalizedLastName ? 0 : 1;
+      const bExact = normalizeNamePart(b.l_name || '') === normalizedLastName ? 0 : 1;
+      return aExact - bExact;
+    });
 
     return attachParticipationCounts(baseMatches);
   };
