@@ -69,6 +69,57 @@ const hourLabel = (hour: number) => {
   return `${h12} ${hour < 12 ? 'AM' : 'PM'}`;
 };
 
+// "June 11, 2026" for single-day events, "June 11-13, 2026" for multi-day ones
+// (month/year only repeated when they differ across the range).
+const formatEventDates = (startISO: string, endISO?: string | null) => {
+  const start = parseISO(startISO);
+  if (!endISO) return format(start, 'MMMM d, yyyy');
+  const end = parseISO(endISO);
+  if (format(start, 'yyyy-MM-dd') === format(end, 'yyyy-MM-dd')) return format(start, 'MMMM d, yyyy');
+  if (start.getFullYear() !== end.getFullYear()) {
+    return `${format(start, 'MMMM d, yyyy')} - ${format(end, 'MMMM d, yyyy')}`;
+  }
+  if (start.getMonth() !== end.getMonth()) {
+    return `${format(start, 'MMMM d')} - ${format(end, 'MMMM d, yyyy')}`;
+  }
+  return `${format(start, 'MMMM d')}-${format(end, 'd, yyyy')}`;
+};
+
+// Defined outside Analytics so their component identity is stable across
+// renders — declaring these inline made React remount every card (and replay
+// chart animations) on each state change, e.g. hovering the event picker.
+const StatCard = ({ icon: Icon, label, value, color, loading }: { icon: React.ElementType; label: string; value: React.ReactNode; color: string; loading: boolean }) => (
+  <div className="flex min-w-0 items-center gap-3 rounded-lg border border-[rgb(var(--ink)/0.08)] bg-card p-3 sm:gap-4 sm:p-5">
+    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${color}`}>
+      <Icon size={18} />
+    </div>
+    <div className="min-w-0">
+      <p className="font-mono text-xl font-medium leading-none text-slate-900 sm:text-2xl">{loading ? '…' : value}</p>
+      <p className="mt-1 truncate text-[11px] text-slate-600 sm:text-xs">{label}</p>
+    </div>
+  </div>
+);
+
+const ChartCard = ({ icon: Icon, title, children, legend }: { icon: React.ElementType; title: string; children: React.ReactNode; legend?: React.ReactNode }) => (
+  <div className="rounded-lg border border-[rgb(var(--ink)/0.08)] bg-card">
+    <div className="flex flex-wrap items-center gap-2 border-b border-[rgb(var(--ink)/0.06)] px-4 py-3">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-600/10 text-indigo-600">
+        <Icon size={13} />
+      </span>
+      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+      {legend && <div className="ml-auto flex items-center gap-3">{legend}</div>}
+    </div>
+    <div className="p-4">{children}</div>
+  </div>
+);
+
+const LegendSwatch = ({ color, label }: { color: string; label: string }) => (
+  <span className="flex items-center gap-1.5 text-[11px] text-slate-600">
+    <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: color }} />
+    {label}
+  </span>
+);
+
 const Analytics: React.FC = () => {
   const { user } = useAuth();
   const colors = useChartTheme();
@@ -96,7 +147,7 @@ const Analytics: React.FC = () => {
     return events.filter(
       (event) =>
         event.event_name.toLowerCase().includes(query) ||
-        format(parseISO(event.start_date), 'MMM d, yyyy').toLowerCase().includes(query)
+        formatEventDates(event.start_date, event.end_date).toLowerCase().includes(query)
     );
   }, [events, pickerQuery]);
 
@@ -343,38 +394,6 @@ const Analytics: React.FC = () => {
   const genderColor = (gender: string) =>
     gender === 'Male' ? colors.seriesAm : gender === 'Female' ? colors.seriesPm : colors.tick;
 
-  const StatCard = ({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: React.ReactNode; color: string }) => (
-    <div className="flex min-w-0 items-center gap-3 rounded-lg border border-[rgb(var(--ink)/0.08)] bg-card p-3 sm:gap-4 sm:p-5">
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${color}`}>
-        <Icon size={18} />
-      </div>
-      <div className="min-w-0">
-        <p className="font-mono text-xl font-medium leading-none text-slate-900 sm:text-2xl">{dataLoading ? '…' : value}</p>
-        <p className="mt-1 truncate text-[11px] text-slate-600 sm:text-xs">{label}</p>
-      </div>
-    </div>
-  );
-
-  const ChartCard = ({ icon: Icon, title, children, legend }: { icon: React.ElementType; title: string; children: React.ReactNode; legend?: React.ReactNode }) => (
-    <div className="rounded-lg border border-[rgb(var(--ink)/0.08)] bg-card">
-      <div className="flex flex-wrap items-center gap-2 border-b border-[rgb(var(--ink)/0.06)] px-4 py-3">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-600/10 text-indigo-600">
-          <Icon size={13} />
-        </span>
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-        {legend && <div className="ml-auto flex items-center gap-3">{legend}</div>}
-      </div>
-      <div className="p-4">{children}</div>
-    </div>
-  );
-
-  const LegendSwatch = ({ color, label }: { color: string; label: string }) => (
-    <span className="flex items-center gap-1.5 text-[11px] text-slate-600">
-      <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: color }} />
-      {label}
-    </span>
-  );
-
   const emptyChart = (message: string) => (
     <p className="py-12 text-center text-xs text-slate-400">{dataLoading ? 'Loading…' : message}</p>
   );
@@ -403,7 +422,7 @@ const Analytics: React.FC = () => {
                   <span className="flex min-w-0 flex-1 items-baseline gap-2 text-left">
                     <span className="truncate">{selectedEvent.event_name}</span>
                     <span className="shrink-0 font-mono text-xs text-slate-400">
-                      {format(parseISO(selectedEvent.start_date), 'MMM d, yyyy')}
+                      {formatEventDates(selectedEvent.start_date, selectedEvent.end_date)}
                     </span>
                   </span>
                 ) : (
@@ -449,13 +468,13 @@ const Analytics: React.FC = () => {
                             aria-selected={isSelected}
                             onClick={() => handlePickEvent(event.event_id)}
                             onMouseEnter={() => setPickerIndex(index)}
-                            className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
+                            className={`flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors ${
                               isHighlighted ? 'bg-slate-50 text-slate-900' : 'text-slate-700'
                             }`}
                           >
-                            <span className="min-w-0 flex-1 truncate">{event.event_name}</span>
+                            <span className="min-w-0 flex-1 whitespace-normal break-words text-xs leading-snug">{event.event_name}</span>
                             <span className="shrink-0 font-mono text-[11px] text-slate-400">
-                              {format(parseISO(event.start_date), 'MMM d, yyyy')}
+                              {formatEventDates(event.start_date, event.end_date)}
                             </span>
                             {isSelected && <Check size={14} className="shrink-0 text-indigo-600" strokeWidth={3} />}
                           </button>
@@ -494,10 +513,10 @@ const Analytics: React.FC = () => {
         <>
           {/* Stat tiles */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-            <StatCard icon={Users} label="Registered" value={registeredCount} color="bg-indigo-600/10 text-indigo-600" />
-            <StatCard icon={CheckCircle} label="Attended (unique)" value={attendedCount} color="bg-emerald-50 text-emerald-600" />
-            <StatCard icon={Percent} label="Attendance Rate" value={attendanceRate === null ? '—' : `${attendanceRate}%`} color="bg-blue-50 text-blue-600" />
-            <StatCard icon={ScanLine} label="Total Scans" value={logs.length} color="bg-stone-100 text-stone-500" />
+            <StatCard icon={Users} label="Registered" value={registeredCount} color="bg-indigo-600/10 text-indigo-600" loading={dataLoading} />
+            <StatCard icon={CheckCircle} label="Attended (unique)" value={attendedCount} color="bg-emerald-50 text-emerald-600" loading={dataLoading} />
+            <StatCard icon={Percent} label="Attendance Rate" value={attendanceRate === null ? '—' : `${attendanceRate}%`} color="bg-blue-50 text-blue-600" loading={dataLoading} />
+            <StatCard icon={ScanLine} label="Total Scans" value={logs.length} color="bg-stone-100 text-stone-500" loading={dataLoading} />
           </div>
 
           <div className="grid gap-4 xl:grid-cols-2">
