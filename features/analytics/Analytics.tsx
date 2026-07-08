@@ -11,7 +11,7 @@ import {
     CheckCircle,
     ChevronDown,
     Clock,
-    Copy,
+    Contact,
     Loader2,
     Percent,
     RefreshCw,
@@ -19,8 +19,7 @@ import {
     Search,
     TrendingUp,
     UserRound,
-    Users,
-    XCircle
+    Users
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import {
@@ -63,15 +62,6 @@ const AGE_GROUP_ORDER = ['18-24', '25-34', '35-44', '45-54', '55-65', '65+'];
 
 const PRESENT_SET = new Set<string>(PRESENT_ATTENDANCE_STATUSES);
 
-// Status colors are semantic (reserved palette) and intentionally not themed;
-// each is always paired with an icon and a text label, never color alone.
-const STATUS_META: { status: LogRow['scan_status']; label: string; icon: React.ElementType; light: string; dark: string }[] = [
-  { status: 'Valid',     label: 'Valid',     icon: CheckCircle, light: '#059669', dark: '#34D399' },
-  { status: 'Late',      label: 'Late',      icon: Clock,       light: '#D97706', dark: '#FBBF24' },
-  { status: 'Duplicate', label: 'Duplicate', icon: Copy,        light: '#78716C', dark: '#9D9DA6' },
-  { status: 'Invalid',   label: 'Invalid',   icon: XCircle,     light: '#DC2626', dark: '#F87171' }
-];
-
 const joined = (value: any) => (Array.isArray(value) ? value[0] : value);
 
 const hourLabel = (hour: number) => {
@@ -88,8 +78,10 @@ const Analytics: React.FC = () => {
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 
   const [logs, setLogs] = useState<LogRow[]>([]);
-  const [registeredCount, setRegisteredCount] = useState(0);
+  const [registrationRoles, setRegistrationRoles] = useState<string[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
+
+  const registeredCount = registrationRoles.length;
 
   // Searchable event picker
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -191,14 +183,27 @@ const Analytics: React.FC = () => {
   const fetchEventData = async (eventId: number) => {
     setDataLoading(true);
     try {
-      const { count } = await supabase
-        .from('event_participants')
-        .select('*', { count: 'exact', head: true })
-        .eq('event_id', eventId)
-        .eq('registration_status', 'Registered');
-      setRegisteredCount(count || 0);
-
       const PAGE = 1000;
+
+      // Registration roles for the event — the row count doubles as the
+      // registered total, so no separate head-count query is needed.
+      let roles: string[] = [];
+      let roleFrom = 0;
+      for (let page = 0; page < 20; page++) {
+        const { data, error } = await supabase
+          .from('event_participants')
+          .select('role')
+          .eq('event_id', eventId)
+          .eq('registration_status', 'Registered')
+          .range(roleFrom, roleFrom + PAGE - 1);
+
+        if (error) throw error;
+        roles = roles.concat((data || []).map((row: any) => row.role || 'Delegate'));
+        if (!data || data.length < PAGE) break;
+        roleFrom += PAGE;
+      }
+      setRegistrationRoles(roles);
+
       let from = 0;
       let all: LogRow[] = [];
       // Paged fetch — PostgREST caps a single response at 1000 rows.
@@ -219,6 +224,7 @@ const Analytics: React.FC = () => {
     } catch (err) {
       console.error('Failed to load analytics data', err);
       setLogs([]);
+      setRegistrationRoles([]);
     } finally {
       setDataLoading(false);
     }
@@ -274,11 +280,14 @@ const Analytics: React.FC = () => {
     return result;
   }, [presentLogs]);
 
-  const statusData = useMemo(() => {
+  // Registered participants per role (Delegate, Speaker, Secretariat, …).
+  const roleData = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const log of logs) counts.set(log.scan_status, (counts.get(log.scan_status) || 0) + 1);
-    return STATUS_META.map((meta) => ({ ...meta, count: counts.get(meta.status) || 0 }));
-  }, [logs]);
+    for (const role of registrationRoles) counts.set(role, (counts.get(role) || 0) + 1);
+    return Array.from(counts.entries())
+      .map(([role, count]) => ({ role, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [registrationRoles]);
 
   // One profile per unique present participant — demographics count people, not scans.
   const attendeeProfiles = useMemo(() => {
@@ -327,7 +336,7 @@ const Analytics: React.FC = () => {
       .sort((a, b) => b.count - a.count);
   }, [attendeeProfiles]);
 
-  const maxStatusCount = Math.max(1, ...statusData.map((s) => s.count));
+  const maxRoleCount = Math.max(1, ...roleData.map((r) => r.count));
   const maxOfficeCount = Math.max(1, ...officeData.map((o) => o.count));
 
   // Color follows the entity: each gender keeps its color regardless of rank.
@@ -601,26 +610,23 @@ const Analytics: React.FC = () => {
               )}
             </ChartCard>
 
-            {/* Scan status breakdown */}
-            <ChartCard icon={ScanLine} title="Scan Outcomes">
-              {logs.length === 0 ? emptyChart('No scans recorded.') : (
+            {/* Registered participants per role */}
+            <ChartCard icon={Contact} title="Participants by Role">
+              {roleData.length === 0 ? emptyChart('No registered participants.') : (
                 <div className="space-y-3 py-1">
-                  {statusData.map((item) => {
-                    const StatusIcon = item.icon;
-                    const color = colors.dark ? item.dark : item.light;
-                    const pct = logs.length > 0 ? Math.round((item.count / logs.length) * 100) : 0;
+                  {roleData.map((item) => {
+                    const pct = registeredCount > 0 ? Math.round((item.count / registeredCount) * 100) : 0;
                     return (
-                      <div key={item.status}>
-                        <div className="mb-1 flex items-center gap-1.5 text-xs">
-                          <StatusIcon size={13} style={{ color }} />
-                          <span className="text-slate-900">{item.label}</span>
-                          <span className="ml-auto font-mono text-slate-900">{item.count}</span>
-                          <span className="w-9 text-right font-mono text-slate-400">{pct}%</span>
+                      <div key={item.role}>
+                        <div className="mb-1 flex items-center gap-2 text-xs">
+                          <span className="min-w-0 flex-1 truncate text-slate-900">{item.role}</span>
+                          <span className="shrink-0 font-mono text-slate-900">{item.count}</span>
+                          <span className="w-9 shrink-0 text-right font-mono text-slate-400">{pct}%</span>
                         </div>
                         <div className="h-2 w-full overflow-hidden rounded-full bg-[rgb(var(--ink)/0.06)]">
                           <div
                             className="h-full rounded-r-full transition-all duration-300"
-                            style={{ width: `${(item.count / maxStatusCount) * 100}%`, backgroundColor: color }}
+                            style={{ width: `${(item.count / maxRoleCount) * 100}%`, backgroundColor: colors.accent }}
                           />
                         </div>
                       </div>
