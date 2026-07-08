@@ -16,8 +16,19 @@ import {
     Radio,
     ScanLine
 } from 'lucide-react';
-import { format, formatDistanceToNowStrict, isSameDay, parseISO } from 'date-fns';
+import { format, formatDistanceToNowStrict, isSameDay, parseISO, subMonths } from 'date-fns';
 import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
+import { ChartTooltip, useChartTheme } from '../../lib/chartTheme';
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    LabelList,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis
+} from 'recharts';
 
 interface DashboardEvent {
   event_id: number;
@@ -52,7 +63,9 @@ const Dashboard: React.FC = () => {
   const [ongoingEvents, setOngoingEvents] = useState<DashboardEvent[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<DashboardEvent[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>([]);
+  const [monthlyEvents, setMonthlyEvents] = useState<{ label: string; Events: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const chartColors = useChartTheme();
 
   useEffect(() => {
     if (user) {
@@ -93,6 +106,22 @@ const Dashboard: React.FC = () => {
             upcomingEvents: accessibleEvents.filter((event) => event.status === 'Scheduled').length,
             completedEvents: accessibleEvents.filter((event) => event.status === 'Completed').length
         });
+
+        // Events per month over the last 12 months, bucketed by start date.
+        const countsByMonth = new Map<string, number>();
+        accessibleEvents.forEach((event) => {
+            const key = format(parseISO(event.start_date), 'yyyy-MM');
+            countsByMonth.set(key, (countsByMonth.get(key) || 0) + 1);
+        });
+        setMonthlyEvents(
+            Array.from({ length: 12 }, (_, i) => {
+                const month = subMonths(new Date(), 11 - i);
+                return {
+                    label: format(month, 'MMM yy'),
+                    Events: countsByMonth.get(format(month, 'yyyy-MM')) || 0
+                };
+            })
+        );
 
         // 2. On-going Events (happening today)
         const ongoingData = accessibleEvents.filter((event) => event.start_date <= today && event.end_date >= today);
@@ -230,6 +259,34 @@ const Dashboard: React.FC = () => {
 
       <div className="flex flex-col lg:flex-row gap-4 items-start">
         <div className="w-full lg:flex-1 min-w-0 space-y-4">
+      {/* Monthly event count */}
+      <div className="bg-card rounded-lg border border-[rgb(var(--ink)/0.08)]">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[rgb(var(--ink)/0.06)]">
+          <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-indigo-600/10 text-indigo-600">
+            <CalendarIcon size={13} />
+          </span>
+          <h3 className="text-sm font-semibold text-slate-900">Monthly Events</h3>
+          <span className="ml-auto text-xs text-slate-400">Last 12 months</span>
+        </div>
+        <div className="p-4">
+          {loading ? (
+            <p className="py-12 text-center text-xs text-slate-400">Loading…</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={monthlyEvents} margin={{ top: 16, right: 8, left: -22, bottom: 0 }} barCategoryGap="30%">
+                <CartesianGrid vertical={false} stroke={chartColors.grid} />
+                <XAxis dataKey="label" tick={{ fill: chartColors.tick, fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <YAxis allowDecimals={false} tick={{ fill: chartColors.tick, fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: chartColors.cursor }} />
+                <Bar dataKey="Events" name="Events" fill={chartColors.accent} radius={[3, 3, 0, 0]} maxBarSize={26}>
+                  <LabelList dataKey="Events" position="top" fill={chartColors.label} fontSize={10} formatter={(value: number) => (value > 0 ? value : '')} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
       {/* Happening Today hero */}
       <div className="bg-card rounded-lg border border-[rgb(var(--ink)/0.08)] overflow-hidden">
         <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[rgb(var(--ink)/0.06)] bg-emerald-50/40">

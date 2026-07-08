@@ -37,7 +37,8 @@ import {
   Gift,
   FileSignature,
   Megaphone,
-  Palette
+  Palette,
+  TrendingUp
 } from 'lucide-react';
 import { Permission } from '../config/permissions';
 
@@ -692,6 +693,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const getPageTitle = () => {
     switch (location.pathname) {
       case '/dashboard': return 'Overview';
+      case '/analytics': return 'Analytics';
       case '/events': return 'Events';
       case '/attendance': return 'Attendance';
       case '/admin/lookup': return 'Name Lookup';
@@ -720,7 +722,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const accessiblePages: SearchablePage[] = ([
-    { label: 'Dashboard',   path: '/dashboard',    icon: LayoutDashboard, section: 'Navigation', permission: 'VIEW_DASHBOARD' },
+    { label: 'Overview',    path: '/dashboard',    icon: LayoutDashboard, section: 'Navigation', permission: 'VIEW_DASHBOARD' },
+    { label: 'Analytics',   path: '/analytics',    icon: TrendingUp,      section: 'Navigation', permission: 'VIEW_DASHBOARD' },
     { label: 'Events',      path: '/events',       icon: Calendar,        section: 'Navigation', permission: 'MANAGE_EVENTS' },
     { label: 'Attendance',  path: '/attendance',   icon: ClipboardList,   section: 'Navigation', permission: 'VIEW_PARTICIPANTS' },
     { label: 'Name Lookup', path: '/admin/lookup', icon: Search,          section: 'Navigation' },
@@ -824,7 +827,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         }`}>
           <SidebarSection title="Navigation">
             {hasPermission('VIEW_DASHBOARD') && (
-                <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" />
+                <NavItem to="/dashboard" icon={LayoutDashboard} label="Overview" />
+            )}
+            {hasPermission('VIEW_DASHBOARD') && (
+                <NavItem to="/analytics" icon={TrendingUp} label="Analytics" />
             )}
             {hasPermission('MANAGE_EVENTS') && (
                 <NavItem to="/events" icon={Calendar} label="Events" />

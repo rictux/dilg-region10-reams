@@ -7,6 +7,7 @@ import Signup from './features/auth/Signup';
 import Layout from './components/Layout';
 import AnnouncementModal from './components/AnnouncementModal';
 import Dashboard from './features/dashboard/Dashboard';
+import Analytics from './features/analytics/Analytics';
 import EventsList from './features/events/EventsList';
 import EventRegistration from './features/events/EventRegistration';
 import ParticipantsList from './features/participants/ParticipantsList';
@@ -67,6 +68,13 @@ const App: React.FC = () => {
             </ProtectedRoute>
           } />
           
+          {/* Analytics - Requires VIEW_DASHBOARD */}
+          <Route path="/analytics" element={
+            <ProtectedRoute requiredPermission="VIEW_DASHBOARD">
+              <Layout><Analytics /></Layout>
+            </ProtectedRoute>
+          } />
+
           {/* Events - Requires MANAGE_EVENTS */}
           <Route path="/events" element={
             <ProtectedRoute requiredPermission="MANAGE_EVENTS">
