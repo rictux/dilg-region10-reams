@@ -69,20 +69,20 @@ const hourLabel = (hour: number) => {
   return `${h12} ${hour < 12 ? 'AM' : 'PM'}`;
 };
 
-// "June 11, 2026" for single-day events, "June 11-13, 2026" for multi-day ones
+// "Jun 11, 2026" for single-day events, "Jun 11-13, 2026" for multi-day ones
 // (month/year only repeated when they differ across the range).
 const formatEventDates = (startISO: string, endISO?: string | null) => {
   const start = parseISO(startISO);
-  if (!endISO) return format(start, 'MMMM d, yyyy');
+  if (!endISO) return format(start, 'MMM d, yyyy');
   const end = parseISO(endISO);
-  if (format(start, 'yyyy-MM-dd') === format(end, 'yyyy-MM-dd')) return format(start, 'MMMM d, yyyy');
+  if (format(start, 'yyyy-MM-dd') === format(end, 'yyyy-MM-dd')) return format(start, 'MMM d, yyyy');
   if (start.getFullYear() !== end.getFullYear()) {
-    return `${format(start, 'MMMM d, yyyy')} - ${format(end, 'MMMM d, yyyy')}`;
+    return `${format(start, 'MMM d, yyyy')} - ${format(end, 'MMM d, yyyy')}`;
   }
   if (start.getMonth() !== end.getMonth()) {
-    return `${format(start, 'MMMM d')} - ${format(end, 'MMMM d, yyyy')}`;
+    return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
   }
-  return `${format(start, 'MMMM d')}-${format(end, 'd, yyyy')}`;
+  return `${format(start, 'MMM d')}-${format(end, 'd, yyyy')}`;
 };
 
 // Defined outside Analytics so their component identity is stable across
