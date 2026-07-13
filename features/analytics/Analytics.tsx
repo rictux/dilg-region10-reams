@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
-import { ChartTooltip, useChartTheme } from '../../lib/chartTheme';
+import { ChartTooltip, pickRampColors, useChartTheme } from '../../lib/chartTheme';
 import {
     Building2,
     Calendar as CalendarIcon,
@@ -113,7 +113,9 @@ const ChartCard = ({ icon: Icon, title, children, legend }: { icon: React.Elemen
   </div>
 );
 
-const LegendSwatch = ({ color, label }: { color: string; label: string }) => (
+// `key` is React's list key (accepted, never read) — without @types/react
+// installed it must appear in the prop type for keyed usage to typecheck.
+const LegendSwatch = ({ color, label }: { color: string; label: string; key?: string }) => (
   <span className="flex items-center gap-1.5 text-[11px] text-slate-600">
     <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: color }} />
     {label}
@@ -313,23 +315,42 @@ const Analytics: React.FC = () => {
       }));
   }, [presentLogs]);
 
-  // Valid check-ins per hour of day, over the whole event.
+  // Distinct check-in dates, in order — multi-day events get one stacked
+  // series per day in the hourly chart so an hour's bar shows which day the
+  // scans came from instead of summing days together indistinguishably.
+  const hourlyDayLabels = useMemo(
+    () =>
+      Array.from(new Set<string>(presentLogs.map((log) => log.attendance_date)))
+        .sort()
+        .map((date) => format(parseISO(date), 'MMM d')),
+    [presentLogs]
+  );
+
+  // Valid check-ins per hour of day, keyed by day label within each hour.
   const hourlyData = useMemo(() => {
     if (presentLogs.length === 0) return [];
-    const byHour = new Map<number, number>();
+    const byHour = new Map<number, Record<string, number>>();
     for (const log of presentLogs) {
       const hour = parseISO(log.scan_time).getHours();
-      byHour.set(hour, (byHour.get(hour) || 0) + 1);
+      if (!byHour.has(hour)) byHour.set(hour, {});
+      const bucket = byHour.get(hour)!;
+      const day = format(parseISO(log.attendance_date), 'MMM d');
+      bucket[day] = (bucket[day] || 0) + 1;
     }
     const hours = Array.from(byHour.keys());
     const min = Math.min(...hours);
     const max = Math.max(...hours);
+    const zeros = Object.fromEntries(hourlyDayLabels.map((day) => [day, 0]));
     const result = [];
     for (let h = min; h <= max; h++) {
-      result.push({ label: hourLabel(h), Scans: byHour.get(h) || 0 });
+      result.push({ label: hourLabel(h), ...zeros, ...byHour.get(h) });
     }
     return result;
-  }, [presentLogs]);
+  }, [presentLogs, hourlyDayLabels]);
+
+  // Reversed so day 1 — the bottom segment of each stack — gets the darkest
+  // shade, fading lighter toward the top.
+  const hourlyDayColors = pickRampColors(colors.ramp, hourlyDayLabels.length).reverse();
 
   // Registered participants per role (Delegate, Speaker, Secretariat, …).
   const roleData = useMemo(() => {
@@ -549,8 +570,15 @@ const Analytics: React.FC = () => {
               )}
             </ChartCard>
 
-            {/* Check-in flow by hour */}
-            <ChartCard icon={Clock} title="Check-in Time Distribution">
+            {/* Check-in flow by hour — stacked by day for multi-day events */}
+            <ChartCard
+              icon={Clock}
+              title="Check-in Time Distribution"
+              legend={
+                hourlyDayLabels.length > 1 &&
+                hourlyDayLabels.map((day, i) => <LegendSwatch key={day} color={hourlyDayColors[i]} label={day} />)
+              }
+            >
               {hourlyData.length === 0 ? emptyChart('No valid check-ins recorded.') : (
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={hourlyData} margin={{ top: 18, right: 8, left: -18, bottom: 0 }} barCategoryGap="24%">
@@ -558,7 +586,19 @@ const Analytics: React.FC = () => {
                     <XAxis dataKey="label" tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                     <YAxis allowDecimals={false} tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
                     <Tooltip content={<ChartTooltip />} cursor={{ fill: colors.cursor }} />
-                    <Bar dataKey="Scans" name="Check-ins" fill={colors.accent} radius={[3, 3, 0, 0]} maxBarSize={28} />
+                    {hourlyDayLabels.map((day, i) => (
+                      <Bar
+                        key={day}
+                        dataKey={day}
+                        name={hourlyDayLabels.length === 1 ? 'Check-ins' : day}
+                        stackId="hour"
+                        fill={hourlyDayLabels.length === 1 ? colors.accent : hourlyDayColors[i]}
+                        stroke={colors.surface}
+                        strokeWidth={hourlyDayLabels.length > 1 ? 1 : 0}
+                        radius={i === hourlyDayLabels.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+                        maxBarSize={28}
+                      />
+                    ))}
                   </BarChart>
                 </ResponsiveContainer>
               )}

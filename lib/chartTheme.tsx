@@ -22,7 +22,17 @@ export const useChartTheme = () => {
       grid: dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)',
       cursor: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
       label: readVar('--neu-600'),
-      surface: readVar('--surface')
+      surface: readVar('--surface'),
+      // Sequential accent shades (light→dark) for charts split by an ordered
+      // dimension such as event days — pick evenly spaced entries via
+      // pickRampColors(). Dark mode shifts one step lighter for visibility on
+      // the dark surface; the lightest steps' sub-3:1 contrast is relieved the
+      // same way as the AM/PM pair (legend swatches + tooltips + surface
+      // strokes between stacked segments).
+      ramp: (dark
+        ? ['--acc-200', '--acc-300', '--acc-400', '--acc-500', '--acc-600']
+        : ['--acc-300', '--acc-400', '--acc-500', '--acc-700', '--acc-800']
+      ).map(readVar)
     };
   };
 
@@ -35,6 +45,14 @@ export const useChartTheme = () => {
   }, []);
 
   return colors;
+};
+
+// `count` evenly spaced colors from a ramp — the ends are used first so charts
+// with few series get maximum separation; counts past the ramp length cycle.
+export const pickRampColors = (ramp: string[], count: number): string[] => {
+  if (count >= ramp.length) return Array.from({ length: count }, (_, i) => ramp[i % ramp.length]);
+  if (count <= 1) return [ramp[ramp.length - 1]];
+  return Array.from({ length: count }, (_, i) => ramp[Math.round((i * (ramp.length - 1)) / (count - 1))]);
 };
 
 export const ChartTooltip = ({ active, payload, label }: any) => {
