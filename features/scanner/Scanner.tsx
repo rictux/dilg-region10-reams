@@ -21,6 +21,7 @@ import {
   Play
 } from 'lucide-react';
 import { Event, GiveawayItem } from '../../types/database';
+import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { SCAN_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
@@ -78,6 +79,7 @@ interface GiveawayClaimDetails {
 
 const Scanner: React.FC = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<'Valid' | 'Invalid' | 'Duplicate' | 'Offline-Saved' | null>(null);
   const [resultMessage, setResultMessage] = useState('');
@@ -251,8 +253,18 @@ const Scanner: React.FC = () => {
         
         if (data && data.length > 0) {
           setEvents(data);
-          
-          if (data.length === 1) {
+
+          // An `?event=<id>` param (e.g. the dashboard's Scan button) preselects
+          // that event even when several are happening today.
+          const requestedId = searchParams.get('event');
+          const requestedEvent = requestedId
+            ? data.find((event) => event.event_id.toString() === requestedId)
+            : undefined;
+
+          if (requestedEvent) {
+            setSelectedEventId(requestedEvent.event_id.toString());
+            setSession(getDefaultSessionForEvent(requestedEvent));
+          } else if (data.length === 1) {
             setSelectedEventId(data[0].event_id.toString());
             setSession(getDefaultSessionForEvent(data[0]));
           } else {
@@ -272,7 +284,7 @@ const Scanner: React.FC = () => {
     if (isOnline && user) {
         loadEvents();
     }
-  }, [isOnline, user]);
+  }, [isOnline, user, searchParams]);
 
   // --- 3. Cache Participants when Event is Selected ---
   useEffect(() => {

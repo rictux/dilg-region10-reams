@@ -355,7 +355,7 @@ const Dashboard: React.FC = () => {
                     {hasPermission('SCAN_QR') && (
                       <button
                         type="button"
-                        onClick={() => navigate('/scan')}
+                        onClick={() => navigate(`/scan?event=${event.event_id}`)}
                         className="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
                       >
                         <ScanLine size={13} />
