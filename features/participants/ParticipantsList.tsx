@@ -1444,8 +1444,8 @@ const AttendanceList: React.FC = () => {
                                         })()}
                                     </div>
                                 </td>
-                                <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 text-slate-600">
-                                    <div className="whitespace-normal break-words leading-snug">
+                                <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 text-slate-600 max-w-0">
+                                    <div className="truncate leading-snug" title={row.participant.position}>
                                         {row.participant.position}
                                     </div>
                                 </td>
