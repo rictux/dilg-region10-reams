@@ -5,3 +5,6 @@ enabled = true
 
 [functions.send-certificate]
 verify_jwt = false
+
+[functions.send-qr]
+verify_jwt = false
