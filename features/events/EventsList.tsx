@@ -18,6 +18,7 @@ import {
   serializeFoodInclusion
 } from '../../lib/eventFoodInclusion';
 import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents, isEventOwnerOffice } from '../../lib/eventAccess';
+import { sendParticipantQrById } from '../../lib/emailService';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 
 type ParticipantFormData = {
@@ -170,6 +171,9 @@ const EventsList: React.FC = () => {
   const [newParticipant, setNewParticipant] = useState<ParticipantFormData>(createEmptyParticipantForm());
   const [editingParticipantRecord, setEditingParticipantRecord] = useState<ParticipantModalRecord | null>(null);
   const [logAttendanceOnRegister, setLogAttendanceOnRegister] = useState(false);
+  const [sendQrOnRegister, setSendQrOnRegister] = useState(true);
+  // QR email can only be sent when the email field holds a valid address.
+  const canSendQrEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newParticipant.email.trim());
 
   // Affiliation State
   const [affiliationType, setAffiliationType] = useState<'Office' | 'LGU'>('Office');
@@ -1120,6 +1124,7 @@ const EventsList: React.FC = () => {
       setNewParticipant(createEmptyParticipantForm());
       setEditingParticipantRecord(null);
       setLogAttendanceOnRegister(false);
+      setSendQrOnRegister(true);
       setAffiliationType('Office');
       setSelectedProvince('');
       setSelectedCity('');
@@ -1591,6 +1596,23 @@ const EventsList: React.FC = () => {
               } catch (attendanceErr: any) {
                   // Registration already succeeded; surface attendance issue without failing the whole flow.
                   toast.error('Participant registered, but attendance logging failed: ' + attendanceErr.message);
+              }
+          }
+
+          // 4. Optionally email the participant their QR code.
+          if (sendQrOnRegister && canSendQrEmail) {
+              const qrResult = await sendParticipantQrById(
+                  participantId,
+                  selectedEvent,
+                  formatEventDate(selectedEvent.start_date, selectedEvent.end_date)
+              );
+
+              if (qrResult.success) {
+                  toast.success('QR code emailed to participant.');
+              } else if (qrResult.skipped) {
+                  toast.info('QR code not emailed — participant has no email address.');
+              } else {
+                  toast.error('Participant registered, but QR email failed: ' + qrResult.error);
               }
           }
 
@@ -3535,8 +3557,27 @@ const EventsList: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {participantModalView === 'add' && isTodayEventDay(selectedEvent) && (
-                                    <div className="flex items-start gap-3 mt-6 p-3 rounded-lg bg-indigo-50 border border-indigo-100">
+                                {participantModalView === 'add' && (
+                                    <div className="space-y-2">
+                                    <div className="flex items-start gap-3 p-3 rounded-lg bg-indigo-50 border border-indigo-100">
+                                        <div className="flex items-center h-5">
+                                            <input
+                                                id="modal-send-qr-email"
+                                                type="checkbox"
+                                                checked={sendQrOnRegister && canSendQrEmail}
+                                                disabled={!canSendQrEmail}
+                                                onChange={(e) => setSendQrOnRegister(e.target.checked)}
+                                                className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer disabled:cursor-not-allowed"
+                                            />
+                                        </div>
+                                        <label htmlFor="modal-send-qr-email" className={`text-xs leading-relaxed cursor-pointer ${canSendQrEmail ? 'text-slate-600' : 'text-slate-400'}`}>
+                                            Send the participant's <span className={`font-semibold ${canSendQrEmail ? 'text-indigo-700' : 'text-slate-400'}`}>QR code</span> to his/her email upon registration.
+                                            {!canSendQrEmail && <span className="block text-[11px] text-slate-400 mt-0.5">Requires a valid email address.</span>}
+                                        </label>
+                                    </div>
+
+                                    {isTodayEventDay(selectedEvent) && (
+                                    <div className="flex items-start gap-3 p-3 rounded-lg bg-indigo-50 border border-indigo-100">
                                         <div className="flex items-center h-5">
                                             <input
                                                 id="modal-log-attendance"
@@ -3549,6 +3590,8 @@ const EventsList: React.FC = () => {
                                         <label htmlFor="modal-log-attendance" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
                                             Log <span className="font-semibold text-indigo-700">{getRegistrationAttendanceSession(selectedEvent)}</span> attendance for today ({format(new Date(), 'MMM d, yyyy')}) upon registration.
                                         </label>
+                                    </div>
+                                    )}
                                     </div>
                                 )}
 

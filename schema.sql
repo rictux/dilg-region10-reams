@@ -186,6 +186,9 @@ CREATE TABLE IF NOT EXISTS event_participants (
     date_accommodation DATE[],
     ca_serial_no INT NULL,
     ca_issued_at TIMESTAMP WITH TIME ZONE NULL,
+    ca_email_sent_at TIMESTAMP WITH TIME ZONE NULL,
+    cop_email_sent_at TIMESTAMP WITH TIME ZONE NULL,
+    qr_email_sent_at TIMESTAMP WITH TIME ZONE NULL,
     UNIQUE(event_id, participant_id)
 );
 

@@ -3,8 +3,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Participant, Event, GiveawayItem } from '../../types/database';
-import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Bed, ChevronDown, Check, UserPlus, Building, Landmark, Download, Gift } from 'lucide-react';
+import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Bed, ChevronDown, Check, UserPlus, Building, Landmark, Download, Gift, Mail } from 'lucide-react';
 import QRCode from 'react-qr-code';
+import QRCodeLib from 'qrcode';
+import { sendQrEmail, sendParticipantQrById } from '../../lib/emailService';
 import { format, parseISO, eachDayOfInterval, isSameMonth, isSameYear } from 'date-fns';
 import { toPng } from 'html-to-image';
 import { toast } from 'sonner';
@@ -100,6 +102,7 @@ const AttendanceList: React.FC = () => {
   const [filter, setFilter] = useState('Show All');
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
   const [qrToken, setQrToken] = useState<string>('');
+  const [sendingQr, setSendingQr] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Event Selection State
@@ -162,6 +165,9 @@ const AttendanceList: React.FC = () => {
   const [suggestions, setSuggestions] = useState<Participant[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [logAttendanceOnRegister, setLogAttendanceOnRegister] = useState(false);
+  const [sendQrOnRegister, setSendQrOnRegister] = useState(true);
+  // QR email can only be sent when the email field holds a valid address.
+  const canSendQrEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newParticipant.email.trim());
 
   // Affiliation State
   const [affiliationType, setAffiliationType] = useState<'Office' | 'LGU'>('Office');
@@ -733,6 +739,48 @@ const AttendanceList: React.FC = () => {
       return format(d, 'h:mm a');
   };
 
+  const handleSendQrEmail = async () => {
+      if (!selectedParticipant || !qrToken || sendingQr) return;
+
+      if (!selectedParticipant.email) {
+          toast.error('This participant has no email address on record.');
+          return;
+      }
+
+      setSendingQr(true);
+      try {
+          // Generate the QR as a PNG data URL (email clients don't render SVG)
+          const qrPngDataUrl = await QRCodeLib.toDataURL(qrToken, {
+              width: 440,
+              margin: 2,
+              errorCorrectionLevel: 'H'
+          });
+
+          const result = await sendQrEmail(
+              selectedParticipant.email,
+              qrPngDataUrl,
+              selectedParticipant.full_name,
+              selectedParticipant.participant_code,
+              selectedParticipant.participant_id,
+              selectedEvent?.event_id,
+              selectedEvent ? (selectedEvent.title || selectedEvent.event_name) : undefined,
+              selectedEvent ? formatEventDate(selectedEvent.start_date, selectedEvent.end_date) : undefined,
+              selectedEvent?.venue || undefined
+          );
+
+          if (result.success) {
+              toast.success(`QR code sent to ${selectedParticipant.email}`);
+          } else {
+              toast.error(`Failed to send QR code: ${result.error}`);
+          }
+      } catch (err) {
+          console.error('Error sending QR email:', err);
+          toast.error('Failed to send QR code email.');
+      } finally {
+          setSendingQr(false);
+      }
+  };
+
   const handleSaveBadge = async () => {
       if (badgeRef.current && selectedParticipant) {
           try {
@@ -1092,6 +1140,23 @@ const AttendanceList: React.FC = () => {
               }
           }
 
+          // 4. Optionally email the participant their QR code.
+          if (sendQrOnRegister && canSendQrEmail) {
+              const qrResult = await sendParticipantQrById(
+                  participantId,
+                  selectedEvent,
+                  formatEventDate(selectedEvent.start_date, selectedEvent.end_date)
+              );
+
+              if (qrResult.success) {
+                  toast.success('QR code emailed to participant.');
+              } else if (qrResult.skipped) {
+                  toast.info('QR code not emailed — participant has no email address.');
+              } else {
+                  toast.error('Participant registered, but QR email failed: ' + qrResult.error);
+              }
+          }
+
           // Success
           setShowAddParticipantModal(false);
           setNewParticipant({
@@ -1120,6 +1185,7 @@ const AttendanceList: React.FC = () => {
           });
           setSuggestions([]);
           setLogAttendanceOnRegister(false);
+          setSendQrOnRegister(true);
           // fetchAttendance will be triggered by supabase real-time channel
 
       } catch (err: any) {
@@ -2052,6 +2118,24 @@ const AttendanceList: React.FC = () => {
                         </div>
                     </div>
 
+                    <div className="space-y-2">
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-indigo-50 border border-indigo-100">
+                        <div className="flex items-center h-5">
+                            <input
+                                id="modal-send-qr-email"
+                                type="checkbox"
+                                checked={sendQrOnRegister && canSendQrEmail}
+                                disabled={!canSendQrEmail}
+                                onChange={(e) => setSendQrOnRegister(e.target.checked)}
+                                className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer disabled:cursor-not-allowed"
+                            />
+                        </div>
+                        <label htmlFor="modal-send-qr-email" className={`text-xs leading-relaxed cursor-pointer ${canSendQrEmail ? 'text-slate-600' : 'text-slate-400'}`}>
+                            Send the participant's <span className={`font-semibold ${canSendQrEmail ? 'text-indigo-700' : 'text-slate-400'}`}>QR code</span> to his/her email upon registration.
+                            {!canSendQrEmail && <span className="block text-[11px] text-slate-400 mt-0.5">Requires a valid email address.</span>}
+                        </label>
+                    </div>
+
                     {isTodayEventDay(selectedEvent) && (
                         <div className="flex items-start gap-3 p-3 rounded-lg bg-indigo-50 border border-indigo-100">
                             <div className="flex items-center h-5">
@@ -2068,6 +2152,7 @@ const AttendanceList: React.FC = () => {
                             </label>
                         </div>
                     )}
+                    </div>
 
                     <div className="pt-2">
                         <button
@@ -2288,9 +2373,18 @@ const AttendanceList: React.FC = () => {
                         <p className="text-[#6B6860] text-sm">{selectedParticipant.office}</p>
                      </>
                 </div>
-                <div className="px-8 pb-8 pt-0">
+                <div className="px-8 pb-8 pt-0 space-y-2">
                     <button onClick={handleSaveBadge} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors">
                         <Download size={18} /> Save Badge
+                    </button>
+                    <button
+                        onClick={handleSendQrEmail}
+                        disabled={sendingQr || !selectedParticipant.email}
+                        title={!selectedParticipant.email ? 'No email address on record' : undefined}
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
+                    >
+                        {sendingQr ? <Loader2 size={18} className="animate-spin" /> : <Mail size={18} />}
+                        {sendingQr ? 'Sending...' : 'Send QR to Email'}
                     </button>
                 </div>
             </div>

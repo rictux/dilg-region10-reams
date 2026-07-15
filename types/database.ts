@@ -115,6 +115,9 @@ export interface EventParticipant {
   ca_issued_at?: string | null;
   need_ca?: boolean | null;
   giveaway_selections?: Record<string, string | boolean> | null;
+  ca_email_sent_at?: string | null;
+  cop_email_sent_at?: string | null;
+  qr_email_sent_at?: string | null;
 }
 
 export interface AttendanceLog {
