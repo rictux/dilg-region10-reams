@@ -760,12 +760,13 @@ const AttendanceList: React.FC = () => {
               selectedParticipant.email,
               qrPngDataUrl,
               selectedParticipant.full_name,
-              selectedParticipant.participant_code,
               selectedParticipant.participant_id,
               selectedEvent?.event_id,
               selectedEvent ? (selectedEvent.title || selectedEvent.event_name) : undefined,
               selectedEvent ? formatEventDate(selectedEvent.start_date, selectedEvent.end_date) : undefined,
-              selectedEvent?.venue || undefined
+              selectedEvent?.venue || undefined,
+              selectedParticipant.position || undefined,
+              selectedParticipant.office || undefined
           );
 
           if (result.success) {
