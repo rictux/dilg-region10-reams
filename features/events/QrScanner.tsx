@@ -5,9 +5,10 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 interface QrScannerProps {
   onScanSuccess: (decodedText: string) => void;
   onScanFailure?: (error: any) => void;
+  active?: boolean;
 }
 
-const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure }) => {
+const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure, active = true }) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isStoppedRef = useRef(false);
   const onSuccessRef = useRef(onScanSuccess);
@@ -21,6 +22,20 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure }) =
     onSuccessRef.current = onScanSuccess;
     onFailureRef.current = onScanFailure;
   }, [onScanSuccess, onScanFailure]);
+
+  // Stop camera when active becomes false (e.g., modal closed)
+  useEffect(() => {
+    if (!active && scannerRef.current) {
+      isStoppedRef.current = true;
+      try {
+        scannerRef.current.stop().catch(() => {});
+        scannerRef.current.clear();
+      } catch {}
+      scannerRef.current = null;
+      setError(null);
+      setIsInitializing(false);
+    }
+  }, [active]);
 
   // Start the scanner with rear camera.
   useEffect(() => {

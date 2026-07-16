@@ -1673,6 +1673,7 @@ const EventRegistration: React.FC = () => {
             </div>
 
             <QrScanner
+              active={showQrScanner}
               onScanSuccess={(code) => {
                 setShowQrScanner(false);
                 handleQrScanSuccess(code);
