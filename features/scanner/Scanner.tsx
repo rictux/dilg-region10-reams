@@ -3,22 +3,23 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { 
-  CheckCircle, 
-  XCircle, 
-  RefreshCw, 
-  Sun, 
-  Moon, 
-  AlertTriangle, 
-  History, 
-  User, 
+import {
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Sun,
+  Moon,
+  AlertTriangle,
+  History,
+  User,
   MapPin,
   Calendar,
   WifiOff,
   CloudUpload,
   Gift,
   Pause,
-  Play
+  Play,
+  Loader2
 } from 'lucide-react';
 import { Event, GiveawayItem } from '../../types/database';
 import { useSearchParams } from 'react-router-dom';
@@ -103,7 +104,20 @@ const Scanner: React.FC = () => {
   // Recent History State
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
   const [focusBoxSize, setFocusBoxSize] = useState(280);
-  
+
+  // Auto-Registration Modal State
+  const [showAutoRegModal, setShowAutoRegModal] = useState(false);
+  const [autoRegStep, setAutoRegStep] = useState<'confirm' | 'details'>('confirm');
+  const [scannedParticipant, setScannedParticipant] = useState<any>(null);
+  const [autoRegData, setAutoRegData] = useState({
+    needs_accommodation: false,
+    date_accommodation: [] as string[],
+    need_ca: false,
+    giveaway_selections: {} as Record<string, string | boolean>
+  });
+  const [autoRegSubmitting, setAutoRegSubmitting] = useState(false);
+  const [autoRegEventId, setAutoRegEventId] = useState<number | null>(null);
+
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const cameraViewportRef = useRef<HTMLDivElement | null>(null);
   const readerId = "qr-reader-viewport";
@@ -478,9 +492,78 @@ const Scanner: React.FC = () => {
     }
   };
 
+  const getEventAccommodationDates = (event?: Event) => {
+    if (!event?.has_accommodation) return [] as string[];
+    const savedDates = (event.dates_with_accom || []).filter(Boolean);
+    if (savedDates.length > 0) return savedDates;
+
+    try {
+      if (!event.start_date) return [];
+      const startDate = new Date(event.start_date);
+      const endDate = event.end_date ? new Date(event.end_date) : startDate;
+
+      const dates: string[] = [];
+      const currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        dates.push(currentDate.toISOString().split('T')[0]);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      return dates;
+    } catch {
+      return [];
+    }
+  };
+
+  const handleAutoRegConfirm = () => {
+    setAutoRegStep('details');
+  };
+
+  const handleAutoRegSubmit = async () => {
+    if (!scannedParticipant || !autoRegEventId || !selectedEvent) return;
+
+    setAutoRegSubmitting(true);
+    try {
+      const accommodationDates = autoRegData.needs_accommodation && selectedEvent.has_accommodation
+        ? autoRegData.date_accommodation
+        : null;
+
+      const { error } = await supabase
+        .from('event_participants')
+        .insert({
+          event_id: autoRegEventId,
+          participant_id: scannedParticipant.participant_id,
+          registration_status: 'Registered',
+          role: 'Delegate',
+          needs_accommodation: autoRegData.needs_accommodation,
+          accommodation_pax: autoRegData.needs_accommodation ? 1 : 0,
+          date_accommodation: accommodationDates,
+          need_ca: autoRegData.need_ca,
+          giveaway_selections: autoRegData.giveaway_selections,
+          accept_photo_video: false,
+          store_to_db: false
+        });
+
+      if (error) {
+        if (error.code === '23505') {
+          processScanResult('Duplicate', 'Participant is already registered.', scannedParticipant.full_name, scannedParticipant.position);
+        } else {
+          throw error;
+        }
+      } else {
+        processScanResult('Valid', 'Auto-registered successfully', scannedParticipant.full_name, scannedParticipant.position);
+        setShowAutoRegModal(false);
+        setScannedParticipant(null);
+      }
+    } catch (err: any) {
+      processScanResult('Invalid', err.message || 'Auto-registration failed', scannedParticipant.full_name, '');
+    } finally {
+      setAutoRegSubmitting(false);
+    }
+  };
+
   const handleScan = async (qrToken: string) => {
     if (!scannerRef.current || isProcessingRef.current) return;
-    
+
     isProcessingRef.current = true;
 
     try {
@@ -575,10 +658,22 @@ const Scanner: React.FC = () => {
 
         if (!regData || regData.registration_status !== 'Registered') {
             if (currentMode === 'attendance') {
-                await logScan(eventId, partData.participant_id, 'Invalid', deviceScanTime, deviceAttendanceDate, currentSession, 'Not Registered');
+                // Show auto-registration modal for attendance mode
+                setScannedParticipant(partData);
+                setAutoRegStep('confirm');
+                setAutoRegData({
+                  needs_accommodation: false,
+                  date_accommodation: [],
+                  need_ca: false,
+                  giveaway_selections: {}
+                });
+                setAutoRegEventId(eventId);
+                setShowAutoRegModal(true);
+                return;
+            } else {
+                processScanResult('Invalid', 'Not registered for this event.', participant.name, participant.position, { autoReset: currentMode !== 'giveaway' });
+                return;
             }
-            processScanResult('Invalid', 'Not registered for this event.', participant.name, participant.position, { autoReset: currentMode !== 'giveaway' });
-            return;
         }
 
         if (currentMode === 'giveaway') {
@@ -1277,6 +1372,239 @@ const Scanner: React.FC = () => {
             </div>
         </div>
 
+        {/* Auto-Registration Modal */}
+        {showAutoRegModal && scannedParticipant && selectedEvent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200 max-w-md w-full">
+              {autoRegStep === 'confirm' ? (
+                <div className="p-6 flex flex-col gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0">
+                      <AlertTriangle className="w-6 h-6 text-amber-600" />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-900">Not Yet Registered</h3>
+                  </div>
+
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <p className="text-sm text-slate-700">
+                      <span className="font-semibold">{scannedParticipant.full_name}</span> is not yet registered for this event.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={handleAutoRegConfirm}
+                      className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors"
+                    >
+                      Auto Register
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowAutoRegModal(false);
+                        setScannedParticipant(null);
+                        isProcessingRef.current = false;
+                      }}
+                      className="sm:w-auto px-5 py-3 rounded-xl font-semibold text-slate-500 hover:bg-slate-100 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6 flex flex-col gap-6 max-h-96 overflow-y-auto">
+                  <h3 className="text-lg font-bold text-slate-900">Event Details</h3>
+
+                  {/* Accommodation */}
+                  {selectedEvent.has_accommodation && (
+                    <div className="space-y-3">
+                      <label className="block text-sm font-semibold text-slate-900">
+                        Accommodation
+                      </label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="accommodation"
+                            checked={!autoRegData.needs_accommodation}
+                            onChange={() => setAutoRegData(prev => ({
+                              ...prev,
+                              needs_accommodation: false,
+                              date_accommodation: []
+                            }))}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm text-slate-700">No</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="accommodation"
+                            checked={autoRegData.needs_accommodation}
+                            onChange={() => setAutoRegData(prev => ({
+                              ...prev,
+                              needs_accommodation: true
+                            }))}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm text-slate-700">Yes</span>
+                        </label>
+                      </div>
+
+                      {/* Accommodation Dates */}
+                      {autoRegData.needs_accommodation && getEventAccommodationDates(selectedEvent).length > 0 && (
+                        <div className="space-y-2">
+                          <label className="block text-xs font-semibold text-slate-700">
+                            Select dates:
+                          </label>
+                          <div className="space-y-2">
+                            {getEventAccommodationDates(selectedEvent).map((date) => (
+                              <label key={date} className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={autoRegData.date_accommodation.includes(date)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setAutoRegData(prev => ({
+                                        ...prev,
+                                        date_accommodation: [...prev.date_accommodation, date]
+                                      }));
+                                    } else {
+                                      setAutoRegData(prev => ({
+                                        ...prev,
+                                        date_accommodation: prev.date_accommodation.filter(d => d !== date)
+                                      }));
+                                    }
+                                  }}
+                                  className="w-4 h-4"
+                                />
+                                <span className="text-sm text-slate-700">
+                                  {new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Want CA */}
+                  <div className="space-y-3">
+                    <label className="block text-sm font-semibold text-slate-900">
+                      Want CA
+                    </label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="ca"
+                          checked={!autoRegData.need_ca}
+                          onChange={() => setAutoRegData(prev => ({ ...prev, need_ca: false }))}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm text-slate-700">No</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="ca"
+                          checked={autoRegData.need_ca}
+                          onChange={() => setAutoRegData(prev => ({ ...prev, need_ca: true }))}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm text-slate-700">Yes</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Giveaways */}
+                  {selectedEvent.giveaways && selectedEvent.giveaways.length > 0 && (
+                    <div className="space-y-3">
+                      <label className="block text-sm font-semibold text-slate-900">
+                        {selectedEvent.giveaways[0]?.label || 'Giveaways'}
+                      </label>
+                      {selectedEvent.giveaways.map((item: any) => {
+                        if (item.type === 'single-select') {
+                          return (
+                            <select
+                              key={item.key}
+                              value={autoRegData.giveaway_selections[item.key] || ''}
+                              onChange={(e) => setAutoRegData(prev => ({
+                                ...prev,
+                                giveaway_selections: { ...prev.giveaway_selections, [item.key]: e.target.value }
+                              }))}
+                              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            >
+                              <option value="">Select {item.label}</option>
+                              {(item.options || []).map((opt: any) => (
+                                <option key={opt} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                          );
+                        } else if (item.type === 'boolean') {
+                          return (
+                            <div key={item.key} className="flex gap-4">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name={item.key}
+                                  checked={!autoRegData.giveaway_selections[item.key]}
+                                  onChange={() => setAutoRegData(prev => ({
+                                    ...prev,
+                                    giveaway_selections: { ...prev.giveaway_selections, [item.key]: false }
+                                  }))}
+                                  className="w-4 h-4"
+                                />
+                                <span className="text-sm text-slate-700">No</span>
+                              </label>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name={item.key}
+                                  checked={!!autoRegData.giveaway_selections[item.key]}
+                                  onChange={() => setAutoRegData(prev => ({
+                                    ...prev,
+                                    giveaway_selections: { ...prev.giveaway_selections, [item.key]: true }
+                                  }))}
+                                  className="w-4 h-4"
+                                />
+                                <span className="text-sm text-slate-700">Yes</span>
+                              </label>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                    </div>
+                  )}
+
+                  {/* Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-200">
+                    <button
+                      onClick={handleAutoRegSubmit}
+                      disabled={autoRegSubmitting}
+                      className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                      {autoRegSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                      Register
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowAutoRegModal(false);
+                        setAutoRegStep('confirm');
+                        setScannedParticipant(null);
+                        isProcessingRef.current = false;
+                      }}
+                      className="sm:w-auto px-5 py-3 rounded-xl font-semibold text-slate-500 hover:bg-slate-100 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
     </div>
   );
 };
