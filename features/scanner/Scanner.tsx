@@ -1381,11 +1381,11 @@ const Scanner: React.FC = () => {
         </div>
 
         {/* Auto-Registration Modal */}
-        {showAutoRegModal && scannedParticipant && selectedEvent && (
+        {showAutoRegModal && scannedParticipant && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200 max-w-md w-full max-h-[90vh] flex flex-col">
+            <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200 max-w-md w-full">
               {autoRegStep === 'confirm' ? (
-                <div className="p-6 flex flex-col gap-4 flex-1">
+                <div className="p-6 flex flex-col gap-4">
                   <div className="flex items-center gap-3">
                     <div className="flex-shrink-0">
                       <AlertTriangle className="w-6 h-6 text-amber-600" />
@@ -1418,8 +1418,8 @@ const Scanner: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              ) : (
-                <div className="p-6 flex flex-col gap-5 overflow-y-auto flex-1">
+              ) : selectedEvent ? (
+                <div className="p-6 flex flex-col gap-5 max-h-[70vh] overflow-y-auto">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
                       <Gift className="w-5 h-5 text-indigo-600" />
@@ -1597,7 +1597,7 @@ const Scanner: React.FC = () => {
                   )}
 
                   {/* Buttons */}
-                  <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-200 mt-auto">
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-200">
                     <button
                       onClick={handleAutoRegSubmit}
                       disabled={autoRegSubmitting}
@@ -1618,6 +1618,10 @@ const Scanner: React.FC = () => {
                       Cancel
                     </button>
                   </div>
+                </div>
+              ) : (
+                <div className="p-6 flex flex-col gap-4">
+                  <p className="text-sm text-slate-600">Loading event details...</p>
                 </div>
               )}
             </div>
