@@ -951,16 +951,6 @@ const EventRegistration: React.FC = () => {
                         {showQrScanner ? 'Close Scanner' : 'Scan'}
                     </button>
                 </div>
-
-                {showQrScanner && (
-                    <div className="mb-6 p-4 border border-slate-200 rounded-lg bg-slate-50">
-                        <QrScanner 
-                            onScanSuccess={handleQrScanSuccess} 
-                            onScanFailure={(err) => console.log(err)} 
-                        />
-                        <p className="text-xs text-center text-slate-500 mt-2">Position the QR code within the frame to scan.</p>
-                    </div>
-                )}
                 
                 <form onSubmit={handleSubmit} className="space-y-5">
                     
@@ -1659,6 +1649,38 @@ const EventRegistration: React.FC = () => {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* QR Scanner Modal - Floating Overlay */}
+    {showQrScanner && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="relative bg-card rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200 max-w-md w-full">
+          <div className="p-6 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900">Scan QR Code</h3>
+              <button
+                onClick={() => setShowQrScanner(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+                aria-label="Close scanner"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <QrScanner
+              onScanSuccess={(code) => {
+                setShowQrScanner(false);
+                handleQrScanSuccess(code);
+              }}
+              onScanFailure={(err) => console.log(err)}
+            />
+
+            <p className="text-xs text-center text-slate-500">Position the QR code within the frame to scan.</p>
           </div>
         </div>
       </div>

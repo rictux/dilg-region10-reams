@@ -130,22 +130,22 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure }) =
 
   return (
     <div className="w-full max-w-sm mx-auto">
-      <div className="relative w-full overflow-hidden rounded-xl shadow-sm border border-[#E0DDD4] bg-black min-h-[300px]">
+      <div className="relative w-full h-80 overflow-hidden rounded-xl shadow-sm border border-[#E0DDD4] bg-black">
         {isInitializing && !error && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#111110]/90 z-10 text-white">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#111110]/90 z-20 text-white">
             <Loader2 className="w-8 h-8 text-[#8B82F0] animate-spin mb-3" />
             <p className="text-sm font-medium">Starting camera...</p>
           </div>
         )}
 
         {error && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#F5F3EE] z-10 p-6 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#F5F3EE] z-20 p-6 text-center">
             <AlertCircle className="w-10 h-10 text-red-500 mb-3" />
             <p className="text-sm text-[#4A4843]">{error}</p>
           </div>
         )}
 
-        <div id="qr-reader" className="w-full h-full [&>video]:object-contain"></div>
+        <div id="qr-reader" className="relative w-full h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover"></div>
       </div>
     </div>
   );
