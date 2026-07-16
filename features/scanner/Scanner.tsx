@@ -527,6 +527,11 @@ const Scanner: React.FC = () => {
         ? autoRegData.date_accommodation
         : null;
 
+      const scanMoment = new Date();
+      const deviceScanTime = scanMoment.toISOString();
+      const deviceAttendanceDate = getDeviceDateString(scanMoment);
+      const currentSession = sessionRef.current;
+
       const { error } = await supabase
         .from('event_participants')
         .insert({
@@ -550,6 +555,9 @@ const Scanner: React.FC = () => {
           throw error;
         }
       } else {
+        // Log the attendance after successful auto-registration
+        await logScan(autoRegEventId, scannedParticipant.participant_id, 'Valid', deviceScanTime, deviceAttendanceDate, currentSession, 'Success');
+
         processScanResult('Valid', 'Auto-registered successfully', scannedParticipant.full_name, scannedParticipant.position);
         setShowAutoRegModal(false);
         setScannedParticipant(null);
