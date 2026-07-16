@@ -1378,16 +1378,27 @@ const Scanner: React.FC = () => {
             <div className="relative bg-[#F9F8F6] rounded-3xl shadow-2xl border border-[#E8E5DE] overflow-hidden animate-in zoom-in-95 duration-200 max-w-md w-full">
               {autoRegStep === 'confirm' ? (
                 <div className="p-8 flex flex-col gap-6">
-                  {/* Header */}
-                  <div className="flex flex-col gap-2">
-                    <h3 className="text-2xl font-bold text-[#1F1F1F]">Complete Registration</h3>
-                    <p className="text-sm text-[#7C7A72]">Quick setup to get attendee started</p>
+                  {/* Status Badge */}
+                  <div className="flex items-center justify-center">
+                    <span className="inline-flex items-center gap-2 bg-red-50 text-red-700 px-4 py-2 rounded-full text-sm font-bold border border-red-200">
+                      <XCircle size={18} />
+                      Not Registered
+                    </span>
                   </div>
 
-                  {/* Participant Card */}
-                  <div className="bg-white border border-[#E8E5DE] rounded-2xl p-5">
-                    <p className="text-xs font-bold uppercase tracking-widest text-[#9A9890] mb-2">Scanned Participant</p>
-                    <p className="text-lg font-bold text-[#1F1F1F]">{scannedParticipant.full_name}</p>
+                  {/* Header */}
+                  <div className="flex flex-col gap-2 text-center">
+                    <h3 className="text-2xl font-bold text-[#1F1F1F]">Registration Required</h3>
+                    <p className="text-sm text-[#7C7A72]">This participant needs to complete registration for this event</p>
+                  </div>
+
+                  {/* Participant Card - Prominent Display */}
+                  <div className="bg-gradient-to-br from-[#6255E9]/5 to-[#4B3FE4]/5 border-2 border-[#6255E9]/30 rounded-2xl p-6">
+                    <p className="text-xs font-bold uppercase tracking-widest text-[#9A9890] mb-3">Participant</p>
+                    <p className="text-2xl font-bold text-[#1F1F1F] mb-2">{scannedParticipant.full_name}</p>
+                    {scannedParticipant.position && (
+                      <p className="text-sm text-[#6255E9] font-semibold">{scannedParticipant.position}</p>
+                    )}
                   </div>
 
                   {/* Event Info */}
@@ -1397,12 +1408,12 @@ const Scanner: React.FC = () => {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex flex-col gap-3 pt-2">
+                  <div className="flex flex-col gap-3 pt-4">
                     <button
                       onClick={handleAutoRegConfirm}
-                      className="w-full bg-[#6255E9] text-white py-3.5 rounded-xl font-bold hover:bg-[#4B3FE4] active:scale-95 transition-all"
+                      className="w-full bg-[#6255E9] text-white py-3.5 rounded-xl font-bold hover:bg-[#4B3FE4] active:scale-95 transition-all shadow-md"
                     >
-                      Continue Registration
+                      Register This Participant
                     </button>
                     <button
                       onClick={() => {
@@ -1412,7 +1423,7 @@ const Scanner: React.FC = () => {
                       }}
                       className="w-full px-5 py-3 rounded-xl font-semibold text-[#7C7A72] hover:bg-white transition-colors border border-[#E8E5DE]"
                     >
-                      Skip
+                      Don't Register
                     </button>
                   </div>
                 </div>
