@@ -1375,28 +1375,34 @@ const Scanner: React.FC = () => {
         {/* Auto-Registration Modal */}
         {showAutoRegModal && scannedParticipant && selectedEvent && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200 max-w-md w-full">
+            <div className="relative bg-[#F9F8F6] rounded-3xl shadow-2xl border border-[#E8E5DE] overflow-hidden animate-in zoom-in-95 duration-200 max-w-md w-full">
               {autoRegStep === 'confirm' ? (
-                <div className="p-6 flex flex-col gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0">
-                      <AlertTriangle className="w-6 h-6 text-amber-600" />
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-900">Not Yet Registered</h3>
+                <div className="p-8 flex flex-col gap-6">
+                  {/* Header */}
+                  <div className="flex flex-col gap-2">
+                    <h3 className="text-2xl font-bold text-[#1F1F1F]">Complete Registration</h3>
+                    <p className="text-sm text-[#7C7A72]">Quick setup to get attendee started</p>
                   </div>
 
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                    <p className="text-sm text-slate-700">
-                      <span className="font-semibold">{scannedParticipant.full_name}</span> is not yet registered for this event.
-                    </p>
+                  {/* Participant Card */}
+                  <div className="bg-white border border-[#E8E5DE] rounded-2xl p-5">
+                    <p className="text-xs font-bold uppercase tracking-widest text-[#9A9890] mb-2">Scanned Participant</p>
+                    <p className="text-lg font-bold text-[#1F1F1F]">{scannedParticipant.full_name}</p>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  {/* Event Info */}
+                  <div className="bg-[#6255E9]/5 border border-[#6255E9]/20 rounded-2xl p-5">
+                    <p className="text-xs font-bold uppercase tracking-widest text-[#6255E9] mb-1">Event</p>
+                    <p className="text-base font-semibold text-[#1F1F1F]">{selectedEvent.event_name}</p>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col gap-3 pt-2">
                     <button
                       onClick={handleAutoRegConfirm}
-                      className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors"
+                      className="w-full bg-[#6255E9] text-white py-3.5 rounded-xl font-bold hover:bg-[#4B3FE4] active:scale-95 transition-all"
                     >
-                      Auto Register
+                      Continue Registration
                     </button>
                     <button
                       onClick={() => {
@@ -1404,189 +1410,206 @@ const Scanner: React.FC = () => {
                         setScannedParticipant(null);
                         isProcessingRef.current = false;
                       }}
-                      className="sm:w-auto px-5 py-3 rounded-xl font-semibold text-slate-500 hover:bg-slate-100 transition-colors"
+                      className="w-full px-5 py-3 rounded-xl font-semibold text-[#7C7A72] hover:bg-white transition-colors border border-[#E8E5DE]"
                     >
-                      Cancel
+                      Skip
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="p-6 flex flex-col gap-6 max-h-96 overflow-y-auto">
-                  <h3 className="text-lg font-bold text-slate-900">Event Details</h3>
+                <div className="flex flex-col max-h-[85vh] overflow-hidden">
+                  {/* Header with Step Indicator */}
+                  <div className="sticky top-0 bg-[#F9F8F6] border-b border-[#E8E5DE] px-8 py-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-xl font-bold text-[#1F1F1F]">Event Preferences</h3>
+                      <span className="text-xs font-bold uppercase tracking-widest text-[#9A9890] bg-white px-3 py-1.5 rounded-full">Step 2 of 2</span>
+                    </div>
+                    <p className="text-sm text-[#7C7A72]">Customize registration details</p>
+                  </div>
 
-                  {/* Accommodation */}
-                  {selectedEvent.has_accommodation && (
-                    <div className="space-y-3">
-                      <label className="block text-sm font-semibold text-slate-900">
-                        Accommodation
-                      </label>
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="accommodation"
-                            checked={!autoRegData.needs_accommodation}
-                            onChange={() => setAutoRegData(prev => ({
-                              ...prev,
-                              needs_accommodation: false,
-                              date_accommodation: []
-                            }))}
-                            className="w-4 h-4"
-                          />
-                          <span className="text-sm text-slate-700">No</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="accommodation"
-                            checked={autoRegData.needs_accommodation}
-                            onChange={() => setAutoRegData(prev => ({
-                              ...prev,
-                              needs_accommodation: true
-                            }))}
-                            className="w-4 h-4"
-                          />
-                          <span className="text-sm text-slate-700">Yes</span>
-                        </label>
+                  {/* Form Content - Scrollable */}
+                  <div className="flex-1 overflow-y-auto px-8 py-6">
+                    <div className="space-y-6">
+                      {/* Accommodation Section */}
+                      {selectedEvent.has_accommodation && (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-bold text-[#1F1F1F] mb-3 uppercase tracking-widest">
+                              Accommodation Needed
+                            </label>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            {[
+                              { value: false, label: 'No' },
+                              { value: true, label: 'Yes' }
+                            ].map((option) => (
+                              <button
+                                key={String(option.value)}
+                                onClick={() => setAutoRegData(prev => ({
+                                  ...prev,
+                                  needs_accommodation: option.value,
+                                  date_accommodation: option.value ? prev.date_accommodation : []
+                                }))}
+                                className={`relative px-4 py-3 rounded-xl font-semibold text-sm transition-all border-2 ${
+                                  autoRegData.needs_accommodation === option.value
+                                    ? 'bg-[#6255E9] text-white border-[#6255E9] shadow-md'
+                                    : 'bg-white text-[#7C7A72] border-[#E8E5DE] hover:border-[#D0CCC3]'
+                                }`}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Accommodation Dates */}
+                          {autoRegData.needs_accommodation && getEventAccommodationDates(selectedEvent).length > 0 && (
+                            <div className="mt-5 pt-5 border-t border-[#E8E5DE]">
+                              <label className="block text-xs font-bold uppercase tracking-widest text-[#9A9890] mb-4">
+                                Select accommodation dates:
+                              </label>
+                              <div className="space-y-2.5">
+                                {getEventAccommodationDates(selectedEvent).map((date) => (
+                                  <label key={date} className="flex items-center gap-3 cursor-pointer group">
+                                    <input
+                                      type="checkbox"
+                                      checked={autoRegData.date_accommodation.includes(date)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setAutoRegData(prev => ({
+                                            ...prev,
+                                            date_accommodation: [...prev.date_accommodation, date]
+                                          }));
+                                        } else {
+                                          setAutoRegData(prev => ({
+                                            ...prev,
+                                            date_accommodation: prev.date_accommodation.filter(d => d !== date)
+                                          }));
+                                        }
+                                      }}
+                                      className="w-5 h-5 rounded border-2 border-[#E8E5DE] accent-[#6255E9] cursor-pointer"
+                                    />
+                                    <span className="text-sm text-[#1F1F1F] group-hover:text-[#6255E9] transition-colors">
+                                      {new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                                    </span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Divider */}
+                      {selectedEvent.has_accommodation && <div className="h-px bg-[#E8E5DE]"></div>}
+
+                      {/* Want CA Section */}
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-bold text-[#1F1F1F] mb-3 uppercase tracking-widest">
+                            Certificate of Appearance (CA)
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            { value: false, label: 'No' },
+                            { value: true, label: 'Yes' }
+                          ].map((option) => (
+                            <button
+                              key={String(option.value)}
+                              onClick={() => setAutoRegData(prev => ({ ...prev, need_ca: option.value }))}
+                              className={`relative px-4 py-3 rounded-xl font-semibold text-sm transition-all border-2 ${
+                                autoRegData.need_ca === option.value
+                                  ? 'bg-[#6255E9] text-white border-[#6255E9] shadow-md'
+                                  : 'bg-white text-[#7C7A72] border-[#E8E5DE] hover:border-[#D0CCC3]'
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
 
-                      {/* Accommodation Dates */}
-                      {autoRegData.needs_accommodation && getEventAccommodationDates(selectedEvent).length > 0 && (
-                        <div className="space-y-2">
-                          <label className="block text-xs font-semibold text-slate-700">
-                            Select dates:
-                          </label>
-                          <div className="space-y-2">
-                            {getEventAccommodationDates(selectedEvent).map((date) => (
-                              <label key={date} className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={autoRegData.date_accommodation.includes(date)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setAutoRegData(prev => ({
+                      {/* Divider */}
+                      {selectedEvent.giveaways && selectedEvent.giveaways.length > 0 && <div className="h-px bg-[#E8E5DE]"></div>}
+
+                      {/* Giveaways Section */}
+                      {selectedEvent.giveaways && selectedEvent.giveaways.length > 0 && (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-bold text-[#1F1F1F] mb-3 uppercase tracking-widest">
+                              {selectedEvent.giveaways[0]?.label || 'Giveaways'}
+                            </label>
+                          </div>
+                          <div className="space-y-3">
+                            {selectedEvent.giveaways.map((item: any) => {
+                              if (item.type === 'single-select') {
+                                return (
+                                  <div key={item.key}>
+                                    <label className="text-xs text-[#7C7A72] font-semibold mb-2 block uppercase tracking-widest">
+                                      {item.label}
+                                    </label>
+                                    <select
+                                      value={autoRegData.giveaway_selections[item.key] || ''}
+                                      onChange={(e) => setAutoRegData(prev => ({
                                         ...prev,
-                                        date_accommodation: [...prev.date_accommodation, date]
-                                      }));
-                                    } else {
-                                      setAutoRegData(prev => ({
-                                        ...prev,
-                                        date_accommodation: prev.date_accommodation.filter(d => d !== date)
-                                      }));
-                                    }
-                                  }}
-                                  className="w-4 h-4"
-                                />
-                                <span className="text-sm text-slate-700">
-                                  {new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-                                </span>
-                              </label>
-                            ))}
+                                        giveaway_selections: { ...prev.giveaway_selections, [item.key]: e.target.value }
+                                      }))}
+                                      className="w-full px-4 py-3 border-2 border-[#E8E5DE] rounded-xl text-sm focus:ring-2 focus:ring-[#6255E9] focus:border-[#6255E9] bg-white text-[#1F1F1F] font-medium transition-all"
+                                    >
+                                      <option value="" className="text-[#9A9890]">Select option</option>
+                                      {(item.options || []).map((opt: any) => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                );
+                              } else if (item.type === 'boolean') {
+                                return (
+                                  <div key={item.key}>
+                                    <label className="text-xs text-[#7C7A72] font-semibold mb-3 block uppercase tracking-widest">
+                                      {item.label}
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                      {[
+                                        { value: false, label: 'No' },
+                                        { value: true, label: 'Yes' }
+                                      ].map((option) => (
+                                        <button
+                                          key={String(option.value)}
+                                          onClick={() => setAutoRegData(prev => ({
+                                            ...prev,
+                                            giveaway_selections: { ...prev.giveaway_selections, [item.key]: option.value }
+                                          }))}
+                                          className={`px-4 py-3 rounded-xl font-semibold text-sm transition-all border-2 ${
+                                            autoRegData.giveaway_selections[item.key] === option.value
+                                              ? 'bg-[#6255E9] text-white border-[#6255E9] shadow-md'
+                                              : 'bg-white text-[#7C7A72] border-[#E8E5DE] hover:border-[#D0CCC3]'
+                                          }`}
+                                        >
+                                          {option.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })}
                           </div>
                         </div>
                       )}
                     </div>
-                  )}
-
-                  {/* Want CA */}
-                  <div className="space-y-3">
-                    <label className="block text-sm font-semibold text-slate-900">
-                      Want CA
-                    </label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="ca"
-                          checked={!autoRegData.need_ca}
-                          onChange={() => setAutoRegData(prev => ({ ...prev, need_ca: false }))}
-                          className="w-4 h-4"
-                        />
-                        <span className="text-sm text-slate-700">No</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="ca"
-                          checked={autoRegData.need_ca}
-                          onChange={() => setAutoRegData(prev => ({ ...prev, need_ca: true }))}
-                          className="w-4 h-4"
-                        />
-                        <span className="text-sm text-slate-700">Yes</span>
-                      </label>
-                    </div>
                   </div>
 
-                  {/* Giveaways */}
-                  {selectedEvent.giveaways && selectedEvent.giveaways.length > 0 && (
-                    <div className="space-y-3">
-                      <label className="block text-sm font-semibold text-slate-900">
-                        {selectedEvent.giveaways[0]?.label || 'Giveaways'}
-                      </label>
-                      {selectedEvent.giveaways.map((item: any) => {
-                        if (item.type === 'single-select') {
-                          return (
-                            <select
-                              key={item.key}
-                              value={autoRegData.giveaway_selections[item.key] || ''}
-                              onChange={(e) => setAutoRegData(prev => ({
-                                ...prev,
-                                giveaway_selections: { ...prev.giveaway_selections, [item.key]: e.target.value }
-                              }))}
-                              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                            >
-                              <option value="">Select {item.label}</option>
-                              {(item.options || []).map((opt: any) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                              ))}
-                            </select>
-                          );
-                        } else if (item.type === 'boolean') {
-                          return (
-                            <div key={item.key} className="flex gap-4">
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name={item.key}
-                                  checked={!autoRegData.giveaway_selections[item.key]}
-                                  onChange={() => setAutoRegData(prev => ({
-                                    ...prev,
-                                    giveaway_selections: { ...prev.giveaway_selections, [item.key]: false }
-                                  }))}
-                                  className="w-4 h-4"
-                                />
-                                <span className="text-sm text-slate-700">No</span>
-                              </label>
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name={item.key}
-                                  checked={!!autoRegData.giveaway_selections[item.key]}
-                                  onChange={() => setAutoRegData(prev => ({
-                                    ...prev,
-                                    giveaway_selections: { ...prev.giveaway_selections, [item.key]: true }
-                                  }))}
-                                  className="w-4 h-4"
-                                />
-                                <span className="text-sm text-slate-700">Yes</span>
-                              </label>
-                            </div>
-                          );
-                        }
-                        return null;
-                      })}
-                    </div>
-                  )}
-
-                  {/* Buttons */}
-                  <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-200">
+                  {/* Action Buttons - Sticky Footer */}
+                  <div className="sticky bottom-0 bg-[#F9F8F6] border-t border-[#E8E5DE] px-8 py-6 flex flex-col gap-3">
                     <button
                       onClick={handleAutoRegSubmit}
                       disabled={autoRegSubmitting}
-                      className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                      className="w-full bg-[#6255E9] text-white py-3.5 rounded-xl font-bold hover:bg-[#4B3FE4] active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                     >
                       {autoRegSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                      Register
+                      Complete Registration
                     </button>
                     <button
                       onClick={() => {
@@ -1595,7 +1618,7 @@ const Scanner: React.FC = () => {
                         setScannedParticipant(null);
                         isProcessingRef.current = false;
                       }}
-                      className="sm:w-auto px-5 py-3 rounded-xl font-semibold text-slate-500 hover:bg-slate-100 transition-colors"
+                      className="w-full px-5 py-3 rounded-xl font-semibold text-[#7C7A72] hover:bg-white transition-colors border border-[#E8E5DE]"
                     >
                       Cancel
                     </button>
