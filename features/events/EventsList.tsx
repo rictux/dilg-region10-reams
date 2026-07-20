@@ -175,6 +175,11 @@ const EventsList: React.FC = () => {
   // QR email can only be sent when the email field holds a valid address.
   const canSendQrEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newParticipant.email.trim());
 
+  // Name change confirmation
+  const [selectedParticipantName, setSelectedParticipantName] = useState<{ f_name: string; l_name: string } | null>(null);
+  const [showNameChangeConfirm, setShowNameChangeConfirm] = useState(false);
+  const [pendingNameChange, setPendingNameChange] = useState<{ field: 'f_name' | 'l_name'; value: string } | null>(null);
+
   // Affiliation State
   const [affiliationType, setAffiliationType] = useState<'Office' | 'LGU'>('Office');
   const [selectedProvince, setSelectedProvince] = useState<string>('');
@@ -1130,6 +1135,28 @@ const EventsList: React.FC = () => {
       setSelectedCity('');
       setSuggestions([]);
       setShowSuggestions(false);
+      setSelectedParticipantName(null);
+      setShowNameChangeConfirm(false);
+      setPendingNameChange(null);
+  };
+
+  const handleConfirmNameChange = () => {
+      if (!pendingNameChange) return;
+
+      setNewParticipant(prev => ({
+          ...prev,
+          [pendingNameChange.field]: pendingNameChange.value,
+          participant_id: null
+      }));
+
+      setShowNameChangeConfirm(false);
+      setPendingNameChange(null);
+      setSelectedParticipantName(null);
+  };
+
+  const handleCancelNameChange = () => {
+      setShowNameChangeConfirm(false);
+      setPendingNameChange(null);
   };
 
   const closeParticipantsModal = () => {
@@ -1197,6 +1224,15 @@ const EventsList: React.FC = () => {
     const value = e.target.value;
     const shouldSearchExistingParticipants = participantModalView === 'add';
 
+    if (selectedParticipantName && participantModalView === 'add') {
+        const originalValue = selectedParticipantName[field];
+        if (value !== originalValue) {
+            setPendingNameChange({ field, value });
+            setShowNameChangeConfirm(true);
+            return;
+        }
+    }
+
     setNewParticipant(prev => ({
         ...prev,
         [field]: value,
@@ -1215,7 +1251,7 @@ const EventsList: React.FC = () => {
             .select('*')
             .ilike('full_name', `%${value}%`)
             .limit(5);
-        
+
         if (data && data.length > 0) {
             setSuggestions(data);
             setShowSuggestions(true);
@@ -1265,6 +1301,7 @@ const EventsList: React.FC = () => {
           indigenous_people: p.indigenous_people || 'No',
           participant_id: p.participant_id
       }));
+      setSelectedParticipantName({ f_name: p.f_name || '', l_name: p.l_name || '' });
       setSuggestions([]);
       setShowSuggestions(false);
   };
@@ -3618,6 +3655,48 @@ const EventsList: React.FC = () => {
                 </div>
                 )}
                 
+            </div>
+        </div>
+      )}
+
+      {/* Name Change Confirmation Modal */}
+      {showNameChangeConfirm && pendingNameChange && selectedParticipantName && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCancelNameChange}></div>
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-sm p-6 relative z-20 animate-in zoom-in-95 duration-200">
+                <div className="flex flex-col items-center text-center">
+                    <div className="bg-red-100 p-3 rounded-full mb-4">
+                        <AlertTriangle className="text-red-600" size={32} />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-800 mb-2">Change Participant Name?</h3>
+                    <p className="text-sm text-slate-500 mb-4">
+                        You are editing the name of an existing participant. Changing the participant's name will update it across all attendance records associated with this participant.
+                    </p>
+                    <div className="w-full mb-6 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-left space-y-2">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-1">Previous {pendingNameChange.field === 'f_name' ? 'First' : 'Last'} Name</p>
+                            <p className="text-sm font-medium text-red-900">{selectedParticipantName[pendingNameChange.field] || '(blank)'}</p>
+                        </div>
+                        <div className="border-t border-red-200 pt-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-1">New {pendingNameChange.field === 'f_name' ? 'First' : 'Last'} Name</p>
+                            <p className="text-sm font-medium text-red-900">{pendingNameChange.value || '(blank)'}</p>
+                        </div>
+                    </div>
+                    <div className="flex gap-3 w-full">
+                        <button
+                            onClick={handleCancelNameChange}
+                            className="flex-1 px-4 py-2.5 bg-card border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+                        >
+                            Keep Original
+                        </button>
+                        <button
+                            onClick={handleConfirmNameChange}
+                            className="flex-1 px-4 py-2.5 bg-indigo-600 dark:bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                            Change Name
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
       )}
