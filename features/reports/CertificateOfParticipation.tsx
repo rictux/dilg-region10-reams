@@ -12,7 +12,7 @@ import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 import { fetchAllSupabaseRows } from '../../lib/supabasePagination';
 import { sendCertificateEmail } from '../../lib/emailService';
 import { toast } from 'sonner';
-import { CertificateSignatory } from './CertificateOfAppearanceTemplate';
+import { CertificateSignatory, getEventDateRows } from './CertificateOfAppearanceTemplate';
 import CertificateOfParticipationCard, {
   buildCoPReferenceNumber,
   CoPPaperSize,
@@ -648,6 +648,7 @@ const CertificateOfParticipation: React.FC = () => {
   // ── UI state
   const [search,           setSearch]           = useState('');
   const [roleFilter,       setRoleFilter]       = useState<CoPRoleFilter>('All');
+  const [completedOnly,    setCompletedOnly]    = useState(false);
   const [selectedIds,      setSelectedIds]      = useState<number[]>([]);
   const [previewId,        setPreviewId]        = useState<number | null>(null);
   const [previewScale,     setPreviewScale]     = useState(1);
@@ -888,6 +889,32 @@ const CertificateOfParticipation: React.FC = () => {
     [participants, roleFilter]
   );
 
+  const requiredAttendanceDates = useMemo(
+    () => event ? getEventDateRows(event).map(row => row.key) : [],
+    [event]
+  );
+
+  const completedParticipantIds = useMemo(() => {
+    const completedIds = new Set<number>();
+    if (requiredAttendanceDates.length === 0) return completedIds;
+
+    participants.forEach(record => {
+      const attendedDates = new Set(record.log_dates);
+      if (requiredAttendanceDates.every(date => attendedDates.has(date))) {
+        completedIds.add(record.participant.participant_id);
+      }
+    });
+
+    return completedIds;
+  }, [participants, requiredAttendanceDates]);
+
+  const attendanceFilteredParticipants = useMemo(
+    () => completedOnly
+      ? roleFilteredParticipants.filter(record => completedParticipantIds.has(record.participant.participant_id))
+      : roleFilteredParticipants,
+    [completedOnly, completedParticipantIds, roleFilteredParticipants]
+  );
+
   const roleCounts = useMemo(() => {
     const counts: Record<CoPRoleFilter, number> = {
       All: participants.length,
@@ -906,16 +933,12 @@ const CertificateOfParticipation: React.FC = () => {
   // ── Filtered list
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return roleFilteredParticipants.filter(r =>
+    return attendanceFilteredParticipants.filter(r =>
       !q ||
       r.participant.full_name?.toLowerCase().includes(q) ||
       buildListName(r.participant).toLowerCase().includes(q)
     );
-  }, [roleFilteredParticipants, search]);
-
-  useEffect(() => {
-    setSelectedIds(roleFilteredParticipants.map(r => r.participant.participant_id));
-  }, [roleFilteredParticipants]);
+  }, [attendanceFilteredParticipants, search]);
 
   useEffect(() => {
     setPreviewId(current => {
@@ -944,9 +967,47 @@ const CertificateOfParticipation: React.FC = () => {
   // ── Selection
   const toggleSelect = (id: number) =>
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  const selectVisible = () => setSelectedIds(filtered.map(r => r.participant.participant_id));
-  const selectRole = () => setSelectedIds(roleFilteredParticipants.map(r => r.participant.participant_id));
-  const clearAll   = () => setSelectedIds([]);
+
+  const filterBySearch = (records: CoPParticipant[]) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return records;
+    return records.filter(record =>
+      record.participant.full_name?.toLowerCase().includes(q)
+      || buildListName(record.participant).toLowerCase().includes(q)
+    );
+  };
+
+  const selectAll = () => {
+    setCompletedOnly(false);
+    setSelectedIds(filterBySearch(roleFilteredParticipants).map(record => record.participant.participant_id));
+  };
+
+  const toggleCompleted = () => {
+    const nextCompletedOnly = !completedOnly;
+    const candidates = nextCompletedOnly
+      ? roleFilteredParticipants.filter(record => completedParticipantIds.has(record.participant.participant_id))
+      : roleFilteredParticipants;
+
+    setCompletedOnly(nextCompletedOnly);
+    setSelectedIds(filterBySearch(candidates).map(record => record.participant.participant_id));
+  };
+
+  const clearAll = () => {
+    setCompletedOnly(false);
+    setSelectedIds([]);
+  };
+
+  const handleRoleFilterChange = (nextRole: CoPRoleFilter) => {
+    const candidates = participants.filter(record =>
+      nextRole === 'All' || getRoleFilterValue(record.role) === nextRole
+    );
+    const attendanceCandidates = completedOnly
+      ? candidates.filter(record => completedParticipantIds.has(record.participant.participant_id))
+      : candidates;
+
+    setRoleFilter(nextRole);
+    setSelectedIds(filterBySearch(attendanceCandidates).map(record => record.participant.participant_id));
+  };
 
   // ── Upload theme
   const handleThemeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1244,7 +1305,7 @@ const CertificateOfParticipation: React.FC = () => {
   const bodyTextResolved = bodyText.trim() || DEFAULT_COP_BODY_TEXT;
 
   const selectedCount  = selectedIds.length;
-  const withLogsCount  = participants.filter(r => r.log_dates.length > 0).length;
+  const completedCount = completedParticipantIds.size;
   const renderFarm     = participants.filter(r => selectedIds.includes(r.participant.participant_id));
 
   return (
@@ -1330,9 +1391,17 @@ const CertificateOfParticipation: React.FC = () => {
                 <span className="text-[#9A9890] font-normal ml-1">({participants.length})</span>
               </p>
               <div className="flex items-center gap-1 text-[10px]">
-                <button onClick={selectVisible} className="text-violet-600 hover:underline">Visible</button>
+                <button onClick={selectAll} className="text-violet-600 hover:underline">All</button>
                 <span className="text-[#C5C2BA]">·</span>
-                <button onClick={selectRole} className="text-violet-600 hover:underline">Role</button>
+                <button
+                  type="button"
+                  aria-pressed={completedOnly}
+                  onClick={toggleCompleted}
+                  className={`${completedOnly ? 'font-semibold text-emerald-700' : 'text-violet-600'} hover:underline`}
+                  title="Show only participants with attendance on every event date"
+                >
+                  Complete
+                </button>
                 <span className="text-[#C5C2BA]">·</span>
                 <button onClick={clearAll} className="text-[#9A9890] hover:text-[#6B6860] hover:underline">None</button>
               </div>
@@ -1345,7 +1414,7 @@ const CertificateOfParticipation: React.FC = () => {
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setRoleFilter(option.value)}
+                    onClick={() => handleRoleFilterChange(option.value)}
                     className={`min-w-0 rounded-md border px-2 py-1.5 text-left transition-colors ${
                       isActive
                         ? 'border-violet-300 bg-violet-50 text-violet-700'
@@ -1381,14 +1450,16 @@ const CertificateOfParticipation: React.FC = () => {
           {/* Stats bar */}
           <div className="px-4 py-1.5 bg-[#F5F3EE] border-b border-[#EDEAE2]">
             <p className="text-[10px] text-[#9A9890]">
-              {selectedCount} selected · {filtered.length} visible · {withLogsCount} with attendance logs
+              {selectedCount} selected · {filtered.length} visible · {completedCount} completed
             </p>
           </div>
 
           {/* List */}
           <div className="flex-1 overflow-visible md:overflow-y-auto">
             {filtered.length === 0 && (
-              <p className="text-xs text-[#9A9890] text-center py-10">No participants found.</p>
+              <p className="text-xs text-[#9A9890] text-center py-10">
+                {completedOnly ? 'No participants have completed attendance for every event date.' : 'No participants found.'}
+              </p>
             )}
             {filtered.map(record => {
               const pid         = record.participant.participant_id;
