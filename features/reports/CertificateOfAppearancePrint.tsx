@@ -34,6 +34,9 @@ type CertificateSignatoryRow = NonNullable<CertificateSignatory> & {
   sort_order?: number | null;
 };
 
+const isPartnerAgencySignatory = (signatory: CertificateSignatoryRow) =>
+  Boolean(signatory.agency_name?.trim() || signatory.agency_logo_url?.trim());
+
 const isDelegateRole = (role: CertificateParticipant['role']) => role === 'Delegate';
 
 const sanitizeFileName = (value: string) => {
@@ -534,7 +537,9 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
         if (signatoryError) throw signatoryError;
 
-        const officeSignatories = (sigData || []) as CertificateSignatoryRow[];
+        const officeSignatories = ((sigData || []) as CertificateSignatoryRow[]).filter(
+          (item) => !isPartnerAgencySignatory(item)
+        );
         setSignatories(officeSignatories);
 
         const savedSignatoryId = sessionStorage.getItem(`coa_signatory_${eventData.organize_by}`);

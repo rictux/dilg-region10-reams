@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload, Eye, X, Trash2, Plus, Star, FileSignature, Megaphone } from 'lucide-react';
+import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload, Eye, X, Trash2, Plus, Star, FileSignature, Megaphone, Handshake } from 'lucide-react';
 import { Event, Office } from '../../types/database';
 import AnnouncementManagement from './AnnouncementManagement';
 import AppearanceSettings from './AppearanceSettings';
@@ -127,7 +127,8 @@ type SignatoryRow = SignatoryState & {
   sort_order?: number | null;
 };
 
-type SettingsTab = 'signatories' | 'announcements';
+const isPartnerAgencySignatory = (row: Pick<SignatoryState, 'agency_name' | 'agency_logo_url'>) =>
+  Boolean(row.agency_name?.trim() || row.agency_logo_url?.trim());
 
 const Settings: React.FC = () => {
   const { user } = useAuth();
@@ -135,18 +136,21 @@ const Settings: React.FC = () => {
   const isOfficeManager = user?.role === 'OfficeManager';
   const canManageCertificateSettings = isAdmin || isOfficeManager;
   const location = useLocation();
-  // View is driven by the sidebar submenu (/settings, ?view=announcements, ?view=appearance).
-  // Appearance is open to every user; Signatories/Announcements stay permission-gated,
+  // View is driven by the sidebar submenu (/settings, ?view=partner-signatories, etc.).
+  // Appearance is open to every user; certificate settings/Announcements stay permission-gated,
   // so users without certificate access land on Appearance by default.
   const viewParam = new URLSearchParams(location.search).get('view');
   const activeView =
     viewParam === 'appearance'
       ? 'appearance'
+      : canManageCertificateSettings && viewParam === 'partner-signatories'
+        ? 'partner-signatories'
       : isAdmin && viewParam === 'announcements'
         ? 'announcements'
         : canManageCertificateSettings
           ? 'signatories'
           : 'appearance';
+  const isPartnerSignatoryView = activeView === 'partner-signatories';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -196,7 +200,7 @@ const Settings: React.FC = () => {
       setAgencyLogoPreviewUrl('');
       setIsPreviewModalOpen(false);
     }
-  }, [selectedOfficeId]);
+  }, [selectedOfficeId, isPartnerSignatoryView]);
 
   useEffect(() => {
     return () => {
@@ -357,7 +361,10 @@ const Settings: React.FC = () => {
     if (error) throw error;
 
     const rows = (data || []) as SignatoryRow[];
-    return rows.find((item) => normalizeSignatoryName(item.name || '') === normalizedName) || null;
+    return rows.find((item) =>
+      isPartnerAgencySignatory(item) === isPartnerSignatoryView
+      && normalizeSignatoryName(item.name || '') === normalizedName
+    ) || null;
   };
 
   useEffect(() => {
@@ -415,7 +422,9 @@ const Settings: React.FC = () => {
 
       if (error) throw error;
 
-      const rows = (data || []) as SignatoryRow[];
+      const rows = ((data || []) as SignatoryRow[]).filter(
+        (row) => isPartnerAgencySignatory(row) === isPartnerSignatoryView
+      );
       setSignatories(rows);
 
       const selected =
@@ -449,13 +458,13 @@ const Settings: React.FC = () => {
     applySignatoryRow(null);
     setSignatory((current) => ({
       ...current,
-      header: signatory.header,
-      sub_header: signatory.sub_header,
-      address: signatory.address,
-      website: signatory.website,
-      footer: signatory.footer,
+      header: isPartnerSignatoryView ? '' : signatory.header,
+      sub_header: isPartnerSignatoryView ? '' : signatory.sub_header,
+      address: isPartnerSignatoryView ? '' : signatory.address,
+      website: isPartnerSignatoryView ? '' : signatory.website,
+      footer: isPartnerSignatoryView ? '' : signatory.footer,
       certificate_template_variant: signatory.certificate_template_variant,
-      is_default: signatories.length === 0
+      is_default: !isPartnerSignatoryView && signatories.length === 0
     }));
     setMessage(null);
   };
@@ -487,7 +496,7 @@ const Settings: React.FC = () => {
       return;
     }
 
-    if (signatories.length <= 1) {
+    if (!isPartnerSignatoryView && signatories.length <= 1) {
       setMessage({ type: 'error', text: 'Each office must keep at least one active signatory.' });
       return;
     }
@@ -584,6 +593,21 @@ const Settings: React.FC = () => {
       setMessage({ type: 'error', text: 'You can only manage certificate settings for your assigned office.' });
       return;
     }
+
+    if (isPartnerSignatoryView && !signatory.agency_name.trim()) {
+      setMessage({ type: 'error', text: 'Enter the official partner agency name.' });
+      return;
+    }
+
+    if (
+      isPartnerSignatoryView
+      && !selectedAgencyLogoFile
+      && !signatory.agency_logo_url
+      && !agencyLogoPreviewUrl
+    ) {
+      setMessage({ type: 'error', text: 'Upload the official partner agency logo.' });
+      return;
+    }
     
     setSaving(true);
     setMessage(null);
@@ -604,7 +628,7 @@ const Settings: React.FC = () => {
       }
 
       let esigLink = signatory.esig_link;
-      let agencyLogoUrl = signatory.agency_logo_url;
+      let agencyLogoUrl = isPartnerSignatoryView ? signatory.agency_logo_url : '';
 
       if (selectedSignatureFile) {
         const fileExtension = selectedSignatureFile.name.includes('.')
@@ -629,7 +653,7 @@ const Settings: React.FC = () => {
         esigLink = publicUrlData.publicUrl;
       }
 
-      if (selectedAgencyLogoFile) {
+      if (isPartnerSignatoryView && selectedAgencyLogoFile) {
         const fileExtension = selectedAgencyLogoFile.name.includes('.')
           ? selectedAgencyLogoFile.name.split('.').pop()?.toLowerCase()
           : '';
@@ -652,7 +676,7 @@ const Settings: React.FC = () => {
         agencyLogoUrl = publicUrlData.publicUrl;
       }
 
-      const shouldSetDefault = signatory.is_default || signatories.length === 0;
+      const shouldSetDefault = !isPartnerSignatoryView && (signatory.is_default || signatories.length === 0);
 
       if (shouldSetDefault) {
         const { error } = await supabase
@@ -670,13 +694,13 @@ const Settings: React.FC = () => {
         name: signatory.name,
         position: signatory.position,
         esig_link: esigLink,
-        agency_name: signatory.agency_name.trim() || null,
-        agency_logo_url: agencyLogoUrl || null,
-        header: signatory.header.trim() || null,
-        sub_header: signatory.sub_header.trim() || null,
-        address: signatory.address.trim() || null,
-        website: signatory.website.trim() || null,
-        footer: signatory.footer.trim() || null,
+        agency_name: isPartnerSignatoryView ? signatory.agency_name.trim() : null,
+        agency_logo_url: isPartnerSignatoryView ? agencyLogoUrl || null : null,
+        header: isPartnerSignatoryView ? null : signatory.header.trim() || null,
+        sub_header: isPartnerSignatoryView ? null : signatory.sub_header.trim() || null,
+        address: isPartnerSignatoryView ? null : signatory.address.trim() || null,
+        website: isPartnerSignatoryView ? null : signatory.website.trim() || null,
+        footer: isPartnerSignatoryView ? null : signatory.footer.trim() || null,
         post_nominals: signatory.post_nominals.trim() || null,
         certificate_template_variant: signatory.certificate_template_variant,
         is_default: shouldSetDefault,
@@ -728,7 +752,12 @@ const Settings: React.FC = () => {
       setSignaturePreviewUrl(esigLink);
       setSelectedAgencyLogoFile(null);
       setAgencyLogoPreviewUrl(agencyLogoUrl);
-      setMessage({ type: 'success', text: 'Certificate signatory saved successfully.' });
+      setMessage({
+        type: 'success',
+        text: isPartnerSignatoryView
+          ? 'Partner agency signatory saved successfully.'
+          : 'Certificate signatory saved successfully.'
+      });
       await fetchSignatories(selectedOfficeId, savedSignatoryId);
     } catch (err: any) {
       console.error('Error saving signatory:', err);
@@ -754,7 +783,11 @@ const Settings: React.FC = () => {
     );
   }
 
-  if (isOfficeManager && !user?.office_id && activeView === 'signatories') {
+  if (
+    isOfficeManager
+    && !user?.office_id
+    && (activeView === 'signatories' || activeView === 'partner-signatories')
+  ) {
     return (
       <div className="p-6 bg-card rounded-xl shadow-sm border border-slate-200">
         <p className="text-slate-500">Your account does not have an office assignment yet, so certificate settings cannot be managed.</p>
@@ -816,32 +849,47 @@ const Settings: React.FC = () => {
   return (
     <div className="min-h-0 flex flex-col -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16">
       <div className="flex-1 min-h-0 bg-card rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-        {activeView === 'signatories' && (
+        {(activeView === 'signatories' || activeView === 'partner-signatories') && (
         <>
         <div className="border-b border-slate-100 p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-semibold text-slate-800">Certificate Signatories</h2>
+                <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                  isPartnerSignatoryView
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-indigo-100 text-indigo-700'
+                }`}>
+                  {isPartnerSignatoryView ? <Handshake className="h-4 w-4" /> : <FileSignature className="h-4 w-4" />}
+                </span>
+                <h2 className="text-lg font-semibold text-slate-800">
+                  {isPartnerSignatoryView ? 'Partner Agency Signatories' : 'Certificate Signatories'}
+                </h2>
                 {selectedOffice && (
                   <span className="inline-flex max-w-full items-center truncate rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
                     {selectedOffice.name}
                   </span>
                 )}
               </div>
-              <p className="mt-1 text-sm text-slate-500">Configure office signatory details for Certificates of Appearance.</p>
+              <p className="mt-1 text-sm text-slate-500">
+                {isPartnerSignatoryView
+                  ? 'Manage external agency signers available to this office for joint Certificates of Participation.'
+                  : 'Configure the office signers used for certificates and official certificate branding.'}
+              </p>
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <button
-                type="button"
-                onClick={() => setIsPreviewModalOpen(true)}
-                disabled={!selectedOfficeId}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-card px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
-              >
-                <Eye className="h-4 w-4" />
-                Show Template Preview
-              </button>
+              {!isPartnerSignatoryView && (
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewModalOpen(true)}
+                  disabled={!selectedOfficeId}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-card px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  <Eye className="h-4 w-4" />
+                  Show Template Preview
+                </button>
+              )}
 
               <button
                 type="submit"
@@ -850,7 +898,7 @@ const Settings: React.FC = () => {
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:bg-indigo-400"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Save Changes
+                {isPartnerSignatoryView ? 'Save Partner Signatory' : 'Save Changes'}
               </button>
             </div>
           </div>
@@ -879,9 +927,13 @@ const Settings: React.FC = () => {
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.68fr)]">
                 <section className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
                   <div className="mb-3">
-                    <h3 className="text-sm font-semibold text-slate-800">Office and Signatory</h3>
+                    <h3 className="text-sm font-semibold text-slate-800">
+                      {isPartnerSignatoryView ? 'Managing Office and Partner Signatory' : 'Office and Signatory'}
+                    </h3>
                     <p className="mt-1 text-xs text-slate-500">
-                      Manage the signer identity shown at the bottom of the certificate.
+                      {isPartnerSignatoryView
+                        ? 'Assign the external signer to the DILG office that is allowed to use this partnership.'
+                        : 'Manage the signer identity shown at the bottom of the certificate.'}
                     </p>
                   </div>
 
@@ -909,7 +961,9 @@ const Settings: React.FC = () => {
                     </div>
 
                     <div className="space-y-1 md:col-span-2">
-                      <label className="block text-xs font-medium text-slate-700">Select Signatory</label>
+                      <label className="block text-xs font-medium text-slate-700">
+                        {isPartnerSignatoryView ? 'Select Partner Signatory' : 'Select Signatory'}
+                      </label>
                       <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                         <select
                           value={selectedSignatoryId}
@@ -918,11 +972,15 @@ const Settings: React.FC = () => {
                           className="w-full rounded-lg border border-slate-300 bg-card px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
                         >
                           {signatories.length === 0 ? (
-                            <option value="">No signatories yet</option>
+                            <option value="">
+                              {isPartnerSignatoryView ? 'No partner signatories yet' : 'No signatories yet'}
+                            </option>
                           ) : (
                             signatories.map((item) => (
                               <option key={item.id} value={item.id}>
-                                {item.label || item.name}{item.is_default ? ' (Default)' : ''}
+                                {item.label || item.name}
+                                {isPartnerSignatoryView && item.agency_name ? ` — ${item.agency_name}` : ''}
+                                {!isPartnerSignatoryView && item.is_default ? ' (Default)' : ''}
                               </option>
                             ))
                           )}
@@ -950,7 +1008,7 @@ const Settings: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="space-y-1">
+                    <div className={`space-y-1 ${isPartnerSignatoryView ? 'md:col-span-2' : ''}`}>
                       <label className="block text-xs font-medium text-slate-700">Label</label>
                       <input
                         type="text"
@@ -962,19 +1020,21 @@ const Settings: React.FC = () => {
                       />
                     </div>
 
-                    <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-card px-3 py-2 text-sm font-medium text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={signatory.is_default || signatories.length === 0}
-                        disabled={!selectedOfficeId || signatories.length === 0}
-                        onChange={(e) => setSignatory({ ...signatory, is_default: e.target.checked })}
-                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <Star className="h-4 w-4 text-amber-500" />
-                      Default
-                    </label>
+                    {!isPartnerSignatoryView && (
+                      <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-card px-3 py-2 text-sm font-medium text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={signatory.is_default || signatories.length === 0}
+                          disabled={!selectedOfficeId || signatories.length === 0}
+                          onChange={(e) => setSignatory({ ...signatory, is_default: e.target.checked })}
+                          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <Star className="h-4 w-4 text-amber-500" />
+                        Default
+                      </label>
+                    )}
 
-                    <div className="space-y-1">
+                    <div className={`space-y-1 ${isPartnerSignatoryView ? 'md:col-span-2' : ''}`}>
                       <label className="block text-xs font-medium text-slate-700">Name</label>
                       <input
                         type="text"
@@ -987,7 +1047,7 @@ const Settings: React.FC = () => {
                       />
                     </div>
 
-                    <div className="space-y-1">
+                    <div className={`space-y-1 ${isPartnerSignatoryView ? 'order-[6]' : ''}`}>
                       <label className="block text-xs font-medium text-slate-700">Post Nominals</label>
                       <input
                         type="text"
@@ -999,7 +1059,7 @@ const Settings: React.FC = () => {
                       />
                     </div>
 
-                    <div className="space-y-1 md:col-span-2">
+                    <div className={`space-y-1 ${isPartnerSignatoryView ? 'order-[5]' : 'md:col-span-2'}`}>
                       <label className="block text-xs font-medium text-slate-700">Position</label>
                       <input
                         type="text"
@@ -1078,11 +1138,12 @@ const Settings: React.FC = () => {
                 </section>
               </div>
 
-              <section className="rounded-lg border border-slate-200 bg-card p-4">
+              {isPartnerSignatoryView && (
+              <section className="rounded-lg border border-amber-200 bg-amber-50/40 p-4">
                 <div className="mb-4">
                   <h3 className="text-sm font-semibold text-slate-800">Partner Agency Details</h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    Optional. Complete these fields when this person may be selected as the second signatory on a Certificate of Participation.
+                    Required. These verified details appear only when this person is selected as the second signatory on a Certificate of Participation.
                   </p>
                 </div>
 
@@ -1091,13 +1152,14 @@ const Settings: React.FC = () => {
                     <label className="block text-xs font-medium text-slate-700">Agency Name</label>
                     <input
                       type="text"
+                      required
                       disabled={!selectedOfficeId}
                       value={signatory.agency_name}
                       onChange={(e) => setSignatory({ ...signatory, agency_name: e.target.value })}
                       placeholder="e.g. DEPARTMENT OF JUSTICE REGION X"
                       className="w-full min-w-0 rounded-lg border border-slate-300 bg-card px-3 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
                     />
-                    <p className="text-xs text-slate-500">Displayed below “in partnership with” when this is the partner signatory.</p>
+                    <p className="text-xs text-slate-500">Displayed below “in partnership with” when this partner signatory is selected.</p>
                   </div>
 
                   <div className="space-y-2">
@@ -1141,7 +1203,9 @@ const Settings: React.FC = () => {
                   </div>
                 </div>
               </section>
+              )}
 
+              {!isPartnerSignatoryView && (
               <section className="rounded-lg border border-slate-200 bg-card p-4">
                 <div className="mb-4">
                   <h3 className="text-sm font-semibold text-slate-800">Certificate Header and Footer Content</h3>
@@ -1209,6 +1273,7 @@ const Settings: React.FC = () => {
                   </div>
                 </div>
               </section>
+              )}
             </div>
           </div>
         </form>

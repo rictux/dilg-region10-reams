@@ -370,7 +370,7 @@ const Reports: React.FC = () => {
                 <div className="bg-violet-100 p-3 rounded-lg text-violet-600 mb-4">
                     <Award size={24} />
                 </div>
-                <h3 className="text-lg font-bold text-slate-800 mb-2">Cert of Participation/Acknow. Receipt</h3>
+                <h3 className="text-lg font-bold text-slate-800 mb-2">Certificate of Participation</h3>
                 <p className="text-slate-500 text-sm mb-6 flex-1">
                     Generate Certificates of Participation with a custom theme and paper size, in A4 or A5.
                     {selectedEventId ? ' Creates certificates for the selected event.' : ' Please select an event first.'}

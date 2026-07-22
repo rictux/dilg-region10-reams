@@ -307,6 +307,12 @@ type SettingsModalProps = {
   isSaving: boolean;
 };
 
+const isPartnerAgencySignatory = (signatory: CertificateSignatory) =>
+  Boolean(signatory?.agency_name?.trim() || signatory?.agency_logo_url?.trim());
+
+const isCompletePartnerAgencySignatory = (signatory: CertificateSignatory) =>
+  Boolean(signatory?.agency_name?.trim() && signatory?.agency_logo_url?.trim());
+
 const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose, themes, themeUrl, onSelectTheme, onUploadTheme, onDeleteTheme,
   isUploadingTheme, themeError,
@@ -319,6 +325,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onSave, isSaving,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const primarySignatories = signatories.filter(sig => !isPartnerAgencySignatory(sig));
+  const partnerSignatories = signatories.filter(isCompletePartnerAgencySignatory);
 
   return (
     <div
@@ -536,8 +544,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 className="h-4 w-4 shrink-0 accent-violet-600"
               />
             </label>
-            {signatories.length === 0 ? (
-              <p className="text-xs text-[#9A9890]">No signatories configured. Go to Settings to add one.</p>
+            {primarySignatories.length === 0 ? (
+              <p className="text-xs text-[#9A9890]">No office signatories configured. Go to Settings to add one.</p>
             ) : (
               <div className="space-y-4">
                 <div>
@@ -548,12 +556,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     id="cop-primary-signatory"
                     value={primarySignatory?.id || ''}
                     onChange={e => {
-                      const selected = signatories.find(sig => sig.id === Number(e.target.value));
+                      const selected = primarySignatories.find(sig => sig.id === Number(e.target.value));
                       if (selected) onSelectPrimarySignatory(selected);
                     }}
                     className="w-full rounded-xl border-2 border-[#E0DDD4] bg-white px-3 py-3 text-sm text-[#4A4843] outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
                   >
-                    {signatories.map(sig => (
+                    {primarySignatories.map(sig => (
                       <option key={sig.id} value={sig.id}>
                         {sig.name}{sig.post_nominals ? `, ${sig.post_nominals}` : ''} — {sig.position}
                       </option>
@@ -570,22 +578,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     value={secondarySignatory?.id || ''}
                     onChange={e => {
                       const id = Number(e.target.value);
-                      onSelectSecondarySignatory(id ? signatories.find(sig => sig.id === id) || null : null);
+                      onSelectSecondarySignatory(id ? partnerSignatories.find(sig => sig.id === id) || null : null);
                     }}
                     className="w-full rounded-xl border-2 border-[#E0DDD4] bg-white px-3 py-3 text-sm text-[#4A4843] outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
                   >
                     <option value="">None — use the standard DILG certificate</option>
-                    {signatories
-                      .filter(sig => sig.id !== primarySignatory?.id)
-                      .map(sig => (
+                    {partnerSignatories.map(sig => (
                         <option key={sig.id} value={sig.id}>
-                          {sig.name}{sig.agency_name ? ` — ${sig.agency_name}` : ' — agency details required'}
+                          {sig.name} — {sig.agency_name}
                         </option>
                       ))}
                   </select>
-                  {secondarySignatory && (!secondarySignatory.agency_name?.trim() || !secondarySignatory.agency_logo_url?.trim()) && (
+                  {partnerSignatories.length === 0 && (
                     <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                      Add both the agency name and agency logo to this signatory in System Settings before saving.
+                      No approved partner agency signatories are configured for this office.
                     </p>
                   )}
                 </div>
@@ -599,7 +605,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="px-6 py-4 border-t border-[#EDEAE2] flex justify-end">
           <button
             onClick={onSave}
-            disabled={isSaving || signatories.length === 0}
+            disabled={isSaving || primarySignatories.length === 0}
             className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-300 text-white text-sm font-medium px-6 py-2 rounded-lg transition-colors"
           >
             {isSaving && <Loader2 size={14} className="animate-spin" />}
@@ -724,15 +730,17 @@ const CertificateOfParticipation: React.FC = () => {
         toast.error('Unable to load certificate signatories.');
       } else {
         const scopedSignatories = (sigs ?? []) as SignatoryRow[];
+        const officeSignatories = scopedSignatories.filter(sig => !isPartnerAgencySignatory(sig));
+        const partnerSignatories = scopedSignatories.filter(isCompletePartnerAgencySignatory);
         setSignatories(scopedSignatories);
-        const savedPrimary = scopedSignatories.find(sig => sig.id === ev.cop_primary_signatory_id);
+        const savedPrimary = officeSignatories.find(sig => sig.id === ev.cop_primary_signatory_id);
         const defaultSignatory = savedPrimary
-          ?? scopedSignatories.find(sig => sig.id === GLOBAL_SIGNATORY_ID)
-          ?? scopedSignatories.find(sig => sig.is_default)
-          ?? scopedSignatories[0]
+          ?? officeSignatories.find(sig => sig.id === GLOBAL_SIGNATORY_ID)
+          ?? officeSignatories.find(sig => sig.is_default)
+          ?? officeSignatories[0]
           ?? null;
-        const savedSecondary = scopedSignatories.find(
-          sig => sig.id === ev.cop_secondary_signatory_id && sig.id !== defaultSignatory?.id
+        const savedSecondary = partnerSignatories.find(
+          sig => sig.id === ev.cop_secondary_signatory_id
         ) ?? null;
         setPrimarySignatory(defaultSignatory);
         setSecondarySignatory(savedSecondary);
