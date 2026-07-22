@@ -64,6 +64,8 @@ export interface Event {
   status: 'Scheduled' | 'Ongoing' | 'Completed' | 'Cancelled';
   created_at?: string;
   organize_by?: number | null;
+  cop_primary_signatory_id?: number | null;
+  cop_secondary_signatory_id?: number | null;
   has_accommodation?: boolean | null;
   registration_open: boolean;
   session: 'AM' | 'PM' | 'All_Day';

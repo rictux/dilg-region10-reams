@@ -103,6 +103,8 @@ const createEmptySignatoryState = () => ({
   name: '',
   position: '',
   esig_link: '',
+  agency_name: '',
+  agency_logo_url: '',
   header: '',
   sub_header: '',
   address: '',
@@ -157,6 +159,8 @@ const Settings: React.FC = () => {
   const [selectedSignatoryId, setSelectedSignatoryId] = useState<number | ''>('');
   const [selectedSignatureFile, setSelectedSignatureFile] = useState<File | null>(null);
   const [signaturePreviewUrl, setSignaturePreviewUrl] = useState('');
+  const [selectedAgencyLogoFile, setSelectedAgencyLogoFile] = useState<File | null>(null);
+  const [agencyLogoPreviewUrl, setAgencyLogoPreviewUrl] = useState('');
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [previewViewport, setPreviewViewport] = useState(() => ({
     width: typeof window !== 'undefined' ? window.innerWidth : 1440,
@@ -188,6 +192,8 @@ const Settings: React.FC = () => {
       setSignatory(createEmptySignatoryState());
       setSelectedSignatureFile(null);
       setSignaturePreviewUrl('');
+      setSelectedAgencyLogoFile(null);
+      setAgencyLogoPreviewUrl('');
       setIsPreviewModalOpen(false);
     }
   }, [selectedOfficeId]);
@@ -199,6 +205,14 @@ const Settings: React.FC = () => {
       }
     };
   }, [signaturePreviewUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (agencyLogoPreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(agencyLogoPreviewUrl);
+      }
+    };
+  }, [agencyLogoPreviewUrl]);
 
   useEffect(() => {
     if (!isPreviewModalOpen) return;
@@ -276,6 +290,8 @@ const Settings: React.FC = () => {
   const applySignatoryRow = (row: SignatoryRow | null) => {
     setSelectedSignatureFile(null);
     setSignaturePreviewUrl(row?.esig_link || '');
+    setSelectedAgencyLogoFile(null);
+    setAgencyLogoPreviewUrl(row?.agency_logo_url || '');
     setSignatory(
       row
         ? {
@@ -283,6 +299,8 @@ const Settings: React.FC = () => {
             name: row.name || '',
             position: row.position || '',
             esig_link: row.esig_link || '',
+            agency_name: row.agency_name || '',
+            agency_logo_url: row.agency_logo_url || '',
             header: row.header || '',
             sub_header: row.sub_header || '',
             address: row.address || '',
@@ -525,6 +543,39 @@ const Settings: React.FC = () => {
     setSignatory((prev) => ({ ...prev, esig_link: '' }));
   };
 
+  const handleAgencyLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+
+    if (!file) return;
+
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setMessage({ type: 'error', text: 'Agency logos must be PNG, JPEG, or WebP images.' });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage({ type: 'error', text: 'Agency logo must be 5 MB or smaller.' });
+      return;
+    }
+
+    setMessage(null);
+    setSelectedAgencyLogoFile(file);
+    setAgencyLogoPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleRemoveAgencyLogo = () => {
+    if (agencyLogoPreviewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(agencyLogoPreviewUrl);
+    }
+
+    setMessage(null);
+    setSelectedAgencyLogoFile(null);
+    setAgencyLogoPreviewUrl('');
+    setSignatory((prev) => ({ ...prev, agency_logo_url: '' }));
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOfficeId) return;
@@ -553,6 +604,7 @@ const Settings: React.FC = () => {
       }
 
       let esigLink = signatory.esig_link;
+      let agencyLogoUrl = signatory.agency_logo_url;
 
       if (selectedSignatureFile) {
         const fileExtension = selectedSignatureFile.name.includes('.')
@@ -577,6 +629,29 @@ const Settings: React.FC = () => {
         esigLink = publicUrlData.publicUrl;
       }
 
+      if (selectedAgencyLogoFile) {
+        const fileExtension = selectedAgencyLogoFile.name.includes('.')
+          ? selectedAgencyLogoFile.name.split('.').pop()?.toLowerCase()
+          : '';
+        const filePath = `office-${selectedOfficeId}/agency-logo-${selectedOfficeId}-${Date.now()}${fileExtension ? `.${fileExtension}` : ''}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('esig')
+          .upload(filePath, selectedAgencyLogoFile, {
+            cacheControl: '3600',
+            upsert: true,
+            contentType: selectedAgencyLogoFile.type
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('esig')
+          .getPublicUrl(filePath);
+
+        agencyLogoUrl = publicUrlData.publicUrl;
+      }
+
       const shouldSetDefault = signatory.is_default || signatories.length === 0;
 
       if (shouldSetDefault) {
@@ -595,6 +670,8 @@ const Settings: React.FC = () => {
         name: signatory.name,
         position: signatory.position,
         esig_link: esigLink,
+        agency_name: signatory.agency_name.trim() || null,
+        agency_logo_url: agencyLogoUrl || null,
         header: signatory.header.trim() || null,
         sub_header: signatory.sub_header.trim() || null,
         address: signatory.address.trim() || null,
@@ -619,6 +696,8 @@ const Settings: React.FC = () => {
             name: payload.name,
             position: payload.position,
             esig_link: payload.esig_link,
+            agency_name: payload.agency_name,
+            agency_logo_url: payload.agency_logo_url,
             header: payload.header,
             sub_header: payload.sub_header,
             address: payload.address,
@@ -644,9 +723,11 @@ const Settings: React.FC = () => {
         savedSignatoryId = inserted?.id || '';
       }
 
-      setSignatory((prev) => ({ ...prev, esig_link: esigLink }));
+      setSignatory((prev) => ({ ...prev, esig_link: esigLink, agency_logo_url: agencyLogoUrl }));
       setSelectedSignatureFile(null);
       setSignaturePreviewUrl(esigLink);
+      setSelectedAgencyLogoFile(null);
+      setAgencyLogoPreviewUrl(agencyLogoUrl);
       setMessage({ type: 'success', text: 'Certificate signatory saved successfully.' });
       await fetchSignatories(selectedOfficeId, savedSignatoryId);
     } catch (err: any) {
@@ -996,6 +1077,70 @@ const Settings: React.FC = () => {
                   </div>
                 </section>
               </div>
+
+              <section className="rounded-lg border border-slate-200 bg-card p-4">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-slate-800">Partner Agency Details</h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Optional. Complete these fields when this person may be selected as the second signatory on a Certificate of Participation.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.75fr)]">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-slate-700">Agency Name</label>
+                    <input
+                      type="text"
+                      disabled={!selectedOfficeId}
+                      value={signatory.agency_name}
+                      onChange={(e) => setSignatory({ ...signatory, agency_name: e.target.value })}
+                      placeholder="e.g. DEPARTMENT OF JUSTICE REGION X"
+                      className="w-full min-w-0 rounded-lg border border-slate-300 bg-card px-3 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                    />
+                    <p className="text-xs text-slate-500">Displayed below “in partnership with” when this is the partner signatory.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-medium text-slate-700">Agency Logo</label>
+                    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                      <label className={`flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors ${
+                        selectedOfficeId ? 'cursor-pointer bg-slate-50 hover:bg-slate-100' : 'cursor-not-allowed bg-slate-100'
+                      }`}>
+                        <Upload className="h-4 w-4" />
+                        <span className="truncate">{selectedAgencyLogoFile?.name || 'Upload agency logo'}</span>
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          onChange={handleAgencyLogoChange}
+                          disabled={!selectedOfficeId}
+                          className="hidden"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleRemoveAgencyLogo}
+                        disabled={!selectedOfficeId || (!agencyLogoPreviewUrl && !signatory.agency_logo_url && !selectedAgencyLogoFile)}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Remove
+                      </button>
+                    </div>
+                    <div className="flex h-24 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-4">
+                      {agencyLogoPreviewUrl ? (
+                        <img
+                          src={agencyLogoPreviewUrl}
+                          alt="Partner agency logo preview"
+                          className="max-h-16 max-w-full object-contain"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <p className="text-center text-xs text-slate-500">No agency logo uploaded.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
 
               <section className="rounded-lg border border-slate-200 bg-card p-4">
                 <div className="mb-4">

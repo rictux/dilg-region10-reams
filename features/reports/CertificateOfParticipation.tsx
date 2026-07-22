@@ -260,7 +260,10 @@ const preloadImages = async (urls: Array<string|null|undefined>) => {
   const all = ['/assets/dilg_logo.png','/assets/bagong_pilipinas_logo.png',...urls].filter((u):u is string=>!!u);
   await Promise.all(all.map(async url=>{
     try {
-      const img=new Image(); img.src=url;
+      const img=new Image();
+      img.crossOrigin='anonymous';
+      img.referrerPolicy='no-referrer';
+      img.src=url;
       // decode() waits until the image is fully decoded (not just fetched), so
       // html-to-image doesn't capture before the bitmap is ready to draw.
       await img.decode();
@@ -294,10 +297,14 @@ type SettingsModalProps = {
   onSelectPaperSize: (s: CoPPaperSize) => void;
   // Signatory
   signatories: SignatoryRow[];
-  selectedSignatory: CertificateSignatory;
-  onSelectSignatory: (s: CertificateSignatory) => void;
+  primarySignatory: CertificateSignatory;
+  secondarySignatory: CertificateSignatory;
+  onSelectPrimarySignatory: (s: SignatoryRow) => void;
+  onSelectSecondarySignatory: (s: SignatoryRow | null) => void;
   includeSignature: boolean;
   onChangeIncludeSignature: (value: boolean) => void;
+  onSave: () => void;
+  isSaving: boolean;
 };
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -306,8 +313,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   certTitle, onSelectTitle,
   bodyText, onChangeBodyText,
   creditHours, onChangeCreditHours,
-  paperSize, onSelectPaperSize, signatories, selectedSignatory, onSelectSignatory,
+  paperSize, onSelectPaperSize, signatories, primarySignatory, secondarySignatory,
+  onSelectPrimarySignatory, onSelectSecondarySignatory,
   includeSignature, onChangeIncludeSignature,
+  onSave, isSaving,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -510,10 +519,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </section>
 
-          {/* ── Signatory ── */}
+          {/* ── Signatories ── */}
           <section>
             <h3 className="text-sm font-semibold text-[#4A4843] mb-3 flex items-center gap-2">
-              <span>✍</span> Signatory
+              <span>✍</span> Certificate Signatories
             </h3>
             <label className="mb-3 flex items-center justify-between gap-4 rounded-xl border-2 border-[#E0DDD4] px-4 py-3 text-sm text-[#4A4843]">
               <span>
@@ -530,31 +539,56 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             {signatories.length === 0 ? (
               <p className="text-xs text-[#9A9890]">No signatories configured. Go to Settings to add one.</p>
             ) : (
-              <div className="space-y-2">
-                {signatories.map(sig => (
-                  <button
-                    key={sig.id}
-                    onClick={() => onSelectSignatory(sig)}
-                    className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center gap-3 ${
-                      (selectedSignatory as any)?.id === sig.id
-                        ? 'border-violet-500 bg-violet-50'
-                        : 'border-[#E0DDD4] hover:border-[#C5C2BA]'
-                    }`}
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="cop-primary-signatory" className="mb-1.5 block text-xs font-semibold text-[#6B6860]">
+                    Primary signatory
+                  </label>
+                  <select
+                    id="cop-primary-signatory"
+                    value={primarySignatory?.id || ''}
+                    onChange={e => {
+                      const selected = signatories.find(sig => sig.id === Number(e.target.value));
+                      if (selected) onSelectPrimarySignatory(selected);
+                    }}
+                    className="w-full rounded-xl border-2 border-[#E0DDD4] bg-white px-3 py-3 text-sm text-[#4A4843] outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
                   >
-                    {sig.esig_link && (
-                      <img src={sig.esig_link} alt="" className="h-8 w-12 object-contain shrink-0" referrerPolicy="no-referrer" />
-                    )}
-                    <div className="min-w-0">
-                      <p className={`text-sm font-semibold truncate ${(selectedSignatory as any)?.id === sig.id ? 'text-violet-700' : 'text-[#4A4843]'}`}>
-                        {sig.name}{sig.post_nominals ? `, ${sig.post_nominals}` : ''}
-                      </p>
-                      <p className="text-xs text-[#9A9890] truncate">{sig.position}</p>
-                    </div>
-                    {(selectedSignatory as any)?.id === sig.id && (
-                      <Check size={15} className="text-violet-600 shrink-0 ml-auto" />
-                    )}
-                  </button>
-                ))}
+                    {signatories.map(sig => (
+                      <option key={sig.id} value={sig.id}>
+                        {sig.name}{sig.post_nominals ? `, ${sig.post_nominals}` : ''} — {sig.position}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="cop-secondary-signatory" className="mb-1.5 block text-xs font-semibold text-[#6B6860]">
+                    Partner agency signatory (optional)
+                  </label>
+                  <select
+                    id="cop-secondary-signatory"
+                    value={secondarySignatory?.id || ''}
+                    onChange={e => {
+                      const id = Number(e.target.value);
+                      onSelectSecondarySignatory(id ? signatories.find(sig => sig.id === id) || null : null);
+                    }}
+                    className="w-full rounded-xl border-2 border-[#E0DDD4] bg-white px-3 py-3 text-sm text-[#4A4843] outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                  >
+                    <option value="">None — use the standard DILG certificate</option>
+                    {signatories
+                      .filter(sig => sig.id !== primarySignatory?.id)
+                      .map(sig => (
+                        <option key={sig.id} value={sig.id}>
+                          {sig.name}{sig.agency_name ? ` — ${sig.agency_name}` : ' — agency details required'}
+                        </option>
+                      ))}
+                  </select>
+                  {secondarySignatory && (!secondarySignatory.agency_name?.trim() || !secondarySignatory.agency_logo_url?.trim()) && (
+                    <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      Add both the agency name and agency logo to this signatory in System Settings before saving.
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </section>
@@ -564,10 +598,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Modal footer */}
         <div className="px-6 py-4 border-t border-[#EDEAE2] flex justify-end">
           <button
-            onClick={onClose}
-            className="bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-6 py-2 rounded-lg transition-colors"
+            onClick={onSave}
+            disabled={isSaving || signatories.length === 0}
+            className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-300 text-white text-sm font-medium px-6 py-2 rounded-lg transition-colors"
           >
-            Done
+            {isSaving && <Loader2 size={14} className="animate-spin" />}
+            {isSaving ? 'Saving…' : 'Save and close'}
           </button>
         </div>
       </div>
@@ -592,11 +628,16 @@ const CertificateOfParticipation: React.FC = () => {
   // ── certificate settings
   const [paperSize,          setPaperSize]          = useState<CoPPaperSize>('A4');
   const [themeUrl,           setThemeUrl]            = useState<string | null>(null);
-  const [selectedSignatory,  setSelectedSignatory]   = useState<CertificateSignatory>(null);
+  const [primarySignatory,   setPrimarySignatory]    = useState<CertificateSignatory>(null);
+  const [secondarySignatory, setSecondarySignatory]  = useState<CertificateSignatory>(null);
   const [certTitle,          setCertTitle]           = useState<CoPTitle>('Certificate of Participation');
   const [bodyText,           setBodyText]            = useState<string>(DEFAULT_COP_BODY_TEXT);
   const [creditHours,        setCreditHours]         = useState<string>('');
   const [includeSignature,   setIncludeSignature]    = useState(true);
+  const certificateSecondarySignatory = secondarySignatory?.agency_name?.trim()
+    && secondarySignatory.agency_logo_url?.trim()
+    ? secondarySignatory
+    : null;
 
   // ── UI state
   const [search,           setSearch]           = useState('');
@@ -610,6 +651,7 @@ const CertificateOfParticipation: React.FC = () => {
   const [isUploadingTheme, setIsUploadingTheme] = useState(false);
   const [themeError,       setThemeError]       = useState<string | null>(null);
   const [showSettings,     setShowSettings]     = useState(false);
+  const [isSavingSignatories, setIsSavingSignatories] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [isSendingEmails,  setIsSendingEmails]  = useState(false);
   const [emailProgress,    setEmailProgress]    = useState<{ done: number; total: number } | null>(null);
@@ -652,6 +694,8 @@ const CertificateOfParticipation: React.FC = () => {
           name,
           position,
           esig_link,
+          agency_name,
+          agency_logo_url,
           header,
           sub_header,
           address,
@@ -659,27 +703,39 @@ const CertificateOfParticipation: React.FC = () => {
           footer,
           post_nominals,
           certificate_template_variant,
-          is_default
+          is_default,
+          active
         `)
+        .eq('active', true)
         .order('name');
 
-      signatoryQuery = ev.organize_by != null
-        ? signatoryQuery.or(`office_id.eq.${ev.organize_by},id.eq.${GLOBAL_SIGNATORY_ID}`)
-        : signatoryQuery.eq('id', GLOBAL_SIGNATORY_ID);
+      const signatoryScope = new Set<string>([`id.eq.${GLOBAL_SIGNATORY_ID}`]);
+      if (ev.organize_by != null) signatoryScope.add(`office_id.eq.${ev.organize_by}`);
+      if (ev.cop_primary_signatory_id != null) signatoryScope.add(`id.eq.${ev.cop_primary_signatory_id}`);
+      if (ev.cop_secondary_signatory_id != null) signatoryScope.add(`id.eq.${ev.cop_secondary_signatory_id}`);
+      signatoryQuery = signatoryQuery.or(Array.from(signatoryScope).join(','));
 
       const { data: sigs, error: signatoryError } = await signatoryQuery;
       if (signatoryError) {
         console.error('Error loading certificate signatories:', signatoryError);
         setSignatories([]);
-        setSelectedSignatory(null);
+        setPrimarySignatory(null);
+        setSecondarySignatory(null);
         toast.error('Unable to load certificate signatories.');
       } else {
         const scopedSignatories = (sigs ?? []) as SignatoryRow[];
         setSignatories(scopedSignatories);
-        const defaultSignatory = scopedSignatories.find(sig => sig.id === GLOBAL_SIGNATORY_ID)
+        const savedPrimary = scopedSignatories.find(sig => sig.id === ev.cop_primary_signatory_id);
+        const defaultSignatory = savedPrimary
+          ?? scopedSignatories.find(sig => sig.id === GLOBAL_SIGNATORY_ID)
+          ?? scopedSignatories.find(sig => sig.is_default)
           ?? scopedSignatories[0]
           ?? null;
-        setSelectedSignatory(defaultSignatory);
+        const savedSecondary = scopedSignatories.find(
+          sig => sig.id === ev.cop_secondary_signatory_id && sig.id !== defaultSignatory?.id
+        ) ?? null;
+        setPrimarySignatory(defaultSignatory);
+        setSecondarySignatory(savedSecondary);
       }
 
       const logs = await fetchAllSupabaseRows<any>(() =>
@@ -735,6 +791,58 @@ const CertificateOfParticipation: React.FC = () => {
       setPreviewId(normalized[0]?.participant.participant_id ?? null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSelectPrimarySignatory = (signatory: SignatoryRow) => {
+    setPrimarySignatory(signatory);
+    if (secondarySignatory?.id === signatory.id) {
+      setSecondarySignatory(null);
+    }
+  };
+
+  const handleSelectSecondarySignatory = (signatory: SignatoryRow | null) => {
+    if (signatory?.id === primarySignatory?.id) return;
+    setSecondarySignatory(signatory);
+  };
+
+  const handleSaveSignatories = async () => {
+    if (!event || !primarySignatory?.id) {
+      toast.error('Select a primary signatory before saving.');
+      return;
+    }
+
+    if (secondarySignatory && (
+      !secondarySignatory.agency_name?.trim()
+      || !secondarySignatory.agency_logo_url?.trim()
+    )) {
+      toast.error('The partner signatory requires an agency name and agency logo.');
+      return;
+    }
+
+    setIsSavingSignatories(true);
+    try {
+      const signatoryIds = {
+        cop_primary_signatory_id: primarySignatory.id,
+        cop_secondary_signatory_id: secondarySignatory?.id ?? null,
+      };
+      const { error } = await supabase
+        .from('events')
+        .update(signatoryIds)
+        .eq('event_id', event.event_id);
+
+      if (error) throw error;
+
+      setEvent(current => current ? { ...current, ...signatoryIds } : current);
+      setShowSettings(false);
+      toast.success(secondarySignatory
+        ? 'Primary and partner signatories saved for this event.'
+        : 'Primary signatory saved for this event.');
+    } catch (error: any) {
+      console.error('Error saving Certificate of Participation signatories:', error);
+      toast.error(error?.message || 'Unable to save the event signatories.');
+    } finally {
+      setIsSavingSignatories(false);
     }
   };
 
@@ -882,7 +990,12 @@ const CertificateOfParticipation: React.FC = () => {
     setIsGenerating(true);
     setProgress({ done: 0, total: queue.length });
     try {
-      await preloadImages([themeUrl, includeSignature ? selectedSignatory?.esig_link : null]);
+      await preloadImages([
+        themeUrl,
+        includeSignature ? primarySignatory?.esig_link : null,
+        includeSignature ? certificateSecondarySignatory?.esig_link : null,
+        certificateSecondarySignatory?.agency_logo_url,
+      ]);
       await ensureCertFontsReady();
       await waitTwoPaints();
       let fontEmbedCSS: string | undefined;
@@ -927,7 +1040,12 @@ const CertificateOfParticipation: React.FC = () => {
     setIsGenerating(true);
     setProgress({ done: 0, total: queue.length });
     try {
-      await preloadImages([themeUrl, includeSignature ? selectedSignatory?.esig_link : null]);
+      await preloadImages([
+        themeUrl,
+        includeSignature ? primarySignatory?.esig_link : null,
+        includeSignature ? certificateSecondarySignatory?.esig_link : null,
+        certificateSecondarySignatory?.agency_logo_url,
+      ]);
       await ensureCertFontsReady();
       await waitTwoPaints();
       let fontEmbedCSS: string | undefined;
@@ -1013,7 +1131,12 @@ const CertificateOfParticipation: React.FC = () => {
     setEmailProgress({ done: 0, total: queue.length });
 
     try {
-      await preloadImages([themeUrl, includeSignature ? selectedSignatory?.esig_link : null]);
+      await preloadImages([
+        themeUrl,
+        includeSignature ? primarySignatory?.esig_link : null,
+        includeSignature ? certificateSecondarySignatory?.esig_link : null,
+        certificateSecondarySignatory?.agency_logo_url,
+      ]);
       await ensureCertFontsReady();
       await waitTwoPaints();
       let fontEmbedCSS: string | undefined;
@@ -1324,7 +1447,13 @@ const CertificateOfParticipation: React.FC = () => {
             <span className="text-[#C5C2BA]">·</span>
             <span>{themeUrl ? 'Theme applied' : 'Plain white'}</span>
             <span className="text-[#C5C2BA]">·</span>
-            <span className="truncate">{(selectedSignatory as any)?.name || 'No signatory'}</span>
+            <span className="truncate">{primarySignatory?.name || 'No signatory'}</span>
+            {certificateSecondarySignatory && (
+              <>
+                <span>·</span>
+                <span className="truncate">Partner: {certificateSecondarySignatory.agency_name || certificateSecondarySignatory.name}</span>
+              </>
+            )}
             <span className="text-[#C5C2BA]">/</span>
             <span>{includeSignature ? 'Signature included' : 'Signature excluded'}</span>
             <button
@@ -1349,7 +1478,8 @@ const CertificateOfParticipation: React.FC = () => {
                 <CertificateOfParticipationCard
                   event={event}
                   participantRecord={previewRecord}
-                  signatory={selectedSignatory}
+                  primarySignatory={primarySignatory}
+                  secondarySignatory={certificateSecondarySignatory}
                   themeUrl={themeUrl}
                   paperSize={paperSize}
                   title={certTitle}
@@ -1377,7 +1507,8 @@ const CertificateOfParticipation: React.FC = () => {
               <CertificateOfParticipationCard
                 event={event}
                 participantRecord={record}
-                signatory={selectedSignatory}
+                primarySignatory={primarySignatory}
+                secondarySignatory={certificateSecondarySignatory}
                 themeUrl={themeUrl}
                 paperSize={paperSize}
                 title={certTitle}
@@ -1411,10 +1542,14 @@ const CertificateOfParticipation: React.FC = () => {
           paperSize={paperSize}
           onSelectPaperSize={setPaperSize}
           signatories={signatories}
-          selectedSignatory={selectedSignatory}
-          onSelectSignatory={setSelectedSignatory}
+          primarySignatory={primarySignatory}
+          secondarySignatory={secondarySignatory}
+          onSelectPrimarySignatory={handleSelectPrimarySignatory}
+          onSelectSecondarySignatory={handleSelectSecondarySignatory}
           includeSignature={includeSignature}
           onChangeIncludeSignature={setIncludeSignature}
+          onSave={handleSaveSignatories}
+          isSaving={isSavingSignatories}
         />
       )}
 
@@ -1435,7 +1570,8 @@ const CertificateOfParticipation: React.FC = () => {
               <CertificateOfParticipationCard
                 event={event}
                 participantRecord={previewRecord}
-                signatory={selectedSignatory}
+                primarySignatory={primarySignatory}
+                secondarySignatory={certificateSecondarySignatory}
                 themeUrl={themeUrl}
                 paperSize={paperSize}
                 title={certTitle}
