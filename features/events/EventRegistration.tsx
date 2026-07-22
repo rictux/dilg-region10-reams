@@ -42,6 +42,18 @@ const formatAccommodationDateLabel = (value: string) => {
 const isValidEmailAddress = (value: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
 
+const AGE_GROUP_OPTIONS = ['18-24', '25-34', '35-44', '45-54', '55-65', '65+'] as const;
+
+const normalizeAgeGroup = (value?: string | null) =>
+  AGE_GROUP_OPTIONS.some((option) => option === value) ? value! : '';
+
+const RequiredMark = () => (
+  <>
+    <span className="text-red-500" aria-hidden="true"> *</span>
+    <span className="sr-only"> (required)</span>
+  </>
+);
+
 const EventRegistration: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const [event, setEvent] = useState<Event | null>(null);
@@ -107,7 +119,7 @@ const EventRegistration: React.FC = () => {
     position: '',
     office: '',
     mobile_no: '',
-    age_group: '18-24',
+    age_group: '',
     pwd: 'No',
     indigenous_people: 'No',
     role: 'Delegate',
@@ -121,6 +133,12 @@ const EventRegistration: React.FC = () => {
     participant_code: '',
     giveaway_selections: {} as Record<string, string | boolean>
   });
+
+  const emailValidationMessage = !emailTouched
+    ? null
+    : formData.email.trim() && !isValidEmailAddress(formData.email.trim())
+      ? 'Enter a valid address, such as name@example.com, or leave this blank.'
+      : null;
 
   const getEventAccommodationDates = () => {
     if (!event?.has_accommodation) return [] as string[];
@@ -326,6 +344,11 @@ const EventRegistration: React.FC = () => {
       return null;
     }
 
+    if (!AGE_GROUP_OPTIONS.some((option) => option === formData.age_group)) {
+      setError("Please select your age group.");
+      return null;
+    }
+
     const normalizedEmail = formData.email.trim().toLowerCase();
     if (normalizedEmail && !isValidEmailAddress(normalizedEmail)) {
       setEmailTouched(true);
@@ -524,7 +547,7 @@ const EventRegistration: React.FC = () => {
         position: data.position || '',
         office: data.office || '',
         mobile_no: data.mobile_no || '',
-        age_group: data.age_group || '18-24',
+        age_group: normalizeAgeGroup(data.age_group),
         pwd: data.pwd || 'No',
         indigenous_people: data.indigenous_people || 'No',
         location_id: data.location_id,
@@ -727,7 +750,7 @@ const EventRegistration: React.FC = () => {
           position: data.position || '',
           office: data.office || '',
           mobile_no: data.mobile_no || '',
-          age_group: data.age_group || '18-24',
+          age_group: normalizeAgeGroup(data.age_group),
           pwd: data.pwd || 'No',
           indigenous_people: data.indigenous_people || 'No',
           location_id: data.location_id,
@@ -972,7 +995,7 @@ const EventRegistration: React.FC = () => {
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="relative">
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">First Name</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">First Name<RequiredMark /></label>
                                 <div className="relative">
                                     <User className="absolute left-3 top-3 text-slate-400" size={18} />
                                     <input 
@@ -988,7 +1011,7 @@ const EventRegistration: React.FC = () => {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Last Name</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Last Name<RequiredMark /></label>
                                 <div className="relative">
                                     <User className="absolute left-3 top-3 text-slate-400" size={18} />
                                     <input 
@@ -1094,22 +1117,21 @@ const EventRegistration: React.FC = () => {
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <div className="flex items-center justify-between gap-3 mb-1.5">
-                                    <label htmlFor="registration-email" className="block text-sm font-medium text-slate-700">Email Address</label>
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="text-xs font-medium text-slate-500">Optional</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowEmailInfo((visible) => !visible)}
-                                            className="inline-flex h-6 w-6 items-center justify-center rounded-full text-indigo-600 transition-colors hover:bg-indigo-100 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-                                            aria-label={showEmailInfo ? 'Hide email information' : 'Why provide an email address?'}
-                                            aria-expanded={showEmailInfo}
-                                            aria-controls="registration-email-help"
-                                            title="Why provide an email address?"
-                                        >
-                                            <Info size={17} aria-hidden="true" />
-                                        </button>
-                                    </div>
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                    <label htmlFor="registration-email" className="block text-sm font-medium text-slate-700">
+                                        Email Address
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowEmailInfo((visible) => !visible)}
+                                        className="inline-flex h-6 w-6 items-center justify-center rounded-full text-indigo-600 transition-colors hover:bg-indigo-100 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                                        aria-label={showEmailInfo ? 'Hide email information' : 'Why provide an email address?'}
+                                        aria-expanded={showEmailInfo}
+                                        aria-controls="registration-email-help"
+                                        title="Why provide an email address?"
+                                    >
+                                        <Info size={17} aria-hidden="true" />
+                                    </button>
                                 </div>
                                 <div className="relative">
                                     {showEmailInfo && (
@@ -1131,7 +1153,7 @@ const EventRegistration: React.FC = () => {
                                     <input
                                         id="registration-email"
                                         type={!!formData.participant_code && !!formData.email && !revealEmail ? 'text' : 'email'}
-                                        className={`w-full pl-10 ${!!formData.participant_code && !!formData.email && !revealEmail ? 'pr-16 bg-slate-50 text-slate-500 font-mono cursor-not-allowed' : 'pr-4'} py-2.5 border ${emailTouched && formData.email.trim() && !isValidEmailAddress(formData.email.trim()) ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/20'} rounded-lg focus:ring-2 outline-none transition-all`}
+                                        className={`w-full pl-10 ${!!formData.participant_code && !!formData.email && !revealEmail ? 'pr-16 bg-slate-50 text-slate-500 font-mono cursor-not-allowed' : 'pr-4'} py-2.5 border ${emailValidationMessage ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/20'} rounded-lg focus:ring-2 outline-none transition-all`}
                                         placeholder="juandelacruz@gmail.com"
                                         value={!!formData.participant_code && !!formData.email && !revealEmail ? maskEmail(formData.email) : formData.email}
                                         onChange={e => {
@@ -1149,10 +1171,10 @@ const EventRegistration: React.FC = () => {
                                         autoComplete="email"
                                         inputMode="email"
                                         spellCheck={false}
-                                        aria-invalid={emailTouched && !!formData.email.trim() && !isValidEmailAddress(formData.email.trim())}
+                                        aria-invalid={!!emailValidationMessage}
                                         aria-describedby={[
                                             showEmailInfo ? 'registration-email-help' : '',
-                                            emailTouched && formData.email.trim() && !isValidEmailAddress(formData.email.trim()) ? 'registration-email-error' : ''
+                                            emailValidationMessage ? 'registration-email-error' : ''
                                         ].filter(Boolean).join(' ') || undefined}
                                     />
                                     {!!formData.participant_code && !!formData.email && !revealEmail && (
@@ -1168,10 +1190,10 @@ const EventRegistration: React.FC = () => {
                                         </button>
                                     )}
                                 </div>
-                                {emailTouched && formData.email.trim() && !isValidEmailAddress(formData.email.trim()) && (
+                                {emailValidationMessage && (
                                     <p id="registration-email-error" role="alert" className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-red-600">
                                         <AlertCircle size={14} aria-hidden="true" />
-                                        Enter a valid address, such as name@example.com, or leave this blank.
+                                        {emailValidationMessage}
                                     </p>
                                 )}
                             </div>
@@ -1206,8 +1228,9 @@ const EventRegistration: React.FC = () => {
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Gender</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Gender<RequiredMark /></label>
                                 <select 
+                                    required
                                     className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                     value={formData.gender}
                                     onChange={e => setFormData({...formData, gender: e.target.value})}
@@ -1218,18 +1241,17 @@ const EventRegistration: React.FC = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">What age group do you belong?</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">What age group do you belong?<RequiredMark /></label>
                                 <select 
+                                    required
                                     className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-card"
                                     value={formData.age_group}
                                     onChange={e => setFormData({...formData, age_group: e.target.value})}
                                 >
-                                    <option value="18-24">18-24</option>
-                                    <option value="25-34">25-34</option>
-                                    <option value="35-44">35-44</option>
-                                    <option value="45-54">45-54</option>
-                                    <option value="55-65">55-65</option>
-                                    <option value="65+">65+</option>
+                                    <option value="" disabled>Select Age Group</option>
+                                    {AGE_GROUP_OPTIONS.map((ageGroup) => (
+                                        <option key={ageGroup} value={ageGroup}>{ageGroup}</option>
+                                    ))}
                                 </select>
                             </div>
                         </div>
@@ -1274,7 +1296,7 @@ const EventRegistration: React.FC = () => {
                          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b pb-2 mb-4 pt-4">Professional Details</h3>
                          
                          <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Position / Title</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Position / Title<RequiredMark /></label>
                             <div className="relative">
                                 <Briefcase className="absolute left-3 top-3 text-slate-400" size={18} />
                                 <input 
@@ -1290,7 +1312,7 @@ const EventRegistration: React.FC = () => {
 
                         {/* Office vs LGU Selection */}
                         <div className="pt-2">
-                             <label className="block text-sm font-medium text-slate-700 mb-2">Affiliation Type</label>
+                             <label className="block text-sm font-medium text-slate-700 mb-2">Affiliation Type<RequiredMark /></label>
                              <div className="flex gap-4 mb-4">
                                 <label className={`flex-1 cursor-pointer border rounded-lg p-3 flex items-center gap-3 transition-all ${affiliationType === 'Office' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
                                     <input 
@@ -1316,7 +1338,7 @@ const EventRegistration: React.FC = () => {
 
                              {affiliationType === 'Office' ? (
                                 <div className="animate-in fade-in zoom-in-95 duration-200">
-                                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Office / Agency Name</label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Office / Agency Name<RequiredMark /></label>
                                     <div className="relative">
                                         <Building className="absolute left-3 top-3 text-slate-400" size={18} />
                                         <input 
@@ -1332,7 +1354,7 @@ const EventRegistration: React.FC = () => {
                              ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-200">
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Province / HUC</label>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Province / HUC<RequiredMark /></label>
                                         <div className="relative">
                                             <MapPin className="absolute left-3 top-3 text-slate-400" size={18} />
                                             <select 
@@ -1464,11 +1486,12 @@ const EventRegistration: React.FC = () => {
                                 <div key={item.key}>
                                     <label className="block text-sm font-medium text-slate-800 mb-2 leading-snug">
                                         {item.label}
-                                        {item.required && item.type === 'single-select' && <span className="text-red-500"> *</span>}
+                                        {item.required && item.type === 'single-select' && <RequiredMark />}
                                     </label>
 
                                     {item.type === 'single-select' ? (
                                         <select
+                                            required={item.required}
                                             className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none bg-card"
                                             value={(formData.giveaway_selections[item.key] as string) || ''}
                                             onChange={(e) => setGiveawaySelection(item.key, e.target.value)}
@@ -1578,7 +1601,7 @@ const EventRegistration: React.FC = () => {
                                 />
                             </div>
                             <label htmlFor="consent-checkbox" className="text-xs text-slate-700 font-bold leading-relaxed cursor-pointer">
-                                I have read and agree to the Data Privacy Notice above. *
+                                I have read and agree to the Data Privacy Notice above.<RequiredMark />
                             </label>
                         </div>
                         
