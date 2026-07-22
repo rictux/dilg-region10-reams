@@ -80,6 +80,7 @@ const EXPORT_DPI    = 300;
 const PIXEL_RATIO   = EXPORT_DPI / 96;
 const JPEG_QUALITY  = 0.97;
 const CERT_BUCKET   = 'cert_of_appearance';
+const GLOBAL_SIGNATORY_ID = 10;
 
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
 
@@ -642,11 +643,43 @@ const CertificateOfParticipation: React.FC = () => {
         if (officeData?.code) setOfficeCode(officeData.code);
       }
 
-      const { data: sigs } = await supabase.from('tbl_signatory').select('*').order('name');
-      if (sigs?.length) {
-        setSignatories(sigs as SignatoryRow[]);
-        const def = sigs.find((s: any) => s.name === 'Bruce A. Colao') ?? sigs[0];
-        setSelectedSignatory(def as CertificateSignatory);
+      let signatoryQuery = supabase
+        .from('tbl_signatory')
+        .select(`
+          id,
+          office_id,
+          label,
+          name,
+          position,
+          esig_link,
+          header,
+          sub_header,
+          address,
+          website,
+          footer,
+          post_nominals,
+          certificate_template_variant,
+          is_default
+        `)
+        .order('name');
+
+      signatoryQuery = ev.organize_by != null
+        ? signatoryQuery.or(`office_id.eq.${ev.organize_by},id.eq.${GLOBAL_SIGNATORY_ID}`)
+        : signatoryQuery.eq('id', GLOBAL_SIGNATORY_ID);
+
+      const { data: sigs, error: signatoryError } = await signatoryQuery;
+      if (signatoryError) {
+        console.error('Error loading certificate signatories:', signatoryError);
+        setSignatories([]);
+        setSelectedSignatory(null);
+        toast.error('Unable to load certificate signatories.');
+      } else {
+        const scopedSignatories = (sigs ?? []) as SignatoryRow[];
+        setSignatories(scopedSignatories);
+        const defaultSignatory = scopedSignatories.find(sig => sig.id === GLOBAL_SIGNATORY_ID)
+          ?? scopedSignatories[0]
+          ?? null;
+        setSelectedSignatory(defaultSignatory);
       }
 
       const logs = await fetchAllSupabaseRows<any>(() =>
