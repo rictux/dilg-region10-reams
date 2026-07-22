@@ -39,6 +39,9 @@ const formatAccommodationDateLabel = (value: string) => {
   }
 };
 
+const isValidEmailAddress = (value: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
+
 const EventRegistration: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const [event, setEvent] = useState<Event | null>(null);
@@ -57,6 +60,8 @@ const EventRegistration: React.FC = () => {
   const [applyingExistingRecord, setApplyingExistingRecord] = useState(false);
   const [revealEmail, setRevealEmail] = useState(false);
   const [revealMobile, setRevealMobile] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [showEmailInfo, setShowEmailInfo] = useState(false);
   
   // Ref for saving image
   const ticketRef = useRef<HTMLDivElement>(null);
@@ -321,6 +326,13 @@ const EventRegistration: React.FC = () => {
       return null;
     }
 
+    const normalizedEmail = formData.email.trim().toLowerCase();
+    if (normalizedEmail && !isValidEmailAddress(normalizedEmail)) {
+      setEmailTouched(true);
+      setError("Please enter a valid email address, or leave the email field blank.");
+      return null;
+    }
+
     if (formData.needs_accommodation && formData.accommodation_pax < 1) {
       setError("Please specify at least 1 pax for accommodation.");
       return null;
@@ -402,7 +414,7 @@ const EventRegistration: React.FC = () => {
     return {
       finalLocationId,
       finalOfficeName,
-      finalEmail: formData.email.trim() === '' ? null : formData.email.trim(),
+      finalEmail: normalizedEmail || null,
       finalMobile: formData.mobile_no.trim() === '' ? null : formData.mobile_no.trim(),
       normalizedAccommodationDates,
       normalizedGiveawaySelections
@@ -1082,16 +1094,66 @@ const EventRegistration: React.FC = () => {
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address</label>
+                                <div className="flex items-center justify-between gap-3 mb-1.5">
+                                    <label htmlFor="registration-email" className="block text-sm font-medium text-slate-700">Email Address</label>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-xs font-medium text-slate-500">Optional</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowEmailInfo((visible) => !visible)}
+                                            className="inline-flex h-6 w-6 items-center justify-center rounded-full text-indigo-600 transition-colors hover:bg-indigo-100 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                                            aria-label={showEmailInfo ? 'Hide email information' : 'Why provide an email address?'}
+                                            aria-expanded={showEmailInfo}
+                                            aria-controls="registration-email-help"
+                                            title="Why provide an email address?"
+                                        >
+                                            <Info size={17} aria-hidden="true" />
+                                        </button>
+                                    </div>
+                                </div>
                                 <div className="relative">
+                                    {showEmailInfo && (
+                                        <div
+                                            id="registration-email-help"
+                                            role="tooltip"
+                                            className="absolute bottom-full left-0 z-30 mb-2 w-full min-w-64 rounded-lg border border-indigo-100 bg-white px-3 py-2.5 shadow-xl ring-1 ring-slate-900/5 animate-in fade-in zoom-in-95 duration-150"
+                                        >
+                                            <span className="absolute -bottom-1.5 left-5 h-3 w-3 rotate-45 border-b border-r border-indigo-100 bg-white" aria-hidden="true" />
+                                            <p className="relative flex items-start gap-2 text-xs leading-relaxed text-slate-700">
+                                                <Mail size={15} className="mt-0.5 shrink-0 text-indigo-600" aria-hidden="true" />
+                                                <span>
+                                                    Provide a valid email to receive your Certificate of Appearance (if requested) and Certificate of Participation conveniently in your inbox. You may leave this blank if you prefer not to receive certificates by email.
+                                                </span>
+                                            </p>
+                                        </div>
+                                    )}
                                     <Mail className="absolute left-3 top-3 text-slate-400" size={18} />
                                     <input
-                                         type={!!formData.participant_code && !!formData.email && !revealEmail ? 'text' : 'email'}
-                                        className={`w-full pl-10 ${!!formData.participant_code && !!formData.email && !revealEmail ? 'pr-16 bg-slate-50 text-slate-500 font-mono cursor-not-allowed' : 'pr-4'} py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all`}
+                                        id="registration-email"
+                                        type={!!formData.participant_code && !!formData.email && !revealEmail ? 'text' : 'email'}
+                                        className={`w-full pl-10 ${!!formData.participant_code && !!formData.email && !revealEmail ? 'pr-16 bg-slate-50 text-slate-500 font-mono cursor-not-allowed' : 'pr-4'} py-2.5 border ${emailTouched && formData.email.trim() && !isValidEmailAddress(formData.email.trim()) ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/20'} rounded-lg focus:ring-2 outline-none transition-all`}
                                         placeholder="juandelacruz@gmail.com"
                                         value={!!formData.participant_code && !!formData.email && !revealEmail ? maskEmail(formData.email) : formData.email}
-                                        onChange={e => setFormData({...formData, email: e.target.value})}
+                                        onChange={e => {
+                                            setFormData({...formData, email: e.target.value});
+                                            if (emailTouched && (!e.target.value.trim() || isValidEmailAddress(e.target.value.trim()))) {
+                                                setEmailTouched(false);
+                                            }
+                                        }}
+                                        onFocus={() => setShowEmailInfo(true)}
+                                        onBlur={() => {
+                                            setEmailTouched(true);
+                                            setShowEmailInfo(false);
+                                        }}
                                         readOnly={!!formData.participant_code && !!formData.email && !revealEmail}
+                                        autoComplete="email"
+                                        inputMode="email"
+                                        spellCheck={false}
+                                        aria-invalid={emailTouched && !!formData.email.trim() && !isValidEmailAddress(formData.email.trim())}
+                                        aria-describedby={[
+                                            showEmailInfo ? 'registration-email-help' : '',
+                                            emailTouched && formData.email.trim() && !isValidEmailAddress(formData.email.trim()) ? 'registration-email-error' : ''
+                                        ].filter(Boolean).join(' ') || undefined}
                                     />
                                     {!!formData.participant_code && !!formData.email && !revealEmail && (
                                         <button
@@ -1106,6 +1168,12 @@ const EventRegistration: React.FC = () => {
                                         </button>
                                     )}
                                 </div>
+                                {emailTouched && formData.email.trim() && !isValidEmailAddress(formData.email.trim()) && (
+                                    <p id="registration-email-error" role="alert" className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-red-600">
+                                        <AlertCircle size={14} aria-hidden="true" />
+                                        Enter a valid address, such as name@example.com, or leave this blank.
+                                    </p>
+                                )}
                             </div>
                              <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Mobile No.</label>
