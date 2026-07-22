@@ -1106,7 +1106,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[#EDEAE2] print:block print:min-h-screen print:h-auto print:overflow-visible print:bg-white">
+    <div className="flex min-h-screen flex-col overflow-y-auto bg-[#EDEAE2] lg:h-screen lg:overflow-hidden print:block print:h-auto print:min-h-screen print:overflow-visible print:bg-white">
       <div className="print:hidden w-full border-b border-[#E0DDD4] bg-white shadow-sm">
         <div className="mx-auto max-w-full px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
@@ -1305,7 +1305,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
         </div>
       </div>
 
-      <div className="print:hidden mx-auto grid w-full max-w-[1600px] flex-1 min-h-0 gap-6 overflow-hidden px-4 py-6 sm:px-6 lg:grid-cols-[520px_minmax(0,1fr)] lg:px-8">
+      <div className="mx-auto block w-full max-w-[1600px] px-4 py-6 print:hidden sm:px-6 lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[520px_minmax(0,1fr)] lg:gap-6 lg:overflow-hidden lg:px-8">
         <aside className="flex min-h-0 flex-col rounded-2xl border border-[#E0DDD4] bg-white p-4 shadow-sm">
           <div className="mb-4">
             <div className="relative">
@@ -1405,7 +1405,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+          <div className="min-h-0 flex-1 space-y-4 overflow-visible pr-1 lg:overflow-y-auto">
             {filteredParticipants.length === 0 ? (
               <div className="rounded-xl border border-dashed border-[#E0DDD4] px-4 py-8 text-center text-sm text-[#7C7A72]">
                 No participant matched your filters.
@@ -1501,7 +1501,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
           </div>
         </aside>
 
-        <section className="flex min-w-0 min-h-0 flex-col gap-4 overflow-hidden">
+        <section className="hidden min-h-0 min-w-0 flex-col gap-4 overflow-hidden lg:flex">
           {selectedParticipant ? (
             <>
               <div className="rounded-2xl border border-[#E0DDD4] bg-white px-4 py-3 shadow-sm">

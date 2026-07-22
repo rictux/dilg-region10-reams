@@ -1240,10 +1240,10 @@ const CertificateOfParticipation: React.FC = () => {
   const renderFarm     = participants.filter(r => selectedIds.includes(r.participant.participant_id));
 
   return (
-    <div className="h-screen flex flex-col bg-[#F5F3EE] overflow-hidden">
+    <div className="flex min-h-screen flex-col overflow-y-auto bg-[#F5F3EE] md:h-screen md:overflow-hidden">
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-4 px-5 py-3 bg-white border-b border-[#E0DDD4] shrink-0">
+      <div className="flex shrink-0 flex-col items-stretch justify-between gap-3 border-b border-[#E0DDD4] bg-white px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={() => navigate('/reports')}
@@ -1259,11 +1259,11 @@ const CertificateOfParticipation: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:items-center">
           {/* Settings button */}
           <button
             onClick={() => setShowSettings(true)}
-            className="flex items-center gap-1.5 text-[#6B6860] hover:text-violet-700 hover:bg-violet-50 border border-[#E0DDD4] hover:border-violet-300 text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+            className="flex items-center justify-center gap-1.5 text-[#6B6860] hover:text-violet-700 hover:bg-violet-50 border border-[#E0DDD4] hover:border-violet-300 text-sm font-medium px-3 py-2 rounded-lg transition-colors"
           >
             <Settings size={15} /> Settings
           </button>
@@ -1272,7 +1272,7 @@ const CertificateOfParticipation: React.FC = () => {
           <button
             onClick={handlePrint}
             disabled={isGenerating || selectedCount === 0}
-            className="flex items-center gap-2 bg-[#6B6860] hover:bg-[#4A4843] disabled:bg-[#C5C2BA] disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center justify-center gap-2 bg-[#6B6860] hover:bg-[#4A4843] disabled:bg-[#C5C2BA] disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             {isGenerating && isPrintMode ? (
               <><Loader2 size={15} className="animate-spin" />{progress ? `${progress.done}/${progress.total}` : 'Preparing…'}</>
@@ -1285,7 +1285,7 @@ const CertificateOfParticipation: React.FC = () => {
           <button
             onClick={handleExport}
             disabled={isGenerating || selectedCount === 0}
-            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:bg-[#C5C2BA] disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:bg-[#C5C2BA] disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             {isGenerating && !isPrintMode ? (
               <><Loader2 size={15} className="animate-spin" />{progress ? `${progress.done}/${progress.total}` : 'Preparing…'}</>
@@ -1298,7 +1298,7 @@ const CertificateOfParticipation: React.FC = () => {
           <button
             onClick={handleEmailCertificates}
             disabled={isSendingEmails || selectedCount === 0}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-[#C5C2BA] disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-[#C5C2BA] disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             {isSendingEmails ? (
               <><Loader2 size={15} className="animate-spin" />{emailProgress ? `${emailProgress.done}/${emailProgress.total}` : 'Sending…'}</>
@@ -1310,10 +1310,10 @@ const CertificateOfParticipation: React.FC = () => {
       </div>
 
       {/* ── Body ────────────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="block flex-1 md:flex md:min-h-0 md:overflow-hidden">
 
         {/* ── Left panel: Participants only ── */}
-        <div className="w-72 shrink-0 flex flex-col bg-white border-r border-[#E0DDD4] overflow-hidden">
+        <div className="flex w-full shrink-0 flex-col overflow-visible bg-white md:w-72 md:overflow-hidden md:border-r md:border-[#E0DDD4]">
           {/* List header */}
           <div className="px-4 py-3 border-b border-[#EDEAE2]">
             <div className="flex items-center justify-between mb-2.5">
@@ -1378,7 +1378,7 @@ const CertificateOfParticipation: React.FC = () => {
           </div>
 
           {/* List */}
-          <div className="overflow-y-auto flex-1">
+          <div className="flex-1 overflow-visible md:overflow-y-auto">
             {filtered.length === 0 && (
               <p className="text-xs text-[#9A9890] text-center py-10">No participants found.</p>
             )}
@@ -1420,7 +1420,7 @@ const CertificateOfParticipation: React.FC = () => {
                   </div>
                   <button
                     onClick={e => { e.stopPropagation(); setPreviewId(pid); setShowPreviewModal(true); }}
-                    className="shrink-0 text-[#C5C2BA] hover:text-violet-500 transition-colors mt-0.5"
+                    className="mt-0.5 hidden shrink-0 text-[#C5C2BA] transition-colors hover:text-violet-500 md:block"
                     title="Full preview"
                   >
                     <Eye size={13} />
@@ -1432,7 +1432,7 @@ const CertificateOfParticipation: React.FC = () => {
         </div>
 
         {/* ── Right panel: Live preview ── */}
-        <div className="flex-1 flex flex-col items-center justify-start p-6 overflow-auto bg-[#EDEAE2]">
+        <div className="hidden flex-1 flex-col items-center justify-start overflow-auto bg-[#EDEAE2] p-6 md:flex">
           {/* Settings summary strip */}
           <div className="flex items-center gap-3 mb-4 text-xs text-[#7C7A72] bg-white border border-[#E0DDD4] rounded-lg px-4 py-2 w-full max-w-4xl">
             <span className="font-medium text-[#6B6860] truncate">
