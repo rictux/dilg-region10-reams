@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Event } from '../../types/database';
 import {
   ArrowLeft, Check, Download, Eye, Image as ImageIcon, Loader2,
-  Mail, Printer, Search, Settings, Trash2, Upload, Users, X,
+  Mail, Printer, Search, Settings, Trash2, Upload, X,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toJpeg, getFontEmbedCSS } from 'html-to-image';
@@ -54,6 +54,7 @@ type SignatoryRow = CertificateSignatory & { id: number; office_id: number };
 type ThemeFile   = { name: string; url: string };
 type CoPParticipantRole = 'Delegate' | 'Speaker' | 'Secretariat' | 'Guest' | 'VIP';
 type CoPRoleFilter = 'All' | 'Delegate' | 'SecretariatGuest' | 'Speaker';
+type CoPAttendanceFilter = 'All' | 'Complete' | 'Incomplete';
 type CoPParticipant = CoPParticipantRecord & {
   registration_status: string;
   role: CoPParticipantRole;
@@ -648,7 +649,7 @@ const CertificateOfParticipation: React.FC = () => {
   // ── UI state
   const [search,           setSearch]           = useState('');
   const [roleFilter,       setRoleFilter]       = useState<CoPRoleFilter>('All');
-  const [completedOnly,    setCompletedOnly]    = useState(false);
+  const [attendanceFilter, setAttendanceFilter] = useState<CoPAttendanceFilter>('All');
   const [selectedIds,      setSelectedIds]      = useState<number[]>([]);
   const [previewId,        setPreviewId]        = useState<number | null>(null);
   const [previewScale,     setPreviewScale]     = useState(1);
@@ -908,12 +909,14 @@ const CertificateOfParticipation: React.FC = () => {
     return completedIds;
   }, [participants, requiredAttendanceDates]);
 
-  const attendanceFilteredParticipants = useMemo(
-    () => completedOnly
-      ? roleFilteredParticipants.filter(record => completedParticipantIds.has(record.participant.participant_id))
-      : roleFilteredParticipants,
-    [completedOnly, completedParticipantIds, roleFilteredParticipants]
-  );
+  const attendanceFilteredParticipants = useMemo(() => {
+    if (attendanceFilter === 'All') return roleFilteredParticipants;
+
+    const shouldBeComplete = attendanceFilter === 'Complete';
+    return roleFilteredParticipants.filter(record =>
+      completedParticipantIds.has(record.participant.participant_id) === shouldBeComplete
+    );
+  }, [attendanceFilter, completedParticipantIds, roleFilteredParticipants]);
 
   const roleCounts = useMemo(() => {
     const counts: Record<CoPRoleFilter, number> = {
@@ -978,22 +981,23 @@ const CertificateOfParticipation: React.FC = () => {
   };
 
   const selectAll = () => {
-    setCompletedOnly(false);
+    setAttendanceFilter('All');
     setSelectedIds(filterBySearch(roleFilteredParticipants).map(record => record.participant.participant_id));
   };
 
-  const toggleCompleted = () => {
-    const nextCompletedOnly = !completedOnly;
-    const candidates = nextCompletedOnly
-      ? roleFilteredParticipants.filter(record => completedParticipantIds.has(record.participant.participant_id))
-      : roleFilteredParticipants;
+  const applyAttendanceFilter = (nextFilter: CoPAttendanceFilter) => {
+    const candidates = nextFilter === 'All'
+      ? roleFilteredParticipants
+      : roleFilteredParticipants.filter(record =>
+          completedParticipantIds.has(record.participant.participant_id) === (nextFilter === 'Complete')
+        );
 
-    setCompletedOnly(nextCompletedOnly);
+    setAttendanceFilter(nextFilter);
     setSelectedIds(filterBySearch(candidates).map(record => record.participant.participant_id));
   };
 
   const clearAll = () => {
-    setCompletedOnly(false);
+    setAttendanceFilter('All');
     setSelectedIds([]);
   };
 
@@ -1001,9 +1005,11 @@ const CertificateOfParticipation: React.FC = () => {
     const candidates = participants.filter(record =>
       nextRole === 'All' || getRoleFilterValue(record.role) === nextRole
     );
-    const attendanceCandidates = completedOnly
-      ? candidates.filter(record => completedParticipantIds.has(record.participant.participant_id))
-      : candidates;
+    const attendanceCandidates = attendanceFilter === 'All'
+      ? candidates
+      : candidates.filter(record =>
+          completedParticipantIds.has(record.participant.participant_id) === (attendanceFilter === 'Complete')
+        );
 
     setRoleFilter(nextRole);
     setSelectedIds(filterBySearch(attendanceCandidates).map(record => record.participant.participant_id));
@@ -1385,26 +1391,37 @@ const CertificateOfParticipation: React.FC = () => {
         <div className="flex w-full shrink-0 flex-col overflow-visible bg-white md:w-72 md:overflow-hidden md:border-r md:border-[#E0DDD4]">
           {/* List header */}
           <div className="px-4 py-3 border-b border-[#EDEAE2]">
-            <div className="flex items-center justify-between mb-2.5">
-              <p className="text-xs font-semibold text-[#6B6860] flex items-center gap-1.5">
-                <Users size={13} /> Participants
-                <span className="text-[#9A9890] font-normal ml-1">({participants.length})</span>
-              </p>
-              <div className="flex items-center gap-1 text-[10px]">
-                <button onClick={selectAll} className="text-violet-600 hover:underline">All</button>
-                <span className="text-[#C5C2BA]">·</span>
-                <button
-                  type="button"
-                  aria-pressed={completedOnly}
-                  onClick={toggleCompleted}
-                  className={`${completedOnly ? 'font-semibold text-emerald-700' : 'text-violet-600'} hover:underline`}
-                  title="Show only participants with attendance on every event date"
-                >
-                  Complete
-                </button>
-                <span className="text-[#C5C2BA]">·</span>
-                <button onClick={clearAll} className="text-[#9A9890] hover:text-[#6B6860] hover:underline">None</button>
-              </div>
+            <div className="mb-2.5 flex items-center gap-1 text-[10px]">
+              <button
+                type="button"
+                aria-pressed={attendanceFilter === 'All' && selectedIds.length > 0}
+                onClick={selectAll}
+                className={`${attendanceFilter === 'All' && selectedIds.length > 0 ? 'font-semibold text-violet-700' : 'text-violet-600'} hover:underline`}
+              >
+                Select All
+              </button>
+              <span className="text-[#C5C2BA]">·</span>
+              <button
+                type="button"
+                aria-pressed={attendanceFilter === 'Complete'}
+                onClick={() => applyAttendanceFilter('Complete')}
+                className={`${attendanceFilter === 'Complete' ? 'font-semibold text-emerald-700' : 'text-violet-600'} hover:underline`}
+                title="Show only participants with attendance on every event date"
+              >
+                Complete
+              </button>
+              <span className="text-[#C5C2BA]">·</span>
+              <button
+                type="button"
+                aria-pressed={attendanceFilter === 'Incomplete'}
+                onClick={() => applyAttendanceFilter('Incomplete')}
+                className={`${attendanceFilter === 'Incomplete' ? 'font-semibold text-amber-700' : 'text-violet-600'} hover:underline`}
+                title="Show only participants missing attendance on one or more event dates"
+              >
+                Incomplete
+              </button>
+              <span className="text-[#C5C2BA]">·</span>
+              <button type="button" onClick={clearAll} className="text-[#9A9890] hover:text-[#6B6860] hover:underline">Unselect</button>
             </div>
 
             <div className="mb-2.5 grid grid-cols-2 gap-1.5">
@@ -1458,7 +1475,11 @@ const CertificateOfParticipation: React.FC = () => {
           <div className="flex-1 overflow-visible md:overflow-y-auto">
             {filtered.length === 0 && (
               <p className="text-xs text-[#9A9890] text-center py-10">
-                {completedOnly ? 'No participants have completed attendance for every event date.' : 'No participants found.'}
+                {attendanceFilter === 'Complete'
+                  ? 'No participants have completed attendance for every event date.'
+                  : attendanceFilter === 'Incomplete'
+                    ? 'No participants have incomplete attendance for this event.'
+                    : 'No participants found.'}
               </p>
             )}
             {filtered.map(record => {
