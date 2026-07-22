@@ -436,17 +436,17 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
             )}
           </div>
           <p style={{ fontSize: subSz, margin: 0, lineHeight: 1.3, letterSpacing: '0.04em', whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'center' }}>
-            REPUBLIC OF THE PHILIPPINES
+            Republic of the Philippines
           </p>
           {hasPartner ? (
             <>
-              <p style={{ fontSize: subSz, fontWeight: 'bold', margin: 0, lineHeight: 1.3, textAlign: 'center', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+              <p style={{ fontSize: s(12.5), fontWeight: 'bold', margin: 0, lineHeight: 1.3, textAlign: 'center', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
                 DEPARTMENT OF THE INTERIOR AND LOCAL GOVERNMENT&nbsp;&nbsp;&nbsp;{partnershipRegion}
               </p>
-              <p style={{ fontSize: s(10.5), margin: 0, lineHeight: 1.3, fontStyle: 'italic', textAlign: 'center' }}>
+              <p style={{ fontSize: s(11), margin: 0, lineHeight: 1.3, fontStyle: 'italic', textAlign: 'center' }}>
                 in partnership with
               </p>
-              <p style={{ fontSize: subSz, fontWeight: 'bold', margin: 0, lineHeight: 1.3, letterSpacing: '0.04em', textAlign: 'center', whiteSpace: 'nowrap', textTransform: 'uppercase' }}>
+              <p style={{ fontSize: s(12.5), fontWeight: 'bold', margin: 0, lineHeight: 1.3, letterSpacing: '0.04em', textAlign: 'center', whiteSpace: 'nowrap', textTransform: 'uppercase' }}>
                 {partnerAgencyName}
               </p>
             </>
@@ -520,7 +520,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
         </div>
 
         {/* ── 4. Signatory (Helvetica) ── */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: hasPartner ? s(24) : 0, width: hasPartner ? '70%' : 'auto', fontFamily: HELVETICA_FONT, transform: `translateY(-${s(12)}px)` }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: hasPartner ? s(24) : 0, width: hasPartner ? '70%' : 'auto', fontFamily: HELVETICA_FONT, transform: `translateY(-${s(18)}px)` }}>
           {renderSignatoryBlock(primarySignatory)}
           {hasPartner && renderSignatoryBlock(secondarySignatory)}
         </div>
