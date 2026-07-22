@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fetchAllSupabaseRows } from '../../lib/supabasePagination';
+import { canAccessEvent, fetchAccessibleEventIds, MANAGE_EVENT_ACCESS_ROLES } from '../../lib/eventAccess';
 
 interface ScanLog {
     attendance_id: number;
@@ -47,18 +48,41 @@ const ScanLogsPrint: React.FC = () => {
   const { user } = useAuth();
   const [logs, setLogs] = useState<ScanLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
-    if (eventId) {
-        sessionStorage.setItem('reports_selected_event_id', eventId);
-    }
+    if (!user) return;
     fetchLogs();
-  }, [eventId]);
+  }, [eventId, user?.user_id, user?.office_id, user?.role]);
 
   const fetchLogs = async () => {
+    setLoading(true);
+    setAccessDenied(false);
     try {
-        // Constructing Supabase query to match the requested SQL structure
-        const parsedEventId = eventId ? parseInt(eventId) : null;
+        const parsedEventId = eventId ? Number(eventId) : null;
+        if (parsedEventId !== null && (!Number.isSafeInteger(parsedEventId) || parsedEventId <= 0)) {
+            setAccessDenied(true);
+            setLogs([]);
+            return;
+        }
+
+        let accessibleEventIds: number[] | null = null;
+        if (parsedEventId !== null) {
+            const allowed = await canAccessEvent(user, parsedEventId, MANAGE_EVENT_ACCESS_ROLES);
+            if (!allowed) {
+                setAccessDenied(true);
+                setLogs([]);
+                return;
+            }
+            sessionStorage.setItem('reports_selected_event_id', String(parsedEventId));
+        } else if (user?.role !== 'Admin') {
+            accessibleEventIds = await fetchAccessibleEventIds(user, MANAGE_EVENT_ACCESS_ROLES);
+            if (accessibleEventIds.length === 0) {
+                setLogs([]);
+                return;
+            }
+        }
+
         const data = await fetchAllSupabaseRows<ScanLog>(() => {
             let query = supabase
                 .from('attendance_logs')
@@ -77,6 +101,8 @@ const ScanLogsPrint: React.FC = () => {
 
             if (parsedEventId) {
                 query = query.eq('event_id', parsedEventId);
+            } else if (accessibleEventIds) {
+                query = query.in('event_id', accessibleEventIds);
             }
 
             return query;
@@ -97,8 +123,19 @@ const ScanLogsPrint: React.FC = () => {
   };
 
   if (loading) return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin text-blue-600" /></div>;
+  if (accessDenied) return (
+    <div className="flex h-screen flex-col items-center justify-center gap-4 bg-[#F5F3EE] px-4 text-center">
+      <p className="text-lg font-semibold text-slate-900">Report access denied</p>
+      <p className="text-sm text-slate-600">This event is not assigned to your office or user account.</p>
+      <button onClick={() => navigate('/reports', { replace: true })} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+        Back to Reports
+      </button>
+    </div>
+  );
 
-  const logPages = logs.length > 0 ? chunkRows(logs, SCAN_LOG_ROWS_PER_PRINT_PAGE) : [[] as ScanLog[]];
+  const logPages: ScanLog[][] = logs.length > 0
+    ? chunkRows<ScanLog>(logs, SCAN_LOG_ROWS_PER_PRINT_PAGE)
+    : [[]];
   const totalPages = logPages.length;
 
   return (

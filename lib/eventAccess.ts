@@ -133,3 +133,102 @@ export const fetchAccessibleEvents = async (
 export const isEventOwnerOffice = (user: User | null | undefined, event: Pick<Event, 'organize_by'>) => {
   return Boolean(user?.office_id && event.organize_by === user.office_id);
 };
+
+const isValidEventId = (eventId: number) => Number.isSafeInteger(eventId) && eventId > 0;
+
+export const canAccessEvent = async (
+  user: User | null | undefined,
+  eventId: number,
+  accessRoles: EventAccessRole[] = MANAGE_EVENT_ACCESS_ROLES
+): Promise<boolean> => {
+  if (!user || !isValidEventId(eventId)) return false;
+
+  const { data: event, error: eventError } = await supabase
+    .from('events')
+    .select('event_id, organize_by')
+    .eq('event_id', eventId)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (eventError) throw eventError;
+  if (!event) return false;
+  if (user.role === 'Admin') return true;
+  if (user.office_id && event.organize_by === user.office_id) return true;
+
+  const { data: access, error: accessError } = await supabase
+    .from('event_user_access')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('user_id', user.user_id)
+    .eq('status', 'Active')
+    .in('access_role', accessRoles)
+    .limit(1)
+    .maybeSingle();
+
+  if (accessError) throw accessError;
+  return Boolean(access);
+};
+
+export const fetchAccessibleEventIds = async (
+  user: User | null | undefined,
+  accessRoles: EventAccessRole[] = MANAGE_EVENT_ACCESS_ROLES
+): Promise<number[]> => {
+  if (!user) return [];
+
+  if (user.role === 'Admin') {
+    const { data, error } = await supabase
+      .from('events')
+      .select('event_id')
+      .is('deleted_at', null);
+
+    if (error) throw error;
+    return (data || []).map((event: any) => Number(event.event_id)).filter(isValidEventId);
+  }
+
+  const eventIds = new Set<number>();
+
+  if (user.office_id) {
+    const { data, error } = await supabase
+      .from('events')
+      .select('event_id')
+      .eq('organize_by', user.office_id)
+      .is('deleted_at', null);
+
+    if (error) throw error;
+    (data || []).forEach((event: any) => {
+      const id = Number(event.event_id);
+      if (isValidEventId(id)) eventIds.add(id);
+    });
+  }
+
+  const { data: accessRows, error: accessError } = await supabase
+    .from('event_user_access')
+    .select('event_id')
+    .eq('user_id', user.user_id)
+    .eq('status', 'Active')
+    .in('access_role', accessRoles);
+
+  if (accessError) throw accessError;
+
+  const assignedEventIds = Array.from(new Set(
+    (accessRows || [])
+      .map((row: any) => Number(row.event_id))
+      .filter(isValidEventId)
+  ));
+
+  if (assignedEventIds.length > 0) {
+    const { data, error } = await supabase
+      .from('events')
+      .select('event_id')
+      .in('event_id', assignedEventIds)
+      .is('deleted_at', null);
+
+    if (error) throw error;
+    (data || []).forEach((event: any) => {
+      const id = Number(event.event_id);
+      if (isValidEventId(id)) eventIds.add(id);
+    });
+  }
+
+  return Array.from(eventIds);
+};
