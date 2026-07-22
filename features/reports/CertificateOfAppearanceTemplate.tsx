@@ -20,6 +20,8 @@ export type CertificateSignatory = {
   name: string;
   position: string;
   esig_link: string;
+  agency_name?: string | null;
+  agency_logo_url?: string | null;
   header?: string | null;
   sub_header?: string | null;
   address?: string | null;

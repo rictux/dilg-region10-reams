@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS tbl_signatory (
     name TEXT NOT NULL,
     position TEXT NOT NULL,
     esig_link TEXT,
+    agency_name TEXT,
+    agency_logo_url TEXT,
     header TEXT,
     sub_header TEXT,
     address TEXT,
@@ -34,6 +36,8 @@ CREATE TABLE IF NOT EXISTS tbl_signatory (
 
 ALTER TABLE tbl_signatory
     ADD COLUMN IF NOT EXISTS label TEXT,
+    ADD COLUMN IF NOT EXISTS agency_name TEXT,
+    ADD COLUMN IF NOT EXISTS agency_logo_url TEXT,
     ADD COLUMN IF NOT EXISTS is_default BOOLEAN NOT NULL DEFAULT FALSE,
     ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE,
     ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
@@ -126,6 +130,8 @@ CREATE TABLE IF NOT EXISTS events (
     status TEXT NOT NULL DEFAULT 'Scheduled' CHECK (status IN ('Scheduled', 'Ongoing', 'Completed', 'Cancelled')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     organize_by BIGINT REFERENCES offices(office_id) ON DELETE SET NULL,
+    cop_primary_signatory_id BIGINT REFERENCES tbl_signatory(id) ON DELETE SET NULL,
+    cop_secondary_signatory_id BIGINT REFERENCES tbl_signatory(id) ON DELETE SET NULL,
     has_accommodation BOOLEAN DEFAULT FALSE,
     registration_open BOOLEAN DEFAULT TRUE,
     session TEXT NOT NULL DEFAULT 'All_Day' CHECK (session IN ('AM', 'PM', 'All_Day')),
@@ -144,7 +150,26 @@ ALTER TABLE events
     -- Giveaways/freebies offered at registration (e.g. T-shirt sizes).
     ADD COLUMN IF NOT EXISTS giveaways JSONB,
     -- When FALSE, giveaway selection is closed for new registrants (sizes etc. become read-only).
-    ADD COLUMN IF NOT EXISTS giveaways_open BOOLEAN DEFAULT TRUE;
+    ADD COLUMN IF NOT EXISTS giveaways_open BOOLEAN DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS cop_primary_signatory_id BIGINT REFERENCES tbl_signatory(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS cop_secondary_signatory_id BIGINT REFERENCES tbl_signatory(id) ON DELETE SET NULL;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'events_cop_signatories_different'
+          AND conrelid = 'public.events'::regclass
+    ) THEN
+        ALTER TABLE public.events
+            ADD CONSTRAINT events_cop_signatories_different
+            CHECK (
+                cop_secondary_signatory_id IS NULL
+                OR cop_primary_signatory_id IS DISTINCT FROM cop_secondary_signatory_id
+            );
+    END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS events_active_idx
     ON events(start_date DESC)

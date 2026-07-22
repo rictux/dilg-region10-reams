@@ -19,6 +19,7 @@ import ScanLogsPrint from './features/reports/ScanLogsPrint';
 import GiveawayClaimLogsPrint from './features/reports/GiveawayClaimLogsPrint';
 import CertificateOfAppearancePrint from './features/reports/CertificateOfAppearancePrint';
 import CertificateOfParticipation from './features/reports/CertificateOfParticipation';
+import ReportEventAccessGuard from './features/reports/ReportEventAccessGuard';
 import UserManagement from './features/users/UserManagement';
 import Settings from './features/settings/Settings';
 import NameLookup from './features/lookup/NameLookup';
@@ -113,35 +114,35 @@ const App: React.FC = () => {
           {/* Attendance Sheet View - (Printable) - Requires VIEW_REPORTS */}
           <Route path="/print-attendance/:eventId" element={
             <ProtectedRoute requiredPermission="VIEW_REPORTS">
-              <AttendanceSheetPrint />
+              <ReportEventAccessGuard><AttendanceSheetPrint /></ReportEventAccessGuard>
             </ProtectedRoute>
           } />
 
           {/* Scan Logs Print View - (Printable) - Requires VIEW_REPORTS */}
           <Route path="/print-scan-logs/:eventId?" element={
             <ProtectedRoute requiredPermission="VIEW_REPORTS">
-              <ScanLogsPrint />
+              <ReportEventAccessGuard><ScanLogsPrint /></ReportEventAccessGuard>
             </ProtectedRoute>
           } />
 
           {/* Giveaway Claim Logs Print View - (Printable) - Requires VIEW_REPORTS */}
           <Route path="/print-giveaway-claims/:eventId" element={
             <ProtectedRoute requiredPermission="VIEW_REPORTS">
-              <GiveawayClaimLogsPrint />
+              <ReportEventAccessGuard><GiveawayClaimLogsPrint /></ReportEventAccessGuard>
             </ProtectedRoute>
           } />
 
           {/* Certificate of Appearance Print View - (Printable) - Requires VIEW_REPORTS */}
           <Route path="/print-certificate/:eventId" element={
             <ProtectedRoute requiredPermission="VIEW_REPORTS">
-              <CertificateOfAppearancePrint />
+              <ReportEventAccessGuard><CertificateOfAppearancePrint /></ReportEventAccessGuard>
             </ProtectedRoute>
           } />
 
           {/* Certificate of Participation - Requires VIEW_REPORTS */}
           <Route path="/print-cop/:eventId" element={
             <ProtectedRoute requiredPermission="VIEW_REPORTS">
-              <CertificateOfParticipation />
+              <ReportEventAccessGuard><CertificateOfParticipation /></ReportEventAccessGuard>
             </ProtectedRoute>
           } />
 

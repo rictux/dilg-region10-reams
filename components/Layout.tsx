@@ -36,6 +36,7 @@ import {
   Award,
   Gift,
   FileSignature,
+  Handshake,
   Megaphone,
   Palette,
   TrendingUp
@@ -62,9 +63,10 @@ const SETTINGS_SUBMENU: {
   adminOnly?: boolean;
   permission?: Permission;
 }[] = [
-  { name: 'Signatories',   icon: FileSignature, view: 'signatories',   permission: 'MANAGE_CERTIFICATE_SETTINGS' },
-  { name: 'Announcements', icon: Megaphone,     view: 'announcements', adminOnly: true },
-  { name: 'Appearance',    icon: Palette,       view: 'appearance' }, // available to every user
+  { name: 'Signatories',                 icon: FileSignature, view: 'signatories',         permission: 'MANAGE_CERTIFICATE_SETTINGS' },
+  { name: 'Partner Agency Signatories',  icon: Handshake,     view: 'partner-signatories', permission: 'MANAGE_CERTIFICATE_SETTINGS' },
+  { name: 'Announcements',               icon: Megaphone,     view: 'announcements',       adminOnly: true },
+  { name: 'Appearance',                  icon: Palette,       view: 'appearance' }, // available to every user
 ];
 
 interface LayoutProps {

@@ -20,7 +20,8 @@ export const DEFAULT_COP_BODY_TEXT =
 type CoPTemplateProps = {
   event: Event;
   participantRecord: CoPParticipantRecord;
-  signatory: CertificateSignatory;
+  primarySignatory: CertificateSignatory;
+  secondarySignatory?: CertificateSignatory;
   themeUrl: string | null;
   paperSize: CoPPaperSize;
   title?: string;
@@ -189,7 +190,8 @@ const DEFAULT_HEADER = 'REGION X - NORTHERN MINDANAO';
 const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   event,
   participantRecord,
-  signatory,
+  primarySignatory,
+  secondarySignatory = null,
   themeUrl,
   paperSize,
   title = 'Certificate of Participation',
@@ -205,11 +207,12 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
 
   const s = (base: number) => Math.round(base * scale * 10) / 10;
 
-  const header    = signatory?.header?.trim()         || DEFAULT_HEADER;
-  const subHeader = signatory?.sub_header?.trim()      || '';
-  const sigName   = signatory?.name?.trim()            || '';
-  const sigPos    = signatory?.position?.trim()        || '';
-  const postNom   = signatory?.post_nominals?.trim()   || '';
+  const header    = primarySignatory?.header?.trim()    || DEFAULT_HEADER;
+  const subHeader = primarySignatory?.sub_header?.trim() || '';
+  const partnerAgencyName = secondarySignatory?.agency_name?.trim() || '';
+  const partnerLogoUrl = secondarySignatory?.agency_logo_url?.trim() || '';
+  const hasPartner = Boolean(secondarySignatory?.id && partnerAgencyName && partnerLogoUrl);
+  const partnershipRegion = header.match(/^REGION\s+[A-Z0-9]+/i)?.[0].toUpperCase() || 'REGION X';
 
   const eventName       = event.event_name || '';
   const venue           = event.venue      || '';
@@ -245,13 +248,13 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
       return React.isValidElement(value) ? React.cloneElement(value, { key: `${token}-${index}` }) : value;
     });
 
-  const logoH    = s(44);
-  const subSz    = s(11.5);
-  const titleSz  = s(48);
-  const presTo   = s(15.6);
-  const bodySz   = s(15);
-  const sigSz    = s(17.6);
-  const sigPosSz = s(13);
+  const logoH    = hasPartner ? s(38) : s(44);
+  const subSz    = hasPartner ? s(12) : s(12.5);
+  const titleSz  = s(44);
+  const presTo   = s(14.5);
+  const bodySz   = s(13.5);
+  const sigSz    = s(16);
+  const sigPosSz = s(11.5);
   const qrSize   = s(48);
   const qrCaptionSz = s(8);
   const lookupUrl = `${window.location.origin}/lookup?participant=${participantRecord.participant.participant_id}`;
@@ -260,12 +263,71 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   // Auto-shrink name to fit within ~70% of the certificate width on one line
   const fullName      = participantRecord.participant.full_name || '';
   const maxNameWidth  = widthPx * 0.70;
-  const baseNameSz    = s(36);
-  const minNameSz     = s(18);
+  const baseNameSz    = s(32);
+  const minNameSz     = s(17);
   const charWidthCoef = 0.48; // approximate em-ratio for bold Poppins (conservative)
   const nameSz = fullName.length > 0
     ? Math.max(minNameSz, Math.min(baseNameSz, Math.floor(maxNameWidth / (fullName.length * charWidthCoef))))
     : baseNameSz;
+
+  const renderSignatoryBlock = (currentSignatory: CertificateSignatory) => {
+    const sigName = currentSignatory?.name?.trim() || '';
+    const sigPos = currentSignatory?.position?.trim() || '';
+    const postNom = currentSignatory?.post_nominals?.trim() || '';
+    const displayNameLength = sigName.length + postNom.length;
+    const signatoryNameSize = hasPartner
+      ? displayNameLength > 46
+        ? s(9.5)
+        : displayNameLength > 38
+          ? s(10.5)
+          : displayNameLength > 30
+            ? s(12.5)
+            : s(14.5)
+      : sigSz;
+
+    return (
+      <div style={{ display: 'flex', flex: 1, minWidth: 0, flexDirection: 'column', alignItems: 'center' }}>
+        {includeSignature && currentSignatory?.esig_link ? (
+          <img
+            src={currentSignatory.esig_link}
+            alt={`${sigName || 'Signatory'} e-signature`}
+            crossOrigin="anonymous"
+            referrerPolicy="no-referrer"
+            style={{
+              height: s(40),
+              maxWidth: '90%',
+              objectFit: 'contain',
+              marginBottom: s(2),
+              pointerEvents: 'none',
+            }}
+          />
+        ) : (
+          <div style={{ height: s(40), marginBottom: s(2) }} />
+        )}
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'baseline',
+          justifyContent: 'center',
+          maxWidth: '100%',
+          fontSize: signatoryNameSize,
+          borderBottom: `${s(1)}px solid #111`,
+          textAlign: 'center',
+          letterSpacing: '0.02em',
+          whiteSpace: 'nowrap',
+        }}>
+          <span style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>{sigName}</span>
+          {postNom && (
+            <span style={{ fontWeight: 'normal', textTransform: 'none', fontStyle: 'italic' }}>
+              , {postNom}
+            </span>
+          )}
+        </div>
+        <p style={{ fontSize: hasPartner ? s(10.5) : sigPosSz, margin: `${s(2)}px 0 0`, maxWidth: '100%', textAlign: 'center', letterSpacing: '0.02em' }}>
+          {sigPos}
+        </p>
+      </div>
+    );
+  };
 
   return (
     <div
@@ -307,7 +369,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: `${s(55)}px ${s(28)}px ${s(48)}px`,
+          padding: `${hasPartner ? s(38) : s(55)}px ${s(28)}px ${s(48)}px`,
           boxSizing: 'border-box',
         }}
       >
@@ -363,23 +425,48 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
               style={{ height: logoH, objectFit: 'contain' }}
               onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
             />
+            {hasPartner && partnerLogoUrl && (
+              <img
+                src={partnerLogoUrl}
+                alt={partnerAgencyName || 'Partner agency'}
+                crossOrigin="anonymous"
+                referrerPolicy="no-referrer"
+                style={{ height: logoH, width: logoH, objectFit: 'contain' }}
+              />
+            )}
           </div>
           <p style={{ fontSize: subSz, margin: 0, lineHeight: 1.3, letterSpacing: '0.04em', whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'center' }}>
-            REPUBLIC OF THE PHILIPPINES
+            Republic of the Philippines
           </p>
-          <p style={{ fontSize: subSz, fontWeight: 'bold', margin: 0, lineHeight: 1.3, textAlign: 'center', letterSpacing: '0.04em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-            DEPARTMENT OF THE INTERIOR AND LOCAL GOVERNMENT
-          </p>
-          <p style={{ fontSize: subSz, fontWeight: 'bold', margin: 0, lineHeight: 1.3, letterSpacing: '0.04em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-            {header}
-          </p>
-          {subHeader && (
+          {hasPartner ? (
+            <>
+              <p style={{ fontSize: s(12.5), fontWeight: 'bold', margin: 0, lineHeight: 1.3, textAlign: 'center', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+                DEPARTMENT OF THE INTERIOR AND LOCAL GOVERNMENT&nbsp;&nbsp;&nbsp;{partnershipRegion}
+              </p>
+              <p style={{ fontSize: s(11), margin: 0, lineHeight: 1.3, fontStyle: 'italic', textAlign: 'center' }}>
+                in partnership with
+              </p>
+              <p style={{ fontSize: s(12.5), fontWeight: 'bold', margin: 0, lineHeight: 1.3, letterSpacing: '0.04em', textAlign: 'center', whiteSpace: 'nowrap', textTransform: 'uppercase' }}>
+                {partnerAgencyName}
+              </p>
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: subSz, fontWeight: 'bold', margin: 0, lineHeight: 1.3, textAlign: 'center', letterSpacing: '0.04em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                DEPARTMENT OF THE INTERIOR AND LOCAL GOVERNMENT
+              </p>
+              <p style={{ fontSize: subSz, fontWeight: 'bold', margin: 0, lineHeight: 1.3, letterSpacing: '0.04em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                {header}
+              </p>
+            </>
+          )}
+          {!hasPartner && subHeader && (
             <p style={{ fontSize: subSz, margin: 0, lineHeight: 1.3 }}>{subHeader}</p>
           )}
         </div>
 
         {/* ── 2. Title + "is presented to" + NAME + body ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', gap: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', gap: 0, transform: `translateY(-${s(16)}px)` }}>
           <h1 style={{
             fontFamily: SCRIPT_FONT,
             fontSize: titleSz,
@@ -433,45 +520,9 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
         </div>
 
         {/* ── 4. Signatory (Helvetica) ── */}
-        <div style={{ display: 'flex', justifyContent: 'center', fontFamily: HELVETICA_FONT }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            {includeSignature && signatory?.esig_link ? (
-              <img
-                src={signatory.esig_link}
-                alt="E-Signature"
-                crossOrigin="anonymous"
-                referrerPolicy="no-referrer"
-                style={{
-                  height: s(40),
-                  objectFit: 'contain',
-                  marginBottom: s(2),
-                  pointerEvents: 'none',
-                }}
-              />
-            ) : (
-              <div style={{ height: s(40), marginBottom: s(2) }} />
-            )}
-            <p style={{
-              fontSize: sigSz,
-              fontWeight: 'bold',
-              textDecoration: 'underline',
-              textTransform: 'uppercase',
-              margin: 0,
-              textAlign: 'center',
-              letterSpacing: '0.02em',
-              whiteSpace: 'nowrap',
-            }}>
-              {sigName}
-              {postNom && (
-                <span style={{ fontWeight: 'normal', textDecoration: 'none', textTransform: 'none', fontStyle: 'italic' }}>
-                  , {postNom}
-                </span>
-              )}
-            </p>
-            <p style={{ fontSize: sigPosSz, margin: `${s(1.5)}px 0 0`, textAlign: 'center', letterSpacing: '0.02em' }}>
-              {sigPos}
-            </p>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: hasPartner ? s(24) : 0, width: hasPartner ? '70%' : 'auto', fontFamily: HELVETICA_FONT, transform: `translateY(-${s(18)}px)` }}>
+          {renderSignatoryBlock(primarySignatory)}
+          {hasPartner && renderSignatoryBlock(secondarySignatory)}
         </div>
 
       </div>
