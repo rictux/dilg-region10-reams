@@ -1,16 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Participant } from '../../types/database';
 import { Search, Edit, Loader2, X, Save, User, Mail, Briefcase, Phone, AlertCircle, Contact } from 'lucide-react';
+import { fetchAllSupabaseRows } from '../../lib/supabasePagination';
 
 const ParticipantsList: React.FC = () => {
     const { user: currentUser } = useAuth();
     const [participants, setParticipants] = useState<Participant[]>([]);
     const [loading, setLoading] = useState(true);
+    const [searchLoading, setSearchLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 15;
+    const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
     // Edit Modal State
     const [showEditModal, setShowEditModal] = useState(false);
@@ -22,20 +25,59 @@ const ParticipantsList: React.FC = () => {
         fetchParticipants();
     }, []);
 
+    useEffect(() => {
+        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
+        if (searchTerm.trim()) {
+            setSearchLoading(true);
+            searchTimeoutRef.current = setTimeout(() => {
+                searchParticipants(searchTerm);
+            }, 500);
+        } else {
+            fetchParticipants();
+        }
+
+        return () => {
+            if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+        };
+    }, [searchTerm]);
+
     const fetchParticipants = async () => {
         setLoading(true);
+        setSearchLoading(false);
         try {
-            const { data, error } = await supabase
-                .from('participants')
-                .select('*')
-                .order('created_at', { ascending: false });
-            
-            if (error) throw error;
+            const data = await fetchAllSupabaseRows<Participant>(() =>
+                supabase
+                    .from('participants')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+            );
             setParticipants(data || []);
         } catch (err) {
             console.error('Error fetching participants:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const searchParticipants = async (query: string) => {
+        try {
+            const searchQuery = query.toLowerCase().trim();
+            const data = await fetchAllSupabaseRows<Participant>(() =>
+                supabase
+                    .from('participants')
+                    .select('*')
+                    .or(
+                        `full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,office.ilike.%${searchQuery}%,participant_code.ilike.%${searchQuery}%`
+                    )
+                    .order('created_at', { ascending: false })
+            );
+            setParticipants(data || []);
+            setCurrentPage(1);
+        } catch (err) {
+            console.error('Error searching participants:', err);
+        } finally {
+            setSearchLoading(false);
         }
     };
 
@@ -83,14 +125,8 @@ const ParticipantsList: React.FC = () => {
         }
     };
 
-    const filteredParticipants = participants.filter(p => 
-        p.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        p.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.office?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    const totalPages = Math.ceil(filteredParticipants.length / itemsPerPage);
-    const paginatedParticipants = filteredParticipants.slice(
+    const totalPages = Math.ceil(participants.length / itemsPerPage);
+    const paginatedParticipants = participants.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
@@ -104,19 +140,16 @@ const ParticipantsList: React.FC = () => {
                         type="text"
                         placeholder="Search participants..."
                         value={searchTerm}
-                        onChange={(e) => {
-                            setSearchTerm(e.target.value);
-                            setCurrentPage(1);
-                        }}
+                        onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-9 pr-14 h-9 bg-card border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 transition-colors"
                     />
-                    {searchTerm && (
+                    {searchLoading && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" size={16} />
+                    )}
+                    {searchTerm && !searchLoading && (
                         <button
                             type="button"
-                            onClick={() => {
-                                setSearchTerm('');
-                                setCurrentPage(1);
-                            }}
+                            onClick={() => setSearchTerm('')}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
                         >
                             Clear
@@ -132,7 +165,7 @@ const ParticipantsList: React.FC = () => {
                     </span>
                     <h3 className="text-sm font-semibold text-slate-900">Participants</h3>
                     <span className="text-[10px] min-w-[1.25rem] text-center px-1.5 py-0.5 rounded-full font-medium font-mono bg-indigo-600/10 text-indigo-700">
-                        {filteredParticipants.length}
+                        {searchLoading ? '…' : participants.length}
                     </span>
                 </div>
 
@@ -266,10 +299,10 @@ const ParticipantsList: React.FC = () => {
                 </div>
 
                 {/* Pagination Controls */}
-                {!loading && totalPages > 1 && (
+                {!loading && !searchLoading && totalPages > 1 && (
                     <div className="px-4 py-3 border-t border-[rgb(var(--ink)/0.06)] flex items-center justify-between gap-3 shrink-0">
                         <p className="text-xs text-slate-500">
-                            Showing <span className="font-medium text-slate-700">{(currentPage - 1) * itemsPerPage + 1}</span>–<span className="font-medium text-slate-700">{Math.min(currentPage * itemsPerPage, filteredParticipants.length)}</span> of <span className="font-medium text-slate-700">{filteredParticipants.length}</span>
+                            Showing <span className="font-medium text-slate-700">{(currentPage - 1) * itemsPerPage + 1}</span>–<span className="font-medium text-slate-700">{Math.min(currentPage * itemsPerPage, participants.length)}</span> of <span className="font-medium text-slate-700">{participants.length}</span>
                         </p>
                         <div className="flex items-center gap-2">
                             <button
