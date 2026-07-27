@@ -275,7 +275,28 @@ const Reports: React.FC = () => {
 
         {/* Actions Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            
+
+            {/* Print Attendance Sheet Card */}
+            {showReport('attendance-sheet') && (
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+                <div className="bg-indigo-100 p-3 rounded-lg text-indigo-600 mb-4">
+                    <Printer size={24} />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 mb-2">Attendance Sheets</h3>
+                <p className="text-slate-500 text-sm mb-6 flex-1">
+                    Generate official printable attendance sheets formatted for DILG Region 10 requirements.
+                    {selectedEventId ? ' Creates a specific report for the selected event.' : ' Please select an event first.'}
+                </p>
+                <button
+                    onClick={handlePrintAttendance}
+                    disabled={!selectedEventId}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
+                >
+                    <Printer size={18} /> Print Attendance Sheet
+                </button>
+            </div>
+            )}
+
             {/* Print Scan Logs Card */}
             {showReport('scan-logs') && (
             <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
@@ -297,52 +318,6 @@ const Reports: React.FC = () => {
             </div>
             )}
 
-            {/* Giveaway Claim Logs Card */}
-            {showReport('giveaways') && (
-            <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
-                <div className="bg-fuchsia-100 p-3 rounded-lg text-fuchsia-600 mb-4">
-                    <Gift size={24} />
-                </div>
-                <h3 className="text-lg font-bold text-slate-800 mb-2">Giveaway Claim Logs</h3>
-                <p className="text-slate-500 text-sm mb-6 flex-1">
-                    Generate a printable claim log showing participant details, selected giveaway values, and claim time.
-                    {!selectedEventId
-                        ? ' Please select an event first.'
-                        : selectedEventHasGiveaways
-                            ? ' Creates a specific report for the selected event.'
-                            : ' The selected event has no configured giveaways.'}
-                </p>
-                <button
-                    onClick={handlePrintGiveawayClaims}
-                    disabled={!selectedEventId || !selectedEventHasGiveaways}
-                    className="w-full bg-fuchsia-600 hover:bg-fuchsia-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
-                >
-                    <Printer size={18} /> Print Giveaway Claims
-                </button>
-            </div>
-            )}
-
-            {/* Print Attendance Sheet Card */}
-            {showReport('attendance-sheet') && (
-            <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
-                <div className="bg-indigo-100 p-3 rounded-lg text-indigo-600 mb-4">
-                    <Printer size={24} />
-                </div>
-                <h3 className="text-lg font-bold text-slate-800 mb-2">Attendance Sheets</h3>
-                <p className="text-slate-500 text-sm mb-6 flex-1">
-                    Generate official printable attendance sheets formatted for DILG Region 10 requirements. 
-                    {selectedEventId ? ' Creates a specific report for the selected event.' : ' Please select an event first.'}
-                </p>
-                <button 
-                    onClick={handlePrintAttendance}
-                    disabled={!selectedEventId}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
-                >
-                    <Printer size={18} /> Print Attendance Sheet
-                </button>
-            </div>
-            )}
-
             {/* Print Certificate of Appearance Card */}
             {showReport('appearance') && (
             <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
@@ -354,7 +329,7 @@ const Reports: React.FC = () => {
                     Generate Certificates of Appearance for participants who have attendance logs. Two certificates per A4 page.
                     {selectedEventId ? ' Creates certificates for the selected event.' : ' Please select an event first.'}
                 </p>
-                <button 
+                <button
                     onClick={handlePrintCertificate}
                     disabled={!selectedEventId}
                     className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
@@ -381,6 +356,31 @@ const Reports: React.FC = () => {
                     className="w-full bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
                 >
                     <Award size={18} /> Generate Certificates
+                </button>
+            </div>
+            )}
+
+            {/* Giveaway Claim Logs Card */}
+            {showReport('giveaways') && (
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+                <div className="bg-fuchsia-100 p-3 rounded-lg text-fuchsia-600 mb-4">
+                    <Gift size={24} />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 mb-2">Giveaway Claim Logs</h3>
+                <p className="text-slate-500 text-sm mb-6 flex-1">
+                    Generate a printable claim log showing participant details, selected giveaway values, and claim time.
+                    {!selectedEventId
+                        ? ' Please select an event first.'
+                        : selectedEventHasGiveaways
+                            ? ' Creates a specific report for the selected event.'
+                            : ' The selected event has no configured giveaways.'}
+                </p>
+                <button
+                    onClick={handlePrintGiveawayClaims}
+                    disabled={!selectedEventId || !selectedEventHasGiveaways}
+                    className="w-full bg-fuchsia-600 hover:bg-fuchsia-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
+                >
+                    <Printer size={18} /> Print Giveaway Claims
                 </button>
             </div>
             )}
