@@ -16,12 +16,17 @@ import CertificateOfAppearanceCard, {
   buildEventDateString,
   CertificateParticipantRecord,
   CertificateSignatory,
+  getEventDateRows
+} from './CertificateOfAppearanceTemplate';
+import {
   clampSignatureAdjustment,
   DEFAULT_SIGNATURE_ADJUSTMENT,
-  getEventDateRows,
-  SIGNATURE_ADJUSTMENT_LIMITS,
-  SignatureAdjustment
-} from './CertificateOfAppearanceTemplate';
+  isSignatureAdjusted as hasSignatureAdjustment,
+  readStoredSignatureAdjustment,
+  SIGNATURE_CONTROLS,
+  SignatureAdjustment,
+  writeStoredSignatureAdjustment
+} from '../../lib/signatureAdjustment';
 import EmailProgressModal from './EmailProgressModal';
 
 type CertificateParticipant = CertificateParticipantRecord & {
@@ -434,40 +439,6 @@ const buildParticipantListName = (participant: CertificateParticipant['participa
   return lastNameSection || firstNameSection || participant.full_name || 'Unnamed participant';
 };
 
-// Calibration is a property of the signatory's scanned image, not of the event, so it is
-// keyed by signatory and kept in localStorage — you tune a signature once and every later
-// certificate that person signs picks it up.
-const SIGNATURE_ADJUSTMENT_STORAGE_PREFIX = 'coa_signature_adjust_';
-
-const readStoredSignatureAdjustment = (signatoryId?: number | null): SignatureAdjustment => {
-  if (!signatoryId) return DEFAULT_SIGNATURE_ADJUSTMENT;
-
-  try {
-    const raw = localStorage.getItem(`${SIGNATURE_ADJUSTMENT_STORAGE_PREFIX}${signatoryId}`);
-    if (!raw) return DEFAULT_SIGNATURE_ADJUSTMENT;
-    return clampSignatureAdjustment(JSON.parse(raw));
-  } catch {
-    // Unreadable or malformed entry — fall back rather than block the certificate.
-    return DEFAULT_SIGNATURE_ADJUSTMENT;
-  }
-};
-
-const writeStoredSignatureAdjustment = (
-  signatoryId: number | null | undefined,
-  adjustment: SignatureAdjustment
-) => {
-  if (!signatoryId) return;
-
-  try {
-    localStorage.setItem(
-      `${SIGNATURE_ADJUSTMENT_STORAGE_PREFIX}${signatoryId}`,
-      JSON.stringify(adjustment)
-    );
-  } catch {
-    /* storage full or blocked (private mode) — the in-memory value still applies */
-  }
-};
-
 const CertificateOfAppearancePrint: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
@@ -508,45 +479,22 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
   // Load the calibration belonging to whichever signatory is active.
   useEffect(() => {
-    setSignatureAdjustment(readStoredSignatureAdjustment(signatory?.id));
+    setSignatureAdjustment(readStoredSignatureAdjustment('coa', signatory?.id));
   }, [signatory?.id]);
 
   const updateSignatureField = (field: keyof SignatureAdjustment, value: number) => {
     const next = clampSignatureAdjustment({ ...signatureAdjustment, [field]: value });
     setSignatureAdjustment(next);
-    writeStoredSignatureAdjustment(signatory?.id, next);
+    writeStoredSignatureAdjustment('coa', signatory?.id, next);
   };
 
   const resetSignatureAdjustment = () => {
     setSignatureAdjustment(DEFAULT_SIGNATURE_ADJUSTMENT);
-    writeStoredSignatureAdjustment(signatory?.id, DEFAULT_SIGNATURE_ADJUSTMENT);
+    writeStoredSignatureAdjustment('coa', signatory?.id, DEFAULT_SIGNATURE_ADJUSTMENT);
   };
 
-  const isSignatureAdjusted =
-    signatureAdjustment.scale !== DEFAULT_SIGNATURE_ADJUSTMENT.scale ||
-    signatureAdjustment.offsetX !== DEFAULT_SIGNATURE_ADJUSTMENT.offsetX ||
-    signatureAdjustment.offsetY !== DEFAULT_SIGNATURE_ADJUSTMENT.offsetY;
-
-  const signatureControls = [
-    {
-      field: 'scale' as const,
-      label: 'Size',
-      limits: SIGNATURE_ADJUSTMENT_LIMITS.scale,
-      format: (value: number) => `${Math.round(value * 100)}%`
-    },
-    {
-      field: 'offsetX' as const,
-      label: 'Horizontal',
-      limits: SIGNATURE_ADJUSTMENT_LIMITS.offsetX,
-      format: (value: number) => `${value > 0 ? '+' : ''}${value} px`
-    },
-    {
-      field: 'offsetY' as const,
-      label: 'Vertical',
-      limits: SIGNATURE_ADJUSTMENT_LIMITS.offsetY,
-      format: (value: number) => `${value > 0 ? '+' : ''}${value} px`
-    }
-  ];
+  const isSignatureAdjusted = hasSignatureAdjustment(signatureAdjustment);
+  const signatureControls = SIGNATURE_CONTROLS;
 
   useEffect(() => {
     if (eventId && user) {

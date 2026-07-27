@@ -3,6 +3,7 @@ import QRCode from 'react-qr-code';
 import { differenceInCalendarDays, eachDayOfInterval, format, parseISO } from 'date-fns';
 import { Event, Participant } from '../../types/database';
 import { formatParticipantOfficialName } from '../../lib/participantName';
+import { clampSignatureAdjustment, SignatureAdjustment } from '../../lib/signatureAdjustment';
 
 export type CertificateTemplateVariant = 'with_serial' | 'without_serial';
 
@@ -32,54 +33,6 @@ export type CertificateSignatory = {
   certificate_template_variant?: CertificateTemplateVariant | null;
   is_default?: boolean | null;
 } | null;
-
-/**
- * Per-signatory calibration for the e-signature image. Scanned signatures carry wildly
- * different amounts of blank padding around the ink, so a single hardcoded box renders
- * some of them small and others oversized. These let an operator correct that once.
- *
- * `scale` multiplies the base box for the current layout density; the offsets nudge the
- * image in card-space pixels (positive X = right, positive Y = down).
- */
-export type SignatureAdjustment = {
-  scale: number;
-  offsetX: number;
-  offsetY: number;
-};
-
-export const DEFAULT_SIGNATURE_ADJUSTMENT: SignatureAdjustment = {
-  scale: 1,
-  offsetX: 0,
-  offsetY: 0
-};
-
-export const SIGNATURE_ADJUSTMENT_LIMITS = {
-  scale: { min: 0.4, max: 2.5, step: 0.05 },
-  offsetX: { min: -80, max: 80, step: 1 },
-  offsetY: { min: -60, max: 60, step: 1 }
-} as const;
-
-/**
- * Guards the render path against out-of-range or malformed values — these round-trip
- * through localStorage, so a stale or hand-edited entry must not break the certificate.
- */
-export const clampSignatureAdjustment = (
-  value?: Partial<SignatureAdjustment> | null
-): SignatureAdjustment => {
-  const clamp = (input: unknown, min: number, max: number, fallback: number) => {
-    const parsed = typeof input === 'number' ? input : Number(input);
-    if (!Number.isFinite(parsed)) return fallback;
-    return Math.min(max, Math.max(min, parsed));
-  };
-
-  const limits = SIGNATURE_ADJUSTMENT_LIMITS;
-
-  return {
-    scale: clamp(value?.scale, limits.scale.min, limits.scale.max, DEFAULT_SIGNATURE_ADJUSTMENT.scale),
-    offsetX: clamp(value?.offsetX, limits.offsetX.min, limits.offsetX.max, DEFAULT_SIGNATURE_ADJUSTMENT.offsetX),
-    offsetY: clamp(value?.offsetY, limits.offsetY.min, limits.offsetY.max, DEFAULT_SIGNATURE_ADJUSTMENT.offsetY)
-  };
-};
 
 type CertificateCardProps = {
   event: Event;

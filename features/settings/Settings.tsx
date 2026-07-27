@@ -6,6 +6,7 @@ import { Save, Loader2, CheckCircle, AlertCircle, Building2, Upload, Eye, X, Tra
 import { Event, Office } from '../../types/database';
 import AnnouncementManagement from './AnnouncementManagement';
 import AppearanceSettings from './AppearanceSettings';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { parseFoodInclusion } from '../../lib/eventFoodInclusion';
 import CertificateOfAppearanceCard, {
   buildEventDateString,
@@ -161,6 +162,7 @@ const Settings: React.FC = () => {
   const [signatory, setSignatory] = useState(createEmptySignatoryState);
   const [signatories, setSignatories] = useState<SignatoryRow[]>([]);
   const [selectedSignatoryId, setSelectedSignatoryId] = useState<number | ''>('');
+  const [showRemoveSignatoryConfirm, setShowRemoveSignatoryConfirm] = useState(false);
   const [selectedSignatureFile, setSelectedSignatureFile] = useState<File | null>(null);
   const [signaturePreviewUrl, setSignaturePreviewUrl] = useState('');
   const [selectedAgencyLogoFile, setSelectedAgencyLogoFile] = useState<File | null>(null);
@@ -560,7 +562,13 @@ const Settings: React.FC = () => {
     });
   };
 
-  const handleDeactivateSignatory = async () => {
+  const signatoryPendingRemoval =
+    signatories.find((item) => item.id === selectedSignatoryId) || null;
+
+  // Runs the guards up front so the confirmation only appears for a removal that can
+  // actually go through. With no signatory selected the button still means "start a new
+  // one", which needs no confirming.
+  const requestRemoveSignatory = () => {
     if (!selectedOfficeId || !selectedSignatoryId) {
       handleAddSignatory();
       return;
@@ -570,6 +578,13 @@ const Settings: React.FC = () => {
       setMessage({ type: 'error', text: 'Each office must keep at least one active signatory.' });
       return;
     }
+
+    setMessage(null);
+    setShowRemoveSignatoryConfirm(true);
+  };
+
+  const handleDeactivateSignatory = async () => {
+    if (!selectedOfficeId || !selectedSignatoryId) return;
 
     setSaving(true);
     setMessage(null);
@@ -589,6 +604,8 @@ const Settings: React.FC = () => {
       setMessage({ type: 'error', text: err.message || 'Failed to remove signatory.' });
     } finally {
       setSaving(false);
+      // Closed either way so the success or error banner behind the dialog is visible.
+      setShowRemoveSignatoryConfirm(false);
     }
   };
 
@@ -1068,7 +1085,7 @@ const Settings: React.FC = () => {
 
                         <button
                           type="button"
-                          onClick={handleDeactivateSignatory}
+                          onClick={requestRemoveSignatory}
                           disabled={!selectedOfficeId || saving || (!selectedSignatoryId && signatories.length === 0)}
                           className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
                         >
@@ -1450,6 +1467,38 @@ const Settings: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={showRemoveSignatoryConfirm}
+        title={isPartnerSignatoryView ? 'Remove partner signatory?' : 'Remove signatory?'}
+        confirmLabel="Remove"
+        confirmingLabel="Removing…"
+        isConfirming={saving}
+        onConfirm={handleDeactivateSignatory}
+        onCancel={() => setShowRemoveSignatoryConfirm(false)}
+        description={
+          <>
+            <p>
+              <span className="font-semibold text-slate-800">
+                {signatoryPendingRemoval?.name || 'This signatory'}
+              </span>
+              {signatoryPendingRemoval?.position ? ` — ${signatoryPendingRemoval.position}` : ''} will
+              no longer be selectable when issuing certificates for{' '}
+              {selectedOffice?.name || 'this office'}.
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              The record is deactivated rather than deleted, so certificates already issued keep
+              their signature.
+            </p>
+            {signatoryPendingRemoval?.is_default && !isPartnerSignatoryView && (
+              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                This is the default signatory. After removing it, set a new default so certificates
+                do not fall back to an arbitrary one.
+              </p>
+            )}
+          </>
+        }
+      />
     </div>
   );
 };

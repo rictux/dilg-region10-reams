@@ -4,6 +4,7 @@ import { format, parseISO } from 'date-fns';
 import { Event, Participant } from '../../types/database';
 import { formatParticipantOfficialName } from '../../lib/participantName';
 import { CertificateSignatory } from './CertificateOfAppearanceTemplate';
+import { clampSignatureAdjustment, SignatureAdjustment } from '../../lib/signatureAdjustment';
 
 export type CoPPaperSize = 'A4' | 'A5';
 
@@ -31,6 +32,16 @@ type CoPTemplateProps = {
   /** When set (> 0), appends "with a credit of <word> (<n>) training hours." to the body. */
   creditHours?: number | null;
   includeSignature?: boolean;
+  /**
+   * Per-signatory e-signature calibration, keyed by signatory id. The primary and partner
+   * blocks each look up their own entry, since the two scans are unrelated images.
+   */
+  signatureAdjustments?: Record<number, Partial<SignatureAdjustment> | undefined>;
+  /**
+   * Background-stripped e-signature sources, keyed by signatory id. Falls back to the
+   * signatory's stored `esig_link` when an entry is missing or still processing.
+   */
+  signatureSrcOverrides?: Record<number, string | undefined>;
   /** Full reference number shown under the QR "Scan to verify" caption. */
   referenceNumber?: string | null;
 };
@@ -199,6 +210,8 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   bodyText = DEFAULT_COP_BODY_TEXT,
   creditHours = null,
   includeSignature = true,
+  signatureAdjustments,
+  signatureSrcOverrides,
   referenceNumber = null,
 }) => {
   const dims     = PAPER_DIMS[paperSize];
@@ -286,25 +299,50 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
             : s(14.5)
       : sigSz;
 
+    const adjustment = clampSignatureAdjustment(
+      currentSignatory?.id ? signatureAdjustments?.[currentSignatory.id] : null
+    );
+    const signatureSrc =
+      (currentSignatory?.id ? signatureSrcOverrides?.[currentSignatory.id] : null)
+      || currentSignatory?.esig_link;
+
+    // The slot reserves the *unscaled* height and the image floats inside it, absolutely
+    // positioned. Resizing therefore never reflows the name and position lines below — the
+    // signature just grows over its slot, which is what makes it safe to tune freely.
+    const signatureSlotHeight = s(40);
+    const signatureHeight = signatureSlotHeight * adjustment.scale;
+
     return (
       <div style={{ display: 'flex', flex: 1, minWidth: 0, flexDirection: 'column', alignItems: 'center' }}>
-        {includeSignature && currentSignatory?.esig_link ? (
-          <img
-            src={currentSignatory.esig_link}
-            alt={`${sigName || 'Signatory'} e-signature`}
-            crossOrigin="anonymous"
-            referrerPolicy="no-referrer"
-            style={{
-              height: s(40),
-              maxWidth: '90%',
-              objectFit: 'contain',
-              marginBottom: s(2),
-              pointerEvents: 'none',
-            }}
-          />
-        ) : (
-          <div style={{ height: s(40), marginBottom: s(2) }} />
-        )}
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: signatureSlotHeight,
+            marginBottom: s(2),
+          }}
+        >
+          {includeSignature && signatureSrc && (
+            <img
+              src={signatureSrc}
+              alt={`${sigName || 'Signatory'} e-signature`}
+              crossOrigin="anonymous"
+              referrerPolicy="no-referrer"
+              style={{
+                position: 'absolute',
+                left: '50%',
+                bottom: 0,
+                height: signatureHeight,
+                // The cap grows with the box, otherwise object-contain immediately claws back
+                // any size increase. 100% keeps a wide scan inside its own signatory column.
+                maxWidth: `${Math.min(100, 90 * adjustment.scale)}%`,
+                objectFit: 'contain',
+                pointerEvents: 'none',
+                transform: `translate(calc(-50% + ${adjustment.offsetX}px), ${adjustment.offsetY}px)`,
+              }}
+            />
+          )}
+        </div>
         <div style={{
           display: 'inline-flex',
           alignItems: 'baseline',

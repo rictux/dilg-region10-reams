@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Event } from '../../types/database';
 import {
   ArrowLeft, Check, Download, Eye, Image as ImageIcon, Loader2,
-  Mail, Printer, Search, Settings, Trash2, Upload, X,
+  Mail, Printer, RotateCcw, Search, Settings, SlidersHorizontal, Trash2, Upload, X,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toJpeg, getFontEmbedCSS } from 'html-to-image';
@@ -26,6 +26,16 @@ import CertificateOfParticipationCard, {
   PAPER_DIMS,
 } from './CertificateOfParticipationTemplate';
 import EmailProgressModal from './EmailProgressModal';
+import {
+  clampSignatureAdjustment,
+  DEFAULT_SIGNATURE_ADJUSTMENT,
+  isSignatureAdjusted,
+  readStoredSignatureAdjustment,
+  SIGNATURE_CONTROLS,
+  SignatureAdjustment,
+  writeStoredSignatureAdjustment,
+} from '../../lib/signatureAdjustment';
+import { getTransparentSignature } from '../../lib/signatureBackground';
 
 const CERT_TITLE_OPTIONS: CoPTitle[] = [
   'Certificate of Participation',
@@ -115,6 +125,11 @@ const ensureCertFontsReady = async () => {
     /* Font Loading API unavailable — fall through and let capture proceed */
   }
 };
+
+const resolveSignatureSrc = (
+  srcs: Record<number, string>,
+  signatory: CertificateSignatory
+) => (signatory?.id ? srcs[signatory.id] : null) || signatory?.esig_link || null;
 
 const buildListName = (p: CoPParticipantRecord['participant']) => {
   const last  = p.l_name?.trim()    || '';
@@ -307,6 +322,8 @@ type SettingsModalProps = {
   onSave: () => void;
   isSaving: boolean;
 };
+
+type SignatureTarget = { id: number; name: string; role: string };
 
 const isPartnerAgencySignatory = (signatory: CertificateSignatory) =>
   Boolean(signatory?.agency_name?.trim() || signatory?.agency_logo_url?.trim());
@@ -618,6 +635,100 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   );
 };
 
+// ─── Signature Adjustment Panel ───────────────────────────────────────────────
+
+type SignatureAdjustPanelProps = {
+  targets: SignatureTarget[];
+  adjustments: Record<number, SignatureAdjustment>;
+  includeSignature: boolean;
+  onChangeField: (signatoryId: number, field: keyof SignatureAdjustment, value: number) => void;
+  onReset: (signatoryId: number) => void;
+};
+
+/**
+ * Sits inline above the preview rather than in a dialog: calibrating a signature means
+ * watching it move, which a modal would cover up.
+ */
+const SignatureAdjustPanel: React.FC<SignatureAdjustPanelProps> = ({
+  targets, adjustments, includeSignature, onChangeField, onReset,
+}) => {
+  if (!includeSignature) {
+    return (
+      <p className="text-xs text-[#9A9890]">
+        Signatures are excluded from this certificate. Turn on “Include signature image” in
+        Settings to adjust them.
+      </p>
+    );
+  }
+
+  if (targets.length === 0) {
+    return (
+      <p className="text-xs text-[#9A9890]">
+        The selected signatories have no e-signature image uploaded.
+      </p>
+    );
+  }
+
+  // With a partner signatory there are two cards to fit, so they share the row. On their
+  // own, a card spans the full panel and the three sliders sit side by side instead of
+  // stacking into a narrow column.
+  const isSingleTarget = targets.length === 1;
+
+  return (
+    <div className={`grid gap-3 ${isSingleTarget ? 'grid-cols-1' : 'sm:grid-cols-2'}`}>
+      {targets.map(target => {
+        const adjustment = adjustments[target.id] ?? DEFAULT_SIGNATURE_ADJUSTMENT;
+        const adjusted = isSignatureAdjusted(adjustment);
+
+        return (
+          <div key={target.id} className="rounded-xl border border-[#E0DDD4] bg-white px-4 py-3">
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-[#4A4843]">{target.name}</p>
+                <p className="truncate text-[10px] text-[#9A9890]">{target.role}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onReset(target.id)}
+                disabled={!adjusted}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#E0DDD4] bg-white px-2 py-1 text-[10px] font-medium text-[#4A4843] transition-colors hover:bg-[#F5F3EE] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RotateCcw size={11} />
+                Reset
+              </button>
+            </div>
+
+            <div className={isSingleTarget ? 'grid gap-x-6 gap-y-2 sm:grid-cols-3' : 'space-y-2'}>
+              {SIGNATURE_CONTROLS.map(control => (
+                <div key={control.field}>
+                  <div className="flex items-center justify-between text-[10px] font-medium text-[#6B6860]">
+                    <label htmlFor={`cop-signature-${target.id}-${control.field}`}>
+                      {control.label}
+                    </label>
+                    <span className="tabular-nums text-violet-600">
+                      {control.format(adjustment[control.field])}
+                    </span>
+                  </div>
+                  <input
+                    id={`cop-signature-${target.id}-${control.field}`}
+                    type="range"
+                    min={control.limits.min}
+                    max={control.limits.max}
+                    step={control.limits.step}
+                    value={adjustment[control.field]}
+                    onChange={e => onChangeField(target.id, control.field, Number(e.target.value))}
+                    className="mt-0.5 w-full accent-violet-600"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 const CertificateOfParticipation: React.FC = () => {
@@ -641,10 +752,93 @@ const CertificateOfParticipation: React.FC = () => {
   const [bodyText,           setBodyText]            = useState<string>(DEFAULT_COP_BODY_TEXT);
   const [creditHours,        setCreditHours]         = useState<string>('');
   const [includeSignature,   setIncludeSignature]    = useState(true);
+  const [signatureAdjustments, setSignatureAdjustments] = useState<Record<number, SignatureAdjustment>>({});
+  const [signatureSrcOverrides, setSignatureSrcOverrides] = useState<Record<number, string>>({});
   const certificateSecondarySignatory = secondarySignatory?.agency_name?.trim()
     && secondarySignatory.agency_logo_url?.trim()
     ? secondarySignatory
     : null;
+
+  // Calibration belongs to the signatory's scanned image, so it is keyed by signatory and
+  // reloaded whenever either slot changes. The 'cop' scope keeps it separate from the
+  // Appearance certificate, whose layout gives the same offsets a different meaning.
+  useEffect(() => {
+    const loaded: Record<number, SignatureAdjustment> = {};
+    if (primarySignatory?.id) {
+      loaded[primarySignatory.id] = readStoredSignatureAdjustment('cop', primarySignatory.id);
+    }
+    if (secondarySignatory?.id) {
+      loaded[secondarySignatory.id] = readStoredSignatureAdjustment('cop', secondarySignatory.id);
+    }
+    setSignatureAdjustments(loaded);
+  }, [primarySignatory?.id, secondarySignatory?.id]);
+
+  const handleSignatureFieldChange = (
+    signatoryId: number,
+    field: keyof SignatureAdjustment,
+    value: number
+  ) => {
+    const base = signatureAdjustments[signatoryId] ?? DEFAULT_SIGNATURE_ADJUSTMENT;
+    const next = clampSignatureAdjustment({ ...base, [field]: value });
+    setSignatureAdjustments(current => ({ ...current, [signatoryId]: next }));
+    writeStoredSignatureAdjustment('cop', signatoryId, next);
+  };
+
+  const handleResetSignature = (signatoryId: number) => {
+    setSignatureAdjustments(current => ({ ...current, [signatoryId]: DEFAULT_SIGNATURE_ADJUSTMENT }));
+    writeStoredSignatureAdjustment('cop', signatoryId, DEFAULT_SIGNATURE_ADJUSTMENT);
+  };
+
+  // Knock the white paper out of the scans so a theme image shows through behind them.
+  // Export/print/email call this too, so a capture never races ahead of the processing and
+  // bakes the untreated image into a PDF.
+  const ensureTransparentSignatures = useCallback(async () => {
+    const sources: Array<[number, string]> = [];
+    if (primarySignatory?.id && primarySignatory.esig_link) {
+      sources.push([primarySignatory.id, primarySignatory.esig_link]);
+    }
+    if (certificateSecondarySignatory?.id && certificateSecondarySignatory.esig_link) {
+      sources.push([certificateSecondarySignatory.id, certificateSecondarySignatory.esig_link]);
+    }
+    if (sources.length === 0) return {} as Record<number, string>;
+
+    const processed = await Promise.all(
+      sources.map(async ([id, url]) => [id, await getTransparentSignature(url)] as const)
+    );
+
+    const next: Record<number, string> = {};
+    processed.forEach(([id, src]) => { next[id] = src; });
+    setSignatureSrcOverrides(next);
+    return next;
+  }, [
+    primarySignatory?.id,
+    primarySignatory?.esig_link,
+    certificateSecondarySignatory?.id,
+    certificateSecondarySignatory?.esig_link,
+  ]);
+
+  useEffect(() => { void ensureTransparentSignatures(); }, [ensureTransparentSignatures]);
+
+  // Only signatories that actually contribute an image to the certificate are adjustable.
+  const signatureTargets: SignatureTarget[] = [];
+  if (primarySignatory?.id && primarySignatory.esig_link) {
+    signatureTargets.push({
+      id: primarySignatory.id,
+      name: primarySignatory.name,
+      role: 'Primary signatory',
+    });
+  }
+  if (certificateSecondarySignatory?.id && certificateSecondarySignatory.esig_link) {
+    signatureTargets.push({
+      id: certificateSecondarySignatory.id,
+      name: certificateSecondarySignatory.name,
+      role: certificateSecondarySignatory.agency_name?.trim() || 'Partner agency signatory',
+    });
+  }
+
+  const hasSignatureAdjustments = signatureTargets.some(target =>
+    isSignatureAdjusted(signatureAdjustments[target.id] ?? DEFAULT_SIGNATURE_ADJUSTMENT)
+  );
 
   // ── UI state
   const [search,           setSearch]           = useState('');
@@ -661,6 +855,7 @@ const CertificateOfParticipation: React.FC = () => {
   const [showSettings,     setShowSettings]     = useState(false);
   const [isSavingSignatories, setIsSavingSignatories] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showSignatureAdjust, setShowSignatureAdjust] = useState(false);
   const [isSendingEmails,  setIsSendingEmails]  = useState(false);
   const [emailProgress,    setEmailProgress]    = useState<{ done: number; total: number } | null>(null);
 
@@ -1065,10 +1260,11 @@ const CertificateOfParticipation: React.FC = () => {
     setIsGenerating(true);
     setProgress({ done: 0, total: queue.length });
     try {
+      const signatureSrcs = await ensureTransparentSignatures();
       await preloadImages([
         themeUrl,
-        includeSignature ? primarySignatory?.esig_link : null,
-        includeSignature ? certificateSecondarySignatory?.esig_link : null,
+        includeSignature ? resolveSignatureSrc(signatureSrcs, primarySignatory) : null,
+        includeSignature ? resolveSignatureSrc(signatureSrcs, certificateSecondarySignatory) : null,
         certificateSecondarySignatory?.agency_logo_url,
       ]);
       await ensureCertFontsReady();
@@ -1115,10 +1311,11 @@ const CertificateOfParticipation: React.FC = () => {
     setIsGenerating(true);
     setProgress({ done: 0, total: queue.length });
     try {
+      const signatureSrcs = await ensureTransparentSignatures();
       await preloadImages([
         themeUrl,
-        includeSignature ? primarySignatory?.esig_link : null,
-        includeSignature ? certificateSecondarySignatory?.esig_link : null,
+        includeSignature ? resolveSignatureSrc(signatureSrcs, primarySignatory) : null,
+        includeSignature ? resolveSignatureSrc(signatureSrcs, certificateSecondarySignatory) : null,
         certificateSecondarySignatory?.agency_logo_url,
       ]);
       await ensureCertFontsReady();
@@ -1206,10 +1403,11 @@ const CertificateOfParticipation: React.FC = () => {
     setEmailProgress({ done: 0, total: queue.length });
 
     try {
+      const signatureSrcs = await ensureTransparentSignatures();
       await preloadImages([
         themeUrl,
-        includeSignature ? primarySignatory?.esig_link : null,
-        includeSignature ? certificateSecondarySignatory?.esig_link : null,
+        includeSignature ? resolveSignatureSrc(signatureSrcs, primarySignatory) : null,
+        includeSignature ? resolveSignatureSrc(signatureSrcs, certificateSecondarySignatory) : null,
         certificateSecondarySignatory?.agency_logo_url,
       ]);
       await ensureCertFontsReady();
@@ -1557,12 +1755,30 @@ const CertificateOfParticipation: React.FC = () => {
             <span className="text-[#C5C2BA]">/</span>
             <span>{includeSignature ? 'Signature included' : 'Signature excluded'}</span>
             <button
-              onClick={() => setShowSettings(true)}
-              className="ml-auto shrink-0 text-violet-600 hover:underline font-medium flex items-center gap-1"
+              onClick={() => setShowSignatureAdjust(current => !current)}
+              className={`ml-auto shrink-0 font-medium flex items-center gap-1 ${
+                showSignatureAdjust ? 'text-violet-700' : 'text-violet-600 hover:underline'
+              }`}
+              title="Resize and reposition the e-signature"
             >
-              <Settings size={12} /> Edit
+              <SlidersHorizontal size={12} /> Adjustment
+              {hasSignatureAdjustments && (
+                <span className="h-1.5 w-1.5 rounded-full bg-violet-600" title="Calibrated" />
+              )}
             </button>
           </div>
+
+          {showSignatureAdjust && (
+            <div className="mb-3 w-full max-w-4xl rounded-xl border border-[#E0DDD4] bg-[#F5F3EE] p-3">
+              <SignatureAdjustPanel
+                targets={signatureTargets}
+                adjustments={signatureAdjustments}
+                includeSignature={includeSignature}
+                onChangeField={handleSignatureFieldChange}
+                onReset={handleResetSignature}
+              />
+            </div>
+          )}
 
           {previewRecord ? (
             <div ref={previewWrapperRef} className="w-full max-w-4xl">
@@ -1586,6 +1802,8 @@ const CertificateOfParticipation: React.FC = () => {
                   bodyText={bodyTextResolved}
                   creditHours={creditHoursNum}
                   includeSignature={includeSignature}
+                  signatureAdjustments={signatureAdjustments}
+                  signatureSrcOverrides={signatureSrcOverrides}
                   referenceNumber={referenceByPid.get(previewRecord.participant.participant_id) ?? null}
                 />
               </div>
@@ -1615,6 +1833,8 @@ const CertificateOfParticipation: React.FC = () => {
                 bodyText={bodyTextResolved}
                 creditHours={creditHoursNum}
                 includeSignature={includeSignature}
+                signatureAdjustments={signatureAdjustments}
+                signatureSrcOverrides={signatureSrcOverrides}
                 referenceNumber={referenceByPid.get(record.participant.participant_id) ?? null}
               />
             </div>
@@ -1678,6 +1898,8 @@ const CertificateOfParticipation: React.FC = () => {
                 bodyText={bodyTextResolved}
                 creditHours={creditHoursNum}
                 includeSignature={includeSignature}
+                signatureAdjustments={signatureAdjustments}
+                signatureSrcOverrides={signatureSrcOverrides}
                 referenceNumber={referenceByPid.get(previewRecord.participant.participant_id) ?? null}
               />
             </div>
