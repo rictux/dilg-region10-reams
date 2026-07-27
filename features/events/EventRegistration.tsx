@@ -716,6 +716,26 @@ const EventRegistration: React.FC = () => {
         }
       }
 
+      // Event-level auto-attendance applies only to this public registration
+      // flow. The database function revalidates the event date, setting, recent
+      // registration, and participant code before it writes an attendance log.
+      if (!regError && event.auto_attendance_on_registration) {
+        const { data: loggedSession, error: attendanceError } = await supabase.rpc(
+          'log_public_event_registration_attendance',
+          {
+            p_event_id: id,
+            p_participant_code: finalParticipantCode
+          }
+        );
+
+        if (attendanceError) {
+          console.error('Event Registration auto-attendance failed', attendanceError);
+          toast.error('Registration completed, but attendance could not be logged. Please contact the event organizer.');
+        } else if (loggedSession === 'AM' || loggedSession === 'PM') {
+          toast.success(`${loggedSession} attendance logged for today.`);
+        }
+      }
+
       closeMatchPrompt();
       setQrToken(finalParticipantCode);
       setSuccess(true);

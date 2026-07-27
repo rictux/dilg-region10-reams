@@ -230,6 +230,7 @@ const EventsList: React.FC = () => {
       organize_by: null as number | null,
       has_accommodation: false,
       registration_open: true,
+      auto_attendance_on_registration: false,
       session: 'All_Day' as const,
       days_accommodation: 0,
       dates_with_accom: [] as string[],
@@ -753,6 +754,7 @@ const EventsList: React.FC = () => {
           organize_by: event.organize_by,
           has_accommodation: event.has_accommodation,
           registration_open: event.registration_open,
+          auto_attendance_on_registration: event.auto_attendance_on_registration ?? false,
           session: event.session || 'All_Day',
           days_accommodation: event.days_accommodation || 0,
           dates_with_accom: event.dates_with_accom || [],
@@ -4614,6 +4616,52 @@ const EventsList: React.FC = () => {
                       <span className={`w-1.5 h-1.5 rounded-full ${formData.registration_open ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                       {formData.registration_open ? 'Open' : 'Closed'}
                   </button>
+                </div>
+
+                <div className={`rounded-xl border px-4 py-3.5 transition-colors ${
+                    formData.auto_attendance_on_registration
+                      ? 'border-emerald-200 bg-emerald-50/70'
+                      : 'border-slate-200 bg-slate-50/60'
+                }`}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <label
+                        htmlFor="auto-attendance-on-registration"
+                        className="block cursor-pointer text-sm font-semibold text-slate-800"
+                      >
+                        Auto attendance on registration
+                      </label>
+                      <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                        When this option is enabled, the attendance time of participants who register on the day of the event will be recorded automatically.
+                      </p>
+                    </div>
+                    <button
+                      id="auto-attendance-on-registration"
+                      type="button"
+                      role="switch"
+                      aria-checked={Boolean(formData.auto_attendance_on_registration)}
+                      aria-label="Auto attendance on registration"
+                      onClick={() => setFormData({
+                        ...formData,
+                        auto_attendance_on_registration: !formData.auto_attendance_on_registration
+                      })}
+                      className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                        formData.auto_attendance_on_registration ? 'bg-emerald-600' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                          formData.auto_attendance_on_registration ? 'translate-x-5' : 'translate-x-0.5'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <p className={`mt-2 text-[11px] font-semibold ${
+                    formData.auto_attendance_on_registration ? 'text-emerald-700' : 'text-slate-500'
+                  }`}>
+                    {formData.auto_attendance_on_registration ? 'Enabled' : 'Off by default'}
+                  </p>
                 </div>
 
               </div>

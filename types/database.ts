@@ -68,6 +68,9 @@ export interface Event {
   cop_secondary_signatory_id?: number | null;
   has_accommodation?: boolean | null;
   registration_open: boolean;
+  // When enabled, public Event Registration submissions made on an event date
+  // create attendance for that date (AM for All Day/AM, PM for PM events).
+  auto_attendance_on_registration?: boolean | null;
   session: 'AM' | 'PM' | 'All_Day';
   days_accommodation?: number | null;
   dates_with_accom?: string[] | null;
