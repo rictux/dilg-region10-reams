@@ -2,6 +2,7 @@ import React from 'react';
 import QRCode from 'react-qr-code';
 import { differenceInCalendarDays, eachDayOfInterval, format, parseISO } from 'date-fns';
 import { Event, Participant } from '../../types/database';
+import { formatParticipantOfficialName } from '../../lib/participantName';
 
 export type CertificateTemplateVariant = 'with_serial' | 'without_serial';
 
@@ -216,6 +217,7 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
   const certificateFooter = signatory?.footer?.trim() || '';
   const signatoryName = signatory?.name?.trim() || 'CORAZON S. VICENTE';
   const signatoryPostNominals = signatory?.post_nominals?.trim() || '';
+  const participantName = formatParticipantOfficialName(participantRecord.participant);
   const cardPaddingClass = isUltraCompactLayout
     ? 'px-5 pt-2 pb-3'
     : isCompactLayout
@@ -374,7 +376,7 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
         <div className={`${bodyTextClass} text-justify font-serif`}>
           <span className={paragraphIndentClass}>This is to certify that Mr./Ms.</span>
           <span className={participantNameClass}>
-            {participantRecord.participant.full_name}
+            {participantName}
           </span>
           <span>with official station at</span>
           <span className={officeClass}>

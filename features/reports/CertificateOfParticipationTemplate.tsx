@@ -2,6 +2,7 @@ import React from 'react';
 import QRCode from 'react-qr-code';
 import { format, parseISO } from 'date-fns';
 import { Event, Participant } from '../../types/database';
+import { formatParticipantOfficialName } from '../../lib/participantName';
 import { CertificateSignatory } from './CertificateOfAppearanceTemplate';
 
 export type CoPPaperSize = 'A4' | 'A5';
@@ -261,7 +262,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   const referenceLabel = referenceNumber?.trim() || '';
 
   // Auto-shrink name to fit within ~70% of the certificate width on one line
-  const fullName      = participantRecord.participant.full_name || '';
+  const fullName      = formatParticipantOfficialName(participantRecord.participant);
   const maxNameWidth  = widthPx * 0.70;
   const baseNameSz    = s(32);
   const minNameSz     = s(17);
@@ -504,7 +505,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
             paddingRight: s(4),
             display: 'block',
           }}>
-            {participantRecord.participant.full_name}
+            {fullName}
           </p>
 
           <div style={{
