@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -154,10 +154,10 @@ const Settings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  
+
   const [offices, setOffices] = useState<Office[]>([]);
   const [selectedOfficeId, setSelectedOfficeId] = useState<number | ''>('');
-  
+
   const [signatory, setSignatory] = useState(createEmptySignatoryState);
   const [signatories, setSignatories] = useState<SignatoryRow[]>([]);
   const [selectedSignatoryId, setSelectedSignatoryId] = useState<number | ''>('');
@@ -170,6 +170,10 @@ const Settings: React.FC = () => {
     width: typeof window !== 'undefined' ? window.innerWidth : 1440,
     height: typeof window !== 'undefined' ? window.innerHeight : 900
   }));
+  const [nameSuggestions, setNameSuggestions] = useState<SignatoryRow[]>([]);
+  const [showNameSuggestions, setShowNameSuggestions] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const nameSuggestionsTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     if (!user) return;
@@ -199,6 +203,8 @@ const Settings: React.FC = () => {
       setSelectedAgencyLogoFile(null);
       setAgencyLogoPreviewUrl('');
       setIsPreviewModalOpen(false);
+      setNameSuggestions([]);
+      setShowNameSuggestions(false);
     }
   }, [selectedOfficeId, isPartnerSignatoryView]);
 
@@ -217,6 +223,14 @@ const Settings: React.FC = () => {
       }
     };
   }, [agencyLogoPreviewUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (nameSuggestionsTimeoutRef.current) {
+        clearTimeout(nameSuggestionsTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!isPreviewModalOpen) return;
@@ -469,21 +483,77 @@ const Settings: React.FC = () => {
     setMessage(null);
   };
 
+  const fetchNameSuggestions = async (nameQuery: string) => {
+    if (!nameQuery.trim() || nameQuery.trim().length < 2) {
+      setNameSuggestions([]);
+      setShowNameSuggestions(false);
+      return;
+    }
+
+    setLoadingSuggestions(true);
+    try {
+      const { data, error } = await supabase
+        .from('tbl_signatory')
+        .select('*')
+        .eq('active', true)
+        .ilike('name', `%${nameQuery.trim()}%`)
+        .order('is_default', { ascending: false })
+        .order('name', { ascending: true })
+        .limit(8);
+
+      if (error) throw error;
+
+      const rows = ((data || []) as SignatoryRow[]).filter(
+        (row) => normalizeSignatoryName(row.name || '') !== normalizeSignatoryName(nameQuery)
+      );
+
+      setNameSuggestions(rows);
+      setShowNameSuggestions(rows.length > 0);
+    } catch (err) {
+      console.error('Error fetching name suggestions:', err);
+      setNameSuggestions([]);
+      setShowNameSuggestions(false);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
   const handleSignatoryNameChange = (value: string) => {
     setSignatory((current) => ({ ...current, name: value }));
 
-    if (selectedSignatoryId) {
+    if (nameSuggestionsTimeoutRef.current) {
+      clearTimeout(nameSuggestionsTimeoutRef.current);
+    }
+
+    if (normalizeSignatoryName(value).length < 2) {
+      setNameSuggestions([]);
+      setShowNameSuggestions(false);
       return;
     }
 
     const existing = findLoadedSignatoryByName(value);
 
-    if (!existing) {
+    if (existing) {
+      setSelectedSignatoryId(existing.id);
+      applySignatoryRow(existing);
+      setShowNameSuggestions(false);
+      setMessage({
+        type: 'success',
+        text: 'Existing signatory found. Saved details and signature were loaded.'
+      });
       return;
     }
 
-    setSelectedSignatoryId(existing.id);
-    applySignatoryRow(existing);
+    nameSuggestionsTimeoutRef.current = setTimeout(() => {
+      fetchNameSuggestions(value);
+    }, SIGNATORY_NAME_LOOKUP_DEBOUNCE_MS);
+  };
+
+  const handleSelectSuggestion = (suggestion: SignatoryRow) => {
+    setSignatory((current) => ({ ...current, name: suggestion.name }));
+    setSelectedSignatoryId(suggestion.id);
+    applySignatoryRow(suggestion);
+    setShowNameSuggestions(false);
     setMessage({
       type: 'success',
       text: 'Existing signatory found. Saved details and signature were loaded.'
@@ -1034,17 +1104,64 @@ const Settings: React.FC = () => {
                       </label>
                     )}
 
-                    <div className={`space-y-1 ${isPartnerSignatoryView ? 'md:col-span-2' : ''}`}>
+                    <div className={`space-y-1 ${isPartnerSignatoryView ? 'md:col-span-2' : ''} relative`}>
                       <label className="block text-xs font-medium text-slate-700">Name</label>
-                      <input
-                        type="text"
-                        required
-                        disabled={!selectedOfficeId}
-                        value={signatory.name}
-                        onChange={(e) => handleSignatoryNameChange(e.target.value)}
-                        placeholder="e.g. Bruce A. Colao"
-                        className="w-full min-w-0 rounded-lg border border-slate-300 bg-card px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
-                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          disabled={!selectedOfficeId}
+                          value={signatory.name}
+                          onChange={(e) => handleSignatoryNameChange(e.target.value)}
+                          onFocus={() => {
+                            if (nameSuggestions.length > 0 && normalizeSignatoryName(signatory.name).length >= 2) {
+                              setShowNameSuggestions(true);
+                            }
+                          }}
+                          placeholder="e.g. Bruce A. Colao"
+                          className="w-full min-w-0 rounded-lg border border-slate-300 bg-card px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                          autoComplete="off"
+                        />
+                        {loadingSuggestions && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            <Loader2 className="h-4 w-4 text-indigo-600 animate-spin" />
+                          </div>
+                        )}
+                      </div>
+
+                      {showNameSuggestions && nameSuggestions.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 z-50 mt-1 rounded-lg border border-slate-300 bg-card shadow-lg">
+                          <div className="max-h-[240px] overflow-y-auto">
+                            <div className="px-3 py-2 text-xs font-medium text-slate-500 bg-slate-50 border-b border-slate-200 sticky top-0">
+                              Existing Signatories
+                            </div>
+                            {nameSuggestions.map((suggestion) => {
+                              const suggestionOffice = offices.find(o => o.office_id === suggestion.office_id);
+                              const isFromCurrentOffice = suggestion.office_id === selectedOfficeId;
+
+                              return (
+                                <button
+                                  key={suggestion.id}
+                                  type="button"
+                                  onClick={() => handleSelectSuggestion(suggestion)}
+                                  className="w-full px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-indigo-50 border-b border-slate-100 last:border-0 transition-colors focus:outline-none focus:bg-indigo-50"
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="font-medium">{suggestion.name}</div>
+                                    {suggestion.esig_link && (
+                                      <div className="text-[10px] text-emerald-600 font-medium shrink-0">✓</div>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-slate-500 truncate">{suggestion.position || '—'}</div>
+                                  <div className={`text-[10px] mt-1 ${isFromCurrentOffice ? 'text-slate-400' : 'text-indigo-600 font-medium'}`}>
+                                    {suggestionOffice?.name || 'Unknown Office'}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className={`space-y-1 ${isPartnerSignatoryView ? 'order-[6]' : ''}`}>
