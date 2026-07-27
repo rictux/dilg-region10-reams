@@ -33,6 +33,54 @@ export type CertificateSignatory = {
   is_default?: boolean | null;
 } | null;
 
+/**
+ * Per-signatory calibration for the e-signature image. Scanned signatures carry wildly
+ * different amounts of blank padding around the ink, so a single hardcoded box renders
+ * some of them small and others oversized. These let an operator correct that once.
+ *
+ * `scale` multiplies the base box for the current layout density; the offsets nudge the
+ * image in card-space pixels (positive X = right, positive Y = down).
+ */
+export type SignatureAdjustment = {
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+};
+
+export const DEFAULT_SIGNATURE_ADJUSTMENT: SignatureAdjustment = {
+  scale: 1,
+  offsetX: 0,
+  offsetY: 0
+};
+
+export const SIGNATURE_ADJUSTMENT_LIMITS = {
+  scale: { min: 0.4, max: 2.5, step: 0.05 },
+  offsetX: { min: -80, max: 80, step: 1 },
+  offsetY: { min: -60, max: 60, step: 1 }
+} as const;
+
+/**
+ * Guards the render path against out-of-range or malformed values — these round-trip
+ * through localStorage, so a stale or hand-edited entry must not break the certificate.
+ */
+export const clampSignatureAdjustment = (
+  value?: Partial<SignatureAdjustment> | null
+): SignatureAdjustment => {
+  const clamp = (input: unknown, min: number, max: number, fallback: number) => {
+    const parsed = typeof input === 'number' ? input : Number(input);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(max, Math.max(min, parsed));
+  };
+
+  const limits = SIGNATURE_ADJUSTMENT_LIMITS;
+
+  return {
+    scale: clamp(value?.scale, limits.scale.min, limits.scale.max, DEFAULT_SIGNATURE_ADJUSTMENT.scale),
+    offsetX: clamp(value?.offsetX, limits.offsetX.min, limits.offsetX.max, DEFAULT_SIGNATURE_ADJUSTMENT.offsetX),
+    offsetY: clamp(value?.offsetY, limits.offsetY.min, limits.offsetY.max, DEFAULT_SIGNATURE_ADJUSTMENT.offsetY)
+  };
+};
+
 type CertificateCardProps = {
   event: Event;
   participantRecord: CertificateParticipantRecord;
@@ -41,6 +89,7 @@ type CertificateCardProps = {
   eventFoodInclusionMap: Record<string, string[]>;
   certificateSerialNumber?: string | null;
   templateVariant?: CertificateTemplateVariant | null;
+  signatureAdjustment?: Partial<SignatureAdjustment> | null;
   showDivider?: boolean;
 };
 
@@ -199,6 +248,7 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
   eventFoodInclusionMap,
   certificateSerialNumber,
   templateVariant,
+  signatureAdjustment,
   showDivider = false
 }) => {
   const eventAccommodationDates = new Set(getEventAccommodationDates(event));
@@ -306,7 +356,26 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
   const tableBodyPaddingClass = isUltraCompactLayout ? 'py-px' : isCompactLayout ? 'py-0.5' : 'py-1';
   const bottomSectionClass = isUltraCompactLayout ? 'pt-0.5 gap-1' : isCompactLayout ? 'pt-0.5 gap-1.5' : isDenseLayout ? 'pt-1 gap-2' : 'pt-1.5 gap-2';
   const signatoryWrapperClass = isUltraCompactLayout ? 'pt-0' : isCompactLayout ? 'pt-0.5' : isDenseLayout ? 'pt-1' : 'pt-1.5';
-  const signatureImageClass = isUltraCompactLayout ? 'bottom-4 h-10' : isCompactLayout ? 'bottom-5 h-12' : isDenseLayout ? 'bottom-5 h-14' : 'bottom-6 h-16';
+  // Base signature box at 100% scale, per layout density. Height alone would let the width
+  // run to the source image's intrinsic aspect ratio, so a wide scan sprawls past the name
+  // it sits over — bounding both axes is what gives object-contain something to normalize.
+  const signatureMetrics = isUltraCompactLayout
+    ? { bottom: 16, height: 40, maxWidth: 150 }
+    : isCompactLayout
+      ? { bottom: 20, height: 48, maxWidth: 180 }
+      : isDenseLayout
+        ? { bottom: 20, height: 56, maxWidth: 210 }
+        : { bottom: 24, height: 64, maxWidth: 240 };
+
+  // Sizes are inline rather than Tailwind classes because the scale is a runtime value —
+  // JIT can only emit classes it can find as literal strings at build time.
+  const signature = clampSignatureAdjustment(signatureAdjustment);
+  const signatureImageStyle: React.CSSProperties = {
+    height: signatureMetrics.height * signature.scale,
+    maxWidth: signatureMetrics.maxWidth * signature.scale,
+    bottom: signatureMetrics.bottom - signature.offsetY,
+    transform: `translateX(calc(-50% + ${signature.offsetX}px))`
+  };
   const signatoryNameClass = isUltraCompactLayout ? 'text-[11px]' : isCompactLayout ? 'text-[12px]' : 'text-[14px]';
   const signatoryPositionClass = isUltraCompactLayout ? 'text-[10px]' : isCompactLayout ? 'text-[11px]' : isDenseLayout ? 'text-[12px]' : 'text-[13px]';
   const footerClass = isUltraCompactLayout ? 'text-[6px]' : isCompactLayout ? 'text-[7px]' : isDenseLayout ? 'text-[8px]' : 'text-[9px]';
@@ -435,7 +504,8 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
                 <img
                   src={signatory.esig_link}
                   alt="E-Signature"
-                  className={`absolute left-1/2 -translate-x-1/2 ${signatureImageClass} object-contain z-0 pointer-events-none`}
+                  className="absolute left-1/2 object-contain z-0 pointer-events-none"
+                  style={signatureImageStyle}
                   referrerPolicy="no-referrer"
                 />
               )}

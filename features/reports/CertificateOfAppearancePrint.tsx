@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Event } from '../../types/database';
-import { ArrowLeft, Download, FileSpreadsheet, Hash, Info, Loader2, Mail, Printer, Search } from 'lucide-react';
+import { ArrowLeft, Download, FileSpreadsheet, Hash, Info, Loader2, Mail, Printer, RotateCcw, Search, SlidersHorizontal } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { toJpeg } from 'html-to-image';
@@ -16,7 +16,11 @@ import CertificateOfAppearanceCard, {
   buildEventDateString,
   CertificateParticipantRecord,
   CertificateSignatory,
-  getEventDateRows
+  clampSignatureAdjustment,
+  DEFAULT_SIGNATURE_ADJUSTMENT,
+  getEventDateRows,
+  SIGNATURE_ADJUSTMENT_LIMITS,
+  SignatureAdjustment
 } from './CertificateOfAppearanceTemplate';
 import EmailProgressModal from './EmailProgressModal';
 
@@ -430,6 +434,40 @@ const buildParticipantListName = (participant: CertificateParticipant['participa
   return lastNameSection || firstNameSection || participant.full_name || 'Unnamed participant';
 };
 
+// Calibration is a property of the signatory's scanned image, not of the event, so it is
+// keyed by signatory and kept in localStorage — you tune a signature once and every later
+// certificate that person signs picks it up.
+const SIGNATURE_ADJUSTMENT_STORAGE_PREFIX = 'coa_signature_adjust_';
+
+const readStoredSignatureAdjustment = (signatoryId?: number | null): SignatureAdjustment => {
+  if (!signatoryId) return DEFAULT_SIGNATURE_ADJUSTMENT;
+
+  try {
+    const raw = localStorage.getItem(`${SIGNATURE_ADJUSTMENT_STORAGE_PREFIX}${signatoryId}`);
+    if (!raw) return DEFAULT_SIGNATURE_ADJUSTMENT;
+    return clampSignatureAdjustment(JSON.parse(raw));
+  } catch {
+    // Unreadable or malformed entry — fall back rather than block the certificate.
+    return DEFAULT_SIGNATURE_ADJUSTMENT;
+  }
+};
+
+const writeStoredSignatureAdjustment = (
+  signatoryId: number | null | undefined,
+  adjustment: SignatureAdjustment
+) => {
+  if (!signatoryId) return;
+
+  try {
+    localStorage.setItem(
+      `${SIGNATURE_ADJUSTMENT_STORAGE_PREFIX}${signatoryId}`,
+      JSON.stringify(adjustment)
+    );
+  } catch {
+    /* storage full or blocked (private mode) — the in-memory value still applies */
+  }
+};
+
 const CertificateOfAppearancePrint: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
@@ -462,7 +500,53 @@ const CertificateOfAppearancePrint: React.FC = () => {
   const [printProgress, setPrintProgress] = useState<{ done: number; total: number } | null>(null);
   const [isSendingEmails, setIsSendingEmails] = useState(false);
   const [emailProgress, setEmailProgress] = useState<{ done: number; total: number } | null>(null);
+  const [signatureAdjustment, setSignatureAdjustment] = useState<SignatureAdjustment>(
+    DEFAULT_SIGNATURE_ADJUSTMENT
+  );
+  const [showSignatureControls, setShowSignatureControls] = useState(false);
   const isPreparingPrint = printPhase !== 'idle';
+
+  // Load the calibration belonging to whichever signatory is active.
+  useEffect(() => {
+    setSignatureAdjustment(readStoredSignatureAdjustment(signatory?.id));
+  }, [signatory?.id]);
+
+  const updateSignatureField = (field: keyof SignatureAdjustment, value: number) => {
+    const next = clampSignatureAdjustment({ ...signatureAdjustment, [field]: value });
+    setSignatureAdjustment(next);
+    writeStoredSignatureAdjustment(signatory?.id, next);
+  };
+
+  const resetSignatureAdjustment = () => {
+    setSignatureAdjustment(DEFAULT_SIGNATURE_ADJUSTMENT);
+    writeStoredSignatureAdjustment(signatory?.id, DEFAULT_SIGNATURE_ADJUSTMENT);
+  };
+
+  const isSignatureAdjusted =
+    signatureAdjustment.scale !== DEFAULT_SIGNATURE_ADJUSTMENT.scale ||
+    signatureAdjustment.offsetX !== DEFAULT_SIGNATURE_ADJUSTMENT.offsetX ||
+    signatureAdjustment.offsetY !== DEFAULT_SIGNATURE_ADJUSTMENT.offsetY;
+
+  const signatureControls = [
+    {
+      field: 'scale' as const,
+      label: 'Size',
+      limits: SIGNATURE_ADJUSTMENT_LIMITS.scale,
+      format: (value: number) => `${Math.round(value * 100)}%`
+    },
+    {
+      field: 'offsetX' as const,
+      label: 'Horizontal',
+      limits: SIGNATURE_ADJUSTMENT_LIMITS.offsetX,
+      format: (value: number) => `${value > 0 ? '+' : ''}${value} px`
+    },
+    {
+      field: 'offsetY' as const,
+      label: 'Vertical',
+      limits: SIGNATURE_ADJUSTMENT_LIMITS.offsetY,
+      format: (value: number) => `${value > 0 ? '+' : ''}${value} px`
+    }
+  ];
 
   useEffect(() => {
     if (eventId && user) {
@@ -1510,15 +1594,86 @@ const CertificateOfAppearancePrint: React.FC = () => {
           {selectedParticipant ? (
             <>
               <div className="rounded-2xl border border-[#E0DDD4] bg-white px-4 py-3 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-[#2A2926]">{selectedParticipant.participant.full_name}</p>
-                  {selectedParticipant.need_ca && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                      Wants CA
-                    </span>
-                  )}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-semibold text-[#2A2926]">{selectedParticipant.participant.full_name}</p>
+                      {selectedParticipant.need_ca && (
+                        <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                          Wants CA
+                        </span>
+                      )}
+                    </div>
+                    <p className="truncate text-sm text-[#7C7A72]">{selectedParticipant.participant.office || 'No office indicated'}</p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowSignatureControls((current) => !current)}
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                      showSignatureControls
+                        ? 'border-[#C3BEF4] bg-[#EEEDFC] text-[#251E7C]'
+                        : 'border-[#E0DDD4] bg-white text-[#4A4843] hover:bg-[#EDEAE2]'
+                    }`}
+                    title="Resize and reposition the e-signature"
+                  >
+                    <SlidersHorizontal size={13} />
+                    Signature
+                    {isSignatureAdjusted && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#4B3FE4]" title="Calibrated" />
+                    )}
+                  </button>
                 </div>
-                <p className="text-sm text-[#7C7A72]">{selectedParticipant.participant.office || 'No office indicated'}</p>
+
+                {showSignatureControls && (
+                  <div className="mt-3 border-t border-[#EDEAE2] pt-3">
+                    {!signatory?.esig_link ? (
+                      <p className="text-xs text-[#9A9890]">
+                        The selected signatory has no e-signature image uploaded.
+                      </p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {signatureControls.map((control) => (
+                          <div key={control.field}>
+                            <div className="flex items-center justify-between text-[11px] font-medium text-[#6B6860]">
+                              <label htmlFor={`signature-${control.field}`}>{control.label}</label>
+                              <span className="tabular-nums text-[#4B3FE4]">
+                                {control.format(signatureAdjustment[control.field])}
+                              </span>
+                            </div>
+                            <input
+                              id={`signature-${control.field}`}
+                              type="range"
+                              min={control.limits.min}
+                              max={control.limits.max}
+                              step={control.limits.step}
+                              value={signatureAdjustment[control.field]}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                updateSignatureField(control.field, Number(e.target.value))
+                              }
+                              className="mt-1 w-full accent-[#4B3FE4]"
+                            />
+                          </div>
+                        ))}
+
+                        <div className="flex items-center justify-between gap-3 pt-0.5">
+                          <p className="text-[10px] leading-tight text-[#9A9890]">
+                            Saved for {signatory.label || signatory.name} and reused on every certificate they sign.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={resetSignatureAdjustment}
+                            disabled={!isSignatureAdjusted}
+                            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#E0DDD4] bg-white px-2 py-1 text-[10px] font-medium text-[#4A4843] transition-colors hover:bg-[#EDEAE2] disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <RotateCcw size={11} />
+                            Reset
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="preview-scroll-area min-h-0 flex-1 overflow-auto rounded-2xl border border-[#E0DDD4] bg-[#F5F3EE] p-3 shadow-sm sm:p-4">
@@ -1544,6 +1699,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                         dateString={dateString}
                         eventFoodInclusionMap={eventFoodInclusionMap}
                         certificateSerialNumber={resolveCertificateSerial(selectedParticipant)}
+                        signatureAdjustment={signatureAdjustment}
                       />
                     </div>
                   </div>
@@ -1573,6 +1729,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                 dateString={dateString}
                 eventFoodInclusionMap={eventFoodInclusionMap}
                 certificateSerialNumber={resolveCertificateSerial(participantRecord)}
+                signatureAdjustment={signatureAdjustment}
                 showDivider={index === 0}
               />
             ))}
@@ -1590,6 +1747,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
               dateString={dateString}
               eventFoodInclusionMap={eventFoodInclusionMap}
               certificateSerialNumber={resolveCertificateSerial(selectedParticipant)}
+              signatureAdjustment={signatureAdjustment}
             />
           </div>
         )}
@@ -1612,6 +1770,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                 dateString={dateString}
                 eventFoodInclusionMap={eventFoodInclusionMap}
                 certificateSerialNumber={resolveCertificateSerial(participantRecord)}
+                signatureAdjustment={signatureAdjustment}
               />
             </div>
           ))}
