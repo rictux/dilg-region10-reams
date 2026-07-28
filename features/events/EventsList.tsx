@@ -2116,6 +2116,7 @@ const EventsList: React.FC = () => {
       ? viewingParticipants.filter(p =>
           p.participants?.full_name?.toLowerCase().includes(lower) ||
           p.participants?.email?.toLowerCase().includes(lower) ||
+          p.participants?.position?.toLowerCase().includes(lower) ||
           p.participants?.office?.toLowerCase().includes(lower)
         )
       : viewingParticipants;
@@ -2230,7 +2231,8 @@ const EventsList: React.FC = () => {
         <th className="px-3 sm:px-4 py-3 font-medium w-[22%]">Name</th>
         <th className="px-4 py-3 font-medium">Role</th>
         <th className="hidden md:table-cell px-4 py-3 font-medium w-20">Gender</th>
-        <th className="hidden md:table-cell px-4 py-3 font-medium w-[30%]">Office</th>
+        <th className="hidden md:table-cell px-4 py-3 font-medium w-[20%]">Position</th>
+        <th className="hidden md:table-cell px-4 py-3 font-medium w-[24%]">Office</th>
         <th className="hidden lg:table-cell px-4 py-3 font-medium w-28">Registered</th>
         {canManageParticipants && <th className="px-4 sm:px-6 py-3 font-medium text-right">Action</th>}
       </tr>
@@ -2303,6 +2305,7 @@ const EventsList: React.FC = () => {
           )}
         </td>
         <td className="hidden md:table-cell px-4 py-3 text-slate-600">{record.participants?.gender || '—'}</td>
+        <td className="hidden md:table-cell px-4 py-3 text-slate-600">{record.participants?.position || '—'}</td>
         <td className="hidden md:table-cell px-4 py-3 text-slate-600">{record.participants?.office || '—'}</td>
         <td className="hidden lg:table-cell px-4 py-3 text-slate-600 font-mono text-xs">
           {record.registered_at ? format(parseISO(record.registered_at), 'yyyy-MM-dd') : '—'}
@@ -3136,7 +3139,7 @@ const EventsList: React.FC = () => {
                                 </div>
                                 <input
                                     type="text"
-                                    placeholder="Search participant..."
+                                    placeholder="Search name, position, office..."
                                     value={participantSearchTerm}
                                     onChange={(e) => setParticipantSearchTerm(e.target.value)}
                                     className="w-full pl-9 pr-14 py-2 bg-slate-100/50 border border-[rgb(var(--ink)/0.10)] rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 transition-all"
