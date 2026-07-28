@@ -20,6 +20,7 @@ import {
 import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents, isEventOwnerOffice } from '../../lib/eventAccess';
 import { sendParticipantQrById } from '../../lib/emailService';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
+import { canvasToPdfBlob, PAGE_SIZES } from '../../lib/canvasPdf';
 
 type ParticipantFormData = {
   f_name: string;
@@ -1729,8 +1730,43 @@ const EventsList: React.FC = () => {
           const link = getRegistrationLink(selectedEvent.event_id);
           const eventName = selectedEvent.event_name || 'Event';
 
-          // Render the QR SVG into an image
-          const svgString = new XMLSerializer().serializeToString(svgElement);
+          // ── Geometry (CSS px, rendered at `scale` so the A4 page stays ~260dpi) ──
+          const scale = 4;
+          const W = 468;                 // card width
+          const PAD = 44;                // horizontal gutter
+          const CONTENT_W = W - PAD * 2; // 380
+          const TOP_BAR = 8;             // red rule across the top of the card
+          const QR_BOX = 172;            // outer size of the framed QR block
+          const QR_FRAME = 2;            // frame stroke
+          const QR_PAD = 10;             // quiet space between frame and QR
+          const QR_INNER = QR_BOX - (QR_FRAME + QR_PAD) * 2;
+
+          const INK = '#201e1d';
+          const RED = '#ec3013';
+          const BADGE_BRAND = 'DILG REGION X';
+          const MUTED = '#6a6867';
+          const SOFT = '#d8d6d5';
+          const FONT_STACK = 'Archivo, Inter, "Segoe UI", Arial, sans-serif';
+          const font = (weight: number, size: number) => `${weight} ${size}px ${FONT_STACK}`;
+
+          // Archivo is web-loaded; canvas will silently fall back unless it is ready
+          if (document.fonts) {
+              try {
+                  await Promise.all([
+                      document.fonts.load(font(500, 14)),
+                      document.fonts.load(font(700, 14)),
+                      document.fonts.load(font(800, 19)),
+                  ]);
+              } catch {
+                  /* fall back to the rest of the stack */
+              }
+          }
+
+          // Render the QR SVG into an image at final device resolution so it stays sharp
+          const svgClone = svgElement.cloneNode(true) as SVGElement;
+          svgClone.setAttribute('width', String(QR_INNER * scale));
+          svgClone.setAttribute('height', String(QR_INNER * scale));
+          const svgString = new XMLSerializer().serializeToString(svgClone);
           const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
           const svgUrl = URL.createObjectURL(svgBlob);
 
@@ -1750,29 +1786,15 @@ const EventsList: React.FC = () => {
               logoImage.src = '/assets/dilg_logo.png';
           });
 
-          // ── Ticket / pass layout (high scale for a crisp printable badge) ──
-          const scale = 3;
-          const width = 600;
-          const margin = 14;          // gap between canvas edge and card
-          const stripW = 14;          // colored accent strip on the left
-          const accent = '#4f46e5';
-          const qrSize = 230;
-          const qrBoxPad = 14;
-          const qrBox = qrSize + qrBoxPad * 2;
-
-          const contentX = margin + stripW + 26;             // left edge of text/content
-          const contentRight = width - margin - 26;
-          const contentWidth = contentRight - contentX;
-
           const eventDate = formatEventDate(selectedEvent.start_date, selectedEvent.end_date);
           const venue = (selectedEvent.venue || '').trim() || 'To be announced';
 
-          // Measure dynamic text heights before sizing the canvas
+          // ── Measurement pass: line breaks decide the card height ──
           const measureCtx = document.createElement('canvas').getContext('2d');
           if (!measureCtx) throw new Error('Canvas not supported');
 
           const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
-              const words = text.split(/\s+/);
+              const words = text.split(/\s+/).filter(Boolean);
               const lines: string[] = [];
               let current = '';
               for (const word of words) {
@@ -1785,121 +1807,148 @@ const EventsList: React.FC = () => {
                   }
               }
               if (current) lines.push(current);
-              return lines;
+              return lines.length ? lines : [''];
           };
 
-          measureCtx.font = 'bold 20px Arial, sans-serif';
-          const nameLines = wrapText(measureCtx, eventName, contentWidth);
-          measureCtx.font = '15px Arial, sans-serif';
-          const venueLines = wrapText(measureCtx, venue, contentWidth);
-          const dateLines = wrapText(measureCtx, eventDate, contentWidth);
-          measureCtx.font = '13px Arial, sans-serif';
-          const linkLines = wrapText(measureCtx, link, contentWidth - 4);
+          // Approximates CSS `text-wrap: balance` — the narrowest width that still
+          // wraps into the same number of lines gives evenly filled rows.
+          const balanceText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
+              const greedy = wrapText(ctx, text, maxWidth);
+              if (greedy.length < 2) return greedy;
+              let lo = 0;
+              let hi = maxWidth;
+              let best = greedy;
+              for (let i = 0; i < 24; i++) {
+                  const mid = (lo + hi) / 2;
+                  const candidate = wrapText(ctx, text, mid);
+                  if (candidate.length <= greedy.length) {
+                      best = candidate;
+                      hi = mid;
+                  } else {
+                      lo = mid;
+                  }
+              }
+              return best;
+          };
 
-          const nameLineH = 26;
-          const infoLineH = 22;
-          const linkLineH = 19;
-          const infoCount = venueLines.length + dateLines.length;
+          const trackedWidth = (ctx: CanvasRenderingContext2D, text: string, tracking: number) => {
+              const chars = Array.from(text);
+              if (!chars.length) return 0;
+              return chars.reduce((w, ch) => w + ctx.measureText(ch).width + tracking, 0) - tracking;
+          };
 
-          // Total height derived from the same vertical increments used when drawing
-          const height = margin + 34 + 24 + nameLines.length * nameLineH + 10 + 18
-              + infoCount * infoLineH + 22 + qrBox + 20 + linkLines.length * linkLineH + 30 + margin;
+          const VALUE_X = PAD + 74 + 16;                 // label column + gutter
+          const VALUE_W = W - PAD - VALUE_X;
+          const RIGHT_X = PAD + QR_BOX + 24;             // caption column beside the QR
+          const RIGHT_W = W - PAD - RIGHT_X;
+          const TITLE_SIZE = 19;
+          const TITLE_LH = 21;
+          const VALUE_LH = 19;
+          const CAPTION_LH = 20;
+          const SCAN_COPY = 'Point your phone camera at the code to open your registration form.';
+
+          measureCtx.font = font(800, TITLE_SIZE);
+          const titleLines = balanceText(measureCtx, eventName.toUpperCase(), CONTENT_W);
+          measureCtx.font = font(500, 14);
+          const venueLines = wrapText(measureCtx, venue, VALUE_W);
+          measureCtx.font = font(700, 14);
+          const dateLines = wrapText(measureCtx, eventDate, VALUE_W);
+          measureCtx.font = font(500, 13);
+          const scanLines = wrapText(measureCtx, SCAN_COPY, RIGHT_W);
+
+          // ── Vertical rhythm: every offset below is also used when drawing ──
+          let y = TOP_BAR + 36;
+          const kickerY = y;
+          y += 12 + 20;
+          const titleY = y;
+          y += titleLines.length * TITLE_LH + 22;
+          const inkRuleY = y;
+          y += 2 + 24;
+          const venueRowY = y;
+          y += venueLines.length * VALUE_LH + 14;
+          const dateRowY = y;
+          y += dateLines.length * VALUE_LH + 28;
+          const softRuleY = y;
+          y += 2 + 28;
+          const qrTop = y;
+          y += QR_BOX + 22;
+          const footRuleY = y;
+          y += 2 + 15;
+          const footTextY = y;
+          const H = y + 14 + 15;
 
           const canvas = document.createElement('canvas');
-          canvas.width = width * scale;
-          canvas.height = height * scale;
+          canvas.width = W * scale;
+          canvas.height = H * scale;
           const ctx = canvas.getContext('2d');
           if (!ctx) throw new Error('Canvas not supported');
           ctx.scale(scale, scale);
+          ctx.textBaseline = 'top';
+          ctx.textAlign = 'left';
 
-          const roundRectPath = (x: number, y: number, w: number, h: number, r: number) => {
-              ctx.beginPath();
-              ctx.moveTo(x + r, y);
-              ctx.arcTo(x + w, y, x + w, y + h, r);
-              ctx.arcTo(x + w, y + h, x, y + h, r);
-              ctx.arcTo(x, y + h, x, y, r);
-              ctx.arcTo(x, y, x + w, y, r);
-              ctx.closePath();
+          // Letter-spaced runs (canvas has no reliable tracking across browsers)
+          const drawTracked = (text: string, x: number, top: number, tracking: number, align: 'left' | 'right' = 'left') => {
+              const chars = Array.from(text);
+              let cursor = align === 'right' ? x - trackedWidth(ctx, text, tracking) : x;
+              for (const ch of chars) {
+                  ctx.fillText(ch, cursor, top);
+                  cursor += ctx.measureText(ch).width + tracking;
+              }
           };
 
-          // Card (rounded white panel, transparent outside the corners)
-          const cardW = width - margin * 2;
-          const cardH = height - margin * 2;
-          const radius = 22;
-          roundRectPath(margin, margin, cardW, cardH, radius);
+          // Card
           ctx.fillStyle = '#ffffff';
-          ctx.fill();
+          ctx.fillRect(0, 0, W, H);
 
-          // Left accent strip (clipped to the rounded card so corners stay round)
-          ctx.save();
-          roundRectPath(margin, margin, cardW, cardH, radius);
-          ctx.clip();
-          ctx.fillStyle = accent;
-          ctx.fillRect(margin, margin, stripW, cardH);
-          ctx.restore();
+          // Accent rule across the top
+          ctx.fillStyle = RED;
+          ctx.fillRect(0, 0, W, TOP_BAR);
 
-          // Card border
-          roundRectPath(margin, margin, cardW, cardH, radius);
-          ctx.strokeStyle = '#e2e8f0';
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-
-          ctx.textBaseline = 'top';
-          let cursorY = margin + 34;
-
-          // Eyebrow
-          ctx.textAlign = 'left';
-          ctx.fillStyle = accent;
-          ctx.font = 'bold 12px Arial, sans-serif';
-          ctx.fillText('E V E N T   R E G I S T R A T I O N', contentX, cursorY);
-          cursorY += 24;
+          // Kicker
+          ctx.fillStyle = RED;
+          ctx.font = font(800, 12);
+          drawTracked('EVENT REGISTRATION', PAD, kickerY, 12 * 0.22);
 
           // Event name
-          ctx.fillStyle = '#0f172a';
-          ctx.font = 'bold 20px Arial, sans-serif';
-          for (const line of nameLines) {
-              ctx.fillText(line, contentX, cursorY);
-              cursorY += nameLineH;
-          }
-          cursorY += 10;
+          ctx.fillStyle = INK;
+          ctx.font = font(800, TITLE_SIZE);
+          titleLines.forEach((line, i) => ctx.fillText(line, PAD, titleY + i * TITLE_LH));
 
-          // Divider
-          ctx.strokeStyle = '#e2e8f0';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(contentX, cursorY);
-          ctx.lineTo(contentRight, cursorY);
-          ctx.stroke();
-          cursorY += 18;
+          // Heavy rule under the name
+          ctx.fillRect(PAD, inkRuleY, CONTENT_W, 2);
 
-          // Venue then Date
-          ctx.fillStyle = '#475569';
-          ctx.font = '15px Arial, sans-serif';
-          for (const line of [...venueLines, ...dateLines]) {
-              ctx.fillText(line, contentX, cursorY);
-              cursorY += infoLineH;
-          }
-          cursorY += 22;
+          // Venue / Date table
+          const drawMetaRow = (label: string, lines: string[], top: number, valueWeight: number) => {
+              ctx.fillStyle = RED;
+              ctx.font = font(800, 11);
+              drawTracked(label, PAD, top + 3, 11 * 0.14);
+              ctx.fillStyle = INK;
+              ctx.font = font(valueWeight, 14);
+              lines.forEach((line, i) => ctx.fillText(line, VALUE_X, top + i * VALUE_LH));
+          };
+          drawMetaRow('VENUE', venueLines, venueRowY, 500);
+          drawMetaRow('DATE', dateLines, dateRowY, 700);
 
-          // QR box (rounded, centered in the content column)
-          const qrBoxX = contentX + (contentWidth - qrBox) / 2;
-          const qrBoxTop = cursorY;
-          roundRectPath(qrBoxX, qrBoxTop, qrBox, qrBox, 16);
-          ctx.fillStyle = '#f8fafc';
-          ctx.fill();
-          ctx.strokeStyle = '#e2e8f0';
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
+          // Hairline above the QR block
+          ctx.fillStyle = SOFT;
+          ctx.fillRect(PAD, softRuleY, CONTENT_W, 2);
 
-          const qrX = qrBoxX + qrBoxPad;
-          const qrTop = qrBoxTop + qrBoxPad;
-          ctx.drawImage(qrImage, qrX, qrTop, qrSize, qrSize);
+          // Framed QR block
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(PAD, qrTop, QR_BOX, QR_BOX);
+          ctx.strokeStyle = INK;
+          ctx.lineWidth = QR_FRAME;
+          ctx.strokeRect(PAD + QR_FRAME / 2, qrTop + QR_FRAME / 2, QR_BOX - QR_FRAME, QR_BOX - QR_FRAME);
+
+          const qrX = PAD + QR_FRAME + QR_PAD;
+          const qrY = qrTop + QR_FRAME + QR_PAD;
+          ctx.drawImage(qrImage, qrX, qrY, QR_INNER, QR_INNER);
 
           // DILG seal in the center, with a thin white circular border (matches UI)
-          const logoSize = qrSize * 0.24;
-          const ringPadding = qrSize * 0.022;
-          const logoCenterX = qrX + qrSize / 2;
-          const logoCenterY = qrTop + qrSize / 2;
+          const logoSize = QR_INNER * 0.25;
+          const ringPadding = QR_INNER * 0.018;
+          const logoCenterX = qrX + QR_INNER / 2;
+          const logoCenterY = qrY + QR_INNER / 2;
           ctx.save();
           ctx.beginPath();
           ctx.arc(logoCenterX, logoCenterY, logoSize / 2 + ringPadding, 0, Math.PI * 2);
@@ -1911,31 +1960,56 @@ const EventsList: React.FC = () => {
           ctx.drawImage(logoImage, logoCenterX - logoSize / 2, logoCenterY - logoSize / 2, logoSize, logoSize);
           ctx.restore();
 
-          cursorY += qrBox + 20;
+          // Caption column, optically centered against the QR frame
+          const captionH = 13 + 8 + scanLines.length * CAPTION_LH;
+          const captionY = qrTop + (QR_BOX - captionH) / 2;
+          ctx.fillStyle = INK;
+          ctx.font = font(800, 12);
+          drawTracked('SCAN TO REGISTER', RIGHT_X, captionY, 12 * 0.14);
+          ctx.fillStyle = MUTED;
+          ctx.font = font(500, 13);
+          scanLines.forEach((line, i) => ctx.fillText(line, RIGHT_X, captionY + 21 + i * CAPTION_LH));
 
-          // Registration link (below the QR code)
-          ctx.textAlign = 'center';
-          ctx.fillStyle = '#64748b';
-          ctx.font = '13px Arial, sans-serif';
-          const linkCenterX = contentX + contentWidth / 2;
-          for (const line of linkLines) {
-              ctx.fillText(line, linkCenterX, cursorY);
-              cursorY += linkLineH;
+          // Footer: registration link on the left, wordmark on the right
+          ctx.fillStyle = INK;
+          ctx.fillRect(0, footRuleY, W, 2);
+
+          ctx.font = font(800, 11);
+          const brandTracking = 11 * 0.14;
+          const brandW = trackedWidth(ctx, BADGE_BRAND, brandTracking);
+          ctx.fillStyle = RED;
+          drawTracked(BADGE_BRAND, W - PAD, footTextY + 1, brandTracking, 'right');
+
+          // The scheme is dropped so the link stays readable next to the wordmark
+          ctx.fillStyle = INK;
+          ctx.font = font(600, 12);
+          let footLink = link.replace(/^https?:\/\//i, '');
+          const maxLinkW = CONTENT_W - brandW - 16;
+          if (ctx.measureText(footLink).width > maxLinkW) {
+              while (footLink.length > 1 && ctx.measureText(`${footLink}…`).width > maxLinkW) {
+                  footLink = footLink.slice(0, -1);
+              }
+              footLink = `${footLink}…`;
           }
+          ctx.fillText(footLink, PAD, footTextY);
 
           URL.revokeObjectURL(svgUrl);
 
+          // A4 portrait, card scaled to the printable area and centered
+          const pdfBlob = await canvasToPdfBlob(canvas, { ...PAGE_SIZES.A4, marginPt: 36 });
+
           // Trigger download
-          const dataUrl = canvas.toDataURL('image/png');
           const safeName = eventName.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').toLowerCase() || 'event';
+          const pdfUrl = URL.createObjectURL(pdfBlob);
           const downloadLink = document.createElement('a');
-          downloadLink.href = dataUrl;
-          downloadLink.download = `${safeName}_registration_badge.png`;
+          downloadLink.href = pdfUrl;
+          downloadLink.download = `${safeName}_registration_badge.pdf`;
           document.body.appendChild(downloadLink);
           downloadLink.click();
           document.body.removeChild(downloadLink);
+          setTimeout(() => URL.revokeObjectURL(pdfUrl), 10000);
 
-          toast.success('Badge downloaded.');
+          toast.success('Badge PDF downloaded.');
       } catch (err: any) {
           toast.error('Error generating badge: ' + (err?.message || 'Unknown error'));
       } finally {
@@ -2943,7 +3017,7 @@ const EventsList: React.FC = () => {
                                 className="w-full px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 {downloadingBadge ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-                                {downloadingBadge ? 'Generating...' : 'Download Badge'}
+                                {downloadingBadge ? 'Generating...' : 'Download Badge (PDF)'}
                             </button>
                         </>
                     )}
