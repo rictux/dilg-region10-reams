@@ -27,6 +27,10 @@ interface AttendanceRow {
     pmLog?: { time: string, status: string };
 }
 
+type ParticipantRole = 'Secretariat' | 'Speaker' | 'Guest' | 'VIP' | 'Delegate';
+
+const PARTICIPANT_ROLES: ParticipantRole[] = ['Secretariat', 'Speaker', 'Guest', 'VIP', 'Delegate'];
+
 const ROWS_PER_PAGE = 22;
 const COMPACT_ROW_HEIGHT_PX = 27;
 
@@ -96,6 +100,7 @@ const AttendanceSheetPrint: React.FC = () => {
     am: true,
     pm: true,
   });
+  const [roleFilter, setRoleFilter] = useState<ParticipantRole[]>([...PARTICIPANT_ROLES]);
 
   useEffect(() => {
     if (eventId) {
@@ -139,7 +144,7 @@ const AttendanceSheetPrint: React.FC = () => {
         const eventParticipants = await fetchAllSupabaseRows<any>(() =>
             supabase
                 .from('event_participants')
-                .select('accept_photo_video, store_to_db, giveaway_selections, participants(*)')
+                .select('accept_photo_video, store_to_db, giveaway_selections, role, participants(*)')
                 .eq('event_id', id)
                 .order('participant_id', { ascending: true })
         );
@@ -149,7 +154,8 @@ const AttendanceSheetPrint: React.FC = () => {
                 ...ep.participants,
                 accept_photo_video: ep.accept_photo_video,
                 store_to_db: ep.store_to_db,
-                giveaway_selections: ep.giveaway_selections
+                giveaway_selections: ep.giveaway_selections,
+                role: ep.role
             };
         }).filter((p: any) => p !== null);
         setParticipants(fetchedParticipants);
@@ -168,6 +174,7 @@ const AttendanceSheetPrint: React.FC = () => {
 
       const rows = participants
           .filter(p => presentIds.has(p.participant_id))
+          .filter(p => roleFilter.includes(((p as any).role || 'Delegate') as ParticipantRole))
           .map(p => {
               const pLogs = daysLogs.filter(l => l.participant_id === p.participant_id);
               const amLogs = pLogs.filter(l => l.action_session === 'AM').sort((a,b) => a.scan_time.localeCompare(b.scan_time));
@@ -245,7 +252,7 @@ const AttendanceSheetPrint: React.FC = () => {
             </button>
             <div className="flex items-center gap-4">
                 <button onClick={() => setShowSettings(!showSettings)} className="bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-md hover:bg-gray-700">
-                    <Settings size={20} /> Columns
+                    <Settings size={20} /> Columns & Filters
                 </button>
                 <button onClick={() => window.print()} className="bg-blue-600 text-white px-6 py-2 rounded-lg flex items-center gap-2 shadow-md hover:bg-blue-700 font-bold">
                     <Printer size={20} /> Print Sheets
@@ -298,6 +305,35 @@ const AttendanceSheetPrint: React.FC = () => {
                         <span className="text-sm">PM Session</span>
                     </label>
                 </div>
+
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-bold text-sm text-[#111110]">Participant Type</h3>
+                        <div className="flex items-center gap-2 text-xs">
+                            <button onClick={() => setRoleFilter([...PARTICIPANT_ROLES])} className="text-blue-600 hover:underline">Select All</button>
+                            <span className="text-gray-300">|</span>
+                            <button onClick={() => setRoleFilter([])} className="text-blue-600 hover:underline">Clear</button>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {PARTICIPANT_ROLES.map((role) => (
+                            <label key={role} className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={roleFilter.includes(role)}
+                                    onChange={(e) => setRoleFilter(e.target.checked
+                                        ? [...roleFilter, role]
+                                        : roleFilter.filter(r => r !== role))}
+                                    className="w-4 h-4"
+                                />
+                                <span className="text-sm">{role}</span>
+                            </label>
+                        ))}
+                    </div>
+                    {roleFilter.length === 0 && (
+                        <p className="text-xs text-red-600 mt-2">No participant type selected — the sheet will be empty.</p>
+                    )}
+                </div>
             </div>
         )}
 
@@ -324,6 +360,13 @@ const AttendanceSheetPrint: React.FC = () => {
                         </div>
                         <div className="text-[9px] leading-tight font-sans text-[#4A4843] mt-0.5">{event.venue}</div>
                         <div className="text-[9px] leading-tight font-sans text-[#111110] mt-0.5">{format(date, 'MMMM d, yyyy')}</div>
+                        {roleFilter.length !== PARTICIPANT_ROLES.length && (
+                            <div className="text-[8px] leading-tight font-sans text-[#4A4843] mt-0.5 italic">
+                                {roleFilter.length === 0
+                                    ? 'No participant type selected'
+                                    : `Participant Type: ${PARTICIPANT_ROLES.filter(r => roleFilter.includes(r)).join(', ')}`}
+                            </div>
+                        )}
                     </div>
                     <div className="px-6 pb-1 flex-1 min-h-0 overflow-hidden">
                         <table className="w-full text-[10px] table-fixed">
