@@ -27,6 +27,8 @@ export interface User {
   office_id?: number | null;
   img_link?: string | null;
   auth_user_id?: string | null;
+  /** Guide id → ISO timestamp of when the user finished or skipped that walkthrough. */
+  guides_seen?: Record<string, string> | null;
 }
 
 export type EventAccessRole = 'Manager' | 'Scanner' | 'ManagerScanner';

@@ -27,6 +27,13 @@ import CertificateOfParticipationCard, {
 } from './CertificateOfParticipationTemplate';
 import EmailProgressModal from './EmailProgressModal';
 import {
+  buildCoPTourSteps,
+  GuidedTour,
+  TutorialButton,
+} from './CertificateOfParticipationTour';
+import { useAuth } from '../../contexts/AuthContext';
+import { hasSeenGuide, markGuideSeen } from '../../lib/userGuides';
+import {
   clampSignatureAdjustment,
   DEFAULT_SIGNATURE_ADJUSTMENT,
   isSignatureAdjusted,
@@ -368,7 +375,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="overflow-y-auto flex-1 p-6 space-y-8">
 
           {/* ── Title ── */}
-          <section>
+          <section data-tour="cop-settings-title">
             <h3 className="text-sm font-semibold text-[#4A4843] mb-3 flex items-center gap-2">
               <span className="text-xs font-bold border border-current px-1 rounded-sm">T</span> Certificate Title
             </h3>
@@ -390,7 +397,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </section>
 
           {/* ── Body text ── */}
-          <section>
+          <section data-tour="cop-settings-body">
             <h3 className="text-sm font-semibold text-[#4A4843] mb-3 flex items-center gap-2">
               <span className="text-xs font-bold border border-current px-1 rounded-sm">¶</span> Certificate Body Text
             </h3>
@@ -438,7 +445,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </section>
 
           {/* ── Credit hours ── */}
-          <section>
+          <section data-tour="cop-settings-credit">
             <h3 className="text-sm font-semibold text-[#4A4843] mb-3 flex items-center gap-2">
               <span className="text-xs font-bold border border-current px-1 rounded-sm">h</span> Training Credit Hours
             </h3>
@@ -469,7 +476,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </section>
 
           {/* ── Theme ── */}
-          <section>
+          <section data-tour="cop-settings-theme">
             <h3 className="text-sm font-semibold text-[#4A4843] mb-3 flex items-center gap-2">
               <ImageIcon size={14} className="text-violet-500" /> Certificate Theme
             </h3>
@@ -520,7 +527,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </section>
 
           {/* ── Paper size ── */}
-          <section>
+          <section data-tour="cop-settings-paper">
             <h3 className="text-sm font-semibold text-[#4A4843] mb-3 flex items-center gap-2">
               <span className="text-xs font-mono border border-current px-0.5">A</span> Paper Size
             </h3>
@@ -546,7 +553,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </section>
 
           {/* ── Signatories ── */}
-          <section>
+          <section data-tour="cop-settings-signatories">
             <h3 className="text-sm font-semibold text-[#4A4843] mb-3 flex items-center gap-2">
               <span>✍</span> Certificate Signatories
             </h3>
@@ -622,6 +629,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Modal footer */}
         <div className="px-6 py-4 border-t border-[#EDEAE2] flex justify-end">
           <button
+            data-tour="cop-settings-save"
             onClick={onSave}
             disabled={isSaving || primarySignatories.length === 0}
             className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-300 text-white text-sm font-medium px-6 py-2 rounded-lg transition-colors"
@@ -734,6 +742,7 @@ const SignatureAdjustPanel: React.FC<SignatureAdjustPanelProps> = ({
 const CertificateOfParticipation: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate    = useNavigate();
+  const { user, loading: authLoading, refreshProfile } = useAuth();
 
   // ── data
   const [event,        setEvent]        = useState<Event | null>(null);
@@ -858,6 +867,30 @@ const CertificateOfParticipation: React.FC = () => {
   const [showSignatureAdjust, setShowSignatureAdjust] = useState(false);
   const [isSendingEmails,  setIsSendingEmails]  = useState(false);
   const [emailProgress,    setEmailProgress]    = useState<{ done: number; total: number } | null>(null);
+  const [showTutorial,     setShowTutorial]     = useState(false);
+
+  // ── Tutorial
+  // Steps drive the Settings modal open and closed so each setting is explained while it
+  // is actually on screen.
+  const tourSteps = useMemo(
+    () => buildCoPTourSteps({
+      openSettings: () => setShowSettings(true),
+      closeSettings: () => setShowSettings(false),
+    }),
+    []
+  );
+
+  // Skipping counts the same as finishing: the user has decided they don't need it, and
+  // the Tutorial button is always there if they change their mind.
+  const handleCloseTutorial = useCallback(async () => {
+    setShowTutorial(false);
+    setShowSettings(false);
+    if (hasSeenGuide(user, 'cop')) return;
+    const updated = await markGuideSeen(user, 'cop');
+    // Keep the cached profile in step so the tour doesn't reappear on the next
+    // navigation, before AuthContext next refetches the row.
+    if (updated) await refreshProfile();
+  }, [user, refreshProfile]);
 
   const previewWrapperRef = useRef<HTMLDivElement>(null);
   const renderRefs        = useRef<Record<number, HTMLDivElement | null>>({});
@@ -1065,6 +1098,13 @@ const CertificateOfParticipation: React.FC = () => {
       setThemeUrl(themesData[0].url);
     }
   };
+
+  // Offer the walkthrough the first time this user opens the page — once it has been
+  // finished or skipped, it is reachable from the Tutorial button.
+  useEffect(() => {
+    if (loading || authLoading || !event) return;
+    if (!hasSeenGuide(user, 'cop')) setShowTutorial(true);
+  }, [loading, authLoading, event, user]);
 
   // ── Preview scale
   useEffect(() => {
@@ -1533,8 +1573,12 @@ const CertificateOfParticipation: React.FC = () => {
         </div>
 
         <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:items-center">
+          {/* Tutorial button */}
+          <TutorialButton onClick={() => setShowTutorial(true)} />
+
           {/* Settings button */}
           <button
+            data-tour="cop-settings-button"
             onClick={() => setShowSettings(true)}
             className="flex items-center justify-center gap-1.5 text-[#6B6860] hover:text-violet-700 hover:bg-violet-50 border border-[#E0DDD4] hover:border-violet-300 text-sm font-medium px-3 py-2 rounded-lg transition-colors"
           >
@@ -1543,6 +1587,7 @@ const CertificateOfParticipation: React.FC = () => {
 
           {/* Print button */}
           <button
+            data-tour="cop-print-button"
             onClick={handlePrint}
             disabled={isGenerating || selectedCount === 0}
             className="flex items-center justify-center gap-2 bg-[#6B6860] hover:bg-[#4A4843] disabled:bg-[#C5C2BA] disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
@@ -1556,6 +1601,7 @@ const CertificateOfParticipation: React.FC = () => {
 
           {/* Export button */}
           <button
+            data-tour="cop-export-button"
             onClick={handleExport}
             disabled={isGenerating || selectedCount === 0}
             className="flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:bg-[#C5C2BA] disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
@@ -1569,6 +1615,7 @@ const CertificateOfParticipation: React.FC = () => {
 
           {/* Email button */}
           <button
+            data-tour="cop-email-button"
             onClick={handleEmailCertificates}
             disabled={isSendingEmails || selectedCount === 0}
             className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-[#C5C2BA] disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
@@ -1589,7 +1636,7 @@ const CertificateOfParticipation: React.FC = () => {
         <div className="flex w-full shrink-0 flex-col overflow-visible bg-white md:w-72 md:overflow-hidden md:border-r md:border-[#E0DDD4]">
           {/* List header */}
           <div className="px-4 py-3 border-b border-[#EDEAE2]">
-            <div className="mb-2.5 flex items-center gap-1 text-[10px]">
+            <div data-tour="cop-attendance-filter" className="mb-2.5 flex items-center gap-1 text-[10px]">
               <button
                 type="button"
                 aria-pressed={attendanceFilter === 'All' && selectedIds.length > 0}
@@ -1622,7 +1669,7 @@ const CertificateOfParticipation: React.FC = () => {
               <button type="button" onClick={clearAll} className="text-[#9A9890] hover:text-[#6B6860] hover:underline">Unselect</button>
             </div>
 
-            <div className="mb-2.5 grid grid-cols-2 gap-1.5">
+            <div data-tour="cop-role-filter" className="mb-2.5 grid grid-cols-2 gap-1.5">
               {ROLE_FILTER_OPTIONS.map(option => {
                 const isActive = roleFilter === option.value;
                 return (
@@ -1645,7 +1692,7 @@ const CertificateOfParticipation: React.FC = () => {
               })}
             </div>
 
-            <div className="relative">
+            <div data-tour="cop-search" className="relative">
               <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9A9890]" />
               <input
                 type="text"
@@ -1670,7 +1717,7 @@ const CertificateOfParticipation: React.FC = () => {
           </div>
 
           {/* List */}
-          <div className="flex-1 overflow-visible md:overflow-y-auto">
+          <div data-tour="cop-participant-list" className="flex-1 overflow-visible md:overflow-y-auto">
             {filtered.length === 0 && (
               <p className="text-xs text-[#9A9890] text-center py-10">
                 {attendanceFilter === 'Complete'
@@ -1755,6 +1802,7 @@ const CertificateOfParticipation: React.FC = () => {
             <span className="text-[#C5C2BA]">/</span>
             <span>{includeSignature ? 'Signature included' : 'Signature excluded'}</span>
             <button
+              data-tour="cop-signature-adjust"
               onClick={() => setShowSignatureAdjust(current => !current)}
               className={`ml-auto shrink-0 font-medium flex items-center gap-1 ${
                 showSignatureAdjust ? 'text-violet-700' : 'text-violet-600 hover:underline'
@@ -1783,6 +1831,7 @@ const CertificateOfParticipation: React.FC = () => {
           {previewRecord ? (
             <div ref={previewWrapperRef} className="w-full max-w-4xl">
               <div
+                data-tour="cop-preview"
                 style={{
                   transformOrigin: 'top left',
                   transform: `scale(${previewScale})`,
@@ -1908,6 +1957,9 @@ const CertificateOfParticipation: React.FC = () => {
       )}
 
       <EmailProgressModal isOpen={isSendingEmails} progress={emailProgress} />
+
+      {/* ── Step-by-step tutorial ── */}
+      <GuidedTour isOpen={showTutorial} steps={tourSteps} onClose={handleCloseTutorial} />
 
     </div>
   );
