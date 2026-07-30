@@ -39,7 +39,8 @@ import {
   Handshake,
   Megaphone,
   Palette,
-  TrendingUp
+  TrendingUp,
+  History
 } from 'lucide-react';
 import { Permission } from '../config/permissions';
 
@@ -704,6 +705,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       case '/users':
         return activeUsersView === 'participants' ? 'Participants' : 'Users';
       case '/scan': return 'Scan Mode';
+      case '/audit-logs': return 'Audit Logs';
       case '/settings':
         return SETTINGS_SUBMENU.find((s) => s.view === activeSettingsView && s.view !== 'signatories')?.name || 'Settings';
       case '/about': return 'About';
@@ -752,6 +754,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       icon: child.icon,
       section: 'Settings',
     })),
+    { label: 'Audit Logs', path: '/audit-logs', icon: History, section: 'System', permission: 'VIEW_AUDIT_LOGS' },
     { label: 'About',     path: '/about',    icon: Info,     section: 'System' },
   ] as SearchablePage[]).filter((page) => !page.permission || hasPermission(page.permission));
 
@@ -1060,6 +1063,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </div>
                   )}
                 </div>
+            )}
+            {hasPermission('VIEW_AUDIT_LOGS') && (
+                <NavItem to="/audit-logs" icon={History} label="Audit Logs" />
             )}
             <NavItem to="/about" icon={Info} label="About" />
                 <div>

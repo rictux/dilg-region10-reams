@@ -14,6 +14,8 @@ import * as XLSX from 'xlsx';
 import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
 import { fetchAllSupabaseRows } from '../../lib/supabasePagination';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
+import { diffRecords, logAudit } from '../../lib/auditLog';
+import { formatParticipantOfficialName } from '../../lib/participantName';
 
 interface AttendanceRow {
     participant: Participant;
@@ -162,6 +164,9 @@ const AttendanceList: React.FC = () => {
       need_ca: false,
       giveaway_selections: {} as Record<string, string | boolean>
   });
+  // The existing participant row picked from the name suggestions, kept so the
+  // audit trail can diff against it when this form updates that record.
+  const [selectedExistingParticipant, setSelectedExistingParticipant] = useState<Participant | null>(null);
   const [suggestions, setSuggestions] = useState<Participant[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [logAttendanceOnRegister, setLogAttendanceOnRegister] = useState(false);
@@ -815,6 +820,7 @@ const AttendanceList: React.FC = () => {
     }
 
     setNewParticipant({ ...newParticipant, [field]: val, participant_id: null });
+    setSelectedExistingParticipant(null);
 
     if (val.length >= 2) {
         const { data } = await supabase
@@ -873,10 +879,11 @@ const AttendanceList: React.FC = () => {
           participant_id: p.participant_id
       }));
       setSelectedParticipantName({ f_name: p.f_name || '', l_name: p.l_name || '' });
+      setSelectedExistingParticipant(p);
       setSuggestions([]);
       setShowSuggestions(false);
   };
-  
+
   const toProperCase = (str: string) => {
     const lowerStr = str.toLowerCase();
     const parts = lowerStr.split('-');
@@ -914,6 +921,7 @@ const AttendanceList: React.FC = () => {
       setShowNameChangeConfirm(false);
       setPendingNameChange(null);
       setSelectedParticipantName(null);
+      setSelectedExistingParticipant(null);
   };
 
   const handleCancelNameChange = () => {
@@ -1024,7 +1032,7 @@ const AttendanceList: React.FC = () => {
           if (newParticipant.participant_id) {
              participantId = newParticipant.participant_id;
              // Optional: Update participant details if changed
-             await supabase.from('participants').update({
+             const participantPayload = {
                 f_name: toProperCase(newParticipant.f_name.trim()),
                 l_name: toProperCase(newParticipant.l_name.trim()),
                 m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
@@ -1038,19 +1046,33 @@ const AttendanceList: React.FC = () => {
                 age_group: newParticipant.age_group,
                 pwd: newParticipant.pwd,
                 indigenous_people: newParticipant.indigenous_people
-             }).eq('participant_id', participantId);
+             };
+
+             await supabase.from('participants').update(participantPayload).eq('participant_id', participantId);
+
+             logAudit({
+                 actor: user,
+                 action: 'Update',
+                 entityType: 'Participant',
+                 entityId: participantId,
+                 entityLabel: formatParticipantOfficialName(participantPayload),
+                 eventId: selectedEvent.event_id,
+                 eventName: selectedEvent.event_name,
+                 changes: diffRecords(selectedExistingParticipant, participantPayload)
+             });
 
           } else if (newParticipant.email) {
+               // Full row (not just the id) so an update here can be diffed for the audit trail.
                const { data: existingUser } = await supabase
                 .from('participants')
-                .select('participant_id')
+                .select('*')
                 .eq('email', newParticipant.email)
                 .single();
-                
+
                if (existingUser) {
                    participantId = existingUser.participant_id;
                    // Update details
-                   await supabase.from('participants').update({
+                   const participantPayload = {
                         f_name: toProperCase(newParticipant.f_name.trim()),
                         l_name: toProperCase(newParticipant.l_name.trim()),
                         m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
@@ -1063,7 +1085,20 @@ const AttendanceList: React.FC = () => {
                         age_group: newParticipant.age_group,
                         pwd: newParticipant.pwd,
                         indigenous_people: newParticipant.indigenous_people
-                    }).eq('participant_id', participantId);
+                    };
+
+                   await supabase.from('participants').update(participantPayload).eq('participant_id', participantId);
+
+                   logAudit({
+                       actor: user,
+                       action: 'Update',
+                       entityType: 'Participant',
+                       entityId: participantId,
+                       entityLabel: formatParticipantOfficialName(participantPayload),
+                       eventId: selectedEvent.event_id,
+                       eventName: selectedEvent.event_name,
+                       changes: diffRecords(existingUser, participantPayload)
+                   });
                } else {
                    // Create
                     const { data: newUser, error: createError } = await supabase
@@ -1223,6 +1258,7 @@ const AttendanceList: React.FC = () => {
           setLogAttendanceOnRegister(false);
           setSendQrOnRegister(true);
           setSelectedParticipantName(null);
+          setSelectedExistingParticipant(null);
           setShowNameChangeConfirm(false);
           setPendingNameChange(null);
           // fetchAttendance will be triggered by supabase real-time channel

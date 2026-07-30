@@ -21,6 +21,7 @@ import CertificateOfAppearancePrint from './features/reports/CertificateOfAppear
 import CertificateOfParticipation from './features/reports/CertificateOfParticipation';
 import ReportEventAccessGuard from './features/reports/ReportEventAccessGuard';
 import UserManagement from './features/users/UserManagement';
+import AuditLogs from './features/audit/AuditLogs';
 import Settings from './features/settings/Settings';
 import NameLookup from './features/lookup/NameLookup';
 import About from './features/about/About';
@@ -101,6 +102,13 @@ const App: React.FC = () => {
           <Route path="/users" element={
             <ProtectedRoute requiredPermission="MANAGE_USERS">
               <Layout><UserManagement /></Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* Audit Logs - Requires VIEW_AUDIT_LOGS (Admin only) */}
+          <Route path="/audit-logs" element={
+            <ProtectedRoute requiredPermission="VIEW_AUDIT_LOGS">
+              <Layout><AuditLogs /></Layout>
             </ProtectedRoute>
           } />
 

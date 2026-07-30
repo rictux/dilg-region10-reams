@@ -9,7 +9,8 @@ export type Permission =
   | 'SCAN_QR'             // Access Scanner
   | 'VIEW_REPORTS'        // Access Reports
   | 'MANAGE_USERS'        // Manage users
-  | 'MANAGE_CERTIFICATE_SETTINGS'; // Manage certificate signatory/template settings
+  | 'MANAGE_CERTIFICATE_SETTINGS' // Manage certificate signatory/template settings
+  | 'VIEW_AUDIT_LOGS';    // Read the record-level audit trail
 
 export const PERMISSIONS = {
   VIEW_DASHBOARD: 'VIEW_DASHBOARD' as Permission,
@@ -21,6 +22,7 @@ export const PERMISSIONS = {
   VIEW_REPORTS: 'VIEW_REPORTS' as Permission,
   MANAGE_USERS: 'MANAGE_USERS' as Permission,
   MANAGE_CERTIFICATE_SETTINGS: 'MANAGE_CERTIFICATE_SETTINGS' as Permission,
+  VIEW_AUDIT_LOGS: 'VIEW_AUDIT_LOGS' as Permission,
 };
 
 // Default configuration. In a full backend implementation, this could be stored in the DB.
@@ -34,7 +36,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'SCAN_QR',
     'VIEW_REPORTS',
     'MANAGE_USERS',
-    'MANAGE_CERTIFICATE_SETTINGS'
+    'MANAGE_CERTIFICATE_SETTINGS',
+    'VIEW_AUDIT_LOGS' // Admin only — the audit trail covers every office
   ],
   'EventManager': [
     'VIEW_DASHBOARD',

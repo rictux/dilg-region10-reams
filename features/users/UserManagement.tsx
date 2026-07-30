@@ -8,6 +8,7 @@ import { Trash2, UserPlus, Shield, CheckCircle, XCircle, Search, Mail, Briefcase
 import { format } from 'date-fns';
 import bcrypt from 'bcryptjs';
 import ParticipantsList from './ParticipantsList';
+import { diffRecords, logAudit, sanitizeSnapshot } from '../../lib/auditLog';
 
 // Extend User type locally to include joined office data
 type UserLoginActivity = {
@@ -237,7 +238,17 @@ const UserManagement: React.FC = () => {
     try {
         const { error } = await supabase.from('users').delete().eq('user_id', userToDelete.user_id);
         if (error) throw error;
-        
+
+        // Hard delete — the snapshot is the only remaining record of this account.
+        logAudit({
+            actor: currentUser,
+            action: 'Delete',
+            entityType: 'User',
+            entityId: userToDelete.user_id,
+            entityLabel: userToDelete.full_name,
+            snapshot: sanitizeSnapshot(userToDelete)
+        });
+
         setUsers(users.filter(u => u.user_id !== userToDelete.user_id));
         setShowDeleteModal(false);
         setUserToDelete(null);
@@ -343,6 +354,17 @@ const UserManagement: React.FC = () => {
               const { error } = await updateQuery;
 
               if (error) throw error;
+
+              // diffRecords redacts password_hash to a "changed" marker.
+              const previousUser = users.find((u) => u.user_id === editingId) || null;
+              logAudit({
+                  actor: currentUser,
+                  action: 'Update',
+                  entityType: 'User',
+                  entityId: editingId,
+                  entityLabel: updates.full_name || previousUser?.full_name || null,
+                  changes: diffRecords(previousUser, updates)
+              });
 
           } else {
               if (!formData.password || formData.password.length < 4) {

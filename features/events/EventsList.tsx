@@ -21,6 +21,8 @@ import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents, isEventOwnerOffice } 
 import { sendParticipantQrById } from '../../lib/emailService';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 import { canvasToPdfBlob, PAGE_SIZES } from '../../lib/canvasPdf';
+import { diffRecords, logAudit, sanitizeSnapshot } from '../../lib/auditLog';
+import { formatParticipantOfficialName } from '../../lib/participantName';
 
 type ParticipantFormData = {
   f_name: string;
@@ -175,6 +177,10 @@ const EventsList: React.FC = () => {
   const [sendQrOnRegister, setSendQrOnRegister] = useState(true);
   // QR email can only be sent when the email field holds a valid address.
   const canSendQrEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newParticipant.email.trim());
+
+  // The existing participant row picked from the name suggestions, kept so the
+  // audit trail can diff against it when the Add form updates that record.
+  const [selectedExistingParticipant, setSelectedExistingParticipant] = useState<Participant | null>(null);
 
   // Name change confirmation
   const [selectedParticipantName, setSelectedParticipantName] = useState<{ f_name: string; l_name: string } | null>(null);
@@ -887,19 +893,50 @@ const EventsList: React.FC = () => {
       let error;
       if (editingEventId) {
           // Update
+          const previousEvent = events.find((event) => event.event_id === editingEventId) || null;
           const { error: updateError } = await supabase
             .from('events')
             .update(payload)
             .eq('event_id', editingEventId);
           error = updateError;
+
+          if (!updateError) {
+              // `status` is recomputed by a DB trigger from the dates, so it is not
+              // a user-made change and would otherwise show up as noise.
+              logAudit({
+                  actor: user,
+                  action: 'Update',
+                  entityType: 'Event',
+                  entityId: editingEventId,
+                  entityLabel: payload.event_name,
+                  eventId: editingEventId,
+                  eventName: payload.event_name,
+                  changes: diffRecords(previousEvent, payload, { ignore: ['status'] })
+              });
+          }
       } else {
           // Create
           // Ensure status is 'Scheduled' for new events to satisfy the check constraint
           payload.status = 'Scheduled';
-          const { error: insertError } = await supabase
+          const { data: createdEvent, error: insertError } = await supabase
             .from('events')
-            .insert([payload]);
+            .insert([payload])
+            .select()
+            .single();
           error = insertError;
+
+          if (!insertError) {
+              logAudit({
+                  actor: user,
+                  action: 'Create',
+                  entityType: 'Event',
+                  entityId: createdEvent?.event_id ?? null,
+                  entityLabel: payload.event_name,
+                  eventId: createdEvent?.event_id ?? null,
+                  eventName: payload.event_name,
+                  snapshot: sanitizeSnapshot(createdEvent)
+              });
+          }
       }
 
       if (!error) {
@@ -1042,9 +1079,10 @@ const EventsList: React.FC = () => {
       if (!targetEvent || !canDeleteEventRecord(targetEvent)) return;
       
       const deletedEventId = eventToDelete;
+      const isPermanentDelete = eventView === 'deleted' && isAdmin;
       setIsDeleting(true);
       try {
-          const { error } = eventView === 'deleted' && isAdmin
+          const { error } = isPermanentDelete
             ? await supabase
                 .from('events')
                 .delete()
@@ -1059,6 +1097,20 @@ const EventsList: React.FC = () => {
                 .eq('event_id', deletedEventId)
                 .is('deleted_at', null);
           if (error) throw error;
+
+          logAudit({
+              actor: user,
+              action: isPermanentDelete ? 'PermanentDelete' : 'Delete',
+              entityType: 'Event',
+              entityId: deletedEventId,
+              entityLabel: targetEvent.event_name,
+              // A permanently deleted event cannot be referenced — the FK would be
+              // nulled anyway, so keep only the name snapshot.
+              eventId: isPermanentDelete ? null : deletedEventId,
+              eventName: targetEvent.event_name,
+              snapshot: sanitizeSnapshot(targetEvent),
+              reason: targetEvent.delete_reason ?? null
+          });
 
           setEvents((prevEvents) => prevEvents.filter((event) => event.event_id !== deletedEventId));
           setOpenActionMenuId(null);
@@ -1080,6 +1132,7 @@ const EventsList: React.FC = () => {
       if (!isAdmin) return;
 
       e.stopPropagation();
+      const targetEvent = events.find((event) => event.event_id === eventId);
       setIsDeleting(true);
       try {
           const { error } = await supabase
@@ -1093,6 +1146,16 @@ const EventsList: React.FC = () => {
             .not('deleted_at', 'is', null);
 
           if (error) throw error;
+
+          logAudit({
+              actor: user,
+              action: 'Restore',
+              entityType: 'Event',
+              entityId: eventId,
+              entityLabel: targetEvent?.event_name ?? null,
+              eventId,
+              eventName: targetEvent?.event_name ?? null
+          });
 
           setEvents((prevEvents) => prevEvents.filter((event) => event.event_id !== eventId));
           setOpenActionMenuId(null);
@@ -1139,6 +1202,7 @@ const EventsList: React.FC = () => {
       setSuggestions([]);
       setShowSuggestions(false);
       setSelectedParticipantName(null);
+      setSelectedExistingParticipant(null);
       setShowNameChangeConfirm(false);
       setPendingNameChange(null);
   };
@@ -1152,6 +1216,7 @@ const EventsList: React.FC = () => {
           participant_id: null
       }));
 
+      setSelectedExistingParticipant(null);
       setShowNameChangeConfirm(false);
       setPendingNameChange(null);
       setSelectedParticipantName(null);
@@ -1180,11 +1245,17 @@ const EventsList: React.FC = () => {
   const confirmRemoveParticipant = async () => {
       if (!selectedEvent || !participantToDelete) return;
       
+      const removedRecord = viewingParticipants.find((record) => record.participant_id === participantToDelete) || null;
       setIsDeleting(true);
       try {
           // Attempt to delete. DB constraints might prevent this if attendance logs exist and cascade isn't set.
           // Ideally, we would delete attendance logs first or handle the error.
-          await supabase.from('attendance_logs').delete().eq('event_id', selectedEvent.event_id).eq('participant_id', participantToDelete);
+          const { data: removedAttendance } = await supabase
+            .from('attendance_logs')
+            .delete()
+            .eq('event_id', selectedEvent.event_id)
+            .eq('participant_id', participantToDelete)
+            .select('attendance_id');
 
           const { error } = await supabase
             .from('event_participants')
@@ -1193,7 +1264,23 @@ const EventsList: React.FC = () => {
             .eq('participant_id', participantToDelete);
 
           if (error) throw error;
-          
+
+          logAudit({
+              actor: user,
+              action: 'Delete',
+              entityType: 'EventParticipant',
+              entityId: participantToDelete,
+              entityLabel: removedRecord?.participants?.full_name ?? null,
+              eventId: selectedEvent.event_id,
+              eventName: selectedEvent.event_name,
+              snapshot: {
+                  ...(sanitizeSnapshot(removedRecord) || {}),
+                  // Removing a registration also discards that person's scans for
+                  // this event; record how many so the loss is visible in the trail.
+                  attendance_logs_deleted: removedAttendance?.length ?? 0
+              }
+          });
+
           // Refresh happens via realtime subscription or we can force it
           fetchEventParticipants(selectedEvent.event_id);
           setParticipantToDelete(null); // Close modal
@@ -1206,7 +1293,9 @@ const EventsList: React.FC = () => {
 
   const handleUpdateRole = async () => {
       if (!editingRole || !selectedEvent) return;
-      
+
+      const previousRecord = viewingParticipants.find((record) => record.participant_id === editingRole.participantId) || null;
+
       try {
           const { error } = await supabase
               .from('event_participants')
@@ -1215,7 +1304,18 @@ const EventsList: React.FC = () => {
               .eq('participant_id', editingRole.participantId);
 
           if (error) throw error;
-          
+
+          logAudit({
+              actor: user,
+              action: 'Update',
+              entityType: 'EventParticipant',
+              entityId: editingRole.participantId,
+              entityLabel: previousRecord?.participants?.full_name ?? null,
+              eventId: selectedEvent.event_id,
+              eventName: selectedEvent.event_name,
+              changes: diffRecords(previousRecord, { role: editingRole.role })
+          });
+
           setEditingRole(null);
           // fetchEventParticipants triggered by subscription
       } catch (err: any) {
@@ -1305,6 +1405,7 @@ const EventsList: React.FC = () => {
           participant_id: p.participant_id
       }));
       setSelectedParticipantName({ f_name: p.f_name || '', l_name: p.l_name || '' });
+      setSelectedExistingParticipant(p);
       setSuggestions([]);
       setShowSuggestions(false);
   };
@@ -1545,13 +1646,25 @@ const EventsList: React.FC = () => {
 
              if (updateError) throw updateError;
 
+             logAudit({
+                 actor: user,
+                 action: 'Update',
+                 entityType: 'Participant',
+                 entityId: participantId,
+                 entityLabel: formatParticipantOfficialName(submission.participantPayload),
+                 eventId: selectedEvent.event_id,
+                 eventName: selectedEvent.event_name,
+                 changes: diffRecords(selectedExistingParticipant, submission.participantPayload)
+             });
+
           } else if (submission.participantPayload.email) {
+               // Full row (not just the id) so an update here can be diffed for the audit trail.
                const { data: existingUser } = await supabase
                 .from('participants')
-                .select('participant_id')
+                .select('*')
                 .eq('email', submission.participantPayload.email)
                 .single();
-                
+
                if (existingUser) {
                    participantId = existingUser.participant_id;
                    // Update details
@@ -1561,6 +1674,17 @@ const EventsList: React.FC = () => {
                     .eq('participant_id', participantId);
 
                    if (updateError) throw updateError;
+
+                   logAudit({
+                       actor: user,
+                       action: 'Update',
+                       entityType: 'Participant',
+                       entityId: participantId,
+                       entityLabel: formatParticipantOfficialName(submission.participantPayload),
+                       eventId: selectedEvent.event_id,
+                       eventName: selectedEvent.event_name,
+                       changes: diffRecords(existingUser, submission.participantPayload)
+                   });
                } else {
                    // Create
                     const { data: newUser, error: createError } = await supabase
@@ -1677,6 +1801,8 @@ const EventsList: React.FC = () => {
 
       setIsAddingParticipant(true);
 
+      const participantLabel = formatParticipantOfficialName(submission.participantPayload);
+
       try {
           const { error: participantError } = await supabase
             .from('participants')
@@ -1685,6 +1811,20 @@ const EventsList: React.FC = () => {
 
           if (participantError) throw participantError;
 
+          // The participant profile and their registration for this event are
+          // separate records, so they get one audit row each — either can be
+          // skipped when its own fields did not change.
+          logAudit({
+              actor: user,
+              action: 'Update',
+              entityType: 'Participant',
+              entityId: editingParticipantRecord.participant_id,
+              entityLabel: participantLabel,
+              eventId: selectedEvent.event_id,
+              eventName: selectedEvent.event_name,
+              changes: diffRecords(editingParticipantRecord.participants, submission.participantPayload)
+          });
+
           const { error: registrationError } = await supabase
             .from('event_participants')
             .update(submission.eventParticipantPayload)
@@ -1692,6 +1832,17 @@ const EventsList: React.FC = () => {
             .eq('participant_id', editingParticipantRecord.participant_id);
 
           if (registrationError) throw registrationError;
+
+          logAudit({
+              actor: user,
+              action: 'Update',
+              entityType: 'EventParticipant',
+              entityId: editingParticipantRecord.participant_id,
+              entityLabel: participantLabel,
+              eventId: selectedEvent.event_id,
+              eventName: selectedEvent.event_name,
+              changes: diffRecords(editingParticipantRecord, submission.eventParticipantPayload)
+          });
 
           setParticipantModalView('list');
           resetParticipantForm();

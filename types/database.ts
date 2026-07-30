@@ -189,3 +189,32 @@ export interface AnnouncementView {
   user_id: number;
   viewed_at: string;
 }
+
+export type AuditAction = 'Create' | 'Update' | 'Delete' | 'PermanentDelete' | 'Restore';
+
+export type AuditEntityType = 'Event' | 'EventParticipant' | 'Participant' | 'User';
+
+/** One field that changed, as stored in `audit_logs.changes`. */
+export interface AuditFieldChange {
+  from: unknown;
+  to: unknown;
+}
+
+export interface AuditLog {
+  audit_id: number;
+  /** NULL once the acting user is deleted — actor_name/actor_role keep the trail readable. */
+  actor_user_id?: number | null;
+  actor_name?: string | null;
+  actor_role?: string | null;
+  action: AuditAction;
+  entity_type: AuditEntityType;
+  entity_id?: number | null;
+  entity_label?: string | null;
+  event_id?: number | null;
+  event_name?: string | null;
+  changes?: Record<string, AuditFieldChange> | null;
+  snapshot?: Record<string, unknown> | null;
+  reason?: string | null;
+  user_agent?: string | null;
+  created_at: string;
+}
