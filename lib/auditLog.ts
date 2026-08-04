@@ -163,6 +163,7 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
   giveaways_open: 'Giveaway Selection Open',
   registration_open: 'Registration Open',
   auto_attendance_on_registration: 'Auto Attendance on Registration',
+  has_principal_delegates: 'Principal / Representative Delegates',
   cop_primary_signatory_id: 'COP Primary Signatory',
   cop_secondary_signatory_id: 'COP Secondary Signatory',
   deleted_at: 'Deleted At',
@@ -187,6 +188,7 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
 
   // event_participants
   role: 'Role',
+  delegate_type: 'Delegate Type',
   needs_accommodation: 'Needs Accommodation',
   accommodation_pax: 'Accommodation Pax',
   date_accommodation: 'Accommodation Dates',

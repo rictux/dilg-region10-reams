@@ -2,9 +2,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Event, Participant, RefLocation } from '../../types/database';
+import { DelegateType, Event, Participant, RefLocation } from '../../types/database';
 import QRCode from 'react-qr-code';
-import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock, Landmark, Download, Info, Gift } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock, Landmark, Download, Info, Gift, Star, UserCheck } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import { toPng } from 'html-to-image';
 import { toast } from 'sonner';
@@ -123,6 +123,7 @@ const EventRegistration: React.FC = () => {
     pwd: 'No',
     indigenous_people: 'No',
     role: 'Delegate',
+    delegate_type: '' as '' | DelegateType,
     needs_accommodation: false,
     accommodation_pax: 0,
     date_accommodation: [] as string[],
@@ -346,6 +347,11 @@ const EventRegistration: React.FC = () => {
 
     if (!AGE_GROUP_OPTIONS.some((option) => option === formData.age_group)) {
       setError("Please select your age group.");
+      return null;
+    }
+
+    if (event?.has_principal_delegates && !formData.delegate_type) {
+      setError("Please select whether you are attending as the Principal or as a Representative.");
       return null;
     }
 
@@ -699,6 +705,7 @@ const EventRegistration: React.FC = () => {
           participant_id: participantId,
           registration_status: 'Registered',
           role: 'Delegate',
+          delegate_type: event.has_principal_delegates ? formData.delegate_type || null : null,
           needs_accommodation: formData.needs_accommodation,
           accommodation_pax: formData.needs_accommodation ? formData.accommodation_pax : 0,
           date_accommodation: formData.needs_accommodation && event.has_accommodation ? normalizedAccommodationDates : null,
@@ -1329,6 +1336,40 @@ const EventRegistration: React.FC = () => {
                                 />
                             </div>
                         </div>
+
+                        {/* Principal vs Representative — only for events that seat principals */}
+                        {event.has_principal_delegates && (
+                            <div className="pt-2">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Are you attending as<RequiredMark /></label>
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    {([
+                                        { value: 'Principal' as DelegateType, icon: Star, title: 'Principal', hint: 'The official invited to this event' },
+                                        { value: 'Representative' as DelegateType, icon: UserCheck, title: 'Representative', hint: 'Attending in the Principal\'s place' }
+                                    ]).map(({ value, icon: Icon, title, hint }) => {
+                                        const active = formData.delegate_type === value;
+                                        return (
+                                            <label
+                                                key={value}
+                                                className={`flex-1 cursor-pointer border rounded-lg p-3 flex items-start gap-3 transition-all ${active ? 'border-amber-500 bg-amber-50 text-amber-800' : 'border-slate-200 hover:bg-slate-50'}`}
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    name="delegate_type"
+                                                    className="hidden"
+                                                    checked={active}
+                                                    onChange={() => setFormData({ ...formData, delegate_type: value })}
+                                                />
+                                                <Icon size={20} className="mt-0.5 shrink-0" />
+                                                <span>
+                                                    <span className="block font-medium">{title}</span>
+                                                    <span className={`block text-xs mt-0.5 ${active ? 'text-amber-700' : 'text-slate-500'}`}>{hint}</span>
+                                                </span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Office vs LGU Selection */}
                         <div className="pt-2">

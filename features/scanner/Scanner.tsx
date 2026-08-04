@@ -19,13 +19,24 @@ import {
   Gift,
   Pause,
   Play,
-  Loader2
+  Loader2,
+  Star,
+  Camera
 } from 'lucide-react';
-import { Event, GiveawayItem } from '../../types/database';
+import { toast } from 'sonner';
+import { DelegateType, Event, GiveawayItem, PrincipalArrivalSource } from '../../types/database';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { SCAN_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
+import { readDelegateType } from '../../lib/delegates';
+import { diffRecords, logAudit } from '../../lib/auditLog';
+import {
+  announcePrincipalArrival,
+  broadcastPrincipalArrival,
+  primeArrivalAudio,
+  requestArrivalNotifications
+} from '../../lib/principalArrival';
 
 type ScanMode = 'attendance' | 'giveaway';
 
@@ -36,6 +47,7 @@ interface RecentScan {
     status: 'Valid' | 'Invalid' | 'Duplicate' | 'Offline-Saved';
     timestamp: Date;
     message: string;
+    delegateType?: DelegateType | null;
 }
 
 interface OfflineScanItem {
@@ -56,6 +68,7 @@ interface ParticipantCache {
         full_name: string;
         position: string;
         office: string;
+        delegate_type: DelegateType | null;
     };
 }
 
@@ -64,6 +77,25 @@ interface ParticipantDetails {
     position: string;
     office: string;
     photo?: string;
+    participantId?: number;
+    delegateType?: DelegateType | null;
+}
+
+interface CapabilityRange {
+    min: number;
+    max: number;
+    step: number;
+}
+
+// What the running camera track actually lets us change. `focusMode` /
+// `focusDistance` / `zoom` are non-standard MediaStream constraints: Chrome and
+// Edge expose them on many phone cameras, and almost never on desktop webcams,
+// so everything here is detected at runtime rather than assumed.
+interface CameraControlSupport {
+    zoom: CapabilityRange | null;
+    focusDistance: CapabilityRange | null;
+    supportsManualFocus: boolean;
+    supportsContinuousFocus: boolean;
 }
 
 interface GiveawayDisplayItem {
@@ -105,6 +137,13 @@ const Scanner: React.FC = () => {
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
   const [focusBoxSize, setFocusBoxSize] = useState(280);
 
+  // Camera focus / zoom controls, populated once the track is live.
+  const [cameraControls, setCameraControls] = useState<CameraControlSupport | null>(null);
+  const [zoomValue, setZoomValue] = useState<number | null>(null);
+  const [focusDistanceValue, setFocusDistanceValue] = useState<number | null>(null);
+  const [manualFocusEnabled, setManualFocusEnabled] = useState(false);
+  const [showCameraControls, setShowCameraControls] = useState(false);
+
   // Auto-Registration Modal State
   const [showAutoRegModal, setShowAutoRegModal] = useState(false);
   const [autoRegStep, setAutoRegStep] = useState<'confirm' | 'details'>('confirm');
@@ -113,9 +152,11 @@ const Scanner: React.FC = () => {
     needs_accommodation: false,
     date_accommodation: [] as string[],
     need_ca: false,
+    delegate_type: '' as '' | DelegateType,
     giveaway_selections: {} as Record<string, string | boolean>
   });
   const [autoRegSubmitting, setAutoRegSubmitting] = useState(false);
+  const [isPromoting, setIsPromoting] = useState(false);
   const [autoRegEventId, setAutoRegEventId] = useState<number | null>(null);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -124,6 +165,7 @@ const Scanner: React.FC = () => {
   
   // Ref to hold selectedEventId to avoid restarting scanner on change
   const eventIdRef = useRef(selectedEventId);
+  const selectedEventRef = useRef<Event | null>(null);
   const scanModeRef = useRef<ScanMode>(scanMode);
   const sessionRef = useRef<'AM' | 'PM'>(session);
   const isProcessingRef = useRef(false);
@@ -154,6 +196,11 @@ const Scanner: React.FC = () => {
   const selectedEvent = events.find((event) => event.event_id.toString() === selectedEventId);
   const selectedEventGiveaways = selectedEvent?.giveaways || [];
   const selectedEventHasGiveaways = selectedEventGiveaways.length > 0;
+  const selectedEventHasPrincipals = Boolean(selectedEvent?.has_principal_delegates);
+  // False on cameras that expose no adjustable focus/zoom — typically desktop webcams.
+  const hasCameraAdjustments = Boolean(
+    cameraControls?.zoom || (cameraControls?.supportsManualFocus && cameraControls?.focusDistance)
+  );
 
   const isSessionEnabled = (sessionOption: 'AM' | 'PM') => {
     if (!selectedEvent) return false;
@@ -171,6 +218,12 @@ const Scanner: React.FC = () => {
   useEffect(() => {
     scanModeRef.current = scanMode;
   }, [scanMode]);
+
+  // handleScan runs inside the html5-qrcode callback, which holds the closure
+  // from when scanning started — event details have to come through refs.
+  useEffect(() => {
+    selectedEventRef.current = selectedEvent ?? null;
+  }, [selectedEvent]);
 
   useEffect(() => {
     if (scanMode === 'giveaway' && (!selectedEventHasGiveaways || !isOnline)) {
@@ -310,6 +363,8 @@ const Scanner: React.FC = () => {
                 .from('event_participants')
                 .select(`
                     participant_id,
+                    role,
+                    delegate_type,
                     participants (
                         participant_id,
                         participant_code,
@@ -329,7 +384,8 @@ const Scanner: React.FC = () => {
                             participant_id: row.participants.participant_id,
                             full_name: row.participants.full_name,
                             position: row.participants.position,
-                            office: row.participants.office
+                            office: row.participants.office,
+                            delegate_type: readDelegateType(row.role, row.delegate_type)
                         };
                     }
                 });
@@ -442,12 +498,109 @@ const Scanner: React.FC = () => {
       } catch(e) { }
       scannerRef.current = null;
       setScanning(false);
+      // Capabilities belong to the track that just stopped.
+      setCameraControls(null);
+      setShowCameraControls(false);
+      setZoomValue(null);
+      setFocusDistanceValue(null);
+      setManualFocusEnabled(false);
     }
+  };
+
+  const toCapabilityRange = (capability: any): CapabilityRange | null => {
+      if (!capability) return null;
+      const { min, max, step } = capability;
+      if (typeof min !== 'number' || typeof max !== 'number' || !(max > min)) return null;
+      return {
+          min,
+          max,
+          step: typeof step === 'number' && step > 0 ? step : (max - min) / 100
+      };
+  };
+
+  // Reads what this specific camera supports. Called after the track is live,
+  // because capabilities are empty until then.
+  const detectCameraControls = () => {
+      const scanner = scannerRef.current;
+      if (!scanner) return;
+
+      try {
+          const capabilities = scanner.getRunningTrackCapabilities() as any;
+          const settings = scanner.getRunningTrackSettings() as any;
+          const focusModes: string[] = Array.isArray(capabilities?.focusMode) ? capabilities.focusMode : [];
+
+          const support: CameraControlSupport = {
+              zoom: toCapabilityRange(capabilities?.zoom),
+              focusDistance: toCapabilityRange(capabilities?.focusDistance),
+              supportsManualFocus: focusModes.includes('manual'),
+              supportsContinuousFocus: focusModes.includes('continuous')
+          };
+
+          setCameraControls(support);
+          setZoomValue(typeof settings?.zoom === 'number' ? settings.zoom : support.zoom?.min ?? null);
+          setFocusDistanceValue(
+              typeof settings?.focusDistance === 'number' ? settings.focusDistance : support.focusDistance?.min ?? null
+          );
+          setManualFocusEnabled(settings?.focusMode === 'manual');
+      } catch {
+          // Browser exposes no track capabilities at all. Treat it as a
+          // fixed-focus camera so the distance hint still shows.
+          setCameraControls({
+              zoom: null,
+              focusDistance: null,
+              supportsManualFocus: false,
+              supportsContinuousFocus: false
+          });
+      }
+  };
+
+  const applyTrackConstraint = async (constraint: Record<string, unknown>) => {
+      const scanner = scannerRef.current;
+      if (!scanner) return false;
+
+      try {
+          await scanner.applyVideoConstraints({ advanced: [constraint] } as any);
+          return true;
+      } catch {
+          toast.error('This camera rejected that setting.');
+          return false;
+      }
+  };
+
+  const handleZoomChange = (value: number) => {
+      setZoomValue(value);
+      void applyTrackConstraint({ zoom: value });
+  };
+
+  const handleFocusDistanceChange = (value: number) => {
+      setFocusDistanceValue(value);
+      void applyTrackConstraint({ focusMode: 'manual', focusDistance: value });
+  };
+
+  const handleManualFocusToggle = async (enabled: boolean) => {
+      if (enabled) {
+          const target = focusDistanceValue ?? cameraControls?.focusDistance?.min ?? 0;
+          const applied = await applyTrackConstraint({ focusMode: 'manual', focusDistance: target });
+          if (applied) {
+              setManualFocusEnabled(true);
+              setFocusDistanceValue(target);
+          }
+          return;
+      }
+
+      const applied = await applyTrackConstraint({ focusMode: 'continuous' });
+      if (applied) setManualFocusEnabled(false);
   };
 
   const startScanner = async () => {
     if (scannerRef.current) {
         await cleanupScanner();
+    }
+
+    // Both need a user gesture; starting the camera is the one we get.
+    if (selectedEventRef.current?.has_principal_delegates) {
+        primeArrivalAudio();
+        requestArrivalNotifications();
     }
 
     const html5QrCode = new Html5Qrcode(readerId, { 
@@ -485,6 +638,13 @@ const Scanner: React.FC = () => {
         );
         setScanning(true);
         setCameraError(null);
+
+        // Chrome can report empty capabilities for a moment after the track
+        // starts, so probe again once the camera has settled.
+        detectCameraControls();
+        setTimeout(() => {
+            if (scannerRef.current?.isScanning) detectCameraControls();
+        }, 800);
     } catch (err) {
         console.error(err);
         setCameraError("Camera permission denied. Please ensure you are using HTTPS or localhost.");
@@ -539,6 +699,7 @@ const Scanner: React.FC = () => {
           participant_id: scannedParticipant.participant_id,
           registration_status: 'Registered',
           role: 'Delegate',
+          delegate_type: selectedEvent?.has_principal_delegates ? autoRegData.delegate_type || null : null,
           needs_accommodation: autoRegData.needs_accommodation,
           accommodation_pax: autoRegData.needs_accommodation ? 1 : 0,
           date_accommodation: accommodationDates,
@@ -558,9 +719,35 @@ const Scanner: React.FC = () => {
         // Log the attendance after successful auto-registration
         await logScan(autoRegEventId, scannedParticipant.participant_id, 'Valid', deviceScanTime, deviceAttendanceDate, currentSession, 'Auto-Registered');
 
-        processScanResult('Valid', 'Auto-registered successfully', scannedParticipant.full_name, scannedParticipant.position);
+        const registeredType = selectedEvent?.has_principal_delegates
+          ? (autoRegData.delegate_type || null)
+          : null;
+
+        setParticipantDetails({
+          name: scannedParticipant.full_name,
+          position: scannedParticipant.position,
+          office: scannedParticipant.office,
+          participantId: scannedParticipant.participant_id,
+          delegateType: registeredType
+        });
+        processScanResult(
+          'Valid',
+          'Auto-registered successfully',
+          scannedParticipant.full_name,
+          scannedParticipant.position,
+          { delegateType: registeredType }
+        );
         setShowAutoRegModal(false);
         setScannedParticipant(null);
+
+        if (registeredType === 'Principal') {
+          void announceArrival({
+            name: scannedParticipant.full_name,
+            position: scannedParticipant.position,
+            office: scannedParticipant.office,
+            participantId: scannedParticipant.participant_id
+          }, { source: 'AutoRegistered' });
+        }
       }
     } catch (err: any) {
       processScanResult('Invalid', err.message || 'Auto-registration failed', scannedParticipant.full_name, '');
@@ -628,10 +815,27 @@ const Scanner: React.FC = () => {
             setParticipantDetails({
                 name: cachedP.full_name,
                 position: cachedP.position,
-                office: cachedP.office
+                office: cachedP.office,
+                participantId: cachedP.participant_id,
+                delegateType: cachedP.delegate_type
             });
 
-            processScanResult('Offline-Saved', 'Saved locally. Will sync when online.', cachedP.full_name, cachedP.position);
+            processScanResult(
+                'Offline-Saved',
+                'Saved locally. Will sync when online.',
+                cachedP.full_name,
+                cachedP.position,
+                { delegateType: cachedP.delegate_type }
+            );
+
+            if (cachedP.delegate_type === 'Principal') {
+                void announceArrival({
+                    name: cachedP.full_name,
+                    position: cachedP.position,
+                    office: cachedP.office,
+                    participantId: cachedP.participant_id
+                });
+            }
         } else {
             processScanResult('Invalid', 'Participant not found in offline cache.', qrToken);
         }
@@ -650,19 +854,25 @@ const Scanner: React.FC = () => {
             return;
         }
 
-        const participant = {
-            name: partData.full_name,
-            position: partData.position,
-            office: partData.office
-        };
-        setParticipantDetails(participant);
-
         const { data: regData } = await supabase
             .from('event_participants')
-            .select('registration_status, giveaway_selections')
+            .select('registration_status, giveaway_selections, role, delegate_type')
             .eq('event_id', eventId)
             .eq('participant_id', partData.participant_id)
             .single();
+
+        const delegateType = selectedEventRef.current?.has_principal_delegates
+            ? readDelegateType(regData?.role, regData?.delegate_type)
+            : null;
+
+        const participant = {
+            name: partData.full_name,
+            position: partData.position,
+            office: partData.office,
+            participantId: partData.participant_id,
+            delegateType
+        };
+        setParticipantDetails(participant);
 
         if (!regData || regData.registration_status !== 'Registered') {
             if (currentMode === 'attendance') {
@@ -673,6 +883,7 @@ const Scanner: React.FC = () => {
                   needs_accommodation: false,
                   date_accommodation: [],
                   need_ca: false,
+                  delegate_type: '',
                   giveaway_selections: {}
                 });
                 setAutoRegEventId(eventId);
@@ -703,12 +914,12 @@ const Scanner: React.FC = () => {
 
         if (existingLog) {
             if (currentSession === 'AM') {
-                processScanResult('Duplicate', `Already scanned for ${currentSession}.`, participant.name, participant.position);
+                processScanResult('Duplicate', `Already scanned for ${currentSession}.`, participant.name, participant.position, { delegateType });
                 return;
             } else {
                 const { error: updateError } = await supabase
                     .from('attendance_logs')
-                    .update({ 
+                    .update({
                         scan_time: deviceScanTime,
                         scanner_device: deviceTokenRef.current,
                         remarks: 'Updated PM Time'
@@ -716,17 +927,142 @@ const Scanner: React.FC = () => {
                     .eq('attendance_id', existingLog.attendance_id);
 
                 if (updateError) throw updateError;
-                processScanResult('Valid', 'PM Time Updated', participant.name, participant.position);
+                processScanResult('Valid', 'PM Time Updated', participant.name, participant.position, { delegateType });
                 return;
             }
         }
 
         await logScan(eventId, partData.participant_id, 'Valid', deviceScanTime, deviceAttendanceDate, currentSession, 'Success');
-        processScanResult('Valid', 'Attendance Recorded', participant.name, participant.position);
+        processScanResult('Valid', 'Attendance Recorded', participant.name, participant.position, { delegateType });
+
+        if (delegateType === 'Principal') {
+            void announceArrival(participant);
+        }
 
     } catch (err: any) {
         processScanResult('Invalid', err.message || 'Scan failed', 'Unknown', '', { autoReset: currentMode !== 'giveaway' });
     }
+  };
+
+  // Every arrival path funnels through here: announce on this device, persist the
+  // arrival, then broadcast to everyone else watching the event.
+  const announceArrival = async (
+      participant: {
+          name: string;
+          position?: string | null;
+          office?: string | null;
+          participantId?: number | null;
+      },
+      options: { source?: PrincipalArrivalSource } = {}
+  ) => {
+      const event = selectedEventRef.current;
+      if (!event) return;
+
+      const source = options.source ?? 'Scan';
+      const arrivedAt = new Date();
+
+      const payload = {
+          event_id: event.event_id,
+          event_name: event.event_name,
+          participant_name: participant.name,
+          position: participant.position ?? null,
+          office: participant.office ?? null,
+          at: arrivedAt.toISOString(),
+          promoted: source === 'Promoted',
+          scanned_by: user?.user_id ?? null
+      };
+
+      // The scanner's own result card already announces this arrival on screen.
+      announcePrincipalArrival(payload, { suppressModal: true });
+
+      // Offline arrivals still announce on this device; there is nothing to log
+      // or broadcast to until the socket is back.
+      if (!navigator.onLine) return;
+
+      await Promise.all([
+          logPrincipalArrival(event.event_id, participant.participantId, arrivedAt, source),
+          broadcastPrincipalArrival(payload, {
+              officeId: event.organize_by,
+              eventId: event.event_id
+          })
+      ]);
+  };
+
+  const logPrincipalArrival = async (
+      eventId: number,
+      participantId: number | null | undefined,
+      arrivedAt: Date,
+      source: PrincipalArrivalSource
+  ) => {
+      if (!participantId) return;
+
+      const { error } = await supabase.from('principal_arrival_logs').insert({
+          event_id: eventId,
+          participant_id: participantId,
+          user_id: user?.user_id ?? null,
+          arrived_at: arrivedAt.toISOString(),
+          arrival_date: getDeviceDateString(arrivedAt),
+          source,
+          scanner_device: deviceTokenRef.current,
+          remarks: source === 'Promoted'
+              ? 'Marked as Principal at the scanner'
+              : source === 'AutoRegistered'
+                  ? 'Registered and arrived at the scanner'
+                  : null
+      });
+
+      // 23505 is the once-per-day unique index: the same Principal re-scanned.
+      if (error && (error as any).code !== '23505') {
+          console.warn('[principal-arrival] could not log arrival', error);
+      }
+  };
+
+  // Scan-time correction: a Representative turned out to be the Principal.
+  const promoteToPrincipal = async () => {
+      const event = selectedEventRef.current;
+      const details = participantDetails;
+      if (!event || !details?.participantId || isPromoting) return;
+
+      setIsPromoting(true);
+      try {
+          const previous = { delegate_type: details.delegateType ?? null };
+          const { error } = await supabase
+              .from('event_participants')
+              .update({ delegate_type: 'Principal' })
+              .eq('event_id', event.event_id)
+              .eq('participant_id', details.participantId);
+
+          if (error) throw error;
+
+          logAudit({
+              actor: user,
+              action: 'Update',
+              entityType: 'EventParticipant',
+              entityId: details.participantId,
+              entityLabel: details.name,
+              eventId: event.event_id,
+              eventName: event.event_name,
+              reason: 'Promoted to Principal at the scanner',
+              changes: diffRecords(previous, { delegate_type: 'Principal' })
+          });
+
+          setParticipantDetails({ ...details, delegateType: 'Principal' });
+          setParticipantCache((prev) => {
+              const code = Object.keys(prev).find((key) => prev[key].participant_id === details.participantId);
+              if (!code) return prev;
+              return { ...prev, [code]: { ...prev[code], delegate_type: 'Principal' } };
+          });
+          setRecentScans((prev) => prev.map((scan, index) => (
+              index === 0 ? { ...scan, delegateType: 'Principal' as DelegateType } : scan
+          )));
+          setResultMessage('Marked as Principal');
+
+          await announceArrival(details, { source: 'Promoted' });
+      } catch (err: any) {
+          toast.error('Could not mark as Principal: ' + (err?.message || 'Unknown error'));
+      } finally {
+          setIsPromoting(false);
+      }
   };
 
   const logScan = async (eventId: number, participantId: number, status: 'Valid' | 'Invalid' | 'Duplicate', scanTimeStr: string, attendanceDate: string, scanSession: 'AM' | 'PM', notes?: string) => {
@@ -905,11 +1241,16 @@ const Scanner: React.FC = () => {
       message: string,
       name: string = 'Unknown',
       position: string = '',
-      options: { autoReset?: boolean } = {}
+      options: { autoReset?: boolean; delegateType?: DelegateType | null } = {}
   ) => {
+      // Principal and Representative cards are held until acknowledged: the first
+      // so the arrival isn't cleared before anyone reads it, the second so there
+      // is time to correct it to Principal. Every other scan keeps the 2s flow.
+      const autoReset = options.delegateType ? false : options.autoReset;
+
       setScanResult(status);
       setResultMessage(message);
-      setResultRequiresAck(options.autoReset === false);
+      setResultRequiresAck(autoReset === false);
 
       const newScan: RecentScan = {
           id: Date.now().toString(),
@@ -917,7 +1258,8 @@ const Scanner: React.FC = () => {
           position,
           status,
           message,
-          timestamp: new Date()
+          timestamp: new Date(),
+          delegateType: options.delegateType ?? null
       };
       setRecentScans(prev => [newScan, ...prev].slice(0, 20));
 
@@ -930,7 +1272,7 @@ const Scanner: React.FC = () => {
           clearTimeout(resetTimerRef.current);
       }
 
-      if (options.autoReset === false) {
+      if (autoReset === false) {
           resetTimerRef.current = null;
           return;
       }
@@ -1195,6 +1537,87 @@ const Scanner: React.FC = () => {
                                 </div>
                             )}
                             
+                            {/* Camera focus / zoom. Rendered from what the running
+                                track reports, so desktop webcams that expose
+                                nothing get the distance hint instead. */}
+                            {!scanResult && scanning && cameraControls && (
+                                <div className="absolute bottom-3 right-3 z-20 flex w-[min(19rem,calc(100%-1.5rem))] flex-col items-end gap-2">
+                                    {showCameraControls && (
+                                        <div className="w-full rounded-2xl border border-white/15 bg-black/80 p-4 text-white shadow-xl backdrop-blur-md">
+                                            {hasCameraAdjustments ? (
+                                                <div className="space-y-4">
+                                                    {cameraControls.zoom && zoomValue !== null && (
+                                                        <div>
+                                                            <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold uppercase tracking-widest text-white/70">
+                                                                <span>Zoom</span>
+                                                                <span className="font-mono text-white">{zoomValue.toFixed(1)}×</span>
+                                                            </div>
+                                                            <input
+                                                                type="range"
+                                                                min={cameraControls.zoom.min}
+                                                                max={cameraControls.zoom.max}
+                                                                step={cameraControls.zoom.step}
+                                                                value={zoomValue}
+                                                                onChange={(e) => handleZoomChange(Number(e.target.value))}
+                                                                className="w-full accent-[#6255E9]"
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    {cameraControls.supportsManualFocus && cameraControls.focusDistance && (
+                                                        <div>
+                                                            <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold uppercase tracking-widest text-white/70">
+                                                                <span>Focus</span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleManualFocusToggle(!manualFocusEnabled)}
+                                                                    className="rounded-full border border-white/25 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white transition-colors hover:bg-white/10"
+                                                                >
+                                                                    {manualFocusEnabled ? 'Manual' : 'Auto'}
+                                                                </button>
+                                                            </div>
+                                                            <input
+                                                                type="range"
+                                                                min={cameraControls.focusDistance.min}
+                                                                max={cameraControls.focusDistance.max}
+                                                                step={cameraControls.focusDistance.step}
+                                                                value={focusDistanceValue ?? cameraControls.focusDistance.min}
+                                                                onChange={(e) => handleFocusDistanceChange(Number(e.target.value))}
+                                                                disabled={!manualFocusEnabled}
+                                                                className="w-full accent-[#6255E9] disabled:opacity-40"
+                                                            />
+                                                            <p className="mt-1 text-[10px] leading-relaxed text-white/50">
+                                                                {manualFocusEnabled
+                                                                    ? 'Drag until the QR code looks sharp.'
+                                                                    : 'Switch to Manual to set focus yourself.'}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-1.5">
+                                                    <p className="text-[11px] font-bold uppercase tracking-widest text-white/70">Fixed focus camera</p>
+                                                    <p className="text-xs leading-relaxed text-white/70">
+                                                        This camera exposes no focus or zoom control to the browser. Hold the QR code
+                                                        <span className="font-bold text-white"> 25–40&nbsp;cm </span>
+                                                        away, keep it flat and well lit, and avoid glare on phone screens.
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCameraControls((prev) => !prev)}
+                                        className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/70 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white backdrop-blur-md transition-colors hover:bg-black/90"
+                                    >
+                                        <Camera size={13} />
+                                        {hasCameraAdjustments ? 'Camera' : 'Focus help'}
+                                    </button>
+                                </div>
+                            )}
+
                             {!scanResult && !scanning && !loadingEvents && (
                                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-6 text-center">
                                     {cameraPaused && selectedEventId ? (
@@ -1282,13 +1705,48 @@ const Scanner: React.FC = () => {
                         
                         <p className="text-[#7C7A72] font-medium mb-6">{resultMessage}</p>
 
+                        {participantDetails?.delegateType === 'Principal' && (
+                            <div className="mb-4 w-full rounded-2xl border-2 border-amber-400 bg-amber-50 px-4 py-3 text-center">
+                                <div className="flex items-center justify-center gap-2 text-amber-700">
+                                    <Star size={18} className="fill-amber-500 text-amber-500" />
+                                    <span className="text-sm font-black uppercase tracking-widest">Principal Delegate</span>
+                                </div>
+                                <p className="mt-1 text-xs font-medium text-amber-800">
+                                    {participantDetails.name} has arrived at this event.
+                                </p>
+                            </div>
+                        )}
+
                         {participantDetails && (scanResult === 'Valid' || scanResult === 'Duplicate' || scanResult === 'Offline-Saved' || resultRequiresAck) && (
                             <div className="w-full bg-[#F5F3EE] rounded-xl p-4 border border-[#EDEAE2]">
                                 <p className="text-xs font-bold text-[#9A9890] uppercase tracking-widest mb-1">Participant</p>
                                 <p className="text-xl font-bold text-[#111110] leading-tight">{participantDetails.name}</p>
                                 <p className="text-[#4B3FE4] font-medium text-sm mt-1">{participantDetails.position}</p>
                                 <p className="text-[#7C7A72] text-xs">{participantDetails.office}</p>
+                                {participantDetails.delegateType === 'Representative' && (
+                                    <span className="mt-2 inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-sky-700">
+                                        Representative
+                                    </span>
+                                )}
                             </div>
+                        )}
+
+                        {/* A Representative may turn out to be the Principal after all. */}
+                        {selectedEventHasPrincipals
+                            && participantDetails?.participantId
+                            && participantDetails.delegateType === 'Representative'
+                            && (scanResult === 'Valid' || scanResult === 'Duplicate' || scanResult === 'Offline-Saved')
+                            && scanMode === 'attendance' && (
+                            <button
+                                type="button"
+                                onClick={promoteToPrincipal}
+                                disabled={isPromoting || !isOnline}
+                                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-amber-400 bg-amber-50 px-5 py-3 text-sm font-bold text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                title={!isOnline ? 'Requires an internet connection' : undefined}
+                            >
+                                {isPromoting ? <Loader2 size={16} className="animate-spin" /> : <Star size={16} />}
+                                {isPromoting ? 'Marking…' : 'Mark as Principal'}
+                            </button>
                         )}
 
                         {giveawayClaimDetails && (
@@ -1355,9 +1813,19 @@ const Scanner: React.FC = () => {
                 ) : (
                     <div className="divide-y divide-[#EDEAE2]">
                         {recentScans.map((scan) => (
-                            <div key={scan.id} className="p-4 hover:bg-[#F5F3EE] transition-colors animate-in slide-in-from-left-4 duration-300">
+                            <div
+                                key={scan.id}
+                                className={`p-4 hover:bg-[#F5F3EE] transition-colors animate-in slide-in-from-left-4 duration-300 ${
+                                    scan.delegateType === 'Principal' ? 'border-l-2 border-amber-400 bg-amber-50/50' : ''
+                                }`}
+                            >
                                 <div className="flex justify-between items-start mb-1">
-                                    <p className="font-bold text-[#2A2926] text-sm truncate pr-2">{scan.name}</p>
+                                    <p className="font-bold text-[#2A2926] text-sm truncate pr-2 inline-flex items-center gap-1.5">
+                                        {scan.delegateType === 'Principal' && (
+                                            <Star size={12} className="shrink-0 fill-amber-500 text-amber-500" />
+                                        )}
+                                        <span className="truncate">{scan.name}</span>
+                                    </p>
                                     <span className="text-[10px] text-[#9A9890] font-mono whitespace-nowrap">
                                         {format(scan.timestamp, 'h:mm:ss a')}
                                     </span>
@@ -1421,6 +1889,29 @@ const Scanner: React.FC = () => {
               ) : (
                 <div className="p-6 flex flex-col gap-6 max-h-96 overflow-y-auto">
                   <h3 className="text-lg font-bold text-slate-900">Event Details</h3>
+
+                  {/* Principal / Representative */}
+                  {selectedEvent.has_principal_delegates && (
+                    <div className="space-y-3">
+                      <label className="block text-sm font-semibold text-slate-900">
+                        Attending as
+                      </label>
+                      <div className="flex gap-4">
+                        {(['Principal', 'Representative'] as DelegateType[]).map((type) => (
+                          <label key={type} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="delegate_type"
+                              checked={autoRegData.delegate_type === type}
+                              onChange={() => setAutoRegData(prev => ({ ...prev, delegate_type: type }))}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-sm text-slate-700">{type}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Accommodation */}
                   {selectedEvent.has_accommodation && (

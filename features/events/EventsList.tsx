@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Event, Participant, Office, GiveawayItem, EventAccessRole, EventUserAccess, User } from '../../types/database';
+import { DelegateType, Event, Participant, Office, GiveawayItem, EventAccessRole, EventUserAccess, User } from '../../types/database';
 import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift, Settings, ChevronDown, Hash, Utensils } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
@@ -23,6 +23,12 @@ import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 import { canvasToPdfBlob, PAGE_SIZES } from '../../lib/canvasPdf';
 import { diffRecords, logAudit, sanitizeSnapshot } from '../../lib/auditLog';
 import { formatParticipantOfficialName } from '../../lib/participantName';
+import {
+  DELEGATE_CHIP_CLASS,
+  DELEGATE_TYPES,
+  delegateTypeForRole,
+  readDelegateType
+} from '../../lib/delegates';
 
 type ParticipantFormData = {
   f_name: string;
@@ -32,6 +38,7 @@ type ParticipantFormData = {
   full_name: string;
   email: string;
   role: string;
+  delegate_type: '' | DelegateType;
   office: string;
   mobile_no: string;
   position: string;
@@ -55,6 +62,7 @@ type ParticipantModalRecord = {
   registration_status: string;
   registered_at?: string | null;
   role: string;
+  delegate_type: string | null;
   needs_accommodation: boolean;
   accommodation_pax: number;
   accept_photo_video: boolean;
@@ -90,6 +98,7 @@ const createEmptyParticipantForm = (): ParticipantFormData => ({
   full_name: '',
   email: '',
   role: 'Delegate',
+  delegate_type: '',
   office: '',
   mobile_no: '',
   position: '',
@@ -213,9 +222,10 @@ const EventsList: React.FC = () => {
   const [accommodationFilter, setAccommodationFilter] = useState<'all' | 'with'>('all');
   const [photoConsentFilter, setPhotoConsentFilter] = useState<'all' | 'declined'>('all');
   const [storeConsentFilter, setStoreConsentFilter] = useState<'all' | 'declined'>('all');
-  
+  const [delegateTypeFilter, setDelegateTypeFilter] = useState<'all' | DelegateType>('all');
+
   // Role Editing State
-  const [editingRole, setEditingRole] = useState<{ participantId: number; role: string } | null>(null);
+  const [editingRole, setEditingRole] = useState<{ participantId: number; role: string; delegate_type: string } | null>(null);
 
   // Delete Confirmation State
   const [participantToDelete, setParticipantToDelete] = useState<number | null>(null);
@@ -238,6 +248,7 @@ const EventsList: React.FC = () => {
       has_accommodation: false,
       registration_open: true,
       auto_attendance_on_registration: false,
+      has_principal_delegates: false,
       session: 'All_Day' as const,
       days_accommodation: 0,
       dates_with_accom: [] as string[],
@@ -493,6 +504,7 @@ const EventsList: React.FC = () => {
             registration_status,
             registered_at,
             role,
+            delegate_type,
             needs_accommodation,
             accommodation_pax,
             accept_photo_video,
@@ -762,6 +774,7 @@ const EventsList: React.FC = () => {
           has_accommodation: event.has_accommodation,
           registration_open: event.registration_open,
           auto_attendance_on_registration: event.auto_attendance_on_registration ?? false,
+          has_principal_delegates: event.has_principal_delegates ?? false,
           session: event.session || 'All_Day',
           days_accommodation: event.days_accommodation || 0,
           dates_with_accom: event.dates_with_accom || [],
@@ -1296,10 +1309,18 @@ const EventsList: React.FC = () => {
 
       const previousRecord = viewingParticipants.find((record) => record.participant_id === editingRole.participantId) || null;
 
+      // delegate_type is constrained to Delegate rows, so moving off Delegate must clear it.
+      const nextChanges = {
+          role: editingRole.role,
+          delegate_type: selectedEvent.has_principal_delegates
+              ? delegateTypeForRole(editingRole.role, editingRole.delegate_type)
+              : null
+      };
+
       try {
           const { error } = await supabase
               .from('event_participants')
-              .update({ role: editingRole.role })
+              .update(nextChanges)
               .eq('event_id', selectedEvent.event_id)
               .eq('participant_id', editingRole.participantId);
 
@@ -1313,7 +1334,7 @@ const EventsList: React.FC = () => {
               entityLabel: previousRecord?.participants?.full_name ?? null,
               eventId: selectedEvent.event_id,
               eventName: selectedEvent.event_name,
-              changes: diffRecords(previousRecord, { role: editingRole.role })
+              changes: diffRecords(previousRecord, nextChanges)
           });
 
           setEditingRole(null);
@@ -1551,6 +1572,9 @@ const EventsList: React.FC = () => {
           },
           eventParticipantPayload: {
               role: newParticipant.role,
+              delegate_type: selectedEvent.has_principal_delegates
+                ? delegateTypeForRole(newParticipant.role, newParticipant.delegate_type)
+                : null,
               needs_accommodation: selectedEvent.has_accommodation ? newParticipant.needs_accommodation : false,
               accommodation_pax: selectedEvent.has_accommodation && newParticipant.needs_accommodation ? Math.max(1, newParticipant.accommodation_pax) : 0,
               accept_photo_video: newParticipant.accept_photo_video,
@@ -1605,6 +1629,7 @@ const EventsList: React.FC = () => {
           full_name: participant.full_name || '',
           email: participant.email || '',
           role: record.role || 'Delegate',
+          delegate_type: readDelegateType(record.role, record.delegate_type) || '',
           office: participant.office || '',
           mobile_no: participant.mobile_no || '',
           position: participant.position || '',
@@ -2178,6 +2203,7 @@ const EventsList: React.FC = () => {
       });
 
       const includeAccommodation = !!selectedEvent.has_accommodation;
+      const includeDelegateType = !!selectedEvent.has_principal_delegates;
       const giveaways = selectedEvent.giveaways || [];
 
       const formatGiveawayValue = (item: GiveawayItem, selections: Record<string, string | boolean> | null) => {
@@ -2187,7 +2213,7 @@ const EventsList: React.FC = () => {
       };
 
       // Excel table column names must be unique — dedupe giveaway labels against fixed headers.
-      const usedColumnNames = new Set(['Participant Name', 'Gender', 'Position', 'Office', 'Age Group', 'Mobile Number', 'Email', 'Role', 'Accommodation', 'Photo/Video', 'Data Storage']);
+      const usedColumnNames = new Set(['Participant Name', 'Gender', 'Position', 'Office', 'Age Group', 'Mobile Number', 'Email', 'Role', 'Delegate Type', 'Accommodation', 'Photo/Video', 'Data Storage']);
       const giveawayHeaders = giveaways.map((g) => {
           const base = g.label || 'Giveaway';
           let name = base;
@@ -2208,6 +2234,7 @@ const EventsList: React.FC = () => {
           record.participants?.mobile_no || '',
           record.participants?.email || '',
           record.role || 'Delegate',
+          ...(includeDelegateType ? [readDelegateType(record.role, record.delegate_type) || ''] : []),
           ...(includeAccommodation ? [record.needs_accommodation ? 'Yes' : 'No'] : []),
           ...giveaways.map((g) => formatGiveawayValue(g, record.giveaway_selections)),
           record.accept_photo_video ? 'Yes' : 'No',
@@ -2235,6 +2262,7 @@ const EventsList: React.FC = () => {
               { name: 'Mobile Number', filterButton: true },
               { name: 'Email', filterButton: true },
               { name: 'Role', filterButton: true },
+              ...(includeDelegateType ? [{ name: 'Delegate Type', filterButton: true }] : []),
               ...(includeAccommodation ? [{ name: 'Accommodation', filterButton: true }] : []),
               ...giveawayHeaders.map((name) => ({ name, filterButton: true })),
               { name: 'Photo/Video', filterButton: true },
@@ -2243,7 +2271,7 @@ const EventsList: React.FC = () => {
           rows
       });
 
-      [32, 10, 28, 34, 12, 16, 30, 14, ...(includeAccommodation ? [14] : []), ...giveaways.map(() => 16), 14, 14].forEach((w, idx) => {
+      [32, 10, 28, 34, 12, 16, 30, 14, ...(includeDelegateType ? [16] : []), ...(includeAccommodation ? [14] : []), ...giveaways.map(() => 16), 14, 14].forEach((w, idx) => {
           worksheet.getColumn(idx + 1).width = w;
       });
 
@@ -2284,12 +2312,16 @@ const EventsList: React.FC = () => {
       matched = matched.filter(p => !p.store_to_db);
     }
 
+    if (delegateTypeFilter !== 'all') {
+      matched = matched.filter(p => readDelegateType(p.role, p.delegate_type) === delegateTypeFilter);
+    }
+
     return [...matched].sort((a, b) => {
       const aTime = a.registered_at ? new Date(a.registered_at).getTime() : Number.POSITIVE_INFINITY;
       const bTime = b.registered_at ? new Date(b.registered_at).getTime() : Number.POSITIVE_INFINITY;
       return aTime - bTime;
     });
-  }, [viewingParticipants, participantSearchTerm, accommodationFilter, photoConsentFilter, storeConsentFilter]);
+  }, [viewingParticipants, participantSearchTerm, accommodationFilter, photoConsentFilter, storeConsentFilter, delegateTypeFilter]);
 
   // Grouping Logic
   const specialRoles = ['Speaker', 'Secretariat', 'VIP', 'Guest'];
@@ -2302,17 +2334,21 @@ const EventsList: React.FC = () => {
   const needsAccommodationCount = viewingParticipants.filter(p => p.needs_accommodation).length;
   const noPhotoConsentCount = viewingParticipants.filter(p => !p.accept_photo_video).length;
   const noStoreConsentCount = viewingParticipants.filter(p => !p.store_to_db).length;
+  const principalCount = viewingParticipants.filter(p => readDelegateType(p.role, p.delegate_type) === 'Principal').length;
+  const representativeCount = viewingParticipants.filter(p => readDelegateType(p.role, p.delegate_type) === 'Representative').length;
 
   // Participant list segmented filter (single-select)
   const activeParticipantFilter =
     accommodationFilter === 'with' ? 'accommodation'
     : photoConsentFilter === 'declined' ? 'noPhoto'
     : storeConsentFilter === 'declined' ? 'noStore'
+    : delegateTypeFilter !== 'all' ? delegateTypeFilter
     : 'all';
   const applyParticipantFilter = (value: string) => {
     setAccommodationFilter(value === 'accommodation' ? 'with' : 'all');
     setPhotoConsentFilter(value === 'noPhoto' ? 'declined' : 'all');
     setStoreConsentFilter(value === 'noStore' ? 'declined' : 'all');
+    setDelegateTypeFilter(value === 'Principal' || value === 'Representative' ? value : 'all');
   };
   const secretariatCount = viewingParticipants.filter(p => p.role === 'Secretariat').length;
   const speakerCount = viewingParticipants.filter(p => p.role === 'Speaker').length;
@@ -2392,8 +2428,14 @@ const EventsList: React.FC = () => {
 
   const renderParticipantRow = (record: ParticipantModalRecord, index: number) => {
     const isEditing = editingRole?.participantId === record.participant_id;
+    const recordDelegateType = selectedEvent?.has_principal_delegates
+      ? readDelegateType(record.role, record.delegate_type)
+      : null;
     return (
-      <tr key={record.id} className="hover:bg-slate-50/60">
+      <tr
+        key={record.id}
+        className={`hover:bg-slate-50/60 ${recordDelegateType === 'Principal' ? 'border-l-2 border-amber-400 bg-amber-50/40' : ''}`}
+      >
         <td className="hidden md:table-cell pl-3 sm:pl-4 pr-1 py-3 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
         <td className="px-3 sm:px-4 py-3">
           <div className="flex items-center gap-1.5 min-w-0">
@@ -2423,6 +2465,20 @@ const EventsList: React.FC = () => {
                 <option value="Guest">Guest</option>
                 <option value="VIP">VIP</option>
               </select>
+              {selectedEvent?.has_principal_delegates && editingRole.role === 'Delegate' && (
+                <select
+                  className="min-w-0 text-xs border border-slate-300 rounded p-1 bg-card focus:outline-none focus:border-amber-500"
+                  value={editingRole.delegate_type}
+                  onChange={(e) => setEditingRole({ ...editingRole, delegate_type: e.target.value })}
+                  onClick={(e) => e.stopPropagation()}
+                  title="Delegate Type"
+                >
+                  <option value="">Unspecified</option>
+                  {DELEGATE_TYPES.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              )}
               <button
                 onClick={(e) => { e.stopPropagation(); handleUpdateRole(); }}
                 className="text-green-600 hover:text-green-800 p-1 hover:bg-green-50 rounded"
@@ -2443,9 +2499,14 @@ const EventsList: React.FC = () => {
               <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${getRoleChipClass(record.role)}`}>
                 {getRoleChipLabel(record.role)}
               </span>
+              {selectedEvent?.has_principal_delegates && recordDelegateType && (
+                <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${DELEGATE_CHIP_CLASS[recordDelegateType]}`}>
+                  {recordDelegateType}
+                </span>
+              )}
               {canManageParticipants && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participant_id, role: record.role }); }}
+                  onClick={(e) => { e.stopPropagation(); setEditingRole({ participantId: record.participant_id, role: record.role, delegate_type: recordDelegateType || '' }); }}
                   className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors p-1 rounded"
                   title="Edit Role"
                 >
@@ -3259,6 +3320,8 @@ const EventsList: React.FC = () => {
                             <div className="mr-auto flex flex-wrap items-center gap-1 p-1 bg-slate-100/50 border border-[rgb(var(--ink)/0.05)] rounded-lg">
                                 {[
                                     { value: 'all', label: 'All', count: totalCount, show: true },
+                                    { value: 'Principal', label: 'Principal', count: principalCount, show: !!selectedEvent?.has_principal_delegates },
+                                    { value: 'Representative', label: 'Representative', count: representativeCount, show: !!selectedEvent?.has_principal_delegates },
                                     { value: 'accommodation', label: 'Accommodation', count: needsAccommodationCount, show: !!selectedEvent?.has_accommodation },
                                     { value: 'noPhoto', label: 'No Photo/Video', count: noPhotoConsentCount, show: true },
                                     { value: 'noStore', label: 'No Data Storage', count: noStoreConsentCount, show: true },
@@ -3623,6 +3686,21 @@ const EventsList: React.FC = () => {
                                                 <option value="VIP">VIP</option>
                                             </select>
                                         </div>
+                                        {selectedEvent?.has_principal_delegates && newParticipant.role === 'Delegate' && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">Delegate Type</label>
+                                                <select
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none bg-card"
+                                                    value={newParticipant.delegate_type}
+                                                    onChange={e => setNewParticipant({...newParticipant, delegate_type: e.target.value as '' | DelegateType})}
+                                                >
+                                                    <option value="">Unspecified</option>
+                                                    {DELEGATE_TYPES.map((type) => (
+                                                        <option key={type} value={type}>{type}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
                                             <select 
@@ -4889,6 +4967,52 @@ const EventsList: React.FC = () => {
                     formData.auto_attendance_on_registration ? 'text-emerald-700' : 'text-slate-500'
                   }`}>
                     {formData.auto_attendance_on_registration ? 'Enabled' : 'Off by default'}
+                  </p>
+                </div>
+
+                <div className={`rounded-xl border px-4 py-3.5 transition-colors ${
+                    formData.has_principal_delegates
+                      ? 'border-amber-200 bg-amber-50/70'
+                      : 'border-slate-200 bg-slate-50/60'
+                }`}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <label
+                        htmlFor="has-principal-delegates"
+                        className="block cursor-pointer text-sm font-semibold text-slate-800"
+                      >
+                        Principal / Representative delegates
+                      </label>
+                      <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                        When enabled, delegates are registered as either a Principal or a Representative sent in the Principal's place. Principal arrivals are announced to your office when their QR code is scanned.
+                      </p>
+                    </div>
+                    <button
+                      id="has-principal-delegates"
+                      type="button"
+                      role="switch"
+                      aria-checked={Boolean(formData.has_principal_delegates)}
+                      aria-label="Principal / Representative delegates"
+                      onClick={() => setFormData({
+                        ...formData,
+                        has_principal_delegates: !formData.has_principal_delegates
+                      })}
+                      className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                        formData.has_principal_delegates ? 'bg-amber-500' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                          formData.has_principal_delegates ? 'translate-x-5' : 'translate-x-0.5'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <p className={`mt-2 text-[11px] font-semibold ${
+                    formData.has_principal_delegates ? 'text-amber-700' : 'text-slate-500'
+                  }`}>
+                    {formData.has_principal_delegates ? 'Enabled' : 'Off by default'}
                   </p>
                 </div>
 

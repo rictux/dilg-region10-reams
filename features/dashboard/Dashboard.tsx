@@ -14,11 +14,13 @@ import {
     UserPlus,
     MapPin,
     Radio,
-    ScanLine
+    ScanLine,
+    Star
 } from 'lucide-react';
 import { format, formatDistanceToNowStrict, isSameDay, parseISO, subMonths } from 'date-fns';
 import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
 import { ChartTooltip, useChartTheme } from '../../lib/chartTheme';
+import { onPrincipalArrival } from '../../lib/principalArrival';
 import {
     Bar,
     BarChart,
@@ -51,6 +53,16 @@ interface ActivityLogItem {
   timestamp: string;
 }
 
+interface PrincipalArrivalItem {
+  key: string;
+  name: string;
+  office: string;
+  eventName: string;
+  timestamp: string;
+}
+
+const PRINCIPAL_ARRIVAL_LIMIT = 5;
+
 const Dashboard: React.FC = () => {
   const { user, hasPermission } = useAuth();
   const navigate = useNavigate();
@@ -63,6 +75,8 @@ const Dashboard: React.FC = () => {
   const [ongoingEvents, setOngoingEvents] = useState<DashboardEvent[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<DashboardEvent[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>([]);
+  const [principalArrivals, setPrincipalArrivals] = useState<PrincipalArrivalItem[]>([]);
+  const [arrivalsError, setArrivalsError] = useState<string | null>(null);
   const [monthlyEvents, setMonthlyEvents] = useState<{ label: string; Events: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const chartColors = useChartTheme();
@@ -84,10 +98,21 @@ const Dashboard: React.FC = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_logs' }, () => {
         if (user) fetchDashboardData();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'principal_arrival_logs' }, () => {
+        if (user) fetchDashboardData();
+      })
       .subscribe();
+
+    // Arrivals also refresh straight off the announcement stream. postgres_changes
+    // on principal_arrival_logs is the backup: it only fires if the table is in
+    // the Realtime publication, whereas the broadcast is always sent.
+    const unsubscribeArrivals = onPrincipalArrival(() => {
+      if (user) fetchDashboardData();
+    });
 
     return () => {
       supabase.removeChannel(channel);
+      unsubscribeArrivals();
     };
   }, [user]);
 
@@ -211,8 +236,34 @@ const Dashboard: React.FC = () => {
                     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
                     .slice(0, 10)
             );
+
+            // 5. Most recent Principal delegate arrivals across accessible events
+            const { data: arrivalRows, error: arrivalError } = await supabase
+                .from('principal_arrival_logs')
+                .select('arrival_id, arrived_at, participants(full_name, office), events(event_name)')
+                .in('event_id', accessibleIds)
+                .order('arrived_at', { ascending: false })
+                .limit(PRINCIPAL_ARRIVAL_LIMIT);
+
+            // Surfaced rather than swallowed: a missing table or blocked policy
+            // would otherwise look identical to "nobody has arrived yet".
+            if (arrivalError) {
+                console.error('Error fetching principal arrivals', arrivalError);
+                setArrivalsError(arrivalError.message || 'Could not load arrivals.');
+            } else {
+                setArrivalsError(null);
+            }
+
+            setPrincipalArrivals((arrivalRows || []).map((row: any) => ({
+                key: `arrival-${row.arrival_id}`,
+                name: joined(row.participants)?.full_name || 'Unknown participant',
+                office: joined(row.participants)?.office || '',
+                eventName: joined(row.events)?.event_name || '',
+                timestamp: row.arrived_at
+            })));
         } else {
             setActivityLogs([]);
+            setPrincipalArrivals([]);
         }
 
     } catch (e) {
@@ -438,8 +489,50 @@ const Dashboard: React.FC = () => {
       </div>
         </div>
 
-        {/* Activity Logs rail */}
-        <div className="w-full lg:w-[30%] xl:w-[28%] shrink-0 bg-card rounded-lg border border-[rgb(var(--ink)/0.08)]">
+        {/* Principal arrivals + Activity Logs rail */}
+        <div className="w-full lg:w-[30%] xl:w-[28%] shrink-0 flex flex-col gap-4">
+        <div className="bg-card rounded-lg border border-[rgb(var(--ink)/0.08)]">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-[rgb(var(--ink)/0.06)]">
+            <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-amber-100 text-amber-600">
+              <Star size={13} className="fill-amber-500 text-amber-500" />
+            </span>
+            <h3 className="text-sm font-semibold text-slate-900">Principal Arrivals</h3>
+          </div>
+          {arrivalsError ? (
+            <p className="px-4 py-8 text-center text-xs text-red-600">{arrivalsError}</p>
+          ) : principalArrivals.length > 0 ? (
+          <div className="divide-y divide-[rgb(var(--ink)/0.04)]">
+            {principalArrivals.map((item) => (
+              <div key={item.key} className="flex items-start gap-2.5 px-4 py-2.5">
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-50 text-amber-600">
+                  <Star size={12} className="fill-amber-500 text-amber-500" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs leading-snug text-slate-900">
+                    <span className="font-semibold">{item.name}</span>
+                    <span className="text-slate-600"> · Arrived</span>
+                  </p>
+                  <p className="mt-0.5 truncate text-[11px] text-slate-400">
+                    {[item.office, item.eventName].filter(Boolean).join(' · ')}
+                  </p>
+                </div>
+                <span
+                  className="shrink-0 text-[10px] font-mono text-slate-400"
+                  title={format(parseISO(item.timestamp), 'MMM d, yyyy h:mm a')}
+                >
+                  {formatDistanceToNowStrict(parseISO(item.timestamp), { addSuffix: true })}
+                </span>
+              </div>
+            ))}
+          </div>
+          ) : (
+            <p className="py-10 text-center text-xs text-slate-400">
+              {loading ? 'Loading…' : 'No principal arrivals yet.'}
+            </p>
+          )}
+        </div>
+
+        <div className="bg-card rounded-lg border border-[rgb(var(--ink)/0.08)]">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-[rgb(var(--ink)/0.06)]">
             <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-indigo-600/10 text-indigo-600">
               <Activity size={13} />
@@ -471,6 +564,7 @@ const Dashboard: React.FC = () => {
           ) : (
             <p className="py-10 text-center text-xs text-slate-400">{loading ? 'Loading…' : 'No recent activity.'}</p>
           )}
+        </div>
         </div>
       </div>
     </div>

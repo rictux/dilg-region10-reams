@@ -3,6 +3,8 @@ import { Event, EventAccessRole, User } from '../types/database';
 
 export const MANAGE_EVENT_ACCESS_ROLES: EventAccessRole[] = ['Manager', 'ManagerScanner'];
 export const SCAN_EVENT_ACCESS_ROLES: EventAccessRole[] = ['Scanner', 'ManagerScanner'];
+/** Any assignment at all — used when access role doesn't narrow the result. */
+export const ALL_EVENT_ACCESS_ROLES: EventAccessRole[] = ['Manager', 'Scanner', 'ManagerScanner'];
 
 type DeletedView = 'active' | 'deleted' | 'all';
 

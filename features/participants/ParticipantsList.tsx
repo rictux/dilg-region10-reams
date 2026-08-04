@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Participant, Event, GiveawayItem } from '../../types/database';
+import { DelegateType, Participant, Event, GiveawayItem } from '../../types/database';
 import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Bed, ChevronDown, Check, UserPlus, Building, Landmark, Download, Gift, Mail } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import QRCodeLib from 'qrcode';
@@ -16,10 +16,12 @@ import { fetchAllSupabaseRows } from '../../lib/supabasePagination';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 import { diffRecords, logAudit } from '../../lib/auditLog';
 import { formatParticipantOfficialName } from '../../lib/participantName';
+import { DELEGATE_CHIP_CLASS, DELEGATE_ROW_CLASS, readDelegateType } from '../../lib/delegates';
 
 interface AttendanceRow {
     participant: Participant;
     role?: string;
+    delegate_type?: DelegateType | null;
     needs_accommodation?: boolean;
     giveaway_selections?: Record<string, string | boolean> | null;
     amLog?: { time: string, status: string };
@@ -148,6 +150,7 @@ const AttendanceList: React.FC = () => {
       full_name: '',
       email: '',
       role: 'Delegate',
+      delegate_type: '' as '' | DelegateType,
       office: '',
       mobile_no: '',
       position: '',
@@ -357,6 +360,7 @@ const AttendanceList: React.FC = () => {
     }
   }, [selectedEventId, selectedDate]);
 
+
   const handleEventSelect = (event: Event) => {
       setSelectedEventId(event.event_id);
       setSelectedEvent(event);
@@ -402,7 +406,7 @@ const AttendanceList: React.FC = () => {
         const eventParticipants = await fetchAllSupabaseRows<any>(() =>
             supabase
                 .from('event_participants')
-                .select('participant_id, role, needs_accommodation, giveaway_selections, participants(*)')
+                .select('participant_id, role, delegate_type, needs_accommodation, giveaway_selections, participants(*)')
                 .eq('event_id', eventId)
                 .order('participant_id', { ascending: true })
         );
@@ -430,6 +434,7 @@ const AttendanceList: React.FC = () => {
                     return {
                         participant: p,
                         role: ep.role,
+                        delegate_type: readDelegateType(ep.role, ep.delegate_type),
                         needs_accommodation: ep.needs_accommodation,
                         giveaway_selections: ep.giveaway_selections,
                         amLog: amLogs.length > 0 ? { time: amLogs[0].scan_time, status: amLogs[0].scan_status } : undefined,
@@ -531,6 +536,7 @@ const AttendanceList: React.FC = () => {
           'Email',
           'Event Name',
           'Role',
+          'Delegate Type',
           'Needs Accomodation',
           'Present',
           'AM Time',
@@ -558,6 +564,7 @@ const AttendanceList: React.FC = () => {
                   'Email': row.participant.email || 'N/A',
                   'Event Name': selectedEvent.title || selectedEvent.event_name,
                   'Role': row.role || 'Delegate',
+                  ...(selectedEvent.has_principal_delegates ? { 'Delegate Type': row.delegate_type || '' } : {}),
                   'Needs Accomodation': row.needs_accommodation ? 'Yes' : 'No',
                   'Present': visibleSessions.some(session => session === 'AM' ? !!row.amLog : !!row.pmLog) ? 'Yes' : 'No'
               };
@@ -1155,6 +1162,9 @@ const AttendanceList: React.FC = () => {
                 participant_id: participantId,
                 registration_status: 'Registered',
                 role: newParticipant.role,
+                delegate_type: selectedEvent.has_principal_delegates
+                    ? readDelegateType(newParticipant.role, newParticipant.delegate_type)
+                    : null,
                 needs_accommodation: newParticipant.needs_accommodation,
                 accommodation_pax: newParticipant.needs_accommodation ? Math.max(1, newParticipant.accommodation_pax) : 0,
                 date_accommodation: selectedEvent.has_accommodation && newParticipant.needs_accommodation ? normalizedAccommodationDates : null,
@@ -1238,6 +1248,7 @@ const AttendanceList: React.FC = () => {
               full_name: '',
               email: '',
               role: 'Delegate',
+              delegate_type: '',
               office: '',
               mobile_no: '',
               position: '',
@@ -1531,9 +1542,10 @@ const AttendanceList: React.FC = () => {
                                 />
                             </th>
                             <th className="px-1 py-1.5 lg:py-1.5 w-9 bg-slate-50 text-center">#</th>
-                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[28%] bg-slate-50">Name</th>
-                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[22%] bg-slate-50">Position</th>
-                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[22%] bg-slate-50">Office</th>
+                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[26%] bg-slate-50">Name</th>
+                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[18%] bg-slate-50">Position</th>
+                            <th className="px-4 py-1.5 lg:px-5 lg:py-1.5 w-[12%] bg-slate-50">Role</th>
+                            <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[20%] bg-slate-50">Office</th>
                             {visibleSessions.map((session) => (
                                 <th key={session} className="px-4 py-1.5 lg:px-5 lg:py-1.5 w-[112px] text-center bg-slate-50">
                                     {session} Time
@@ -1544,10 +1556,10 @@ const AttendanceList: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {filteredData.map((row, index) => (
-                            <tr 
-                                key={row.participant.participant_id} 
+                            <tr
+                                key={row.participant.participant_id}
                                 onClick={() => handleRowClick(row.participant)}
-                                className="hover:bg-indigo-50 cursor-pointer transition-colors group"
+                                className={`hover:bg-indigo-50 cursor-pointer transition-colors group ${row.delegate_type ? DELEGATE_ROW_CLASS[row.delegate_type] : ''}`}
                             >
                                 <td className="pl-3 pr-1 py-1.5 lg:pl-4 lg:py-1.5 text-center">
                                     <input
@@ -1589,6 +1601,15 @@ const AttendanceList: React.FC = () => {
                                     <div className="truncate leading-snug" title={row.participant.position}>
                                         {row.participant.position}
                                     </div>
+                                </td>
+                                <td className="px-4 py-1.5 lg:px-5 lg:py-1.5 text-slate-600">
+                                    {row.delegate_type ? (
+                                        <span className={`inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${DELEGATE_CHIP_CLASS[row.delegate_type]}`}>
+                                            {row.delegate_type}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs leading-snug">{row.role || 'Delegate'}</span>
+                                    )}
                                 </td>
                                 <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 text-slate-600">
                                     <div className="whitespace-normal break-words leading-snug">
@@ -1979,6 +2000,20 @@ const AttendanceList: React.FC = () => {
                                         <option value="VIP">VIP</option>
                                     </select>
                                 </div>
+                                {selectedEvent?.has_principal_delegates && newParticipant.role === 'Delegate' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Delegate Type</label>
+                                        <select
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none bg-card"
+                                            value={newParticipant.delegate_type}
+                                            onChange={e => setNewParticipant({...newParticipant, delegate_type: e.target.value as '' | DelegateType})}
+                                        >
+                                            <option value="">Unspecified</option>
+                                            <option value="Principal">Principal</option>
+                                            <option value="Representative">Representative</option>
+                                        </select>
+                                    </div>
+                                )}
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
                                     <select 
