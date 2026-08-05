@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { DelegateType, Event, Participant, Office, GiveawayItem, EventAccessRole, EventUserAccess, User } from '../../types/database';
 import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift, Settings, ChevronDown, Hash, Utensils } from 'lucide-react';
@@ -143,6 +143,27 @@ const EVENT_STATUS_SORT_ORDER: Record<string, number> = {
   Scheduled: 1,
   Completed: 2,
   Cancelled: 3
+};
+
+// Page buttons on offer at once. Ten fit beside Previous/Next on a laptop; below the
+// `lg` breakpoint (phones and tablets) the row has to stay short enough not to wrap.
+const DESKTOP_PAGE_BUTTONS = 10;
+const COMPACT_PAGE_BUTTONS = 5;
+const DESKTOP_PAGINATION_QUERY = '(min-width: 1024px)';
+
+const useMaxPageButtons = () => {
+  const [maxButtons, setMaxButtons] = useState(DESKTOP_PAGE_BUTTONS);
+
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const query = window.matchMedia(DESKTOP_PAGINATION_QUERY);
+    const apply = () => setMaxButtons(query.matches ? DESKTOP_PAGE_BUTTONS : COMPACT_PAGE_BUTTONS);
+    apply();
+    query.addEventListener('change', apply);
+    return () => query.removeEventListener('change', apply);
+  }, []);
+
+  return maxButtons;
 };
 
 const EventsList: React.FC = () => {
@@ -2638,10 +2659,35 @@ const EventsList: React.FC = () => {
   };
 
   const totalPages = Math.ceil(filteredEvents.length / itemsPerPage);
+  const maxPageButtons = useMaxPageButtons();
+
+  // The window slides with the current page rather than paging in fixed blocks, so
+  // clicking the last number on screen reveals the pages past it instead of dead-ending.
+  const visiblePages = useMemo(() => {
+    const count = Math.min(maxPageButtons, totalPages);
+    if (count <= 0) return [];
+    const firstPage = Math.min(
+      Math.max(currentPage - Math.floor((count - 1) / 2), 1),
+      Math.max(totalPages - count + 1, 1)
+    );
+    return Array.from({ length: count }, (_, i) => firstPage + i);
+  }, [currentPage, maxPageButtons, totalPages]);
+
   const paginatedEvents = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredEvents.slice(start, start + itemsPerPage);
   }, [filteredEvents, currentPage]);
+
+  // The paginator sits below the fold on a phone, so a page change would otherwise leave the
+  // viewport on the *last* cards of the new page. Jump instantly — smooth-scrolling this far
+  // just looks like the list is running away.
+  const listScrollRef = useRef<HTMLDivElement>(null);
+  const lastScrolledPage = useRef(currentPage);
+  useEffect(() => {
+    if (lastScrolledPage.current === currentPage) return;
+    lastScrolledPage.current = currentPage;
+    listScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [currentPage]);
 
   // Reset to page 1 when search or filter changes
   useEffect(() => {
@@ -2670,7 +2716,7 @@ const EventsList: React.FC = () => {
   return (
     <div className="h-full min-h-0 flex flex-col gap-6">
       {!(showParticipantsModal && selectedEvent) && (
-      <div className="flex-1 min-h-0 overflow-y-auto -m-4 md:-m-6 p-4 md:py-8 md:px-12 lg:px-16 flex flex-col gap-6">
+      <div ref={listScrollRef} className="flex-1 min-h-0 overflow-y-auto -m-4 md:-m-6 p-4 md:py-8 md:px-12 lg:px-16 flex flex-col gap-6">
       {/* Page header */}
       <div className="flex justify-end w-full -mb-3">
         <button
@@ -3133,6 +3179,8 @@ const EventsList: React.FC = () => {
           {/* Pagination Controls */}
           {!loading && totalPages > 1 && (
               <div className="pt-1 flex items-center justify-center sm:justify-between shrink-0">
+                  {/* Sighted users get the scroll-to-top as confirmation; this is its equivalent. */}
+                  <p aria-live="polite" className="sr-only">Page {currentPage} of {totalPages}</p>
                   <div className="hidden sm:block text-sm text-slate-500">
                       Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredEvents.length)}</span> of <span className="font-medium">{filteredEvents.length}</span> results
                   </div>
@@ -3145,17 +3193,17 @@ const EventsList: React.FC = () => {
                           Previous
                       </button>
                       <div className="flex items-center gap-1">
-                          {[...Array(totalPages)].map((_, i) => (
+                          {visiblePages.map(page => (
                               <button
-                                  key={i + 1}
-                                  onClick={() => setCurrentPage(i + 1)}
+                                  key={page}
+                                  onClick={() => setCurrentPage(page)}
                                   className={`w-8 h-8 flex items-center justify-center rounded-md text-sm font-medium transition-colors
-                                      ${currentPage === i + 1 
-                                          ? 'bg-indigo-600 text-white' 
+                                      ${currentPage === page
+                                          ? 'bg-indigo-600 text-white'
                                           : 'text-slate-700 hover:bg-slate-100'
                                       }`}
                               >
-                                  {i + 1}
+                                  {page}
                               </button>
                           ))}
                       </div>
