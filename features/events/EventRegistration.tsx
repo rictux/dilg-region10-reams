@@ -1814,7 +1814,7 @@ const EventRegistration: React.FC = () => {
     {/* QR Scanner Modal - Floating Overlay */}
     {showQrScanner && (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-        <div className="relative bg-card rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200 max-w-md w-full">
+        <div className="relative bg-card rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200 max-w-lg w-full max-h-[90vh] overflow-y-auto">
           <div className="p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900">Scan QR Code</h3>
