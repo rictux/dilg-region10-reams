@@ -4,11 +4,11 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Event, Participant, RefLocation } from '../../types/database';
 import QRCode from 'react-qr-code';
-import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock, Landmark, Download, Info, Gift } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock, Landmark, Download, Info, Gift, Upload } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import { toPng } from 'html-to-image';
 import { toast } from 'sonner';
-import QrScanner from './QrScanner';
+import QrScanner, { decodeQrFromFile } from './QrScanner';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 
 type ParticipantMatch = Pick<Participant, 'participant_id' | 'participant_code'> & Partial<Pick<Participant, 'full_name' | 'f_name' | 'l_name' | 'm_initial' | 'suffix' | 'email' | 'mobile_no' | 'office' | 'position'>> & {
@@ -64,6 +64,7 @@ const EventRegistration: React.FC = () => {
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showQrScanner, setShowQrScanner] = useState(false);
+  const [decodingQrFile, setDecodingQrFile] = useState(false);
   const [showMatchPrompt, setShowMatchPrompt] = useState(false);
   const [potentialMatches, setPotentialMatches] = useState<ParticipantMatch[]>([]);
   const [inlineMatches, setInlineMatches] = useState<ParticipantMatch[]>([]);
@@ -77,6 +78,7 @@ const EventRegistration: React.FC = () => {
   
   // Ref for saving image
   const ticketRef = useRef<HTMLDivElement>(null);
+  const qrFileInputRef = useRef<HTMLInputElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
   // Location / Office State
@@ -800,6 +802,31 @@ const EventRegistration: React.FC = () => {
     }
   };
 
+  const handleQrFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Reset so picking the same file again still fires a change event.
+    e.target.value = '';
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file (PNG, JPG) containing your QR code.');
+      return;
+    }
+
+    setDecodingQrFile(true);
+    setError(null);
+    try {
+      const decodedText = await decodeQrFromFile(file);
+      setShowQrScanner(false);
+      await handleQrScanSuccess(decodedText.trim());
+    } catch (err) {
+      console.error('Failed to decode QR image', err);
+      setError('No QR code was found in that image. Please upload a clearer photo or screenshot of your QR code.');
+    } finally {
+      setDecodingQrFile(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const skipPotentialMatch = inlineMatchDismissed || inlineMatches.length > 0;
@@ -996,16 +1023,35 @@ const EventRegistration: React.FC = () => {
                 
                 <div className="mb-6 bg-indigo-50 border border-indigo-100 p-4 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="text-sm text-indigo-800">
-                        <strong>Already have a QR code?</strong> Click 'Scan' to quickly fill out this form.
+                        <strong>Already have a QR code?</strong> Scan it or upload a saved image to quickly fill out this form.
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => setShowQrScanner(!showQrScanner)}
-                        className="whitespace-nowrap bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-                    >
-                        {showQrScanner ? 'Close Scanner' : 'Scan'}
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setShowQrScanner(!showQrScanner)}
+                            className="whitespace-nowrap bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                        >
+                            {showQrScanner ? 'Close Scanner' : 'Scan QR'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => qrFileInputRef.current?.click()}
+                            disabled={decodingQrFile}
+                            className="whitespace-nowrap bg-card border border-indigo-200 text-indigo-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors disabled:opacity-60 flex items-center gap-2"
+                        >
+                            {decodingQrFile ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                            {decodingQrFile ? 'Reading...' : 'Upload QR'}
+                        </button>
+                    </div>
                 </div>
+
+                <input
+                    ref={qrFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleQrFileSelected}
+                />
                 
                 <form onSubmit={handleSubmit} className="space-y-5">
                     
@@ -1793,6 +1839,22 @@ const EventRegistration: React.FC = () => {
             />
 
             <p className="text-xs text-center text-slate-500">Position the QR code within the frame to scan.</p>
+
+            <div className="flex items-center gap-3">
+              <span className="h-px flex-1 bg-slate-200" />
+              <span className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">or</span>
+              <span className="h-px flex-1 bg-slate-200" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => qrFileInputRef.current?.click()}
+              disabled={decodingQrFile}
+              className="w-full border border-slate-200 text-slate-700 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {decodingQrFile ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+              {decodingQrFile ? 'Reading image...' : 'Upload QR code image'}
+            </button>
           </div>
         </div>
       </div>
