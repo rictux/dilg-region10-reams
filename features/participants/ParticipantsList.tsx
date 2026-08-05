@@ -99,6 +99,14 @@ const ATTENDANCE_EVENT_STATUS_SORT_ORDER: Record<string, number> = {
     Completed: 1
 };
 
+// Sessions an event actually runs, i.e. the columns/logs worth showing and sorting by.
+const getVisibleSessions = (event?: Event | null): Array<'AM' | 'PM'> =>
+    event?.session === 'All_Day'
+        ? ['AM', 'PM']
+        : event?.session
+            ? [event.session]
+            : ['AM', 'PM'];
+
 const AttendanceList: React.FC = () => {
   const { user } = useAuth();
   const [data, setData] = useState<AttendanceRow[]>([]);
@@ -442,20 +450,25 @@ const AttendanceList: React.FC = () => {
                     };
                 });
 
-            // Sorting logic: AM logs on top, then sorted by AM time ascending, then alphabetically for those without
+            // Sorting logic: logged participants on top, sorted by scan time ascending, then
+            // alphabetically for those without. PM-only events sort by their PM log — every other
+            // event (All_Day and AM-only) sorts by AM.
+            const sortSession = getVisibleSessions(selectedEvent)[0];
+            const sortLogOf = (row: AttendanceRow) => (sortSession === 'PM' ? row.pmLog : row.amLog);
+
             const sortedRows = rows.sort((a, b) => {
-                const hasAM_a = !!a.amLog;
-                const hasAM_b = !!b.amLog;
+                const logA = sortLogOf(a);
+                const logB = sortLogOf(b);
 
-                if (hasAM_a && !hasAM_b) return -1;
-                if (!hasAM_a && hasAM_b) return 1;
+                if (logA && !logB) return -1;
+                if (!logA && logB) return 1;
 
-                if (hasAM_a && hasAM_b) {
-                    // Both have AM logs, sort by time ASC
-                    return a.amLog!.time.localeCompare(b.amLog!.time);
+                if (logA && logB) {
+                    // Both logged for the sorted session, order by time ASC
+                    return logA.time.localeCompare(logB.time);
                 }
 
-                // Neither have AM logs, sort alphabetically
+                // Neither is logged, sort alphabetically
                 return a.participant.full_name.localeCompare(b.participant.full_name);
             });
 
@@ -468,12 +481,7 @@ const AttendanceList: React.FC = () => {
     }
   };
 
-  const visibleSessions: Array<'AM' | 'PM'> =
-      selectedEvent?.session === 'All_Day'
-          ? ['AM', 'PM']
-          : selectedEvent?.session
-              ? [selectedEvent.session]
-              : ['AM', 'PM'];
+  const visibleSessions = getVisibleSessions(selectedEvent);
   const hasMultipleSessions = visibleSessions.length > 1;
 
   const filteredData = data.filter(row => {
