@@ -8,6 +8,29 @@ interface QrScannerProps {
   active?: boolean;
 }
 
+// Decode a QR code from an uploaded image file. html5-qrcode needs a real DOM
+// container, so we mount a throwaway hidden one and remove it afterwards.
+export const decodeQrFromFile = async (file: File): Promise<string> => {
+  const container = document.createElement('div');
+  container.id = `qr-file-reader-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  container.style.display = 'none';
+  document.body.appendChild(container);
+
+  const fileScanner = new Html5Qrcode(container.id, {
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+    verbose: false,
+  } as any);
+
+  try {
+    return await fileScanner.scanFile(file, false);
+  } finally {
+    try {
+      fileScanner.clear();
+    } catch {}
+    container.remove();
+  }
+};
+
 const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure, active = true }) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isStoppedRef = useRef(false);
