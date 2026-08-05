@@ -15,6 +15,31 @@ export type CoPParticipantRecord = {
 
 export type CoPTitle = 'Certificate of Participation' | 'Certificate of Appreciation' | 'Certificate of Completion';
 
+/** Which accreditation line, if any, sits above the primary signatory. */
+export type CoPAccreditationMode = 'None' | 'CPD' | 'PRC';
+
+/** DILG 10's CPD provider accreditation number — the stem of both accreditation lines. */
+export const CPD_ACCREDITATION_NUMBER = 'OCE-2023-078';
+/** Programme-specific series appended for the PRC variant; editable per event. */
+export const DEFAULT_PRC_ACCREDITATION_SUFFIX = '3974';
+
+/** Blank line offices fill in by hand after printing. */
+export const PRC_LICENSE_LINE = 'PRC License No: ____________';
+
+export const buildAccreditationLines = (
+  mode: CoPAccreditationMode,
+  prcSuffix?: string | null
+): { number: string; label: string } | null => {
+  if (mode === 'CPD') {
+    return { number: CPD_ACCREDITATION_NUMBER, label: 'DILG 10 CPD Provider Accreditation Number' };
+  }
+  if (mode === 'PRC') {
+    const suffix = (prcSuffix ?? '').trim() || DEFAULT_PRC_ACCREDITATION_SUFFIX;
+    return { number: `${CPD_ACCREDITATION_NUMBER}-${suffix}`, label: 'PRC Accreditation Number' };
+  }
+  return null;
+};
+
 /** Default body section shown before the signatory block. */
 export const DEFAULT_COP_BODY_TEXT =
   'for having actively participated during the conduct of the "{EventName}" held on {EventDate}, at {Venue}{CreditPhrase}.\n{GivenDate}';
@@ -32,6 +57,12 @@ type CoPTemplateProps = {
   /** When set (> 0), appends "with a credit of <word> (<n>) training hours." to the body. */
   creditHours?: number | null;
   includeSignature?: boolean;
+  /** Adds a blank "PRC License No:" line under the participant's name. */
+  showPrcLicenseNo?: boolean;
+  /** Accreditation line shown above the primary signatory. */
+  accreditationMode?: CoPAccreditationMode;
+  /** Series appended to the accreditation number in PRC mode. */
+  prcAccreditationSuffix?: string;
   /**
    * Per-signatory e-signature calibration, keyed by signatory id. The primary and partner
    * blocks each look up their own entry, since the two scans are unrelated images.
@@ -210,6 +241,9 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
   bodyText = DEFAULT_COP_BODY_TEXT,
   creditHours = null,
   includeSignature = true,
+  showPrcLicenseNo = false,
+  accreditationMode = 'None',
+  prcAccreditationSuffix = DEFAULT_PRC_ACCREDITATION_SUFFIX,
   signatureAdjustments,
   signatureSrcOverrides,
   referenceNumber = null,
@@ -284,7 +318,17 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
     ? Math.max(minNameSz, Math.min(baseNameSz, Math.floor(maxNameWidth / (fullName.length * charWidthCoef))))
     : baseNameSz;
 
-  const renderSignatoryBlock = (currentSignatory: CertificateSignatory) => {
+  const accreditation = buildAccreditationLines(
+    accreditationMode as CoPAccreditationMode,
+    prcAccreditationSuffix
+  );
+
+  // The accreditation belongs to DILG as the CPD provider, so it rides above the primary
+  // block only; the partner column keeps its bottom-aligned signature line.
+  const renderSignatoryBlock = (
+    currentSignatory: CertificateSignatory,
+    accreditationLines: { number: string; label: string } | null = null
+  ) => {
     const sigName = currentSignatory?.name?.trim() || '';
     const sigPos = currentSignatory?.position?.trim() || '';
     const postNom = currentSignatory?.post_nominals?.trim() || '';
@@ -314,6 +358,24 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
 
     return (
       <div style={{ display: 'flex', flex: 1, minWidth: 0, flexDirection: 'column', alignItems: 'center' }}>
+        {accreditationLines && (
+          <div style={{ marginBottom: s(4), textAlign: 'center', lineHeight: 1.25, fontSize: s(11) }}>
+            <p style={{
+              margin: 0,
+              fontWeight: 'bold',
+              textDecoration: 'underline',
+              letterSpacing: '0.04em',
+              whiteSpace: 'nowrap',
+            }}>
+              {accreditationLines.number}
+            </p>
+            {/* Left wrappable: at body size the label is wider than a signatory column
+                once a partner agency splits the row. */}
+            <p style={{ margin: 0, letterSpacing: '0.02em' }}>
+              {accreditationLines.label}
+            </p>
+          </div>
+        )}
         <div
           style={{
             position: 'relative',
@@ -451,7 +513,9 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
         )}
 
         {/* ── 1. Header: logos + org text (Helvetica) ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: s(2), fontFamily: HELVETICA_FONT }}>
+        {/* Shifted with a transform rather than less top padding so the title/body block
+            below keeps its space-between position. */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: s(2), fontFamily: HELVETICA_FONT, transform: `translateY(-${s(14)}px)` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: s(10), marginBottom: s(2) }}>
             <img
               src="/assets/dilg_logo.png"
@@ -550,8 +614,24 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
             width: '85%',
             borderBottom: `${s(1.5)}px solid #111`,
             marginTop: s(1),
-            marginBottom: s(8),
+            marginBottom: showPrcLicenseNo ? s(4) : s(8),
           }} />
+
+          {showPrcLicenseNo && (
+            /* No bottom margin: matching the body's line-height makes the gap to the body
+               paragraph the same as the gap between two body lines. */
+            <p style={{
+              fontSize: s(11),
+              margin: 0,
+              lineHeight: 1.5,
+              textAlign: 'center',
+              fontFamily: HELVETICA_FONT,
+              letterSpacing: '0.04em',
+              whiteSpace: 'nowrap',
+            }}>
+              {PRC_LICENSE_LINE}
+            </p>
+          )}
 
           <p style={{ fontSize: bodySz, margin: 0, lineHeight: 1.5, textAlign: 'center', width: '88%', fontFamily: CERT_FONT, whiteSpace: 'pre-wrap' }}>
             {bodyParts}
@@ -559,8 +639,10 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
         </div>
 
         {/* ── 4. Signatory (Helvetica) ── */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: hasPartner ? s(24) : 0, width: hasPartner ? '70%' : 'auto', fontFamily: HELVETICA_FONT, transform: `translateY(-${s(18)}px)` }}>
-          {renderSignatoryBlock(primarySignatory)}
+        {/* The accreditation lines grow the block upward (the row is bottom-anchored), which
+            closes the gap under the body text — so the whole row rides lower when they show. */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: hasPartner ? s(24) : 0, width: hasPartner ? '70%' : 'auto', fontFamily: HELVETICA_FONT, transform: `translateY(-${accreditation ? s(12) : s(18)}px)` }}>
+          {renderSignatoryBlock(primarySignatory, accreditation)}
           {hasPartner && renderSignatoryBlock(secondarySignatory)}
         </div>
 

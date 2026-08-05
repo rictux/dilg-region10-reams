@@ -14,11 +14,15 @@ import { sendCertificateEmail } from '../../lib/emailService';
 import { toast } from 'sonner';
 import { CertificateSignatory, getEventDateRows } from './CertificateOfAppearanceTemplate';
 import CertificateOfParticipationCard, {
+  buildAccreditationLines,
   buildCoPReferenceNumber,
+  CoPAccreditationMode,
   CoPPaperSize,
   CoPParticipantRecord,
   CoPTitle,
   DEFAULT_COP_BODY_TEXT,
+  DEFAULT_PRC_ACCREDITATION_SUFFIX,
+  PRC_LICENSE_LINE,
   formatAttendanceDates,
   getCoP_HeightPx,
   getCoP_WidthPx,
@@ -63,6 +67,12 @@ const CERT_BODY_TEMPLATES = [
     label: 'Template 3',
     text: 'for his valuable insights and contribution during the conduct of the "{EventName}" held on {EventDate}, at {Venue}.\n{GivenDate}',
   },
+];
+
+const ACCREDITATION_OPTIONS: Array<{ value: CoPAccreditationMode; label: string }> = [
+  { value: 'None', label: 'None' },
+  { value: 'CPD', label: 'Option 1 — CPD Provider' },
+  { value: 'PRC', label: 'Option 2 — PRC Accreditation' },
 ];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -315,6 +325,13 @@ type SettingsModalProps = {
   // Credit hours
   creditHours: string;
   onChangeCreditHours: (v: string) => void;
+  // PRC / CPD accreditation
+  showPrcLicenseNo: boolean;
+  onChangeShowPrcLicenseNo: (value: boolean) => void;
+  accreditationMode: CoPAccreditationMode;
+  onChangeAccreditationMode: (mode: CoPAccreditationMode) => void;
+  prcAccreditationSuffix: string;
+  onChangePrcAccreditationSuffix: (value: string) => void;
   // Paper size
   paperSize: CoPPaperSize;
   onSelectPaperSize: (s: CoPPaperSize) => void;
@@ -344,6 +361,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   certTitle, onSelectTitle,
   bodyText, onChangeBodyText,
   creditHours, onChangeCreditHours,
+  showPrcLicenseNo, onChangeShowPrcLicenseNo,
+  accreditationMode, onChangeAccreditationMode,
+  prcAccreditationSuffix, onChangePrcAccreditationSuffix,
   paperSize, onSelectPaperSize, signatories, primarySignatory, secondarySignatory,
   onSelectPrimarySignatory, onSelectSecondarySignatory,
   includeSignature, onChangeIncludeSignature,
@@ -473,6 +493,87 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             <p className="text-[11px] text-[#9A9890] mt-2">
               Leave blank to omit. When set, the certificate reads “…with a credit of <span className="font-medium text-[#7C7A72]">{(parseInt(creditHours, 10) > 0 ? numberToWords(parseInt(creditHours, 10)) : 'N')} ({parseInt(creditHours, 10) > 0 ? parseInt(creditHours, 10) : 'N'})</span> training hours.”
             </p>
+          </section>
+
+          {/* ── PRC / CPD accreditation ── */}
+          <section data-tour="cop-settings-accreditation">
+            <h3 className="text-sm font-semibold text-[#4A4843] mb-3 flex items-center gap-2">
+              <span className="text-xs font-bold border border-current px-1 rounded-sm">P</span> PRC / CPD Details
+            </h3>
+
+            <label className="mb-4 flex items-center justify-between gap-4 rounded-xl border-2 border-[#E0DDD4] px-4 py-3 text-sm text-[#4A4843]">
+              <span>
+                <span className="block font-semibold">Show “PRC License No.” line</span>
+                <span className="block text-xs text-[#9A9890]">
+                  Prints <span className="font-medium text-[#7C7A72]">{PRC_LICENSE_LINE}</span> under the participant’s name.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={showPrcLicenseNo}
+                onChange={e => onChangeShowPrcLicenseNo(e.target.checked)}
+                className="h-4 w-4 shrink-0 accent-violet-600"
+              />
+            </label>
+
+            <p className="mb-2 text-xs font-semibold text-[#6B6860]">Accreditation line above the signatory</p>
+            <div className="space-y-2">
+              {ACCREDITATION_OPTIONS.map(option => {
+                const isSelected = accreditationMode === option.value;
+                const preview = buildAccreditationLines(option.value, prcAccreditationSuffix);
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => onChangeAccreditationMode(option.value)}
+                    className={`w-full rounded-xl border-2 px-3 py-2 text-left transition-all ${
+                      isSelected
+                        ? 'border-violet-500 bg-violet-50 text-violet-700'
+                        : 'border-[#E0DDD4] text-[#6B6860] hover:border-[#C5C2BA] hover:bg-[#F5F3EE]'
+                    }`}
+                  >
+                    <span className="block text-xs font-semibold mb-1">{option.label}</span>
+                    <span className="block text-[11px] leading-relaxed">
+                      {preview
+                        ? <><span className="font-semibold">{preview.number}</span><br />{preview.label}</>
+                        : 'No accreditation line is printed.'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {accreditationMode === 'PRC' && (
+              <div className="mt-3">
+                <label htmlFor="cop-prc-suffix" className="mb-1.5 block text-xs font-semibold text-[#6B6860]">
+                  PRC accreditation series
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-[#7C7A72]">OCE-2023-078-</span>
+                  <input
+                    id="cop-prc-suffix"
+                    type="text"
+                    value={prcAccreditationSuffix}
+                    onChange={e => onChangePrcAccreditationSuffix(e.target.value)}
+                    placeholder={DEFAULT_PRC_ACCREDITATION_SUFFIX}
+                    className="w-32 px-3 py-2.5 text-sm border-2 border-[#E0DDD4] rounded-xl focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400"
+                  />
+                  {prcAccreditationSuffix.trim() !== DEFAULT_PRC_ACCREDITATION_SUFFIX && (
+                    <button
+                      type="button"
+                      onClick={() => onChangePrcAccreditationSuffix(DEFAULT_PRC_ACCREDITATION_SUFFIX)}
+                      className="text-xs text-[#9A9890] hover:text-[#6B6860] hover:underline"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-[#9A9890] mt-2">
+                  Changes the last segment of the accreditation number. Leave blank to fall back to{' '}
+                  <span className="font-medium text-[#7C7A72]">{DEFAULT_PRC_ACCREDITATION_SUFFIX}</span>.
+                </p>
+              </div>
+            )}
           </section>
 
           {/* ── Theme ── */}
@@ -761,6 +862,9 @@ const CertificateOfParticipation: React.FC = () => {
   const [bodyText,           setBodyText]            = useState<string>(DEFAULT_COP_BODY_TEXT);
   const [creditHours,        setCreditHours]         = useState<string>('');
   const [includeSignature,   setIncludeSignature]    = useState(true);
+  const [showPrcLicenseNo,   setShowPrcLicenseNo]    = useState(false);
+  const [accreditationMode,  setAccreditationMode]   = useState<CoPAccreditationMode>('None');
+  const [prcAccreditationSuffix, setPrcAccreditationSuffix] = useState(DEFAULT_PRC_ACCREDITATION_SUFFIX);
   const [signatureAdjustments, setSignatureAdjustments] = useState<Record<number, SignatureAdjustment>>({});
   const [signatureSrcOverrides, setSignatureSrcOverrides] = useState<Record<number, string>>({});
   const certificateSecondarySignatory = secondarySignatory?.agency_name?.trim()
@@ -1851,6 +1955,9 @@ const CertificateOfParticipation: React.FC = () => {
                   bodyText={bodyTextResolved}
                   creditHours={creditHoursNum}
                   includeSignature={includeSignature}
+                  showPrcLicenseNo={showPrcLicenseNo}
+                  accreditationMode={accreditationMode}
+                  prcAccreditationSuffix={prcAccreditationSuffix}
                   signatureAdjustments={signatureAdjustments}
                   signatureSrcOverrides={signatureSrcOverrides}
                   referenceNumber={referenceByPid.get(previewRecord.participant.participant_id) ?? null}
@@ -1882,6 +1989,9 @@ const CertificateOfParticipation: React.FC = () => {
                 bodyText={bodyTextResolved}
                 creditHours={creditHoursNum}
                 includeSignature={includeSignature}
+                showPrcLicenseNo={showPrcLicenseNo}
+                accreditationMode={accreditationMode}
+                prcAccreditationSuffix={prcAccreditationSuffix}
                 signatureAdjustments={signatureAdjustments}
                 signatureSrcOverrides={signatureSrcOverrides}
                 referenceNumber={referenceByPid.get(record.participant.participant_id) ?? null}
@@ -1908,6 +2018,12 @@ const CertificateOfParticipation: React.FC = () => {
           onChangeBodyText={setBodyText}
           creditHours={creditHours}
           onChangeCreditHours={setCreditHours}
+          showPrcLicenseNo={showPrcLicenseNo}
+          onChangeShowPrcLicenseNo={setShowPrcLicenseNo}
+          accreditationMode={accreditationMode}
+          onChangeAccreditationMode={setAccreditationMode}
+          prcAccreditationSuffix={prcAccreditationSuffix}
+          onChangePrcAccreditationSuffix={setPrcAccreditationSuffix}
           paperSize={paperSize}
           onSelectPaperSize={setPaperSize}
           signatories={signatories}
@@ -1947,6 +2063,9 @@ const CertificateOfParticipation: React.FC = () => {
                 bodyText={bodyTextResolved}
                 creditHours={creditHoursNum}
                 includeSignature={includeSignature}
+                showPrcLicenseNo={showPrcLicenseNo}
+                accreditationMode={accreditationMode}
+                prcAccreditationSuffix={prcAccreditationSuffix}
                 signatureAdjustments={signatureAdjustments}
                 signatureSrcOverrides={signatureSrcOverrides}
                 referenceNumber={referenceByPid.get(previewRecord.participant.participant_id) ?? null}

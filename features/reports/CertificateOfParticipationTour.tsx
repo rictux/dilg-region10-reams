@@ -402,6 +402,32 @@ export const buildCoPTourSteps = ({ openSettings, closeSettings }: StepFactoryOp
     ),
   },
   {
+    id: 'accreditation',
+    section: 'Part 1 · Set up the certificate',
+    title: 'Add PRC / CPD details',
+    target: 'cop-settings-accreditation',
+    placement: 'right',
+    onEnter: openSettings,
+    body: (
+      <>
+        <p className="mb-2">
+          Only needed for activities that carry professional credit — leave both off and the
+          certificate prints exactly as before.
+        </p>
+        <p className="mb-2">
+          <strong>Show “PRC License No.” line</strong> prints a blank line under the participant's
+          name for them to fill in by hand after printing.
+        </p>
+        <p>
+          Then pick the accreditation line shown above the signatory:{' '}
+          <strong>Option 1</strong> for the DILG 10 CPD provider number, or{' '}
+          <strong>Option 2</strong> for the PRC accreditation number — whose last segment you can
+          change per activity, since it differs from one accredited programme to the next.
+        </p>
+      </>
+    ),
+  },
+  {
     id: 'theme',
     section: 'Part 1 · Set up the certificate',
     title: 'Choose the background theme',
@@ -463,8 +489,8 @@ export const buildCoPTourSteps = ({ openSettings, closeSettings }: StepFactoryOp
     body: (
       <p>
         This saves the chosen <strong>signatories</strong> to the event, so they are still selected
-        the next time anyone opens this page. Title, body text, credit hours, theme and paper size
-        apply to the current session only — set them again if you come back later.
+        the next time anyone opens this page. Title, body text, credit hours, PRC/CPD details, theme
+        and paper size apply to the current session only — set them again if you come back later.
       </p>
     ),
   },
