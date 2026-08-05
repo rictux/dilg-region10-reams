@@ -41,8 +41,24 @@ export const decodeQrFromFile = async (file: File): Promise<string> => {
   }
 };
 
+// Fully release a scanner instance and remove its <video> from the DOM.
+// clear() throws while a scan is still ongoing, so the stop() must complete
+// first — hence the await rather than a fire-and-forget catch.
+const teardown = async (scanner: Html5Qrcode | null) => {
+  if (!scanner) return;
+  try {
+    if (scanner.isScanning) {
+      await scanner.stop();
+    }
+  } catch {}
+  try {
+    scanner.clear();
+  } catch {}
+};
+
 const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure, active = true }) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const startupChainRef = useRef<Promise<void>>(Promise.resolve());
   const isStoppedRef = useRef(false);
   const onSuccessRef = useRef(onScanSuccess);
   const onFailureRef = useRef(onScanFailure);
@@ -58,16 +74,18 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure, act
 
   // Stop camera when active becomes false (e.g., modal closed)
   useEffect(() => {
-    if (!active && scannerRef.current) {
-      isStoppedRef.current = true;
-      try {
-        scannerRef.current.stop().catch(() => {});
-        scannerRef.current.clear();
-      } catch {}
-      scannerRef.current = null;
-      setError(null);
-      setIsInitializing(false);
-    }
+    if (active) return;
+
+    isStoppedRef.current = true;
+    const stopping = scannerRef.current;
+    scannerRef.current = null;
+
+    startupChainRef.current = startupChainRef.current
+      .then(() => teardown(stopping))
+      .catch(() => {});
+
+    setError(null);
+    setIsInitializing(false);
   }, [active]);
 
   // Start the scanner with rear camera.
@@ -76,26 +94,20 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure, act
     let scanner: Html5Qrcode | null = null;
 
     const initScanner = async () => {
-      // Clean up any existing scanner first
+      // Belt and braces: the chain guarantees the previous run already tore
+      // down, but never start a second camera on top of a live one.
       if (scannerRef.current) {
-        try {
-          if (scannerRef.current.isScanning) {
-            await scannerRef.current.stop();
-          }
-          scannerRef.current.clear();
-        } catch (e) {
-          console.error('Cleanup error:', e);
-        }
+        await teardown(scannerRef.current);
         scannerRef.current = null;
       }
 
-      // Clear the qr-reader div
+      if (!isMounted) return;
+
+      // Drop any stray nodes a previous run left behind before re-rendering.
       const readerDiv = document.getElementById('qr-reader');
       if (readerDiv) {
         readerDiv.innerHTML = '';
       }
-
-      if (!isMounted) return;
 
       setIsInitializing(true);
       setError(null);
@@ -157,9 +169,17 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure, act
           }
         );
 
-        if (isMounted) {
-          setIsInitializing(false);
+        // The effect may have been torn down while start() was still in flight
+        // (React StrictMode mounts, unmounts, then remounts). html5-qrcode
+        // appends its <video> only once start() resolves, so a scanner
+        // abandoned mid-start would otherwise leave a second live camera feed
+        // in #qr-reader — the doubled preview.
+        if (!isMounted) {
+          await teardown(scanner);
+          return;
         }
+
+        setIsInitializing(false);
       } catch (err) {
         console.error('Failed to start scanner:', err);
         if (isMounted) {
@@ -169,18 +189,22 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure, act
       }
     };
 
-    initScanner();
+    // Serialize start/teardown: a remount must not begin until the previous
+    // run has fully released the camera, or both feeds end up in the DOM.
+    const task = startupChainRef.current.then(initScanner);
+    startupChainRef.current = task.catch(() => {});
 
     return () => {
       isMounted = false;
       isStoppedRef.current = true;
-      if (scannerRef.current) {
-        try {
-          scannerRef.current.stop().catch(() => {});
-          scannerRef.current.clear();
-        } catch {}
-      }
-      scannerRef.current = null;
+      startupChainRef.current = task
+        .then(async () => {
+          await teardown(scanner);
+          if (scannerRef.current === scanner) {
+            scannerRef.current = null;
+          }
+        })
+        .catch(() => {});
     };
   }, []);
 
