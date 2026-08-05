@@ -13,7 +13,17 @@ interface QrScannerProps {
 export const decodeQrFromFile = async (file: File): Promise<string> => {
   const container = document.createElement('div');
   container.id = `qr-file-reader-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  container.style.display = 'none';
+  // Positioned off-screen rather than `display: none`: html5-qrcode sizes its
+  // decode canvas from the container's clientWidth/clientHeight, and a hidden
+  // element reports 0 — which silently downsamples uploads to 300x300 and makes
+  // high-resolution phone photos undecodable.
+  container.style.position = 'fixed';
+  container.style.left = '-10000px';
+  container.style.top = '0';
+  container.style.width = '1500px';
+  container.style.height = '1500px';
+  container.style.opacity = '0';
+  container.style.pointerEvents = 'none';
   document.body.appendChild(container);
 
   const fileScanner = new Html5Qrcode(container.id, {
