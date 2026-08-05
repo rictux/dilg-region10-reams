@@ -21,6 +21,7 @@ import {
   Play,
   Loader2,
   Star,
+  UserCheck,
   Camera
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -29,7 +30,13 @@ import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { SCAN_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
-import { readDelegateType } from '../../lib/delegates';
+import {
+  DELEGATE_CHOICES,
+  DelegateChoice,
+  delegateTypeFromChoice,
+  isPlainDelegate,
+  readDelegateType
+} from '../../lib/delegates';
 import { diffRecords, logAudit } from '../../lib/auditLog';
 import {
   announcePrincipalArrival,
@@ -68,6 +75,7 @@ interface ParticipantCache {
         full_name: string;
         position: string;
         office: string;
+        role: string | null;
         delegate_type: DelegateType | null;
     };
 }
@@ -79,6 +87,9 @@ interface ParticipantDetails {
     photo?: string;
     participantId?: number;
     delegateType?: DelegateType | null;
+    // Needed to tell an ordinary Delegate apart from a Speaker/VIP, which never
+    // carry a delegate type and so must not be offered a reassignment.
+    role?: string | null;
 }
 
 interface CapabilityRange {
@@ -152,7 +163,7 @@ const Scanner: React.FC = () => {
     needs_accommodation: false,
     date_accommodation: [] as string[],
     need_ca: false,
-    delegate_type: '' as '' | DelegateType,
+    delegate_type: '' as '' | DelegateChoice,
     giveaway_selections: {} as Record<string, string | boolean>
   });
   const [autoRegSubmitting, setAutoRegSubmitting] = useState(false);
@@ -197,6 +208,22 @@ const Scanner: React.FC = () => {
   const selectedEventGiveaways = selectedEvent?.giveaways || [];
   const selectedEventHasGiveaways = selectedEventGiveaways.length > 0;
   const selectedEventHasPrincipals = Boolean(selectedEvent?.has_principal_delegates);
+
+  // Which delegate types the scanned participant can still be reassigned to.
+  // A plain Delegate — an "Attendee", stored as NULL — can become either; a
+  // Representative can only be corrected upward to Principal; a Principal is
+  // already at the top and gets no buttons.
+  const delegateReassignmentOptions: DelegateType[] = (() => {
+      if (!selectedEventHasPrincipals) return [];
+      if (scanMode !== 'attendance') return [];
+      if (!participantDetails?.participantId) return [];
+      if (scanResult !== 'Valid' && scanResult !== 'Duplicate' && scanResult !== 'Offline-Saved') return [];
+      if (participantDetails.delegateType === 'Principal') return [];
+      if (participantDetails.delegateType === 'Representative') return ['Principal'];
+      return isPlainDelegate(participantDetails.role, participantDetails.delegateType)
+          ? ['Principal', 'Representative']
+          : [];
+  })();
   // False on cameras that expose no adjustable focus/zoom — typically desktop webcams.
   const hasCameraAdjustments = Boolean(
     cameraControls?.zoom || (cameraControls?.supportsManualFocus && cameraControls?.focusDistance)
@@ -385,6 +412,7 @@ const Scanner: React.FC = () => {
                             full_name: row.participants.full_name,
                             position: row.participants.position,
                             office: row.participants.office,
+                            role: row.role ?? null,
                             delegate_type: readDelegateType(row.role, row.delegate_type)
                         };
                     }
@@ -699,7 +727,8 @@ const Scanner: React.FC = () => {
           participant_id: scannedParticipant.participant_id,
           registration_status: 'Registered',
           role: 'Delegate',
-          delegate_type: selectedEvent?.has_principal_delegates ? autoRegData.delegate_type || null : null,
+          // 'Attendee' is a UI-only answer meaning "neither", so it collapses to NULL.
+          delegate_type: selectedEvent?.has_principal_delegates ? delegateTypeFromChoice(autoRegData.delegate_type) : null,
           needs_accommodation: autoRegData.needs_accommodation,
           accommodation_pax: autoRegData.needs_accommodation ? 1 : 0,
           date_accommodation: accommodationDates,
@@ -720,7 +749,7 @@ const Scanner: React.FC = () => {
         await logScan(autoRegEventId, scannedParticipant.participant_id, 'Valid', deviceScanTime, deviceAttendanceDate, currentSession, 'Auto-Registered');
 
         const registeredType = selectedEvent?.has_principal_delegates
-          ? (autoRegData.delegate_type || null)
+          ? delegateTypeFromChoice(autoRegData.delegate_type)
           : null;
 
         setParticipantDetails({
@@ -728,14 +757,15 @@ const Scanner: React.FC = () => {
           position: scannedParticipant.position,
           office: scannedParticipant.office,
           participantId: scannedParticipant.participant_id,
-          delegateType: registeredType
+          delegateType: registeredType,
+          role: 'Delegate'
         });
         processScanResult(
           'Valid',
           'Auto-registered successfully',
           scannedParticipant.full_name,
           scannedParticipant.position,
-          { delegateType: registeredType }
+          { delegateType: registeredType, role: 'Delegate' }
         );
         setShowAutoRegModal(false);
         setScannedParticipant(null);
@@ -817,7 +847,8 @@ const Scanner: React.FC = () => {
                 position: cachedP.position,
                 office: cachedP.office,
                 participantId: cachedP.participant_id,
-                delegateType: cachedP.delegate_type
+                delegateType: cachedP.delegate_type,
+                role: cachedP.role
             });
 
             processScanResult(
@@ -825,7 +856,7 @@ const Scanner: React.FC = () => {
                 'Saved locally. Will sync when online.',
                 cachedP.full_name,
                 cachedP.position,
-                { delegateType: cachedP.delegate_type }
+                { delegateType: cachedP.delegate_type, role: cachedP.role }
             );
 
             if (cachedP.delegate_type === 'Principal') {
@@ -870,7 +901,8 @@ const Scanner: React.FC = () => {
             position: partData.position,
             office: partData.office,
             participantId: partData.participant_id,
-            delegateType
+            delegateType,
+            role: regData?.role ?? null
         };
         setParticipantDetails(participant);
 
@@ -914,7 +946,7 @@ const Scanner: React.FC = () => {
 
         if (existingLog) {
             if (currentSession === 'AM') {
-                processScanResult('Duplicate', `Already scanned for ${currentSession}.`, participant.name, participant.position, { delegateType });
+                processScanResult('Duplicate', `Already scanned for ${currentSession}.`, participant.name, participant.position, { delegateType, role: regData.role });
                 return;
             } else {
                 const { error: updateError } = await supabase
@@ -927,13 +959,13 @@ const Scanner: React.FC = () => {
                     .eq('attendance_id', existingLog.attendance_id);
 
                 if (updateError) throw updateError;
-                processScanResult('Valid', 'PM Time Updated', participant.name, participant.position, { delegateType });
+                processScanResult('Valid', 'PM Time Updated', participant.name, participant.position, { delegateType, role: regData.role });
                 return;
             }
         }
 
         await logScan(eventId, partData.participant_id, 'Valid', deviceScanTime, deviceAttendanceDate, currentSession, 'Success');
-        processScanResult('Valid', 'Attendance Recorded', participant.name, participant.position, { delegateType });
+        processScanResult('Valid', 'Attendance Recorded', participant.name, participant.position, { delegateType, role: regData.role });
 
         if (delegateType === 'Principal') {
             void announceArrival(participant);
@@ -1017,8 +1049,9 @@ const Scanner: React.FC = () => {
       }
   };
 
-  // Scan-time correction: a Representative turned out to be the Principal.
-  const promoteToPrincipal = async () => {
+  // Scan-time correction: an ordinary Attendee turns out to hold the seat, or a
+  // Representative turns out to be the Principal after all.
+  const assignDelegateType = async (next: DelegateType) => {
       const event = selectedEventRef.current;
       const details = participantDetails;
       if (!event || !details?.participantId || isPromoting) return;
@@ -1028,7 +1061,7 @@ const Scanner: React.FC = () => {
           const previous = { delegate_type: details.delegateType ?? null };
           const { error } = await supabase
               .from('event_participants')
-              .update({ delegate_type: 'Principal' })
+              .update({ delegate_type: next })
               .eq('event_id', event.event_id)
               .eq('participant_id', details.participantId);
 
@@ -1042,24 +1075,28 @@ const Scanner: React.FC = () => {
               entityLabel: details.name,
               eventId: event.event_id,
               eventName: event.event_name,
-              reason: 'Promoted to Principal at the scanner',
-              changes: diffRecords(previous, { delegate_type: 'Principal' })
+              reason: `Marked as ${next} at the scanner`,
+              changes: diffRecords(previous, { delegate_type: next })
           });
 
-          setParticipantDetails({ ...details, delegateType: 'Principal' });
+          const updated = { ...details, delegateType: next };
+          setParticipantDetails(updated);
           setParticipantCache((prev) => {
               const code = Object.keys(prev).find((key) => prev[key].participant_id === details.participantId);
               if (!code) return prev;
-              return { ...prev, [code]: { ...prev[code], delegate_type: 'Principal' } };
+              return { ...prev, [code]: { ...prev[code], delegate_type: next } };
           });
           setRecentScans((prev) => prev.map((scan, index) => (
-              index === 0 ? { ...scan, delegateType: 'Principal' as DelegateType } : scan
+              index === 0 ? { ...scan, delegateType: next } : scan
           )));
-          setResultMessage('Marked as Principal');
+          setResultMessage(`Marked as ${next}`);
 
-          await announceArrival(details, { source: 'Promoted' });
+          // Only a Principal's arrival is announced.
+          if (next === 'Principal') {
+              await announceArrival(updated, { source: 'Promoted' });
+          }
       } catch (err: any) {
-          toast.error('Could not mark as Principal: ' + (err?.message || 'Unknown error'));
+          toast.error(`Could not mark as ${next}: ` + (err?.message || 'Unknown error'));
       } finally {
           setIsPromoting(false);
       }
@@ -1241,12 +1278,16 @@ const Scanner: React.FC = () => {
       message: string,
       name: string = 'Unknown',
       position: string = '',
-      options: { autoReset?: boolean; delegateType?: DelegateType | null } = {}
+      options: { autoReset?: boolean; delegateType?: DelegateType | null; role?: string | null } = {}
   ) => {
-      // Principal and Representative cards are held until acknowledged: the first
-      // so the arrival isn't cleared before anyone reads it, the second so there
-      // is time to correct it to Principal. Every other scan keeps the 2s flow.
-      const autoReset = options.delegateType ? false : options.autoReset;
+      // On events that seat principals, every Delegate card is held until
+      // acknowledged: a Principal so the arrival isn't cleared before anyone
+      // reads it, and a Representative or Attendee so there is time to correct
+      // the type. Non-delegates, and every scan on ordinary events, keep the 2s
+      // flow.
+      const holdForDelegateAction = Boolean(selectedEventRef.current?.has_principal_delegates)
+          && options.role === 'Delegate';
+      const autoReset = (options.delegateType || holdForDelegateAction) ? false : options.autoReset;
 
       setScanResult(status);
       setResultMessage(message);
@@ -1731,22 +1772,33 @@ const Scanner: React.FC = () => {
                             </div>
                         )}
 
-                        {/* A Representative may turn out to be the Principal after all. */}
-                        {selectedEventHasPrincipals
-                            && participantDetails?.participantId
-                            && participantDetails.delegateType === 'Representative'
-                            && (scanResult === 'Valid' || scanResult === 'Duplicate' || scanResult === 'Offline-Saved')
-                            && scanMode === 'attendance' && (
-                            <button
-                                type="button"
-                                onClick={promoteToPrincipal}
-                                disabled={isPromoting || !isOnline}
-                                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-amber-400 bg-amber-50 px-5 py-3 text-sm font-bold text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                title={!isOnline ? 'Requires an internet connection' : undefined}
-                            >
-                                {isPromoting ? <Loader2 size={16} className="animate-spin" /> : <Star size={16} />}
-                                {isPromoting ? 'Marking…' : 'Mark as Principal'}
-                            </button>
+                        {/*
+                          A Representative may turn out to be the Principal, and an
+                          ordinary Attendee may turn out to hold the seat entirely.
+                          Offer whichever reassignments the current type allows.
+                        */}
+                        {delegateReassignmentOptions.length > 0 && (
+                            <div className={`mt-4 grid w-full gap-2 ${delegateReassignmentOptions.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                {delegateReassignmentOptions.map((option) => (
+                                    <button
+                                        key={option}
+                                        type="button"
+                                        onClick={() => assignDelegateType(option)}
+                                        disabled={isPromoting || !isOnline}
+                                        className={`inline-flex items-center justify-center gap-2 rounded-xl border-2 px-5 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                                            option === 'Principal'
+                                                ? 'border-amber-400 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                                                : 'border-sky-300 bg-sky-50 text-sky-800 hover:bg-sky-100'
+                                        }`}
+                                        title={!isOnline ? 'Requires an internet connection' : undefined}
+                                    >
+                                        {isPromoting
+                                            ? <Loader2 size={16} className="animate-spin" />
+                                            : option === 'Principal' ? <Star size={16} /> : <UserCheck size={16} />}
+                                        {isPromoting ? 'Marking…' : `Mark as ${option}`}
+                                    </button>
+                                ))}
+                            </div>
                         )}
 
                         {giveawayClaimDetails && (
@@ -1890,14 +1942,14 @@ const Scanner: React.FC = () => {
                 <div className="p-6 flex flex-col gap-6 max-h-96 overflow-y-auto">
                   <h3 className="text-lg font-bold text-slate-900">Event Details</h3>
 
-                  {/* Principal / Representative */}
+                  {/* Principal / Representative / Attendee */}
                   {selectedEvent.has_principal_delegates && (
                     <div className="space-y-3">
                       <label className="block text-sm font-semibold text-slate-900">
                         Attending as
                       </label>
-                      <div className="flex gap-4">
-                        {(['Principal', 'Representative'] as DelegateType[]).map((type) => (
+                      <div className="flex flex-wrap gap-4">
+                        {DELEGATE_CHOICES.map((type) => (
                           <label key={type} className="flex items-center gap-2 cursor-pointer">
                             <input
                               type="radio"

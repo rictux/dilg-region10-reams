@@ -2,7 +2,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { DelegateType, Event, Participant, RefLocation } from '../../types/database';
+import { Event, Participant, RefLocation } from '../../types/database';
+import { DelegateChoice, delegateTypeFromChoice } from '../../lib/delegates';
 import QRCode from 'react-qr-code';
 import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock, Landmark, Download, Info, Gift, Star, UserCheck, Upload } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
@@ -125,7 +126,7 @@ const EventRegistration: React.FC = () => {
     pwd: 'No',
     indigenous_people: 'No',
     role: 'Delegate',
-    delegate_type: '' as '' | DelegateType,
+    delegate_type: '' as '' | DelegateChoice,
     needs_accommodation: false,
     accommodation_pax: 0,
     date_accommodation: [] as string[],
@@ -353,7 +354,7 @@ const EventRegistration: React.FC = () => {
     }
 
     if (event?.has_principal_delegates && !formData.delegate_type) {
-      setError("Please select whether you are attending as the Principal or as a Representative.");
+      setError("Please select whether you are attending as the Principal, as a Representative, or as an Attendee.");
       return null;
     }
 
@@ -707,7 +708,8 @@ const EventRegistration: React.FC = () => {
           participant_id: participantId,
           registration_status: 'Registered',
           role: 'Delegate',
-          delegate_type: event.has_principal_delegates ? formData.delegate_type || null : null,
+          // 'Attendee' is a UI-only answer meaning "neither", so it collapses to NULL.
+          delegate_type: event.has_principal_delegates ? delegateTypeFromChoice(formData.delegate_type) : null,
           needs_accommodation: formData.needs_accommodation,
           accommodation_pax: formData.needs_accommodation ? formData.accommodation_pax : 0,
           date_accommodation: formData.needs_accommodation && event.has_accommodation ? normalizedAccommodationDates : null,
@@ -1389,8 +1391,9 @@ const EventRegistration: React.FC = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-2">Are you attending as<RequiredMark /></label>
                                 <div className="flex flex-col sm:flex-row gap-3">
                                     {([
-                                        { value: 'Principal' as DelegateType, icon: Star, title: 'Principal', hint: 'The official invited to this event' },
-                                        { value: 'Representative' as DelegateType, icon: UserCheck, title: 'Representative', hint: 'Attending in the Principal\'s place' }
+                                        { value: 'Principal' as DelegateChoice, icon: Star, title: 'Principal', hint: 'The official invited to this event' },
+                                        { value: 'Representative' as DelegateChoice, icon: UserCheck, title: 'Representative', hint: 'Attending in the Principal\'s place' },
+                                        { value: 'Attendee' as DelegateChoice, icon: Users, title: 'Attendee', hint: 'Neither — attending on your own behalf' }
                                     ]).map(({ value, icon: Icon, title, hint }) => {
                                         const active = formData.delegate_type === value;
                                         return (

@@ -111,7 +111,9 @@ export interface Participant {
 
 // Sub-classification of a Delegate on events with `has_principal_delegates`.
 // A Principal holds the seat; a Representative attends in the Principal's place.
-// Always NULL when the participant's role is not 'Delegate'.
+// NULL means an ordinary delegate claiming neither — what the registration form
+// offers as "Attendee" — and is also the value for any role other than
+// 'Delegate'. Only these two values are ever persisted.
 export type DelegateType = 'Principal' | 'Representative';
 
 export interface EventParticipant {
