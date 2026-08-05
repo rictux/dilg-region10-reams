@@ -128,17 +128,25 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure, act
           { facingMode: "environment" },
           {
             fps: 20,
+            // qrbox is measured in CSS pixels and also sizes the decode canvas,
+            // so a small box literally means fewer pixels per QR module. Keep it
+            // as large as the viewfinder allows — it must never exceed the
+            // viewfinder or getShadedRegionBounds throws.
             qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
               const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-              const size = Math.max(150, Math.floor(minEdge * 0.7));
+              const size = Math.min(minEdge, Math.max(150, Math.floor(minEdge * 0.9)));
               return { width: size, height: size };
             },
             videoConstraints: {
               facingMode: "environment",
-              // @ts-ignore - focusMode is supported in many browsers even if not in standard TS types
+              // @ts-ignore - focusMode is a hint; browsers that don't support it ignore it
               focusMode: "continuous",
-              width: { min: 640, ideal: 1280, max: 1920 },
-              height: { min: 480, ideal: 720, max: 1080 }
+              // Only ideals: `min` is a hard constraint and makes getUserMedia
+              // throw OverconstrainedError on devices that can't hit it. A
+              // higher-resolution source also downsamples more cleanly into the
+              // decode canvas.
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
             }
           },
           handleSuccess,
@@ -177,8 +185,8 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure, act
   }, []);
 
   return (
-    <div className="w-full max-w-sm mx-auto">
-      <div className="relative w-full h-80 overflow-hidden rounded-xl shadow-sm border border-[#E0DDD4] bg-black">
+    <div className="w-full mx-auto">
+      <div className="relative w-full min-h-[18rem] overflow-hidden rounded-xl shadow-sm border border-[#E0DDD4] bg-black">
         {isInitializing && !error && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#111110]/90 z-20 text-white">
             <Loader2 className="w-8 h-8 text-[#8B82F0] animate-spin mb-3" />
@@ -193,7 +201,14 @@ const QrScanner: React.FC<QrScannerProps> = ({ onScanSuccess, onScanFailure, act
           </div>
         )}
 
-        <div id="qr-reader" className="relative w-full h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover"></div>
+        {/*
+          The video must keep its natural aspect ratio. html5-qrcode maps the
+          scan box to source pixels using videoWidth/clientWidth and
+          videoHeight/clientHeight independently, which is only correct when the
+          video is not letterboxed or cropped. `object-cover` broke that
+          assumption and handed the decoder a horizontally squashed QR.
+        */}
+        <div id="qr-reader" className="relative w-full [&_video]:w-full [&_video]:h-auto [&_video]:block"></div>
       </div>
     </div>
   );
