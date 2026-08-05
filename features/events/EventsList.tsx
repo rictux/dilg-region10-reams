@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { DelegateType, Event, Participant, Office, GiveawayItem, EventAccessRole, EventUserAccess, User } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift, Settings, ChevronDown, Hash, Utensils } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift, Settings, ChevronDown, Hash, Utensils, QrCode } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import ExcelJS from 'exceljs';
@@ -288,6 +288,7 @@ const EventsList: React.FC = () => {
   const venueInputFocusedRef = React.useRef(false);
   const qrCodeRef = React.useRef<HTMLDivElement>(null);
   const [downloadingBadge, setDownloadingBadge] = useState(false);
+  const [downloadingQr, setDownloadingQr] = useState(false);
 
   useEffect(() => {
     if (!isAdmin && eventView === 'deleted') {
@@ -1913,6 +1914,101 @@ const EventsList: React.FC = () => {
       setTimeout(() => setCopied(false), 2000);
   };
 
+  // Downloads the registration QR on its own — the same artwork as the badge's QR
+  // block (DILG seal centered, white quiet zone) minus the surrounding card, for
+  // dropping into posters, slides or chat.
+  const downloadRegistrationQrCode = async () => {
+      if (!selectedEvent) return;
+
+      const svgElement = qrCodeRef.current?.querySelector('svg');
+      if (!svgElement) {
+          toast.error('Unable to generate QR code. Please try again.');
+          return;
+      }
+
+      setDownloadingQr(true);
+      let svgUrl: string | null = null;
+      try {
+          const QR_SIZE = 1024;             // rendered QR edge in px
+          const MARGIN = 64;                // white quiet zone around it
+          const CANVAS = QR_SIZE + MARGIN * 2;
+
+          // Render the QR SVG at final resolution so it stays sharp when scaled up
+          const svgClone = svgElement.cloneNode(true) as SVGElement;
+          svgClone.setAttribute('width', String(QR_SIZE));
+          svgClone.setAttribute('height', String(QR_SIZE));
+          const svgString = new XMLSerializer().serializeToString(svgClone);
+          svgUrl = URL.createObjectURL(new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' }));
+
+          const qrImage = new Image();
+          await new Promise<void>((resolve, reject) => {
+              qrImage.onload = () => resolve();
+              qrImage.onerror = () => reject(new Error('Failed to load QR code image'));
+              qrImage.src = svgUrl as string;
+          });
+
+          // The on-screen seal is an overlay <img>, not part of the SVG, so load it separately
+          const logoImage = new Image();
+          await new Promise<void>((resolve, reject) => {
+              logoImage.onload = () => resolve();
+              logoImage.onerror = () => reject(new Error('Failed to load logo image'));
+              logoImage.src = '/assets/dilg_logo.png';
+          });
+
+          const canvas = document.createElement('canvas');
+          canvas.width = CANVAS;
+          canvas.height = CANVAS;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('Canvas not supported');
+
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, CANVAS, CANVAS);
+          ctx.drawImage(qrImage, MARGIN, MARGIN, QR_SIZE, QR_SIZE);
+
+          // DILG seal in the center, with a thin white circular border (matches UI)
+          const logoSize = QR_SIZE * 0.25;
+          const ringPadding = QR_SIZE * 0.018;
+          const center = MARGIN + QR_SIZE / 2;
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(center, center, logoSize / 2 + ringPadding, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(center, center, logoSize / 2, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(logoImage, center - logoSize / 2, center - logoSize / 2, logoSize, logoSize);
+          ctx.restore();
+
+          const pngBlob = await new Promise<Blob>((resolve, reject) => {
+              canvas.toBlob(
+                  (blob) => (blob ? resolve(blob) : reject(new Error('Failed to render PNG'))),
+                  'image/png'
+              );
+          });
+
+          const safeName = (selectedEvent.event_name || 'Event')
+              .replace(/[^a-z0-9]+/gi, '_')
+              .replace(/^_+|_+$/g, '')
+              .toLowerCase() || 'event';
+          const pngUrl = URL.createObjectURL(pngBlob);
+          const downloadLink = document.createElement('a');
+          downloadLink.href = pngUrl;
+          downloadLink.download = `${safeName}_registration_qr.png`;
+          document.body.appendChild(downloadLink);
+          downloadLink.click();
+          document.body.removeChild(downloadLink);
+          setTimeout(() => URL.revokeObjectURL(pngUrl), 10000);
+
+          toast.success('QR code downloaded.');
+      } catch (err: any) {
+          toast.error('Error generating QR code: ' + (err?.message || 'Unknown error'));
+      } finally {
+          if (svgUrl) URL.revokeObjectURL(svgUrl);
+          setDownloadingQr(false);
+      }
+  };
+
   const downloadRegistrationBadge = async () => {
       if (!selectedEvent) return;
 
@@ -3274,14 +3370,25 @@ const EventsList: React.FC = () => {
                                 </div>
                             </div>
 
-                            <button
-                                onClick={downloadRegistrationBadge}
-                                disabled={downloadingBadge}
-                                className="w-full px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                                {downloadingBadge ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-                                {downloadingBadge ? 'Generating...' : 'Download Badge (PDF)'}
-                            </button>
+                            <div className="w-full space-y-2">
+                                <button
+                                    onClick={downloadRegistrationBadge}
+                                    disabled={downloadingBadge || downloadingQr}
+                                    className="w-full px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                                >
+                                    {downloadingBadge ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                                    {downloadingBadge ? 'Generating...' : 'Download Badge (PDF)'}
+                                </button>
+
+                                <button
+                                    onClick={downloadRegistrationQrCode}
+                                    disabled={downloadingBadge || downloadingQr}
+                                    className="w-full px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                                >
+                                    {downloadingQr ? <Loader2 size={18} className="animate-spin" /> : <QrCode size={18} />}
+                                    {downloadingQr ? 'Generating...' : 'Download QR Code (PNG)'}
+                                </button>
+                            </div>
                         </>
                     )}
                 </div>
