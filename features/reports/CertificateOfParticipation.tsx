@@ -47,6 +47,13 @@ import {
   writeStoredSignatureAdjustment,
 } from '../../lib/signatureAdjustment';
 import { getTransparentSignature } from '../../lib/signatureBackground';
+import { EventTest, EventTestSubmission } from '../../types/database';
+import {
+  EVENT_TEST_LABEL,
+  buildTestCompletionIndex,
+  evaluateTestRequirement,
+  missingTestsLabel,
+} from '../../lib/eventTests';
 
 const CERT_TITLE_OPTIONS: CoPTitle[] = [
   'Certificate of Participation',
@@ -319,6 +326,8 @@ type SettingsModalProps = {
   // Title
   certTitle: CoPTitle;
   onSelectTitle: (t: CoPTitle) => void;
+  /** Explains the extra Pre/Post-test requirement, when the chosen title carries one. */
+  testRequirementHint: string | null;
   // Body text
   bodyText: string;
   onChangeBodyText: (v: string) => void;
@@ -358,7 +367,7 @@ const isCompletePartnerAgencySignatory = (signatory: CertificateSignatory) =>
 const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose, themes, themeUrl, onSelectTheme, onUploadTheme, onDeleteTheme,
   isUploadingTheme, themeError,
-  certTitle, onSelectTitle,
+  certTitle, onSelectTitle, testRequirementHint,
   bodyText, onChangeBodyText,
   creditHours, onChangeCreditHours,
   showPrcLicenseNo, onChangeShowPrcLicenseNo,
@@ -414,6 +423,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 </button>
               ))}
             </div>
+            {testRequirementHint && (
+              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+                {testRequirementHint}
+              </p>
+            )}
           </section>
 
           {/* ── Body text ── */}
@@ -853,6 +867,11 @@ const CertificateOfParticipation: React.FC = () => {
   const [officeCode,   setOfficeCode]   = useState<string | null>(null);
   const [loading,      setLoading]      = useState(true);
 
+  // Pre-test / Post-test. A Certificate of Completion additionally requires that
+  // every test the event runs was submitted — the score does not matter.
+  const [eventTests,     setEventTests]     = useState<EventTest[]>([]);
+  const [testCompletion, setTestCompletion] = useState<Map<number, Set<number>>>(new Map());
+
   // ── certificate settings
   const [paperSize,          setPaperSize]          = useState<CoPPaperSize>('A4');
   const [themeUrl,           setThemeUrl]            = useState<string | null>(null);
@@ -1080,6 +1099,28 @@ const CertificateOfParticipation: React.FC = () => {
         setSecondarySignatory(savedSecondary);
       }
 
+      const { data: testRows } = await supabase
+        .from('event_tests')
+        .select('*')
+        .eq('event_id', id);
+      const tests = (testRows ?? []) as EventTest[];
+      setEventTests(tests);
+
+      if (tests.length === 0) {
+        setTestCompletion(new Map());
+      } else {
+        const submissions = await fetchAllSupabaseRows<any>(() =>
+          supabase
+            .from('event_test_submissions')
+            .select('participant_id, test_id')
+            .eq('event_id', id)
+            .order('submission_id', { ascending: true })
+        );
+        setTestCompletion(
+          buildTestCompletionIndex(submissions as Pick<EventTestSubmission, 'participant_id' | 'test_id'>[])
+        );
+      }
+
       const logs = await fetchAllSupabaseRows<any>(() =>
         supabase
           .from('attendance_logs')
@@ -1234,19 +1275,49 @@ const CertificateOfParticipation: React.FC = () => {
     [event]
   );
 
+  // Only the Certificate of Completion carries the test requirement — Participation
+  // and Appreciation have no prerequisites beyond attendance, so a participant who
+  // skipped a test can still receive one of those.
+  const requiresTests = certTitle === 'Certificate of Completion' && eventTests.length > 0;
+
+  const testRequirementHint = useMemo(() => {
+    if (eventTests.length === 0) return null;
+    const names = eventTests
+      .map(test => EVENT_TEST_LABEL[test.test_type].toLowerCase())
+      .join(' and ');
+    return requiresTests
+      ? `This event runs a ${names}. Only participants who submitted ${eventTests.length > 1 ? 'both' : 'it'} count as complete for a Certificate of Completion — the score does not matter.`
+      : `This event runs a ${names}, but only a Certificate of Completion requires ${eventTests.length > 1 ? 'them' : 'it'}.`;
+  }, [eventTests, requiresTests]);
+
+  /** Tests this participant still owes, or [] when nothing is required of them. */
+  const missingTestsFor = useCallback(
+    (participantId: number) =>
+      requiresTests
+        ? evaluateTestRequirement(eventTests, testCompletion, participantId).missing
+        : [],
+    [requiresTests, eventTests, testCompletion]
+  );
+
   const completedParticipantIds = useMemo(() => {
     const completedIds = new Set<number>();
     if (requiredAttendanceDates.length === 0) return completedIds;
 
     participants.forEach(record => {
+      const participantId = record.participant.participant_id;
       const attendedDates = new Set(record.log_dates);
-      if (requiredAttendanceDates.every(date => attendedDates.has(date))) {
-        completedIds.add(record.participant.participant_id);
+      const attendanceComplete = requiredAttendanceDates.every(date => attendedDates.has(date));
+      if (!attendanceComplete) return;
+
+      if (requiresTests && !evaluateTestRequirement(eventTests, testCompletion, participantId).met) {
+        return;
       }
+
+      completedIds.add(participantId);
     });
 
     return completedIds;
-  }, [participants, requiredAttendanceDates]);
+  }, [participants, requiredAttendanceDates, requiresTests, eventTests, testCompletion]);
 
   const attendanceFilteredParticipants = useMemo(() => {
     if (attendanceFilter === 'All') return roleFilteredParticipants;
@@ -1755,7 +1826,9 @@ const CertificateOfParticipation: React.FC = () => {
                 aria-pressed={attendanceFilter === 'Complete'}
                 onClick={() => applyAttendanceFilter('Complete')}
                 className={`${attendanceFilter === 'Complete' ? 'font-semibold text-emerald-700' : 'text-violet-600'} hover:underline`}
-                title="Show only participants with attendance on every event date"
+                title={requiresTests
+                  ? 'Show only participants with attendance on every event date who have also submitted every test'
+                  : 'Show only participants with attendance on every event date'}
               >
                 Complete
               </button>
@@ -1825,9 +1898,13 @@ const CertificateOfParticipation: React.FC = () => {
             {filtered.length === 0 && (
               <p className="text-xs text-[#9A9890] text-center py-10">
                 {attendanceFilter === 'Complete'
-                  ? 'No participants have completed attendance for every event date.'
+                  ? requiresTests
+                    ? 'No participants have both complete attendance and every test submitted.'
+                    : 'No participants have completed attendance for every event date.'
                   : attendanceFilter === 'Incomplete'
-                    ? 'No participants have incomplete attendance for this event.'
+                    ? requiresTests
+                      ? 'Every participant has complete attendance and has submitted every test.'
+                      : 'No participants have incomplete attendance for this event.'
                     : 'No participants found.'}
               </p>
             )}
@@ -1836,6 +1913,7 @@ const CertificateOfParticipation: React.FC = () => {
               const isSelected  = selectedIds.includes(pid);
               const isPreviewing = previewId === pid;
               const hasLogs     = record.log_dates.length > 0;
+              const missingTests = missingTestsFor(pid);
 
               return (
                 <div
@@ -1866,6 +1944,14 @@ const CertificateOfParticipation: React.FC = () => {
                     <p className="truncate text-[10px] leading-snug text-[#9A9890] mt-0.5">
                       {record.participant.office || '—'}
                     </p>
+                    {missingTests.length > 0 && (
+                      <span
+                        className="mt-1 inline-block rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-700"
+                        title="A Certificate of Completion requires every test to be submitted. Switch the title to Certificate of Participation to issue one anyway."
+                      >
+                        {missingTestsLabel(missingTests)}
+                      </span>
+                    )}
                   </div>
                   <button
                     onClick={e => { e.stopPropagation(); setPreviewId(pid); setShowPreviewModal(true); }}
@@ -1887,6 +1973,14 @@ const CertificateOfParticipation: React.FC = () => {
             <span className="font-medium text-[#6B6860] truncate">
               {certTitle}
             </span>
+            {requiresTests && (
+              <>
+                <span className="text-[#C5C2BA]">·</span>
+                <span className="shrink-0 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                  Pre/Post test required
+                </span>
+              </>
+            )}
             <span className="text-[#C5C2BA]">·</span>
             <span className="font-medium text-[#6B6860]">
               {paperSize} Landscape
@@ -2014,6 +2108,7 @@ const CertificateOfParticipation: React.FC = () => {
           themeError={themeError}
           certTitle={certTitle}
           onSelectTitle={setCertTitle}
+          testRequirementHint={testRequirementHint}
           bodyText={bodyText}
           onChangeBodyText={setBodyText}
           creditHours={creditHours}
