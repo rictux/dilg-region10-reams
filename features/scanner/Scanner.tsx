@@ -168,6 +168,9 @@ const Scanner: React.FC = () => {
   });
   const [autoRegSubmitting, setAutoRegSubmitting] = useState(false);
   const [isPromoting, setIsPromoting] = useState(false);
+  // True once the scanner has picked a delegate type for the current scan, so
+  // the card doesn't come straight back asking to correct the choice again.
+  const [delegateTypeAssigned, setDelegateTypeAssigned] = useState(false);
   const [autoRegEventId, setAutoRegEventId] = useState<number | null>(null);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -218,6 +221,9 @@ const Scanner: React.FC = () => {
       if (scanMode !== 'attendance') return [];
       if (!participantDetails?.participantId) return [];
       if (scanResult !== 'Valid' && scanResult !== 'Duplicate' && scanResult !== 'Offline-Saved') return [];
+      // The choice was already made on this card — offering "Mark as Principal"
+      // to someone just marked Representative would only re-ask the question.
+      if (delegateTypeAssigned) return [];
       if (participantDetails.delegateType === 'Principal') return [];
       if (participantDetails.delegateType === 'Representative') return ['Principal'];
       return isPlainDelegate(participantDetails.role, participantDetails.delegateType)
@@ -1090,6 +1096,7 @@ const Scanner: React.FC = () => {
               index === 0 ? { ...scan, delegateType: next } : scan
           )));
           setResultMessage(`Marked as ${next}`);
+          setDelegateTypeAssigned(true);
 
           // Only a Principal's arrival is announced.
           if (next === 'Principal') {
@@ -1264,6 +1271,7 @@ const Scanner: React.FC = () => {
       setGiveawayClaimDetails(null);
       setResultMessage('');
       setResultRequiresAck(false);
+      setDelegateTypeAssigned(false);
       isProcessingRef.current = false;
 
       if (options.resumeCamera) {
@@ -1292,6 +1300,7 @@ const Scanner: React.FC = () => {
       setScanResult(status);
       setResultMessage(message);
       setResultRequiresAck(autoReset === false);
+      setDelegateTypeAssigned(false);
 
       const newScan: RecentScan = {
           id: Date.now().toString(),
