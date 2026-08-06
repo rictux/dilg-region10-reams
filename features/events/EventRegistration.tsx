@@ -1391,9 +1391,9 @@ const EventRegistration: React.FC = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-2">Are you attending as<RequiredMark /></label>
                                 <div className="flex flex-col sm:flex-row gap-3">
                                     {([
-                                        { value: 'Principal' as DelegateChoice, icon: Star, title: 'Principal', hint: 'The official invited to this event' },
-                                        { value: 'Representative' as DelegateChoice, icon: UserCheck, title: 'Representative', hint: 'Attending in the Principal\'s place' },
-                                        { value: 'Attendee' as DelegateChoice, icon: Users, title: 'Attendee', hint: 'Neither — attending on your own behalf' }
+                                        { value: 'Principal' as DelegateChoice, icon: Star, title: 'Principal', hint: 'The official member invited to this event' },
+                                        { value: 'Representative' as DelegateChoice, icon: UserCheck, title: 'Representative', hint: 'Authorized to attend on behalf of the principal' },
+                                        { value: 'Attendee' as DelegateChoice, icon: Users, title: 'Attendee', hint: 'Attending as participant/observer' }
                                     ]).map(({ value, icon: Icon, title, hint }) => {
                                         const active = formData.delegate_type === value;
                                         return (
