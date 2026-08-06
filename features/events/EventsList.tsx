@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { DelegateType, Event, Participant, Office, GiveawayItem, EventAccessRole, EventUserAccess, User } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift, Settings, ChevronDown, Hash, Utensils, QrCode } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift, Settings, ChevronDown, Hash, Utensils, QrCode, ClipboardList } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import ExcelJS from 'exceljs';
@@ -29,6 +29,8 @@ import {
   delegateTypeForRole,
   readDelegateType
 } from '../../lib/delegates';
+import { downloadQrCodePng, qrFileSlug } from '../../lib/qrDownload';
+import EventTestBuilder from './EventTestBuilder';
 
 type ParticipantFormData = {
   f_name: string;
@@ -183,6 +185,7 @@ const EventsList: React.FC = () => {
   // Modal States
   const [showEventModal, setShowEventModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showTestBuilder, setShowTestBuilder] = useState(false);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [showEventAccessModal, setShowEventAccessModal] = useState(false);
   const [selectedAccessEvent, setSelectedAccessEvent] = useState<Event | null>(null);
@@ -1209,6 +1212,12 @@ const EventsList: React.FC = () => {
       setCopied(false);
   };
 
+  const openTestBuilder = (e: React.MouseEvent, event: Event) => {
+      e.stopPropagation(); // Prevent row click
+      setSelectedEvent(event);
+      setShowTestBuilder(true);
+  };
+
   const handleRowClick = (event: Event) => {
       setSelectedEvent(event);
       setShowParticipantsModal(true);
@@ -1927,84 +1936,15 @@ const EventsList: React.FC = () => {
       }
 
       setDownloadingQr(true);
-      let svgUrl: string | null = null;
       try {
-          const QR_SIZE = 1024;             // rendered QR edge in px
-          const MARGIN = 64;                // white quiet zone around it
-          const CANVAS = QR_SIZE + MARGIN * 2;
-
-          // Render the QR SVG at final resolution so it stays sharp when scaled up
-          const svgClone = svgElement.cloneNode(true) as SVGElement;
-          svgClone.setAttribute('width', String(QR_SIZE));
-          svgClone.setAttribute('height', String(QR_SIZE));
-          const svgString = new XMLSerializer().serializeToString(svgClone);
-          svgUrl = URL.createObjectURL(new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' }));
-
-          const qrImage = new Image();
-          await new Promise<void>((resolve, reject) => {
-              qrImage.onload = () => resolve();
-              qrImage.onerror = () => reject(new Error('Failed to load QR code image'));
-              qrImage.src = svgUrl as string;
-          });
-
-          // The on-screen seal is an overlay <img>, not part of the SVG, so load it separately
-          const logoImage = new Image();
-          await new Promise<void>((resolve, reject) => {
-              logoImage.onload = () => resolve();
-              logoImage.onerror = () => reject(new Error('Failed to load logo image'));
-              logoImage.src = '/assets/dilg_logo.png';
-          });
-
-          const canvas = document.createElement('canvas');
-          canvas.width = CANVAS;
-          canvas.height = CANVAS;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) throw new Error('Canvas not supported');
-
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, CANVAS, CANVAS);
-          ctx.drawImage(qrImage, MARGIN, MARGIN, QR_SIZE, QR_SIZE);
-
-          // DILG seal in the center, with a thin white circular border (matches UI)
-          const logoSize = QR_SIZE * 0.25;
-          const ringPadding = QR_SIZE * 0.018;
-          const center = MARGIN + QR_SIZE / 2;
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(center, center, logoSize / 2 + ringPadding, 0, Math.PI * 2);
-          ctx.fillStyle = '#ffffff';
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(center, center, logoSize / 2, 0, Math.PI * 2);
-          ctx.clip();
-          ctx.drawImage(logoImage, center - logoSize / 2, center - logoSize / 2, logoSize, logoSize);
-          ctx.restore();
-
-          const pngBlob = await new Promise<Blob>((resolve, reject) => {
-              canvas.toBlob(
-                  (blob) => (blob ? resolve(blob) : reject(new Error('Failed to render PNG'))),
-                  'image/png'
-              );
-          });
-
-          const safeName = (selectedEvent.event_name || 'Event')
-              .replace(/[^a-z0-9]+/gi, '_')
-              .replace(/^_+|_+$/g, '')
-              .toLowerCase() || 'event';
-          const pngUrl = URL.createObjectURL(pngBlob);
-          const downloadLink = document.createElement('a');
-          downloadLink.href = pngUrl;
-          downloadLink.download = `${safeName}_registration_qr.png`;
-          document.body.appendChild(downloadLink);
-          downloadLink.click();
-          document.body.removeChild(downloadLink);
-          setTimeout(() => URL.revokeObjectURL(pngUrl), 10000);
-
+          await downloadQrCodePng(
+              svgElement,
+              `${qrFileSlug(selectedEvent.event_name)}_registration_qr.png`
+          );
           toast.success('QR code downloaded.');
       } catch (err: any) {
           toast.error('Error generating QR code: ' + (err?.message || 'Unknown error'));
       } finally {
-          if (svgUrl) URL.revokeObjectURL(svgUrl);
           setDownloadingQr(false);
       }
   };
@@ -3057,6 +2997,16 @@ const EventsList: React.FC = () => {
                                           </button>
                                           {canEditCurrentEvent && (
                                               <button
+                                                  onClick={(e) => openTestBuilder(e, event)}
+                                                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                                                  title="Pre-test / Post-test"
+                                              >
+                                                  <ClipboardList size={13} />
+                                                  <span>Tests</span>
+                                              </button>
+                                          )}
+                                          {canEditCurrentEvent && (
+                                              <button
                                                   onClick={(e) => {
                                                       e.stopPropagation();
                                                       openEditModal(e, event);
@@ -3229,6 +3179,16 @@ const EventsList: React.FC = () => {
                                       </button>
                                       {canEditCurrentEvent && (
                                       <button
+                                          onClick={(e) => openTestBuilder(e, event)}
+                                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 transition-colors hover:bg-slate-100"
+                                          title="Pre-test / Post-test"
+                                          aria-label="Pre-test / Post-test"
+                                      >
+                                          <ClipboardList size={16} />
+                                      </button>
+                                      )}
+                                      {canEditCurrentEvent && (
+                                      <button
                                           onClick={(e) => {
                                               e.stopPropagation();
                                               openEditModal(e, event);
@@ -3315,6 +3275,14 @@ const EventsList: React.FC = () => {
           )}
       </div>
       </div>
+      )}
+
+      {/* Pre-test / Post-test builder */}
+      {showTestBuilder && selectedEvent && (
+        <EventTestBuilder
+            event={selectedEvent}
+            onClose={() => setShowTestBuilder(false)}
+        />
       )}
 
       {/* Share / Registration Modal */}

@@ -19,6 +19,8 @@ import ScanLogsPrint from './features/reports/ScanLogsPrint';
 import GiveawayClaimLogsPrint from './features/reports/GiveawayClaimLogsPrint';
 import CertificateOfAppearancePrint from './features/reports/CertificateOfAppearancePrint';
 import CertificateOfParticipation from './features/reports/CertificateOfParticipation';
+import TestResults from './features/reports/TestResults';
+import EventTest from './features/tests/EventTest';
 import ReportEventAccessGuard from './features/reports/ReportEventAccessGuard';
 import UserManagement from './features/users/UserManagement';
 import AuditLogs from './features/audit/AuditLogs';
@@ -54,6 +56,7 @@ const App: React.FC = () => {
           
           {/* Public Routes */}
           <Route path="/register/:eventId" element={<EventRegistration />} />
+          <Route path="/test/:eventId/:testType" element={<EventTest />} />
           <Route path="/lookup" element={<NameLookup />} />
           
           {/* Internal Name Lookup - Wrapped in Layout */}
@@ -151,6 +154,13 @@ const App: React.FC = () => {
           <Route path="/print-cop/:eventId" element={
             <ProtectedRoute requiredPermission="VIEW_REPORTS">
               <ReportEventAccessGuard><CertificateOfParticipation /></ReportEventAccessGuard>
+            </ProtectedRoute>
+          } />
+
+          {/* Pre-test / Post-test Results - Requires VIEW_REPORTS */}
+          <Route path="/test-results/:eventId" element={
+            <ProtectedRoute requiredPermission="VIEW_REPORTS">
+              <ReportEventAccessGuard><TestResults /></ReportEventAccessGuard>
             </ProtectedRoute>
           } />
 

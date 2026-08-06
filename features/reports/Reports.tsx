@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Printer, Calendar, ScrollText, Search, ChevronDown, Check, X, Award, Gift } from 'lucide-react';
+import { Printer, Calendar, ScrollText, Search, ChevronDown, Check, X, Award, Gift, ClipboardList } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { Event } from '../../types/database';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,9 +21,13 @@ const Reports: React.FC = () => {
     'scan-logs': 'Scan Logs',
     'appearance': 'Certificate of Appearance',
     'participation': 'Certificate of Participation',
-    'giveaways': 'Giveaway Logs'
+    'giveaways': 'Giveaway Logs',
+    'tests': 'Pre-test / Post-test'
   };
   const [events, setEvents] = useState<Event[]>([]);
+  // Event ids that have at least one test configured — the results report is only
+  // meaningful for those, the same way giveaway logs need configured giveaways.
+  const [eventIdsWithTests, setEventIdsWithTests] = useState<Set<number>>(new Set());
   
   // Initialize from session storage if available
   const [selectedEventId, setSelectedEventId] = useState<string>(() => {
@@ -65,6 +70,16 @@ const Reports: React.FC = () => {
     });
     setEvents(data);
     setLoading(false);
+
+    const { data: testRows } = await supabase.from('event_tests').select('event_id');
+    setEventIdsWithTests(new Set((testRows || []).map((row: any) => row.event_id as number)));
+  };
+
+  const handleViewTestResults = () => {
+    if (selectedEventId) {
+        sessionStorage.setItem('reports_selected_event_id', selectedEventId);
+        navigate(`/test-results/${selectedEventId}`);
+    }
   };
 
   const handlePrintScanLogs = () => {
@@ -135,6 +150,7 @@ const Reports: React.FC = () => {
 
   const selectedEvent = events.find(e => e.event_id.toString() === selectedEventId);
   const selectedEventHasGiveaways = (selectedEvent?.giveaways || []).length > 0;
+  const selectedEventHasTests = !!selectedEvent && eventIdsWithTests.has(selectedEvent.event_id);
 
   useEffect(() => {
     if (!loading && selectedEventId && !selectedEvent) {
@@ -381,6 +397,32 @@ const Reports: React.FC = () => {
                     className="w-full bg-fuchsia-600 hover:bg-fuchsia-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
                 >
                     <Printer size={18} /> Print Giveaway Claims
+                </button>
+            </div>
+            )}
+
+            {/* Pre-test / Post-test Results Card */}
+            {showReport('tests') && (
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-start hover:border-indigo-200 transition-colors">
+                <div className="bg-sky-100 p-3 rounded-lg text-sky-600 mb-4">
+                    <ClipboardList size={24} />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 mb-2">Pre-test / Post-test</h3>
+                <p className="text-slate-500 text-sm mb-6 flex-1">
+                    See who has taken each test, their scores, the average gain from pre to post, and
+                    per-question results.
+                    {!selectedEventId
+                        ? ' Please select an event first.'
+                        : selectedEventHasTests
+                            ? ' Shows results for the selected event.'
+                            : ' The selected event has no test configured.'}
+                </p>
+                <button
+                    onClick={handleViewTestResults}
+                    disabled={!selectedEventId || !selectedEventHasTests}
+                    className="w-full bg-sky-600 hover:bg-sky-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 font-medium transition-colors"
+                >
+                    <ClipboardList size={18} /> View Test Results
                 </button>
             </div>
             )}

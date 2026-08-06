@@ -196,6 +196,84 @@ export interface PrincipalArrivalLog {
   remarks?: string | null;
 }
 
+// ─── Pre-test / Post-test ────────────────────────────────────────────────────
+// A test exists for an event only when an `event_tests` row is present, so there
+// is no per-event boolean to keep in sync. See lib/eventTests.ts.
+
+export type EventTestType = 'Pre' | 'Post';
+
+/** One option of a multiple-choice question. `key` is what a submission stores. */
+export interface EventTestChoice {
+  key: string;
+  label: string;
+}
+
+export interface EventTest {
+  test_id: number;
+  event_id: number;
+  test_type: EventTestType;
+  title: string;
+  instructions?: string | null;
+  /** Percent benchmark shown in the results report. Never gates a certificate. */
+  passing_score?: number | null;
+  /** Closed means the QR still resolves but no new submissions are accepted. */
+  is_open: boolean;
+  /** Whether the participant sees their score on the thank-you screen. */
+  show_score: boolean;
+  created_at?: string;
+}
+
+export interface EventTestQuestion {
+  question_id: number;
+  test_id: number;
+  position: number;
+  question_text: string;
+  choices: EventTestChoice[];
+  correct_key: string;
+  points: number;
+}
+
+/** A question as handed to the public test page — the answer key is stripped. */
+export type EventTestPublicQuestion = Omit<EventTestQuestion, 'test_id' | 'correct_key'>;
+
+/** Shape returned by the `get_event_test` RPC. */
+export interface EventTestPublicView {
+  event_id: number;
+  event_name: string;
+  venue: string;
+  start_date: string;
+  end_date: string;
+  test_id: number;
+  test_type: EventTestType;
+  title: string;
+  instructions?: string | null;
+  is_open: boolean;
+  show_score: boolean;
+  questions: EventTestPublicQuestion[];
+}
+
+/** Shape returned by the `submit_event_test` RPC. */
+export interface EventTestSubmitResult {
+  already_submitted: boolean;
+  score: number;
+  max_score: number;
+  submitted_at: string;
+}
+
+export interface EventTestSubmission {
+  submission_id: number;
+  test_id: number;
+  event_id: number;
+  participant_id: number;
+  /** Snapshot taken at submit time, so the report survives participant edits. */
+  participant_name: string;
+  submitted_at: string;
+  score: number;
+  max_score: number;
+  /** question_id → chosen choice key. */
+  answers: Record<string, string>;
+}
+
 export type AnnouncementType = 'info' | 'warning' | 'success';
 
 export interface FeatureAnnouncement {

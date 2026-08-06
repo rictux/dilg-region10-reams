@@ -57,6 +57,7 @@ const REPORT_SUBMENU = [
   { name: 'Certificate of Appearance',    icon: ScrollText, report: 'appearance' },
   { name: 'Certificate of Participation', icon: Award,      report: 'participation' },
   { name: 'Giveaway Logs',                icon: Gift,       report: 'giveaways' },
+  { name: 'Pre-test / Post-test',         icon: ClipboardList, report: 'tests' },
 ];
 
 const USERS_SUBMENU = [
