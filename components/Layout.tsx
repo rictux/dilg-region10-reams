@@ -2,6 +2,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  eventArrivalChannel,
+  officeArrivalChannel,
+  setArrivalChannels
+} from '../lib/principalArrival';
+import { ALL_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../lib/eventAccess';
+import PrincipalArrivalModal from './PrincipalArrivalModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -169,6 +176,54 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Events running today that this user can reach. Their per-event arrival
+  // channels are joined alongside the office channel, so announcements still
+  // land when the event has no organizing office or the user has no office_id.
+  const [arrivalEventIds, setArrivalEventIds] = useState<number[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTodaysEvents = async () => {
+      if (!user) {
+        setArrivalEventIds([]);
+        return;
+      }
+
+      try {
+        const events = await fetchAccessibleEvents(user, {
+          accessRoles: ALL_EVENT_ACCESS_ROLES,
+          dateContains: new Date().toISOString().slice(0, 10),
+          excludeCancelled: true
+        });
+        if (!cancelled) {
+          setArrivalEventIds(
+            events.filter((event) => event.has_principal_delegates).map((event) => event.event_id)
+          );
+        }
+      } catch {
+        if (!cancelled) setArrivalEventIds([]);
+      }
+    };
+
+    void loadTodaysEvents();
+    return () => { cancelled = true; };
+  }, [user?.user_id, user?.office_id, location.pathname]);
+
+  // Principal delegate arrivals. Mounted here so the announcement reaches the
+  // user on any page, and fires even while the tab is in the background.
+  // Repeats across the two channel kinds are deduped in announcePrincipalArrival.
+  const arrivalEventKey = arrivalEventIds.join(',');
+
+  useEffect(() => {
+    setArrivalChannels([
+      ...(user?.office_id ? [officeArrivalChannel(user.office_id)] : []),
+      ...arrivalEventIds.map((eventId) => eventArrivalChannel(eventId))
+    ]);
+  }, [user?.office_id, arrivalEventKey]);
+
+  useEffect(() => () => setArrivalChannels([]), []);
 
   // Ctrl+K / Cmd+K opens the search palette from anywhere
   useEffect(() => {
@@ -1276,6 +1331,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </main>
       </div>
+
+      <PrincipalArrivalModal />
 
       {/* Search palette (Ctrl+K) */}
       {isPageSearchOpen && (

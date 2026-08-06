@@ -81,6 +81,9 @@ export interface Event {
   // When false, giveaway selection is closed: new registrants can no longer pick
   // sizes / Yes-No answers, though existing selections are kept. Defaults to open.
   giveaways_open?: boolean | null;
+  // When enabled, Delegates are further classified as Principal or Representative,
+  // and Principal arrivals are announced on scan.
+  has_principal_delegates?: boolean | null;
   deleted_at?: string | null;
   deleted_by?: number | null;
   delete_reason?: string | null;
@@ -106,6 +109,13 @@ export interface Participant {
   location_id?: number | null;
 }
 
+// Sub-classification of a Delegate on events with `has_principal_delegates`.
+// A Principal holds the seat; a Representative attends in the Principal's place.
+// NULL means an ordinary delegate claiming neither — what the registration form
+// offers as "Attendee" — and is also the value for any role other than
+// 'Delegate'. Only these two values are ever persisted.
+export type DelegateType = 'Principal' | 'Representative';
+
 export interface EventParticipant {
   id: number;
   event_id: number;
@@ -114,6 +124,7 @@ export interface EventParticipant {
   registered_at?: string;
   accommodation_pax?: number | null;
   role: 'Delegate' | 'Speaker' | 'Secretariat' | 'Guest' | 'VIP';
+  delegate_type?: DelegateType | null;
   needs_accommodation?: boolean | null;
   accept_photo_video?: boolean | null;
   store_to_db?: boolean | null;
@@ -168,6 +179,21 @@ export interface AttendanceLogWithDetails extends AttendanceLog {
     full_name: string;
     email?: string;
   };
+}
+
+/** How a Principal delegate's arrival was recorded at the scanner. */
+export type PrincipalArrivalSource = 'Scan' | 'Promoted' | 'AutoRegistered';
+
+export interface PrincipalArrivalLog {
+  arrival_id: number;
+  event_id: number;
+  participant_id: number;
+  user_id?: number | null;
+  arrived_at: string;
+  arrival_date: string; // YYYY-MM-DD
+  source: PrincipalArrivalSource;
+  scanner_device?: string | null;
+  remarks?: string | null;
 }
 
 export type AnnouncementType = 'info' | 'warning' | 'success';
