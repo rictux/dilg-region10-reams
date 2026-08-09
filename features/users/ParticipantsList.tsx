@@ -1,20 +1,28 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Participant } from '../../types/database';
-import { Search, Edit, Loader2, X, Save, User, Mail, Briefcase, Phone, AlertCircle, Contact, Trash2 } from 'lucide-react';
+import { Search, Edit, Loader2, X, Save, User, Mail, Briefcase, Phone, AlertCircle, Contact, Trash2, SlidersHorizontal, ChevronDown, Users, CalendarRange, RotateCcw } from 'lucide-react';
 import { fetchAllSupabaseRows } from '../../lib/supabasePagination';
 import { logAudit, sanitizeSnapshot } from '../../lib/auditLog';
+
+const AGE_GROUPS = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+'];
 
 const ParticipantsList: React.FC = () => {
     const { user: currentUser } = useAuth();
     const [participants, setParticipants] = useState<Participant[]>([]);
     const [loading, setLoading] = useState(true);
-    const [searchLoading, setSearchLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 15;
-    const searchTimeoutRef = useRef<NodeJS.Timeout>();
+
+    // Filter State
+    const [showFilters, setShowFilters] = useState(false);
+    const [genderFilter, setGenderFilter] = useState('all');
+    const [ageFilter, setAgeFilter] = useState('all');
+    const [pwdOnly, setPwdOnly] = useState(false);
+    const [ipOnly, setIpOnly] = useState(false);
+    const [missingEmailOnly, setMissingEmailOnly] = useState(false);
 
     // Edit Modal State
     const [showEditModal, setShowEditModal] = useState(false);
@@ -34,26 +42,8 @@ const ParticipantsList: React.FC = () => {
         fetchParticipants();
     }, []);
 
-    useEffect(() => {
-        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-
-        if (searchTerm.trim()) {
-            setSearchLoading(true);
-            searchTimeoutRef.current = setTimeout(() => {
-                searchParticipants(searchTerm);
-            }, 500);
-        } else {
-            fetchParticipants();
-        }
-
-        return () => {
-            if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-        };
-    }, [searchTerm]);
-
     const fetchParticipants = async () => {
         setLoading(true);
-        setSearchLoading(false);
         try {
             const data = await fetchAllSupabaseRows<Participant>(() =>
                 supabase
@@ -69,26 +59,53 @@ const ParticipantsList: React.FC = () => {
         }
     };
 
-    const searchParticipants = async (query: string) => {
-        try {
-            const searchQuery = query.toLowerCase().trim();
-            const data = await fetchAllSupabaseRows<Participant>(() =>
-                supabase
-                    .from('participants')
-                    .select('*')
-                    .or(
-                        `full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,office.ilike.%${searchQuery}%,participant_code.ilike.%${searchQuery}%`
-                    )
-                    .order('created_at', { ascending: false })
-            );
-            setParticipants(data || []);
-            setCurrentPage(1);
-        } catch (err) {
-            console.error('Error searching participants:', err);
-        } finally {
-            setSearchLoading(false);
-        }
+    // The whole table is already in memory (fetchAllSupabaseRows pages through it),
+    // so search and filters both run client-side. That keeps the counts stable
+    // instead of narrowing to whatever the server last returned.
+    const filteredParticipants = useMemo(() => {
+        const query = searchTerm.trim().toLowerCase();
+
+        return participants.filter(p => {
+            if (query) {
+                const haystack = [p.full_name, p.email, p.office, p.participant_code, p.position, p.mobile_no];
+                if (!haystack.some(value => value?.toLowerCase().includes(query))) return false;
+            }
+            if (genderFilter !== 'all' && p.gender !== genderFilter) return false;
+            if (ageFilter !== 'all' && p.age_group !== ageFilter) return false;
+            if (pwdOnly && p.pwd !== 'Yes') return false;
+            if (ipOnly && p.indigenous_people !== 'Yes') return false;
+            if (missingEmailOnly && p.email?.trim()) return false;
+            return true;
+        });
+    }, [participants, searchTerm, genderFilter, ageFilter, pwdOnly, ipOnly, missingEmailOnly]);
+
+    const activeFilterCount =
+        (genderFilter !== 'all' ? 1 : 0) +
+        (ageFilter !== 'all' ? 1 : 0) +
+        (pwdOnly ? 1 : 0) +
+        (ipOnly ? 1 : 0) +
+        (missingEmailOnly ? 1 : 0);
+
+    const isNarrowed = activeFilterCount > 0 || searchTerm.trim() !== '';
+
+    const clearFilters = () => {
+        setSearchTerm('');
+        setGenderFilter('all');
+        setAgeFilter('all');
+        setPwdOnly(false);
+        setIpOnly(false);
+        setMissingEmailOnly(false);
     };
+
+    // A narrower result set (new filter, or a deletion) can strand the view past the last page.
+    useEffect(() => {
+        const lastPage = Math.max(1, Math.ceil(filteredParticipants.length / itemsPerPage));
+        setCurrentPage(page => Math.min(page, lastPage));
+    }, [filteredParticipants.length]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, genderFilter, ageFilter, pwdOnly, ipOnly, missingEmailOnly]);
 
     const handleEdit = (participant: Participant) => {
         setEditingParticipant(participant);
@@ -167,10 +184,7 @@ const ParticipantsList: React.FC = () => {
                 snapshot: sanitizeSnapshot(participantToDelete)
             });
 
-            const remaining = participants.filter(p => p.participant_id !== participantToDelete.participant_id);
-            setParticipants(remaining);
-            // Deleting the last row on the last page would otherwise leave an empty view.
-            setCurrentPage(page => Math.min(page, Math.max(1, Math.ceil(remaining.length / itemsPerPage))));
+            setParticipants(prev => prev.filter(p => p.participant_id !== participantToDelete.participant_id));
             setShowDeleteModal(false);
             setParticipantToDelete(null);
         } catch (err: any) {
@@ -180,36 +194,113 @@ const ParticipantsList: React.FC = () => {
         }
     };
 
-    const totalPages = Math.ceil(participants.length / itemsPerPage);
-    const paginatedParticipants = participants.slice(
+    const totalPages = Math.ceil(filteredParticipants.length / itemsPerPage);
+    const paginatedParticipants = filteredParticipants.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
+    const columnCount = isAdmin ? 5 : 4;
+
+    const toggleChipClass = (active: boolean) =>
+        `h-8 px-3 rounded-full border text-xs font-medium transition-colors ${
+            active
+                ? 'border-indigo-600/30 bg-indigo-600/10 text-indigo-700'
+                : 'border-[rgb(var(--ink)/0.10)] bg-card text-slate-600 hover:bg-slate-50'
+        }`;
 
     return (
         <div className="h-full min-h-0 flex flex-col gap-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="relative w-full sm:w-72">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-                    <input
-                        type="text"
-                        placeholder="Search participants..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-9 pr-14 h-9 bg-card border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 transition-colors"
-                    />
-                    {searchLoading && (
-                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" size={16} />
-                    )}
-                    {searchTerm && !searchLoading && (
+            <div className="rounded-lg border border-[rgb(var(--ink)/0.08)] bg-card p-3">
+                <div className="flex flex-col gap-3 md:grid md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(150px,200px)_minmax(150px,200px)_auto]">
+                    <div className="flex min-w-0 gap-2">
+                        <div className="relative min-w-0 flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                            <input
+                                type="text"
+                                placeholder="Search name, code, email, or office..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-9 pr-14 h-9 bg-card border border-[rgb(var(--ink)/0.10)] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/15 focus:border-indigo-600 transition-colors"
+                            />
+                            {searchTerm && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchTerm('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                                >
+                                    Clear
+                                </button>
+                            )}
+                        </div>
                         <button
                             type="button"
-                            onClick={() => setSearchTerm('')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                            onClick={() => setShowFilters((prev) => !prev)}
+                            aria-expanded={showFilters}
+                            className="flex shrink-0 items-center gap-2 rounded-md border border-[rgb(var(--ink)/0.10)] bg-card px-3 h-9 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 md:hidden"
                         >
-                            Clear
+                            <SlidersHorizontal size={16} />
+                            Filters
+                            {activeFilterCount > 0 && (
+                                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-[11px] font-semibold text-white">
+                                    {activeFilterCount}
+                                </span>
+                            )}
+                            <ChevronDown size={16} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
                         </button>
-                    )}
+                    </div>
+
+                    <div className={`${showFilters ? 'grid' : 'hidden'} grid-cols-1 gap-3 md:contents`}>
+                        <div className="relative min-w-0">
+                            <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                            <select
+                                value={genderFilter}
+                                onChange={(e) => setGenderFilter(e.target.value)}
+                                aria-label="Filter by gender"
+                                className="w-full appearance-none rounded-md border border-[rgb(var(--ink)/0.10)] bg-card h-9 pl-9 pr-8 text-sm text-slate-700 outline-none transition-colors focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/15"
+                            >
+                                <option value="all">All genders</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </div>
+
+                        <div className="relative min-w-0">
+                            <CalendarRange className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                            <select
+                                value={ageFilter}
+                                onChange={(e) => setAgeFilter(e.target.value)}
+                                aria-label="Filter by age group"
+                                className="w-full appearance-none rounded-md border border-[rgb(var(--ink)/0.10)] bg-card h-9 pl-9 pr-8 text-sm text-slate-700 outline-none transition-colors focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/15"
+                            >
+                                <option value="all">All ages</option>
+                                {AGE_GROUPS.map(group => (
+                                    <option key={group} value={group}>{group}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                            <button type="button" onClick={() => setPwdOnly(v => !v)} aria-pressed={pwdOnly} className={toggleChipClass(pwdOnly)}>
+                                PWD
+                            </button>
+                            <button type="button" onClick={() => setIpOnly(v => !v)} aria-pressed={ipOnly} className={toggleChipClass(ipOnly)}>
+                                IP
+                            </button>
+                            <button type="button" onClick={() => setMissingEmailOnly(v => !v)} aria-pressed={missingEmailOnly} className={toggleChipClass(missingEmailOnly)}>
+                                No email
+                            </button>
+                            {isNarrowed && (
+                                <button
+                                    type="button"
+                                    onClick={clearFilters}
+                                    className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-indigo-600"
+                                >
+                                    <RotateCcw size={13} />
+                                    Reset
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -220,8 +311,11 @@ const ParticipantsList: React.FC = () => {
                     </span>
                     <h3 className="text-sm font-semibold text-slate-900">Participants</h3>
                     <span className="text-[10px] min-w-[1.25rem] text-center px-1.5 py-0.5 rounded-full font-medium font-mono bg-indigo-600/10 text-indigo-700">
-                        {searchLoading ? '…' : participants.length}
+                        {filteredParticipants.length}
                     </span>
+                    {isNarrowed && !loading && (
+                        <span className="text-xs text-slate-500">of {participants.length}</span>
+                    )}
                 </div>
 
                 <div className="hidden md:block flex-1 min-h-0 overflow-auto">
@@ -237,9 +331,24 @@ const ParticipantsList: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-[rgb(var(--ink)/0.04)]">
                             {loading ? (
-                                <tr><td colSpan={5} className="py-10 text-center text-xs text-slate-400">Loading participants…</td></tr>
+                                <tr><td colSpan={columnCount} className="py-10 text-center text-xs text-slate-400">Loading participants…</td></tr>
                             ) : paginatedParticipants.length === 0 ? (
-                                <tr><td colSpan={5} className="py-10 text-center text-xs text-slate-400">No participants found.</td></tr>
+                                <tr>
+                                    <td colSpan={columnCount} className="py-12 text-center">
+                                        <p className="text-xs text-slate-400">
+                                            {isNarrowed ? 'No participants match these filters.' : 'No participants found.'}
+                                        </p>
+                                        {isNarrowed && (
+                                            <button
+                                                type="button"
+                                                onClick={clearFilters}
+                                                className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                                            >
+                                                Reset filters
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
                             ) : (
                                 paginatedParticipants.map((participant) => (
                                     <tr key={participant.participant_id} className="hover:bg-slate-50/60 transition-colors">
@@ -308,7 +417,20 @@ const ParticipantsList: React.FC = () => {
                             </div>
                         ))
                     ) : paginatedParticipants.length === 0 ? (
-                        <div className="py-10 text-center text-xs text-slate-400 bg-slate-50/50 rounded-lg border border-[rgb(var(--ink)/0.06)]">No participants found.</div>
+                        <div className="py-10 text-center bg-slate-50/50 rounded-lg border border-[rgb(var(--ink)/0.06)]">
+                            <p className="text-xs text-slate-400">
+                                {isNarrowed ? 'No participants match these filters.' : 'No participants found.'}
+                            </p>
+                            {isNarrowed && (
+                                <button
+                                    type="button"
+                                    onClick={clearFilters}
+                                    className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                                >
+                                    Reset filters
+                                </button>
+                            )}
+                        </div>
                     ) : (
                         paginatedParticipants.map((participant) => (
                             <div key={participant.participant_id} className="rounded-lg border border-[rgb(var(--ink)/0.08)] bg-card p-4">
@@ -372,10 +494,10 @@ const ParticipantsList: React.FC = () => {
                 </div>
 
                 {/* Pagination Controls */}
-                {!loading && !searchLoading && totalPages > 1 && (
+                {!loading && totalPages > 1 && (
                     <div className="px-4 py-3 border-t border-[rgb(var(--ink)/0.06)] flex items-center justify-between gap-3 shrink-0">
                         <p className="text-xs text-slate-500">
-                            Showing <span className="font-medium text-slate-700">{(currentPage - 1) * itemsPerPage + 1}</span>–<span className="font-medium text-slate-700">{Math.min(currentPage * itemsPerPage, participants.length)}</span> of <span className="font-medium text-slate-700">{participants.length}</span>
+                            Showing <span className="font-medium text-slate-700">{(currentPage - 1) * itemsPerPage + 1}</span>–<span className="font-medium text-slate-700">{Math.min(currentPage * itemsPerPage, filteredParticipants.length)}</span> of <span className="font-medium text-slate-700">{filteredParticipants.length}</span>
                         </p>
                         <div className="flex items-center gap-2">
                             <button
