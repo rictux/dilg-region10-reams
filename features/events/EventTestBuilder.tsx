@@ -510,7 +510,7 @@ const EventTestBuilder: React.FC<Props> = ({ event, onClose, onSaved }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="relative z-10 flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-card shadow-2xl">
 
         {/* Header */}
