@@ -2,8 +2,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Participant } from '../../types/database';
-import { Search, Edit, Loader2, X, Save, User, Mail, Briefcase, Phone, AlertCircle, Contact } from 'lucide-react';
+import { Search, Edit, Loader2, X, Save, User, Mail, Briefcase, Phone, AlertCircle, Contact, Trash2 } from 'lucide-react';
 import { fetchAllSupabaseRows } from '../../lib/supabasePagination';
+import { logAudit, sanitizeSnapshot } from '../../lib/auditLog';
 
 const ParticipantsList: React.FC = () => {
     const { user: currentUser } = useAuth();
@@ -20,6 +21,14 @@ const ParticipantsList: React.FC = () => {
     const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState('');
+
+    // Delete Modal State
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [participantToDelete, setParticipantToDelete] = useState<Participant | null>(null);
+    const [deleting, setDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState('');
+
+    const isAdmin = currentUser?.role === 'Admin';
 
     useEffect(() => {
         fetchParticipants();
@@ -125,6 +134,52 @@ const ParticipantsList: React.FC = () => {
         }
     };
 
+    const handleDelete = (participant: Participant) => {
+        if (!isAdmin) return;
+
+        setParticipantToDelete(participant);
+        setDeleteError('');
+        setShowDeleteModal(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!participantToDelete) return;
+
+        setDeleting(true);
+        setDeleteError('');
+
+        try {
+            const { error } = await supabase
+                .from('participants')
+                .delete()
+                .eq('participant_id', participantToDelete.participant_id);
+
+            if (error) throw error;
+
+            // Hard delete — everything referencing this participant cascades away,
+            // so the snapshot is the only remaining record of the row.
+            logAudit({
+                actor: currentUser,
+                action: 'Delete',
+                entityType: 'Participant',
+                entityId: participantToDelete.participant_id,
+                entityLabel: participantToDelete.full_name,
+                snapshot: sanitizeSnapshot(participantToDelete)
+            });
+
+            const remaining = participants.filter(p => p.participant_id !== participantToDelete.participant_id);
+            setParticipants(remaining);
+            // Deleting the last row on the last page would otherwise leave an empty view.
+            setCurrentPage(page => Math.min(page, Math.max(1, Math.ceil(remaining.length / itemsPerPage))));
+            setShowDeleteModal(false);
+            setParticipantToDelete(null);
+        } catch (err: any) {
+            setDeleteError(err.message);
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     const totalPages = Math.ceil(participants.length / itemsPerPage);
     const paginatedParticipants = participants.slice(
         (currentPage - 1) * itemsPerPage,
@@ -177,7 +232,7 @@ const ParticipantsList: React.FC = () => {
                                 <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono">Contact</th>
                                 <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono">Office & Position</th>
                                 <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono">Demographics</th>
-                                {currentUser?.role === 'Admin' && <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono text-right">Actions</th>}
+                                {isAdmin && <th className="px-4 py-2.5 bg-slate-50 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500 font-mono text-right">Actions</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[rgb(var(--ink)/0.04)]">
@@ -216,15 +271,24 @@ const ParticipantsList: React.FC = () => {
                                                 {participant.indigenous_people === 'Yes' && <span className="border border-emerald-200 bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-medium">IP</span>}
                                             </div>
                                         </td>
-                                        {currentUser?.role === 'Admin' && (
+                                        {isAdmin && (
                                             <td className="px-4 py-3 text-right">
-                                                <button
-                                                    onClick={() => handleEdit(participant)}
-                                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-600/10 rounded-md transition-colors"
-                                                    title="Edit Participant"
-                                                >
-                                                    <Edit size={16} />
-                                                </button>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <button
+                                                        onClick={() => handleEdit(participant)}
+                                                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-600/10 rounded-md transition-colors"
+                                                        title="Edit Participant"
+                                                    >
+                                                        <Edit size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(participant)}
+                                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                        title="Delete Participant"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
                                             </td>
                                         )}
                                     </tr>
@@ -258,14 +322,23 @@ const ParticipantsList: React.FC = () => {
                                             <div className="text-xs text-slate-500 font-mono">{participant.participant_code}</div>
                                         </div>
                                     </div>
-                                    {currentUser?.role === 'Admin' && (
-                                        <button
-                                            onClick={() => handleEdit(participant)}
-                                            className="shrink-0 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-600/10 rounded-md transition-colors"
-                                            title="Edit Participant"
-                                        >
-                                            <Edit size={16} />
-                                        </button>
+                                    {isAdmin && (
+                                        <div className="shrink-0 flex items-center gap-1">
+                                            <button
+                                                onClick={() => handleEdit(participant)}
+                                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-600/10 rounded-md transition-colors"
+                                                title="Edit Participant"
+                                            >
+                                                <Edit size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(participant)}
+                                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                title="Delete Participant"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
 
@@ -507,6 +580,56 @@ const ParticipantsList: React.FC = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && participantToDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+                        onClick={() => !deleting && setShowDeleteModal(false)}
+                    ></div>
+
+                    <div className="bg-card border border-[rgb(var(--ink)/0.10)] rounded-lg shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 text-center">
+                            <div className="w-12 h-12 bg-red-50 border border-red-200 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <AlertCircle size={22} />
+                            </div>
+                            <h3 className="text-base font-semibold text-slate-900 mb-2">Confirm Deletion</h3>
+                            <p className="text-sm text-slate-600 mb-2">
+                                Are you sure you want to delete participant <strong>"{participantToDelete.full_name}"</strong> <span className="font-mono text-xs text-slate-500">({participantToDelete.participant_code})</span>?
+                            </p>
+                            <p className="text-xs text-slate-500 mb-6">
+                                All of their event registrations, attendance logs, and test submissions will be removed as well. This action cannot be undone.
+                            </p>
+
+                            {deleteError && (
+                                <div className="mb-5 p-3 bg-red-50 border border-red-100 rounded-md flex items-start gap-2.5 text-red-600 text-left">
+                                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                                    <p className="text-sm">{deleteError}</p>
+                                </div>
+                            )}
+
+                            <div className="flex justify-center gap-3">
+                                <button
+                                    onClick={() => setShowDeleteModal(false)}
+                                    disabled={deleting}
+                                    className="h-9 px-4 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-md transition-colors disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmDelete}
+                                    disabled={deleting}
+                                    className="h-9 bg-red-600 text-white px-5 rounded-md text-sm font-medium hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    {deleting && <Loader2 className="animate-spin" size={15} />}
+                                    {deleting ? 'Deleting...' : 'Yes, Delete Participant'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
