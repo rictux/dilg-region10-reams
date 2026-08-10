@@ -1,8 +1,8 @@
 
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { DelegateType, Event, Participant, Office, GiveawayItem, EventAccessRole, EventUserAccess, User } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift, Settings, ChevronDown, Hash, Utensils, QrCode, ClipboardList } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift, Settings, ChevronDown, Hash, Utensils, QrCode, ClipboardList, GraduationCap } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import ExcelJS from 'exceljs';
@@ -30,6 +30,15 @@ import {
   readDelegateType
 } from '../../lib/delegates';
 import { downloadQrCodePng, qrFileSlug } from '../../lib/qrDownload';
+import { hasSeenGuide, markGuideSeen } from '../../lib/userGuides';
+import { GuidedTour } from '../../components/GuidedTour';
+import { buildEventsTourSteps, EventsTutorialButton, type EventsTourStage } from './EventsListTour';
+import {
+  buildSampleAccessList,
+  buildSampleEvent,
+  buildSampleParticipants,
+  isSampleEvent,
+} from './tutorialSampleEvent';
 import EventTestBuilder from './EventTestBuilder';
 
 type ParticipantFormData = {
@@ -169,7 +178,7 @@ const useMaxPageButtons = () => {
 };
 
 const EventsList: React.FC = () => {
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, refreshProfile, loading: authLoading } = useAuth();
   const isAdmin = user?.role === 'Admin';
   const [events, setEvents] = useState<Event[]>([]);
   const [offices, setOffices] = useState<Office[]>([]);
@@ -183,6 +192,7 @@ const EventsList: React.FC = () => {
   const location = useLocation();
 
   // Modal States
+  const [showTutorial, setShowTutorial] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showTestBuilder, setShowTestBuilder] = useState(false);
@@ -329,6 +339,9 @@ const EventsList: React.FC = () => {
         // Initial fetch
         fetchEventParticipants(selectedEvent.event_id);
 
+        // The tutorial's sample event has no rows to watch, and its id matches nothing.
+        if (isSampleEvent(selectedEvent.event_id)) return;
+
         // Subscribe to changes for this specific event's participants
         const channel = supabase
             .channel(`modal_participants_${selectedEvent.event_id}`)
@@ -455,6 +468,12 @@ const EventsList: React.FC = () => {
   };
 
   const fetchEventAccess = async (eventId: number) => {
+      if (isSampleEvent(eventId)) {
+          setEventAccessList(buildSampleAccessList() as EventAccessRecord[]);
+          setLoadingEventAccess(false);
+          return;
+      }
+
       setLoadingEventAccess(true);
 
       const { data, error } = await supabase
@@ -520,6 +539,12 @@ const EventsList: React.FC = () => {
   };
 
   const fetchEventParticipants = async (eventId: number) => {
+    if (isSampleEvent(eventId)) {
+        setViewingParticipants(buildSampleParticipants() as ParticipantModalRecord[]);
+        setLoadingParticipants(false);
+        return;
+    }
+
     setLoadingParticipants(true);
     const { data, error } = await supabase
         .from('event_participants')
@@ -994,6 +1019,13 @@ const EventsList: React.FC = () => {
 
   const handleGrantEventAccess = async () => {
       if (!selectedAccessEvent || !selectedAccessUserId || !user) return;
+
+      // Belt and braces: the tutorial overlay blocks the mouse but not keyboard focus, so
+      // the sample event refuses writes outright rather than relying on a foreign key.
+      if (isSampleEvent(selectedAccessEvent.event_id)) {
+          toast.info('This is a sample event for the tutorial — nothing is saved.');
+          return;
+      }
 
       if (!canSetEventAccess(selectedAccessEvent)) {
           toast.error('Only Admin or the owning Office Manager can assign users to this event.');
@@ -2714,6 +2746,115 @@ const EventsList: React.FC = () => {
     return filteredEvents.slice(start, start + itemsPerPage);
   }, [filteredEvents, currentPage]);
 
+  // ── Tutorial ────────────────────────────────────────────────────────────────
+  // Almost everything this page does happens inside a modal, so the walkthrough drives the
+  // page into the screen each step describes rather than only pointing at the button that
+  // opens it.
+  //
+  // It always demonstrates on a front-end-only sample card, never on one of the office's
+  // real events. That keeps the tour identical for every office — an empty list and a busy
+  // one see the same thing — and means the steps that open the test builder, access
+  // settings and the participant list can never touch a real record. The card is prepended
+  // to the list only while the tour is open, and disappears with it. See
+  // tutorialSampleEvent.ts.
+  const sampleEvent = useMemo(() => buildSampleEvent(user?.office_id), [user?.office_id]);
+  const tourEvent = showTutorial ? sampleEvent : null;
+  const displayedEvents = showTutorial ? [sampleEvent, ...paginatedEvents] : paginatedEvents;
+  const tourStage = useRef<EventsTourStage | null>(null);
+
+  const showTourStage = (stage: EventsTourStage) => {
+    // Steps re-declare their stage on the way back as well as forward, so the transition is
+    // only worth doing when the screen actually has to change.
+    if (tourStage.current === stage) return;
+    tourStage.current = stage;
+
+    setShowEventCodeInfo(false);
+    setOpenActionMenuId(null);
+    setActionMenuPosition(null);
+    if (stage !== 'create') setShowEventModal(false);
+    if (stage !== 'tests') setShowTestBuilder(false);
+    if (stage !== 'share') setShowShareModal(false);
+    if (stage !== 'participants') closeParticipantsModal();
+    if (stage !== 'access') closeEventAccessModal();
+
+    // Drop the sample from `selectedEvent` between parts and on the way out, so no later
+    // code path can pick it up once the card itself is gone.
+    if (stage === 'list') setSelectedEvent(null);
+
+    if (stage === 'create') {
+      // Opens an empty draft — nothing reaches the database until Create Event is pressed.
+      openCreateModal();
+      return;
+    }
+
+    if (!tourEvent) return;
+
+    if (stage === 'tests') {
+      setSelectedEvent(tourEvent);
+      setShowTestBuilder(true);
+    } else if (stage === 'share') {
+      setSelectedEvent(tourEvent);
+      setCopied(false);
+      setShowShareModal(true);
+    } else if (stage === 'participants') {
+      setSelectedEvent(tourEvent);
+      setShowParticipantsModal(true);
+    } else if (stage === 'access' && canSetEventAccess(tourEvent)) {
+      setSelectedAccessEvent(tourEvent);
+      setAccessUserSearch('');
+      setSelectedAccessUserId('');
+      setSelectedAccessRole('ManagerScanner');
+      setIsAccessUserDropdownOpen(false);
+      setShowEventAccessModal(true);
+      fetchEventAccess(tourEvent.event_id);
+      fetchEventAccessUsers();
+    }
+  };
+
+  const openTutorial = () => {
+    // Forget the stage the last run left behind — the page may have been navigated since.
+    tourStage.current = null;
+    // The Deleted view renders cards with Restore / Delete Forever in place of the Share,
+    // Tests and Access buttons the tour points at, so the sample card would be unusable
+    // there. Search and the status tabs are left alone — they no longer decide what the
+    // tour demonstrates on.
+    setEventView('active');
+    setShowTutorial(true);
+  };
+
+  // Skipping counts the same as finishing: the user has decided they don't need it, and the
+  // Tutorial button is always there if they change their mind.
+  const handleCloseTutorial = useCallback(async () => {
+    setShowTutorial(false);
+    tourStage.current = null;
+    showTourStage('list');
+    if (hasSeenGuide(user, 'events')) return;
+    const updated = await markGuideSeen(user, 'events');
+    // Keep the cached profile in step so the tour doesn't reappear on the next navigation,
+    // before AuthContext next refetches the row.
+    if (updated) await refreshProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, refreshProfile]);
+
+  // Offer the walkthrough the first time this user opens the page.
+  useEffect(() => {
+    if (loading || authLoading || showTutorial) return;
+    if (hasSeenGuide(user, 'events')) return;
+    openTutorial();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, authLoading, user]);
+
+  // Rebuilt per render while open so the steps never close over stale permissions or a
+  // stale example event; while closed the tour renders nothing, so the work is skipped.
+  const tourSteps = showTutorial
+    ? buildEventsTourSteps({
+        showStage: showTourStage,
+        canEditEvents: Boolean(tourEvent && canEditEventRecord(tourEvent)),
+        canSetAccess: canSetEventAccess(tourEvent),
+        canManageParticipants,
+      })
+    : [];
+
   // The paginator sits below the fold on a phone, so a page change would otherwise leave the
   // viewport on the *last* cards of the new page. Jump instantly — smooth-scrolling this far
   // just looks like the list is running away.
@@ -2754,8 +2895,10 @@ const EventsList: React.FC = () => {
       {!(showParticipantsModal && selectedEvent) && (
       <div ref={listScrollRef} className="flex-1 min-h-0 overflow-y-auto -m-4 md:-m-6 p-4 md:py-8 md:px-12 lg:px-16 flex flex-col gap-6">
       {/* Page header */}
-      <div className="flex justify-end w-full -mb-3">
+      <div className="flex justify-end items-center gap-2 w-full -mb-3">
+        <EventsTutorialButton onClick={openTutorial} />
         <button
+            data-tour="events-new-button"
             onClick={openCreateModal}
             type="button"
             className="h-9 shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md flex items-center gap-1.5 px-3 transition-colors"
@@ -2874,7 +3017,7 @@ const EventsList: React.FC = () => {
                           </div>
                       ))}
                   </div>
-              ) : filteredEvents.length === 0 ? (
+              ) : displayedEvents.length === 0 ? (
                   <div className="text-center py-16 text-slate-400 bg-card border border-[rgb(var(--ink)/0.08)] rounded-lg">
                       <div className="flex flex-col items-center justify-center">
                         {searchTerm ? <Search className="w-12 h-12 text-slate-300 mb-3" /> : eventView === 'deleted' ? <Trash2 className="w-12 h-12 text-slate-300 mb-3" /> : <Calendar className="w-12 h-12 text-slate-300 mb-3" />}
@@ -2888,14 +3031,18 @@ const EventsList: React.FC = () => {
                   </div>
               ) : (
                   <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-fr">
-                      {paginatedEvents.map((event) => {
+                      {displayedEvents.map((event, cardIndex) => {
                           const canEditCurrentEvent = canEditEventRecord(event);
                           const canDeleteCurrentEvent = canDeleteEventRecord(event);
                           const canSetCurrentEventAccess = canSetEventAccess(event);
+                          // The tutorial demonstrates on the first card, which is also the
+                          // event its modal steps open — keep the two in step.
+                          const isTourCard = cardIndex === 0;
 
                           return (
                           <div
                               key={event.event_id}
+                              data-tour={isTourCard ? 'events-card' : undefined}
                               onClick={() => {
                                   if (eventView === 'active') handleRowClick(event);
                               }}
@@ -2914,7 +3061,12 @@ const EventsList: React.FC = () => {
                                       }`}>
                                           {event.event_name}
                                       </h3>
-                                      <div className="shrink-0">
+                                      <div className="flex shrink-0 items-center gap-1.5">
+                                          {isSampleEvent(event.event_id) && (
+                                              <span className="inline-flex items-center gap-1 rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
+                                                  <GraduationCap size={10} /> Sample
+                                              </span>
+                                          )}
                                           {eventView === 'deleted' ? (
                                               <span className="inline-flex items-center gap-1 rounded border border-red-100 bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-700 font-mono">
                                                   <Clock size={10} />
@@ -2990,6 +3142,7 @@ const EventsList: React.FC = () => {
                                   ) : (
                                       <>
                                           <button
+                                              data-tour={isTourCard ? 'events-card-share' : undefined}
                                               onClick={(e) => {
                                                   e.stopPropagation();
                                                   openShareModal(e, event);
@@ -3003,6 +3156,7 @@ const EventsList: React.FC = () => {
                                           </button>
                                           {canEditCurrentEvent && (
                                               <button
+                                                  data-tour={isTourCard ? 'events-card-tests' : undefined}
                                                   onClick={(e) => openTestBuilder(e, event)}
                                                   className="flex shrink-0 items-center gap-1.5 px-2 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
                                                   title="Pre-test / Post-test"
@@ -3028,6 +3182,7 @@ const EventsList: React.FC = () => {
                                           )}
                                           {canSetCurrentEventAccess && (
                                               <button
+                                                  data-tour={isTourCard ? 'events-card-access' : undefined}
                                                   onClick={(e) => {
                                                       e.stopPropagation();
                                                       openEventAccessModal(e, event);
@@ -3077,7 +3232,7 @@ const EventsList: React.FC = () => {
                           </div>
                       </div>
                   ))
-              ) : filteredEvents.length === 0 ? (
+              ) : displayedEvents.length === 0 ? (
                   <div className="text-center py-12 text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100">
                       <div className="flex flex-col items-center justify-center">
                           {searchTerm ? <Search className="w-12 h-12 text-slate-300 mb-3" /> : eventView === 'deleted' ? <Trash2 className="w-12 h-12 text-slate-300 mb-3" /> : <Calendar className="w-12 h-12 text-slate-300 mb-3" />}
@@ -3090,14 +3245,16 @@ const EventsList: React.FC = () => {
                       </div>
                   </div>
               ) : (
-                  paginatedEvents.map((event) => {
+                  displayedEvents.map((event, cardIndex) => {
                       const canEditCurrentEvent = canEditEventRecord(event);
                       const canDeleteCurrentEvent = canDeleteEventRecord(event);
                       const canSetCurrentEventAccess = canSetEventAccess(event);
+                      const isTourCard = cardIndex === 0;
 
                       return (
                       <div
                           key={event.event_id}
+                          data-tour={isTourCard ? 'events-card' : undefined}
                           onClick={() => {
                               if (eventView === 'active') handleRowClick(event);
                           }}
@@ -3128,7 +3285,12 @@ const EventsList: React.FC = () => {
                                       )}
                                   </div>
                               </div>
-                              <div className="shrink-0">
+                              <div className="flex shrink-0 items-center gap-1.5">
+                                  {isSampleEvent(event.event_id) && (
+                                      <span className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700">
+                                          <GraduationCap size={11} /> Sample
+                                      </span>
+                                  )}
                                   {eventView === 'deleted' ? (
                                       <span className="inline-flex items-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
                                           <Clock size={12} />
@@ -3177,6 +3339,7 @@ const EventsList: React.FC = () => {
                               ) : (
                                   <>
                                       <button
+                                          data-tour={isTourCard ? 'events-card-share' : undefined}
                                           onClick={(e) => {
                                               e.stopPropagation();
                                               openShareModal(e, event);
@@ -3189,6 +3352,7 @@ const EventsList: React.FC = () => {
                                       </button>
                                       {canEditCurrentEvent && (
                                       <button
+                                          data-tour={isTourCard ? 'events-card-tests' : undefined}
                                           onClick={(e) => openTestBuilder(e, event)}
                                           className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 transition-colors hover:bg-slate-100"
                                           title="Pre-test / Post-test"
@@ -3212,6 +3376,7 @@ const EventsList: React.FC = () => {
                                       )}
                                       {canSetCurrentEventAccess && (
                                           <button
+                                              data-tour={isTourCard ? 'events-card-access' : undefined}
                                               onClick={(e) => openEventAccessModal(e, event)}
                                               className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 transition-colors hover:bg-indigo-100"
                                               title="Access Settings"
@@ -3320,7 +3485,7 @@ const EventsList: React.FC = () => {
                         </div>
                     ) : (
                         <>
-                            <div ref={qrCodeRef} className="p-4 border-2 border-indigo-100 rounded-lg bg-indigo-50/50">
+                            <div data-tour="events-share-qr" ref={qrCodeRef} className="p-4 border-2 border-indigo-100 rounded-lg bg-indigo-50/50">
                                 <div className="relative inline-block">
                                     <QRCode value={getRegistrationLink(selectedEvent.event_id)} size={180} level="H" />
                                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-card rounded-full p-1">
@@ -3329,7 +3494,7 @@ const EventsList: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="w-full">
+                            <div data-tour="events-share-link" className="w-full">
                                 <label className="block text-sm font-medium text-slate-700 mb-2">Registration Link</label>
                                 <div className="flex gap-2">
                                     <input
@@ -3348,7 +3513,7 @@ const EventsList: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="w-full space-y-2">
+                            <div data-tour="events-share-downloads" className="w-full space-y-2">
                                 <button
                                     onClick={downloadRegistrationBadge}
                                     disabled={downloadingBadge || downloadingQr}
@@ -3413,7 +3578,7 @@ const EventsList: React.FC = () => {
                         </div>
 
                         {/* Participants summary */}
-                        <div className="flex flex-wrap items-center gap-2 mt-4">
+                        <div data-tour="participants-summary" className="flex flex-wrap items-center gap-2 mt-4">
                             <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
                                 <Users size={15} className="text-slate-500" /> Participants
                             </span>
@@ -3450,7 +3615,7 @@ const EventsList: React.FC = () => {
 
                 <div className="mb-4">
                         <div className="flex items-center justify-end gap-2 flex-wrap">
-                            <div className="mr-auto flex flex-wrap items-center gap-1 p-1 bg-slate-100/50 border border-[rgb(var(--ink)/0.05)] rounded-lg">
+                            <div data-tour="participants-filters" className="mr-auto flex flex-wrap items-center gap-1 p-1 bg-slate-100/50 border border-[rgb(var(--ink)/0.05)] rounded-lg">
                                 {[
                                     { value: 'all', label: 'All', count: totalCount, show: true },
                                     { value: 'Principal', label: 'Principal', count: principalCount, show: !!selectedEvent?.has_principal_delegates },
@@ -3501,34 +3666,36 @@ const EventsList: React.FC = () => {
                                     </button>
                                 )}
                             </div>
-                            <button
-                                onClick={exportParticipantsToExcel}
-                                disabled={viewingParticipants.length === 0}
-                                type="button"
-                                aria-label="Export participants"
-                                title="Export participants"
-                                className="shrink-0 bg-emerald-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-emerald-700 transition-colors shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
-                            >
-                                <Download size={16} />
-                                <span className="hidden sm:inline">Export</span>
-                            </button>
-                            {canManageParticipants && (
+                            <div data-tour="participants-actions" className="flex shrink-0 items-center gap-2">
                                 <button
-                                    onClick={openAddParticipantView}
+                                    onClick={exportParticipantsToExcel}
+                                    disabled={viewingParticipants.length === 0}
                                     type="button"
-                                    aria-label="Add participant"
-                                    title="Add participant"
-                                    className="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
+                                    aria-label="Export participants"
+                                    title="Export participants"
+                                    className="shrink-0 bg-emerald-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-emerald-700 transition-colors shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
                                 >
-                                    <UserPlus size={16} />
-                                    <span className="hidden sm:inline">Add Participant</span>
+                                    <Download size={16} />
+                                    <span className="hidden sm:inline">Export</span>
                                 </button>
-                            )}
+                                {canManageParticipants && (
+                                    <button
+                                        onClick={openAddParticipantView}
+                                        type="button"
+                                        aria-label="Add participant"
+                                        title="Add participant"
+                                        className="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
+                                    >
+                                        <UserPlus size={16} />
+                                        <span className="hidden sm:inline">Add Participant</span>
+                                    </button>
+                                )}
+                            </div>
                         </div>
                 </div>
 
                 {/* Content */}
-                <div>
+                <div data-tour="participants-table">
                     {loadingParticipants ? (
                         <div className="py-16 flex items-center justify-center text-slate-400 gap-2">
                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div> Loading participants...
@@ -4261,7 +4428,7 @@ const EventsList: React.FC = () => {
 
                 <div className="flex min-h-0 flex-1 flex-col gap-4 p-5">
                     {canAssignAccessForSelectedEvent && (
-                        <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 lg:grid-cols-[minmax(0,1fr)_180px_auto]">
+                        <div data-tour="access-assign" className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 lg:grid-cols-[minmax(0,1fr)_180px_auto]">
                             <div className="space-y-2">
                                 <label className="block text-xs font-medium text-slate-600">User</label>
                                 <div className="relative">
@@ -4366,7 +4533,7 @@ const EventsList: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-card">
+                    <div data-tour="access-list" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-card">
                         <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
                             <p className="text-sm font-semibold text-slate-800">Assigned Users</p>
                         </div>
@@ -4533,6 +4700,9 @@ const EventsList: React.FC = () => {
               {/* Scrollable body */}
               <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
+                {/* Identity — grouped so the tutorial can spotlight it as one block */}
+                <div data-tour="events-form-basics" className="space-y-5">
+
                 {/* Event Name */}
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1.5">Event Name<span className="text-red-500">*</span></label>
@@ -4680,6 +4850,9 @@ const EventsList: React.FC = () => {
                   </div>
                 </div>
 
+                </div>
+
+                <div data-tour="events-form-schedule" className="space-y-5">
                 {/* ── Schedule ── */}
                 <div className="flex items-center gap-2 pt-2">
                   <Calendar size={14} className="text-indigo-600 shrink-0" />
@@ -4728,6 +4901,9 @@ const EventsList: React.FC = () => {
                   </div>
                 </div>
 
+                </div>
+
+                <div data-tour="events-form-accommodation" className="space-y-5">
                 {/* ── Accommodation ── */}
                 <div className="flex items-center gap-2 pt-2">
                   <Bed size={14} className="text-indigo-600 shrink-0" />
@@ -4886,6 +5062,9 @@ const EventsList: React.FC = () => {
                   )}
                 </div>
 
+                </div>
+
+                <div data-tour="events-form-giveaways" className="space-y-5">
                 {/* ── Giveaways ── */}
                 <div className="flex items-center gap-2 pt-2">
                   <Gift size={14} className="text-indigo-600 shrink-0" />
@@ -5029,6 +5208,9 @@ const EventsList: React.FC = () => {
                     </div>
                 )}
 
+                </div>
+
+                <div data-tour="events-form-registration" className="space-y-5">
                 {/* ── Registration ── */}
                 <div className="flex items-center gap-2 pt-2">
                   <Users size={14} className="text-indigo-600 shrink-0" />
@@ -5148,6 +5330,7 @@ const EventsList: React.FC = () => {
                     {formData.has_principal_delegates ? 'Enabled' : 'Off by default'}
                   </p>
                 </div>
+                </div>
 
               </div>
 
@@ -5161,6 +5344,7 @@ const EventsList: React.FC = () => {
                     Cancel
                   </button>
                   <button
+                    data-tour="events-form-save"
                     type="submit"
                     className="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-all"
                   >
@@ -5172,6 +5356,13 @@ const EventsList: React.FC = () => {
           </div>
         </div>
       )}
+
+      <GuidedTour
+        isOpen={showTutorial}
+        steps={tourSteps}
+        onClose={handleCloseTutorial}
+        ariaLabel="Events walkthrough"
+      />
     </div>
   );
 };
