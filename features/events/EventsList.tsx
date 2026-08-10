@@ -22,7 +22,7 @@ import { sendParticipantQrById } from '../../lib/emailService';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 import { canvasToPdfBlob, PAGE_SIZES } from '../../lib/canvasPdf';
 import { diffRecords, logAudit, sanitizeSnapshot } from '../../lib/auditLog';
-import { formatParticipantOfficialName } from '../../lib/participantName';
+import { formatParticipantOfficialName, formatSuffix, toProperCase } from '../../lib/participantName';
 import {
   DELEGATE_CHIP_CLASS,
   DELEGATE_TYPES,
@@ -1494,31 +1494,6 @@ const EventsList: React.FC = () => {
       setShowSuggestions(false);
   };
   
-  const toProperCase = (str: string) => {
-    const lowerStr = str.toLowerCase();
-    const parts = lowerStr.split('-');
-
-    // Known Filipino/indigenous particle suffixes that shouldn't be capitalized
-    const particles = ['a', 'an', 'om', 'ay', 'in', 'oy', 'on', 'ud'];
-
-    return parts
-      .map((part, index) => {
-        // First part always capitalize, or if not a known particle
-        if (index === 0 || !particles.includes(part)) {
-          return part.split(/\s+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-        }
-        return part; // Keep known particles lowercase
-      })
-      .join('-');
-  };
-
-  const formatSuffix = (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) return '';
-    if (/^[ivx]+$/i.test(trimmed)) return trimmed.toUpperCase();
-    return toProperCase(trimmed);
-  };
-
   const buildParticipantSubmission = () => {
       if (!selectedEvent) return null;
       const availableAccommodationDates = getSelectedEventAccommodationDates(selectedEvent);

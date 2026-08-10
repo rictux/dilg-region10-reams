@@ -23,6 +23,37 @@ export const normalizeOfficialNameText = (value?: string | null): string =>
     .trim()
     .replace(/\s+/g, ' ');
 
+// Known Filipino/indigenous particle suffixes that shouldn't be capitalized
+const NAME_PARTICLES = [
+  'a', 'an', 'om', 'ay', 'in', 'oy', 'on', 'ud', 'at', 'ap', 'awon', 'o', 'ayan', 'og', 'ag'
+];
+
+/**
+ * Title-cases a name, keeping hyphenated particle suffixes lowercase
+ * (e.g. "baleng-at" -> "Baleng-at", "cruz-santos" -> "Cruz-Santos").
+ */
+export const toProperCase = (str: string): string => {
+  const lowerStr = str.toLowerCase();
+  const parts = lowerStr.split('-');
+
+  return parts
+    .map((part, index) => {
+      // First part always capitalize, or if not a known particle
+      if (index === 0 || !NAME_PARTICLES.includes(part)) {
+        return part.split(/\s+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+      }
+      return part; // Keep known particles lowercase
+    })
+    .join('-');
+};
+
+export const formatSuffix = (value: string): string => {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (/^[ivx]+$/i.test(trimmed)) return trimmed.toUpperCase();
+  return toProperCase(trimmed);
+};
+
 const formatMiddleInitial = (value?: string | null): string => {
   const normalized = normalizeOfficialNameText(value).replace(/\.+$/g, '');
   return normalized ? `${normalized}.` : '';

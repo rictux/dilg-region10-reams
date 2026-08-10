@@ -15,7 +15,7 @@ import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/even
 import { fetchAllSupabaseRows } from '../../lib/supabasePagination';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 import { diffRecords, logAudit } from '../../lib/auditLog';
-import { formatParticipantOfficialName } from '../../lib/participantName';
+import { formatParticipantOfficialName, formatSuffix, toProperCase } from '../../lib/participantName';
 import { DELEGATE_CHIP_CLASS, DELEGATE_ROW_CLASS, readDelegateType } from '../../lib/delegates';
 
 interface AttendanceRow {
@@ -897,31 +897,6 @@ const AttendanceList: React.FC = () => {
       setSelectedExistingParticipant(p);
       setSuggestions([]);
       setShowSuggestions(false);
-  };
-
-  const toProperCase = (str: string) => {
-    const lowerStr = str.toLowerCase();
-    const parts = lowerStr.split('-');
-
-    // Known Filipino/indigenous particle suffixes that shouldn't be capitalized
-    const particles = ['a', 'an', 'om', 'ay', 'in', 'oy', 'on', 'ud'];
-
-    return parts
-      .map((part, index) => {
-        // First part always capitalize, or if not a known particle
-        if (index === 0 || !particles.includes(part)) {
-          return part.split(/\s+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-        }
-        return part; // Keep known particles lowercase
-      })
-      .join('-');
-  };
-
-  const formatSuffix = (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) return '';
-    if (/^[ivx]+$/i.test(trimmed)) return trimmed.toUpperCase();
-    return toProperCase(trimmed);
   };
 
   const handleConfirmNameChange = () => {

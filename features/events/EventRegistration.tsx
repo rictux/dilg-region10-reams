@@ -11,6 +11,7 @@ import { toPng } from 'html-to-image';
 import { toast } from 'sonner';
 import QrScanner, { decodeQrFromFile } from './QrScanner';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
+import { formatSuffix, toProperCase } from '../../lib/participantName';
 
 type ParticipantMatch = Pick<Participant, 'participant_id' | 'participant_code'> & Partial<Pick<Participant, 'full_name' | 'f_name' | 'l_name' | 'm_initial' | 'suffix' | 'email' | 'mobile_no' | 'office' | 'position'>> & {
   participatedEventsCount?: number;
@@ -214,31 +215,6 @@ const EventRegistration: React.FC = () => {
     if (data) {
         setLocations(data);
     }
-  };
-
-  const toProperCase = (str: string) => {
-    const lowerStr = str.toLowerCase();
-    const parts = lowerStr.split('-');
-
-    // Known Filipino/indigenous particle suffixes that shouldn't be capitalized
-    const particles = ['a', 'an', 'om', 'ay', 'in', 'oy', 'on', 'ud'];
-
-    return parts
-      .map((part, index) => {
-        // First part always capitalize, or if not a known particle
-        if (index === 0 || !particles.includes(part)) {
-          return part.split(/\s+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-        }
-        return part; // Keep known particles lowercase
-      })
-      .join('-');
-  };
-
-  const formatSuffix = (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) return '';
-    if (/^[ivx]+$/i.test(trimmed)) return trimmed.toUpperCase();
-    return toProperCase(trimmed);
   };
 
   const normalizeNamePart = (value: string) => value.trim().toLowerCase();
