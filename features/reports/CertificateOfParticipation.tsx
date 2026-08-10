@@ -2173,7 +2173,12 @@ const CertificateOfParticipation: React.FC = () => {
       <EmailProgressModal isOpen={isSendingEmails} progress={emailProgress} />
 
       {/* ── Step-by-step tutorial ── */}
-      <GuidedTour isOpen={showTutorial} steps={tourSteps} onClose={handleCloseTutorial} />
+      <GuidedTour
+        isOpen={showTutorial}
+        steps={tourSteps}
+        onClose={handleCloseTutorial}
+        ariaLabel="Certificate of Participation tutorial"
+      />
 
     </div>
   );

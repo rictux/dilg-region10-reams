@@ -25,6 +25,12 @@ import {
   validateDraftQuestions,
 } from '../../lib/eventTests';
 import { downloadQrCodePng, qrFileSlug } from '../../lib/qrDownload';
+import {
+  buildSampleTestQuestions,
+  isSampleEvent,
+  SAMPLE_PRE_TEST_ID,
+  SAMPLE_TEST_META,
+} from './tutorialSampleEvent';
 
 // The Pre-test / Post-test editor for one event.
 //
@@ -114,6 +120,28 @@ const EventTestBuilder: React.FC<Props> = ({ event, onClose, onSaved }) => {
 
     const load = async () => {
       setLoading(true);
+
+      // The tutorial's sample event has no rows to load. Hand the builder a worked pre-test
+      // so the tour has real questions, a marked answer and a QR block to point at.
+      if (isSampleEvent(event.event_id)) {
+        setDrafts({
+          Pre: {
+            test_id: SAMPLE_PRE_TEST_ID,
+            enabled: true,
+            title: DEFAULT_EVENT_TEST_TITLE.Pre,
+            instructions: SAMPLE_TEST_META.instructions,
+            passingScore: SAMPLE_TEST_META.passingScore,
+            isOpen: true,
+            showScore: false,
+            questions: buildSampleTestQuestions(),
+          },
+          Post: emptyDraft('Post'),
+        });
+        setSubmissionCounts({});
+        setLoading(false);
+        return;
+      }
+
       try {
         const { data: tests, error: testError } = await supabase
           .from('event_tests')
@@ -348,6 +376,13 @@ const EventTestBuilder: React.FC<Props> = ({ event, onClose, onSaved }) => {
   };
 
   const handleSave = async () => {
+    // Belt and braces: the tutorial overlay blocks the mouse but not keyboard focus, so the
+    // sample event refuses writes outright rather than relying on a foreign key.
+    if (isSampleEvent(event.event_id)) {
+      toast.info('This is a sample event for the tutorial — nothing is saved.');
+      return;
+    }
+
     setSaving(true);
     try {
       for (const testType of EVENT_TEST_TYPES) {
@@ -525,7 +560,7 @@ const EventTestBuilder: React.FC<Props> = ({ event, onClose, onSaved }) => {
         </div>
 
         {/* Test tabs */}
-        <div className="flex gap-2 border-b border-slate-200 px-6 pt-3">
+        <div data-tour="test-tabs" className="flex gap-2 border-b border-slate-200 px-6 pt-3">
           {EVENT_TEST_TYPES.map(testType => (
             <button
               key={testType}
@@ -554,7 +589,7 @@ const EventTestBuilder: React.FC<Props> = ({ event, onClose, onSaved }) => {
           <div className="flex-1 space-y-6 overflow-y-auto p-6">
 
             {/* Enable */}
-            <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border-2 border-slate-200 px-4 py-3">
+            <label data-tour="test-enable" className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border-2 border-slate-200 px-4 py-3">
               <span>
                 <span className="block text-sm font-semibold text-slate-800">
                   Run a {EVENT_TEST_LABEL[activeType].toLowerCase()} for this event
@@ -584,7 +619,7 @@ const EventTestBuilder: React.FC<Props> = ({ event, onClose, onSaved }) => {
                 )}
 
                 {/* Meta */}
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div data-tour="test-meta" className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <label className="mb-1.5 block text-xs font-semibold text-slate-600">Title</label>
                     <input
@@ -658,7 +693,7 @@ const EventTestBuilder: React.FC<Props> = ({ event, onClose, onSaved }) => {
 
                 {/* QR — only once the test exists, so the link always resolves */}
                 {draft.test_id ? (
-                  <div className="flex flex-col items-center gap-4 rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 sm:flex-row sm:items-start">
+                  <div data-tour="test-qr" className="flex flex-col items-center gap-4 rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 sm:flex-row sm:items-start">
                     <div
                       ref={element => { qrRefs.current[activeType] = element; }}
                       className="rounded-lg border-2 border-indigo-100 bg-card p-3"
@@ -795,7 +830,7 @@ const EventTestBuilder: React.FC<Props> = ({ event, onClose, onSaved }) => {
                 )}
 
                 {/* Questions */}
-                <div>
+                <div data-tour="test-questions">
                   <div className="mb-3 flex items-center justify-between">
                     <h4 className="text-sm font-semibold text-slate-800">
                       Questions
@@ -972,6 +1007,7 @@ const EventTestBuilder: React.FC<Props> = ({ event, onClose, onSaved }) => {
               Cancel
             </button>
             <button
+              data-tour="test-save"
               onClick={handleSave}
               disabled={saving || loading}
               className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:bg-indigo-300"

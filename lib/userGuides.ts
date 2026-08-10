@@ -10,7 +10,7 @@ import { User } from '../types/database';
  * before the row comes back and the case where the write fails outright.
  */
 
-export type GuideId = 'cop';
+export type GuideId = 'cop' | 'events';
 
 const localKey = (guideId: GuideId, userId?: number | null) =>
   `guide_seen_${guideId}${userId ? `_${userId}` : ''}`;
