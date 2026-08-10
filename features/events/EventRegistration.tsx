@@ -43,7 +43,7 @@ const formatAccommodationDateLabel = (value: string) => {
 const isValidEmailAddress = (value: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
 
-const AGE_GROUP_OPTIONS = ['18-24', '25-34', '35-44', '45-54', '55-65', '65+'] as const;
+const AGE_GROUP_OPTIONS = ['Under 18', '18-24', '25-34', '35-44', '45-54', '55-65', '65+'] as const;
 
 const normalizeAgeGroup = (value?: string | null) =>
   AGE_GROUP_OPTIONS.some((option) => option === value) ? value! : '';

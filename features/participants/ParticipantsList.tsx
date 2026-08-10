@@ -2044,6 +2044,7 @@ const AttendanceList: React.FC = () => {
                                         value={newParticipant.age_group}
                                         onChange={e => setNewParticipant({...newParticipant, age_group: e.target.value})}
                                     >
+                                        <option value="Under 18">Under 18</option>
                                         <option value="18-24">18-24</option>
                                         <option value="25-34">25-34</option>
                                         <option value="35-44">35-44</option>
