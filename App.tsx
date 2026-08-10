@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, matchPath } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './features/auth/Login';
 import Signup from './features/auth/Signup';
@@ -45,11 +45,39 @@ const ProtectedRoute = ({ children, requiredPermission }: React.PropsWithChildre
   return <>{children}</>;
 };
 
+// Participant-facing and print-only routes. Feature announcements are an
+// internal, signed-in-user feature, so on these pages the modal has no business
+// showing: a staff member with an unread announcement who opens a registration
+// link would otherwise get the modal covering the registration form, and the
+// print views would carry it into the printout.
+const ANNOUNCEMENT_FREE_ROUTES = [
+  '/register/:eventId',
+  '/test/:eventId/:testType',
+  '/lookup',
+  '/badges/:id',
+  '/print-attendance/:eventId',
+  '/print-scan-logs/:eventId?',
+  '/print-giveaway-claims/:eventId',
+  '/print-certificate/:eventId',
+  '/print-cop/:eventId',
+  '/test-results/:eventId',
+];
+
+const RouteAwareAnnouncementModal: React.FC = () => {
+  const { pathname } = useLocation();
+
+  if (ANNOUNCEMENT_FREE_ROUTES.some((route) => matchPath(route, pathname))) {
+    return null;
+  }
+
+  return <AnnouncementModal />;
+};
+
 const App: React.FC = () => {
   return (
     <AuthProvider>
       <Router>
-        <AnnouncementModal />
+        <RouteAwareAnnouncementModal />
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
