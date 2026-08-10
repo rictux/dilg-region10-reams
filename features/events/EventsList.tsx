@@ -2958,28 +2958,33 @@ const EventsList: React.FC = () => {
                                   </div>
                               </div>
 
-                              {/* Action bar */}
-                              <div className="flex items-center gap-1 px-4 py-2.5 border-t border-[rgb(var(--ink)/0.06)] bg-slate-50/40 rounded-b-lg">
+                              {/* Action bar — labels are dropped below 2xl, where a 3-up card is
+                                  too narrow to fit five of them and Delete would spill past the
+                                  card edge. flex-wrap is the backstop for the in-between widths
+                                  the breakpoints can't see (e.g. an expanded sidebar). */}
+                              <div className="flex flex-wrap items-center gap-x-1 gap-y-1 px-3 py-2.5 border-t border-[rgb(var(--ink)/0.06)] bg-slate-50/40 rounded-b-lg">
                                   {eventView === 'deleted' && isAdmin ? (
                                       <>
                                           <button
                                               onClick={(e) => handleRestoreEvent(e, event.event_id)}
-                                              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors"
+                                              className="flex shrink-0 items-center gap-1.5 px-2 py-1.5 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors"
                                               title="Restore"
+                                              aria-label="Restore"
                                           >
                                               <RotateCcw size={13} />
-                                              <span>Restore</span>
+                                              <span className="hidden 2xl:inline">Restore</span>
                                           </button>
                                           <button
                                               onClick={(e) => {
                                                   e.stopPropagation();
                                                   handleDelete(e, event.event_id);
                                               }}
-                                              className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                              className="ml-auto flex shrink-0 items-center gap-1.5 px-2 py-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                                               title="Permanently delete"
+                                              aria-label="Permanently delete"
                                           >
                                               <Trash2 size={13} />
-                                              <span>Delete Forever</span>
+                                              <span className="hidden 2xl:inline">Delete Forever</span>
                                           </button>
                                       </>
                                   ) : (
@@ -2989,20 +2994,22 @@ const EventsList: React.FC = () => {
                                                   e.stopPropagation();
                                                   openShareModal(e, event);
                                               }}
-                                              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                                              className="flex shrink-0 items-center gap-1.5 px-2 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
                                               title="Share"
+                                              aria-label="Share"
                                           >
                                               <Share2 size={13} />
-                                              <span>Share</span>
+                                              <span className="hidden 2xl:inline">Share</span>
                                           </button>
                                           {canEditCurrentEvent && (
                                               <button
                                                   onClick={(e) => openTestBuilder(e, event)}
-                                                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                                                  className="flex shrink-0 items-center gap-1.5 px-2 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
                                                   title="Pre-test / Post-test"
+                                                  aria-label="Pre-test / Post-test"
                                               >
                                                   <ClipboardList size={13} />
-                                                  <span>Tests</span>
+                                                  <span className="hidden 2xl:inline">Tests</span>
                                               </button>
                                           )}
                                           {canEditCurrentEvent && (
@@ -3011,11 +3018,12 @@ const EventsList: React.FC = () => {
                                                       e.stopPropagation();
                                                       openEditModal(e, event);
                                                   }}
-                                                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                                                  className="flex shrink-0 items-center gap-1.5 px-2 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
                                                   title="Edit"
+                                                  aria-label="Edit"
                                               >
                                                   <Edit size={13} />
-                                                  <span>Edit</span>
+                                                  <span className="hidden 2xl:inline">Edit</span>
                                               </button>
                                           )}
                                           {canSetCurrentEventAccess && (
@@ -3024,11 +3032,12 @@ const EventsList: React.FC = () => {
                                                       e.stopPropagation();
                                                       openEventAccessModal(e, event);
                                                   }}
-                                                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                                                  className="flex shrink-0 items-center gap-1.5 px-2 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
                                                   title="Access Settings"
+                                                  aria-label="Access Settings"
                                               >
                                                   <Settings size={13} />
-                                                  <span>Access</span>
+                                                  <span className="hidden 2xl:inline">Access</span>
                                               </button>
                                           )}
                                           {canDeleteCurrentEvent && (
@@ -3037,11 +3046,12 @@ const EventsList: React.FC = () => {
                                                       e.stopPropagation();
                                                       handleDelete(e, event.event_id);
                                                   }}
-                                                  className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                  className="ml-auto flex shrink-0 items-center gap-1.5 px-2 py-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                                                   title="Delete"
+                                                  aria-label="Delete"
                                               >
                                                   <Trash2 size={13} />
-                                                  <span>Delete</span>
+                                                  <span className="hidden 2xl:inline">Delete</span>
                                               </button>
                                           )}
                                       </>
