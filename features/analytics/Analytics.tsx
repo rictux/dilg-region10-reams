@@ -4,6 +4,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 import { MANAGE_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
 import { ChartTooltip, pickRampColors, useChartTheme } from '../../lib/chartTheme';
+import { isPrincipalEvent, readDelegateType } from '../../lib/delegates';
+import { DelegateType } from '../../types/database';
 import {
     Building2,
     Calendar as CalendarIcon,
@@ -41,6 +43,13 @@ interface AnalyticsEvent {
   event_name: string;
   start_date: string;
   end_date: string;
+  has_principal_delegates?: boolean | null;
+}
+
+interface RegistrationRow {
+  participant_id: number;
+  role: string;
+  delegate_type: DelegateType | null;
 }
 
 interface ParticipantInfo {
@@ -59,6 +68,28 @@ interface LogRow {
 }
 
 const AGE_GROUP_ORDER = ['18-24', '25-34', '35-44', '45-54', '55-65', '65+'];
+
+// The buckets the role filter offers. Principal / Representative only appear on
+// events that opted into principal delegates; everywhere else every delegate
+// falls under the single "Delegate" bucket.
+type RoleKey = 'Secretariat' | 'Guest' | 'Speaker' | 'VIP' | 'Principal' | 'Representative' | 'Delegate';
+
+const ROLE_FILTER_ORDER: RoleKey[] = ['Secretariat', 'Guest', 'Speaker', 'VIP', 'Principal', 'Representative', 'Delegate'];
+
+const SPLIT_ONLY_ROLES = new Set<RoleKey>(['Principal', 'Representative']);
+
+/**
+ * The filter bucket a registration belongs to. When `split` is on, a Delegate
+ * holding a Principal / Representative seat is reported as that seat and only
+ * the seatless ones stay "Delegate".
+ */
+const roleKeyOf = (row: RegistrationRow, split: boolean): RoleKey => {
+  if (split) {
+    const delegateType = readDelegateType(row.role, row.delegate_type);
+    if (delegateType) return delegateType;
+  }
+  return (row.role || 'Delegate') as RoleKey;
+};
 
 const PRESENT_SET = new Set<string>(PRESENT_ATTENDANCE_STATUSES);
 
@@ -131,10 +162,11 @@ const Analytics: React.FC = () => {
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 
   const [logs, setLogs] = useState<LogRow[]>([]);
-  const [registrationRoles, setRegistrationRoles] = useState<string[]>([]);
+  const [registrations, setRegistrations] = useState<RegistrationRow[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
 
-  const registeredCount = registrationRoles.length;
+  // Empty means "All roles" — every chart then sees the unfiltered data.
+  const [roleFilter, setRoleFilter] = useState<RoleKey[]>([]);
 
   // Searchable event picker
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -238,24 +270,31 @@ const Analytics: React.FC = () => {
     try {
       const PAGE = 1000;
 
-      // Registration roles for the event — the row count doubles as the
-      // registered total, so no separate head-count query is needed.
-      let roles: string[] = [];
+      // Registrations for the event — the row count doubles as the registered
+      // total, so no separate head-count query is needed, and the per-row role
+      // is what the role filter maps attendance logs through.
+      let rows: RegistrationRow[] = [];
       let roleFrom = 0;
       for (let page = 0; page < 20; page++) {
         const { data, error } = await supabase
           .from('event_participants')
-          .select('role')
+          .select('participant_id, role, delegate_type')
           .eq('event_id', eventId)
           .eq('registration_status', 'Registered')
           .range(roleFrom, roleFrom + PAGE - 1);
 
         if (error) throw error;
-        roles = roles.concat((data || []).map((row: any) => row.role || 'Delegate'));
+        rows = rows.concat(
+          (data || []).map((row: any) => ({
+            participant_id: Number(row.participant_id),
+            role: row.role || 'Delegate',
+            delegate_type: (row.delegate_type ?? null) as DelegateType | null
+          }))
+        );
         if (!data || data.length < PAGE) break;
         roleFrom += PAGE;
       }
-      setRegistrationRoles(roles);
+      setRegistrations(rows);
 
       let from = 0;
       let all: LogRow[] = [];
@@ -277,7 +316,7 @@ const Analytics: React.FC = () => {
     } catch (err) {
       console.error('Failed to load analytics data', err);
       setLogs([]);
-      setRegistrationRoles([]);
+      setRegistrations([]);
     } finally {
       setDataLoading(false);
     }
@@ -285,11 +324,61 @@ const Analytics: React.FC = () => {
 
   useEffect(() => {
     if (selectedEventId) fetchEventData(selectedEventId);
+    // Buckets differ per event (only some split delegates), so a filter carried
+    // over from the previous event could select a role that no longer exists.
+    setRoleFilter([]);
   }, [selectedEventId]);
 
   const selectedEvent = events.find((e) => e.event_id === selectedEventId) || null;
 
-  const presentLogs = useMemo(() => logs.filter((log) => PRESENT_SET.has(log.scan_status)), [logs]);
+  const splitDelegates = isPrincipalEvent(selectedEvent);
+
+  const roleFilterActive = roleFilter.length > 0;
+  const activeRoles = useMemo(() => new Set<RoleKey>(roleFilter), [roleFilter]);
+
+  const roleOptions = useMemo(
+    () => ROLE_FILTER_ORDER.filter((key) => splitDelegates || !SPLIT_ONLY_ROLES.has(key)),
+    [splitDelegates]
+  );
+
+  // Registered head count per bucket — shown on the filter chips, so it stays
+  // unfiltered even while a filter is applied.
+  const roleCounts = useMemo(() => {
+    const counts = new Map<RoleKey, number>();
+    for (const row of registrations) {
+      const key = roleKeyOf(row, splitDelegates);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts;
+  }, [registrations, splitDelegates]);
+
+  const roleByParticipant = useMemo(() => {
+    const map = new Map<number, RoleKey>();
+    for (const row of registrations) map.set(row.participant_id, roleKeyOf(row, splitDelegates));
+    return map;
+  }, [registrations, splitDelegates]);
+
+  const toggleRole = (key: RoleKey) =>
+    setRoleFilter((current) => (current.includes(key) ? current.filter((r) => r !== key) : [...current, key]));
+
+  const filteredRegistrations = useMemo(
+    () => (roleFilterActive ? registrations.filter((row) => activeRoles.has(roleKeyOf(row, splitDelegates))) : registrations),
+    [registrations, roleFilterActive, activeRoles, splitDelegates]
+  );
+
+  const registeredCount = filteredRegistrations.length;
+
+  // Logs from participants outside the selected roles drop out — including any
+  // whose registration was cancelled, since they no longer carry a role.
+  const filteredLogs = useMemo(() => {
+    if (!roleFilterActive) return logs;
+    return logs.filter((log) => {
+      const key = roleByParticipant.get(log.participant_id);
+      return key !== undefined && activeRoles.has(key);
+    });
+  }, [logs, roleFilterActive, roleByParticipant, activeRoles]);
+
+  const presentLogs = useMemo(() => filteredLogs.filter((log) => PRESENT_SET.has(log.scan_status)), [filteredLogs]);
 
   const attendedCount = useMemo(
     () => new Set(presentLogs.map((log) => log.participant_id)).size,
@@ -352,14 +441,19 @@ const Analytics: React.FC = () => {
   // shade, fading lighter toward the top.
   const hourlyDayColors = pickRampColors(colors.ramp, hourlyDayLabels.length).reverse();
 
-  // Registered participants per role (Delegate, Speaker, Secretariat, …).
+  // Registered participants per role (Delegate, Speaker, Secretariat, …), using
+  // the same buckets as the filter so Principal / Representative show
+  // separately on events that split them.
   const roleData = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const role of registrationRoles) counts.set(role, (counts.get(role) || 0) + 1);
+    for (const row of filteredRegistrations) {
+      const key = roleKeyOf(row, splitDelegates);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
     return Array.from(counts.entries())
       .map(([role, count]) => ({ role, count }))
       .sort((a, b) => b.count - a.count);
-  }, [registrationRoles]);
+  }, [filteredRegistrations, splitDelegates]);
 
   // One profile per unique present participant — demographics count people, not scans.
   const attendeeProfiles = useMemo(() => {
@@ -418,6 +512,10 @@ const Analytics: React.FC = () => {
   const emptyChart = (message: string) => (
     <p className="py-12 text-center text-xs text-slate-400">{dataLoading ? 'Loading…' : message}</p>
   );
+
+  const noScansMessage = roleFilterActive
+    ? 'No valid check-ins for the selected roles.'
+    : 'No valid check-ins recorded.';
 
   return (
     <div className="-m-4 h-[calc(100%+2rem)] min-h-0 space-y-4 overflow-y-auto p-4 md:-m-6 md:h-[calc(100%+3rem)] md:px-12 md:py-8 lg:px-16">
@@ -518,6 +616,59 @@ const Analytics: React.FC = () => {
             Refresh
           </button>
         </div>
+
+        {/* Role filter — every tile and chart below reads the filtered data. */}
+        {selectedEvent && (
+          <div className="mt-3 border-t border-[rgb(var(--ink)/0.06)] pt-3">
+            <span className="mb-1.5 block font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400">
+              Role
+            </span>
+            <div className="flex flex-wrap items-center gap-1 rounded-lg border border-[rgb(var(--ink)/0.05)] bg-slate-100/50 p-1">
+              <button
+                type="button"
+                onClick={() => setRoleFilter([])}
+                aria-pressed={!roleFilterActive}
+                className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-xs transition-all ${
+                  !roleFilterActive
+                    ? 'border border-black/[0.06] bg-card font-medium text-slate-900 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                All
+                <span className={`font-mono text-[10px] leading-none ${!roleFilterActive ? 'rounded bg-indigo-600/10 px-1 py-0.5 text-indigo-600' : 'text-slate-400'}`}>
+                  {registrations.length}
+                </span>
+              </button>
+              {roleOptions.map((key) => {
+                const count = roleCounts.get(key) || 0;
+                const isActive = activeRoles.has(key);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleRole(key)}
+                    disabled={count === 0 && !isActive}
+                    aria-pressed={isActive}
+                    className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-xs transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
+                      isActive
+                        ? 'border border-black/[0.06] bg-card font-medium text-slate-900 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {key}
+                    <span className={`font-mono text-[10px] leading-none ${isActive ? 'rounded bg-indigo-600/10 px-1 py-0.5 text-indigo-600' : 'text-slate-400'}`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-[11px] text-slate-400">
+              Pick one or more roles to narrow every tile and chart; counts are registered participants.
+              {splitDelegates && ' This event seats Principal and Representative delegates, so “Delegate” covers only those claiming neither.'}
+            </p>
+          </div>
+        )}
       </div>
 
       {eventsLoading ? (
@@ -537,7 +688,7 @@ const Analytics: React.FC = () => {
             <StatCard icon={Users} label="Registered" value={registeredCount} color="bg-indigo-600/10 text-indigo-600" loading={dataLoading} />
             <StatCard icon={CheckCircle} label="Attended (unique)" value={attendedCount} color="bg-emerald-50 text-emerald-600" loading={dataLoading} />
             <StatCard icon={Percent} label="Attendance Rate" value={attendanceRate === null ? '—' : `${attendanceRate}%`} color="bg-blue-50 text-blue-600" loading={dataLoading} />
-            <StatCard icon={ScanLine} label="Total Scans" value={logs.length} color="bg-stone-100 text-stone-500" loading={dataLoading} />
+            <StatCard icon={ScanLine} label="Total Scans" value={filteredLogs.length} color="bg-stone-100 text-stone-500" loading={dataLoading} />
           </div>
 
           <div className="grid gap-4 xl:grid-cols-2">
@@ -552,7 +703,7 @@ const Analytics: React.FC = () => {
                 </>
               }
             >
-              {dailyData.length === 0 ? emptyChart('No valid check-ins recorded.') : (
+              {dailyData.length === 0 ? emptyChart(noScansMessage) : (
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={dailyData} margin={{ top: 18, right: 8, left: -18, bottom: 0 }} barCategoryGap="28%" barGap={2}>
                     <CartesianGrid vertical={false} stroke={colors.grid} />
@@ -579,7 +730,7 @@ const Analytics: React.FC = () => {
                 hourlyDayLabels.map((day, i) => <LegendSwatch key={day} color={hourlyDayColors[i]} label={day} />)
               }
             >
-              {hourlyData.length === 0 ? emptyChart('No valid check-ins recorded.') : (
+              {hourlyData.length === 0 ? emptyChart(noScansMessage) : (
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={hourlyData} margin={{ top: 18, right: 8, left: -18, bottom: 0 }} barCategoryGap="24%">
                     <CartesianGrid vertical={false} stroke={colors.grid} />
@@ -606,7 +757,7 @@ const Analytics: React.FC = () => {
 
             {/* Age group distribution */}
             <ChartCard icon={Users} title="Attendees by Age Group">
-              {attendeeProfiles.length === 0 ? emptyChart('No valid check-ins recorded.') : (
+              {attendeeProfiles.length === 0 ? emptyChart(noScansMessage) : (
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={ageData} margin={{ top: 18, right: 8, left: -18, bottom: 0 }} barCategoryGap="24%">
                     <CartesianGrid vertical={false} stroke={colors.grid} />
@@ -623,7 +774,7 @@ const Analytics: React.FC = () => {
 
             {/* Gender distribution */}
             <ChartCard icon={UserRound} title="Attendees by Gender">
-              {genderData.length === 0 ? emptyChart('No valid check-ins recorded.') : (
+              {genderData.length === 0 ? emptyChart(noScansMessage) : (
                 <div className="flex flex-col items-center gap-5 py-2 sm:flex-row sm:justify-center sm:gap-10">
                   <div className="relative h-[200px] w-[200px] shrink-0">
                     <ResponsiveContainer width="100%" height="100%">
@@ -671,7 +822,7 @@ const Analytics: React.FC = () => {
 
             {/* Registered participants per role */}
             <ChartCard icon={Contact} title="Participants by Role">
-              {roleData.length === 0 ? emptyChart('No registered participants.') : (
+              {roleData.length === 0 ? emptyChart(roleFilterActive ? 'No registrations for the selected roles.' : 'No registered participants.') : (
                 <div className="space-y-3 py-1">
                   {roleData.map((item) => {
                     const pct = registeredCount > 0 ? Math.round((item.count / registeredCount) * 100) : 0;
@@ -697,7 +848,7 @@ const Analytics: React.FC = () => {
 
             {/* Top offices */}
             <ChartCard icon={Building2} title="Top Offices by Attendees">
-              {officeData.length === 0 ? emptyChart('No valid check-ins recorded.') : (
+              {officeData.length === 0 ? emptyChart(noScansMessage) : (
                 <div className="space-y-3 py-1">
                   {officeData.map((item) => (
                     <div key={item.office}>

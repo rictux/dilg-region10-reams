@@ -44,6 +44,42 @@ interface DashboardEvent {
   session?: 'AM' | 'PM' | 'All_Day';
 }
 
+/**
+ * Unique participants with a present scan on `date`, across every session.
+ *
+ * Counting only AM rows reported 0 for PM-only events, and counting raw rows
+ * instead would double-count anyone scanned in both sessions — so the distinct
+ * participant ids are gathered client-side (PostgREST has no COUNT DISTINCT).
+ */
+const fetchPresentCount = async (eventId: number, date: string) => {
+  const PAGE = 1000;
+  const ids = new Set<number>();
+
+  for (let page = 0; page < 20; page++) {
+    const { data, error } = await supabase
+      .from('attendance_logs')
+      .select('participant_id')
+      .eq('event_id', eventId)
+      .eq('attendance_date', date)
+      .in('scan_status', [...PRESENT_ATTENDANCE_STATUSES])
+      .range(page * PAGE, page * PAGE + PAGE - 1);
+
+    // One event's count failing shouldn't blank the whole dashboard.
+    if (error) {
+      console.error('Error fetching present count', error);
+      break;
+    }
+
+    (data || []).forEach((row: any) => {
+      const id = Number(row.participant_id);
+      if (Number.isFinite(id)) ids.add(id);
+    });
+    if (!data || data.length < PAGE) break;
+  }
+
+  return ids.size;
+};
+
 interface ActivityLogItem {
   key: string;
   type: 'scan' | 'registration';
@@ -158,18 +194,12 @@ const Dashboard: React.FC = () => {
                 .eq('event_id', e.event_id)
                 .eq('registration_status', 'Registered');
 
-            const { count: amCount } = await supabase
-                .from('attendance_logs')
-                .select('*', { count: 'exact', head: true })
-                .eq('event_id', e.event_id)
-                .eq('attendance_date', today)
-                .eq('action_session', 'AM')
-                .in('scan_status', [...PRESENT_ATTENDANCE_STATUSES]);
+            const presentCount = await fetchPresentCount(e.event_id, today);
 
             return {
                 ...e,
                 registered_count: regCount || 0,
-                present_count: amCount || 0
+                present_count: presentCount
             };
         }));
         setOngoingEvents(ongoingEventsWithCounts);
