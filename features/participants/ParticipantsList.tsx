@@ -17,6 +17,7 @@ import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 import { diffRecords, logAudit } from '../../lib/auditLog';
 import { formatParticipantOfficialName, formatSuffix, toProperCase } from '../../lib/participantName';
 import { DELEGATE_CHIP_CLASS, DELEGATE_ROW_CLASS, readDelegateType } from '../../lib/delegates';
+import { readDeviceLabelSync, resolveDeviceLabel } from '../../lib/deviceLabel';
 
 interface AttendanceRow {
     participant: Participant;
@@ -252,6 +253,18 @@ const AttendanceList: React.FC = () => {
   // Attendance session to auto-log on registration: AM for All_Day / AM-only events, PM for PM-only events.
   const getRegistrationAttendanceSession = (event?: Event | null): 'AM' | 'PM' =>
       event?.session === 'PM' ? 'PM' : 'AM';
+
+  // Names the machine that entered the attendance, same as the scanner does.
+  // Seeded synchronously, then upgraded once the Client Hints model resolves.
+  const deviceLabelRef = useRef(readDeviceLabelSync());
+
+  useEffect(() => {
+    let active = true;
+    resolveDeviceLabel().then((label) => {
+      if (active) deviceLabelRef.current = label;
+    });
+    return () => { active = false; };
+  }, []);
 
   // Click Outside Listener for Dropdown
   useEffect(() => {
@@ -672,10 +685,10 @@ const AttendanceList: React.FC = () => {
                   scan_status: manualForm.status,
                   remarks: `${remarksLabel} (Updated ${manualForm.session})`,
                   user_id: user.user_id,
-                  // The row's values now come from the form, not from whatever
-                  // device first recorded them — overwriting the scanner phone
-                  // here keeps the Scan Logs column honest about the last write.
-                  scanner_device: 'Manual Input'
+                  // The row's values now come from this machine, not from
+                  // whatever device first recorded them, so the column follows
+                  // the last write. `remarks` still marks it as a manual entry.
+                  scanner_device: deviceLabelRef.current
               })
               .eq('attendance_id', existingLog.attendance_id);
 
@@ -692,7 +705,7 @@ const AttendanceList: React.FC = () => {
           action_session: manualForm.session,
           scan_status: manualForm.status,
           remarks: remarksLabel,
-          scanner_device: 'Manual Input'
+          scanner_device: deviceLabelRef.current
       });
 
       if (insertError) throw insertError;

@@ -1,8 +1,9 @@
 /**
  * Human-readable label for the device doing the scanning, written to
- * `scanner_device` on attendance, giveaway-claim and principal-arrival logs
- * alongside the descriptive values the other entry points already use
- * ('Web', 'Manual Input', 'Event Registration').
+ * `scanner_device` on attendance, giveaway-claim and principal-arrival logs —
+ * for both scans and manual entry, so the column always names the machine that
+ * wrote the row. The remaining automatic paths keep their fixed descriptions
+ * ('Web', 'Event Registration').
  *
  * Browsers never hand out marketing names — there is no way to read
  * "iPhone 16 Pro Max" from a web page. The best available per platform:
