@@ -38,6 +38,7 @@ import {
   readDelegateType
 } from '../../lib/delegates';
 import { diffRecords, logAudit } from '../../lib/auditLog';
+import { readDeviceLabelSync, resolveDeviceLabel } from '../../lib/deviceLabel';
 import {
   announcePrincipalArrival,
   broadcastPrincipalArrival,
@@ -185,13 +186,10 @@ const Scanner: React.FC = () => {
   const isProcessingRef = useRef(false);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Utility function to generate 8 character alphanumeric string
-  const generateDeviceToken = () => {
-    return 'web-' + Math.random().toString(36).substring(2, 10);
-  };
-
-  // Ref to hold device token
-  const deviceTokenRef = useRef(generateDeviceToken());
+  // What every log this page writes records as its `scanner_device`. Seeded
+  // synchronously so a scan landing right after mount still names a device,
+  // then upgraded once the Client Hints model resolves.
+  const deviceLabelRef = useRef(readDeviceLabelSync());
   const getDeviceDateString = useCallback((date: Date) => format(date, 'yyyy-MM-dd'), []);
 
   const getDefaultSessionForEvent = (event?: Event): 'AM' | 'PM' => {
@@ -305,6 +303,15 @@ const Scanner: React.FC = () => {
       setSession(selectedEvent.session);
     }
   }, [selectedEvent, session]);
+
+  // --- 0. Device Label ---
+  useEffect(() => {
+    let active = true;
+    resolveDeviceLabel().then((label) => {
+      if (active) deviceLabelRef.current = label;
+    });
+    return () => { active = false; };
+  }, []);
 
   // --- 1. Network Status Listeners & Queue Loading ---
   useEffect(() => {
@@ -840,7 +847,7 @@ const Scanner: React.FC = () => {
                 attendance_date: deviceAttendanceDate,
                 scan_time: deviceScanTime,
                 session: currentSession,
-                scanner_device: deviceTokenRef.current + " (Offline)",
+                scanner_device: deviceLabelRef.current + " (Offline)",
                 timestamp: Date.now()
             };
 
@@ -959,7 +966,7 @@ const Scanner: React.FC = () => {
                     .from('attendance_logs')
                     .update({
                         scan_time: deviceScanTime,
-                        scanner_device: deviceTokenRef.current,
+                        scanner_device: deviceLabelRef.current,
                         remarks: 'Updated PM Time'
                     })
                     .eq('attendance_id', existingLog.attendance_id);
@@ -1041,7 +1048,7 @@ const Scanner: React.FC = () => {
           arrived_at: arrivedAt.toISOString(),
           arrival_date: getDeviceDateString(arrivedAt),
           source,
-          scanner_device: deviceTokenRef.current,
+          scanner_device: deviceLabelRef.current,
           remarks: source === 'Promoted'
               ? 'Marked as Principal at the scanner'
               : source === 'AutoRegistered'
@@ -1123,7 +1130,7 @@ const Scanner: React.FC = () => {
           action_session: scanSession,
           remarks: notes,
           scan_time: scanTimeStr,
-          scanner_device: deviceTokenRef.current
+          scanner_device: deviceLabelRef.current
       });
   };
 
@@ -1239,7 +1246,7 @@ const Scanner: React.FC = () => {
           claimed_at: scanTimeStr,
           claim_status: 'Claimed',
           giveaway_snapshot: buildGiveawaySnapshot(giveaways, giveawaySelections),
-          scanner_device: deviceTokenRef.current,
+          scanner_device: deviceLabelRef.current,
           remarks: 'Claimed via scanner giveaway mode'
       });
 

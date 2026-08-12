@@ -671,7 +671,11 @@ const AttendanceList: React.FC = () => {
                   scan_time: scanTimeStr,
                   scan_status: manualForm.status,
                   remarks: `${remarksLabel} (Updated ${manualForm.session})`,
-                  user_id: user.user_id
+                  user_id: user.user_id,
+                  // The row's values now come from the form, not from whatever
+                  // device first recorded them — overwriting the scanner phone
+                  // here keeps the Scan Logs column honest about the last write.
+                  scanner_device: 'Manual Input'
               })
               .eq('attendance_id', existingLog.attendance_id);
 
