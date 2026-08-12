@@ -12,7 +12,7 @@ interface ScanLog {
     attendance_id: number;
     scan_time: string;
     action_session: string;
-    remarks: string | null;
+    scanner_device: string | null;
     events: {
         event_name: string;
     } | null;
@@ -89,7 +89,7 @@ const ScanLogsPrint: React.FC = () => {
                 .select(`
                   scan_time,
                   attendance_id,
-                  remarks,
+                  scanner_device,
                   action_session,
                   events!inner ( event_name, deleted_at ),
                   participants ( participant_id, participant_code, full_name, email, mobile_no, gender, office ),
@@ -261,13 +261,13 @@ const ScanLogsPrint: React.FC = () => {
                                 <col className="w-[4%]" />
                                 <col className="w-[10%]" />
                                 <col className="w-[6%]" />
-                                <col className="w-[25%]" />
+                                <col className="w-[22%]" />
                                 <col className="w-[6%]" />
                                 <col className="w-[13%]" />
                                 <col className="w-[12%]" />
                                 <col className="w-[7%]" />
                                 <col className="w-[10%]" />
-                                <col className="w-[7%]" />
+                                <col className="w-[10%]" />
                             </colgroup>
                             <thead className="bg-[#F5F3EE] border-b border-[#E0DDD4] print:bg-[#EDEAE2] print:border-black text-[#4A4843]">
                                 <tr>
@@ -280,7 +280,7 @@ const ScanLogsPrint: React.FC = () => {
                                     <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 print-wrap">Contact</th>
                                     <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 print-wrap">Office</th>
                                     <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 print-wrap">Scanner</th>
-                                    <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 print-wrap">Remarks</th>
+                                    <th className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap print:px-1 print:py-1 print-wrap">Scan Device</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-[#EDEAE2] print:divide-y-0">
@@ -322,8 +322,8 @@ const ScanLogsPrint: React.FC = () => {
                                                     {log.users?.email && <span className="text-[10px] print:text-[6px] text-[#9A9890] print:text-black">{log.users.email}</span>}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 italic text-[#7C7A72] print:text-black whitespace-nowrap print-wrap">
-                                                {log.remarks || ''}
+                                            <td className="px-4 py-2 text-xs print:text-[7px] print:px-1 print:py-0.5 whitespace-nowrap print-wrap">
+                                                {log.scanner_device || '-'}
                                             </td>
                                         </tr>
                                     );
