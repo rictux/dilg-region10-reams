@@ -351,7 +351,7 @@ const EventsList: React.FC = () => {
                 table: 'event_participants',
                 filter: `event_id=eq.${selectedEvent.event_id}`
             }, () => {
-                fetchEventParticipants(selectedEvent.event_id);
+                fetchEventParticipants(selectedEvent.event_id, { silent: true });
             })
             .subscribe();
 
@@ -538,14 +538,19 @@ const EventsList: React.FC = () => {
       setEventAccessUsers((data || []) as EventAccessUser[]);
   };
 
-  const fetchEventParticipants = async (eventId: number) => {
+  // `silent` refetches in the background: the rows swap in place instead of the
+  // whole table being replaced by the spinner, so scroll position and the reader's
+  // place in the list survive a realtime update or a save.
+  const fetchEventParticipants = async (eventId: number, options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+
     if (isSampleEvent(eventId)) {
         setViewingParticipants(buildSampleParticipants() as ParticipantModalRecord[]);
-        setLoadingParticipants(false);
+        if (!silent) setLoadingParticipants(false);
         return;
     }
 
-    setLoadingParticipants(true);
+    if (!silent) setLoadingParticipants(true);
     const { data, error } = await supabase
         .from('event_participants')
         .select(`
@@ -591,7 +596,7 @@ const EventsList: React.FC = () => {
 
         setViewingParticipants(normalizedParticipants);
     }
-    setLoadingParticipants(false);
+    if (!silent) setLoadingParticipants(false);
   };
 
   // --- Date Formatting Logic ---
@@ -1358,7 +1363,7 @@ const EventsList: React.FC = () => {
           });
 
           // Refresh happens via realtime subscription or we can force it
-          fetchEventParticipants(selectedEvent.event_id);
+          fetchEventParticipants(selectedEvent.event_id, { silent: true });
           setParticipantToDelete(null); // Close modal
       } catch (err: any) {
           toast.error("Error removing participant: " + err.message);
@@ -1846,7 +1851,7 @@ const EventsList: React.FC = () => {
           // Success
           setParticipantModalView('list');
           resetParticipantForm();
-          fetchEventParticipants(selectedEvent.event_id);
+          fetchEventParticipants(selectedEvent.event_id, { silent: true });
 
       } catch (err: any) {
           toast.error("Error adding participant: " + err.message);
@@ -1909,7 +1914,7 @@ const EventsList: React.FC = () => {
 
           setParticipantModalView('list');
           resetParticipantForm();
-          fetchEventParticipants(selectedEvent.event_id);
+          fetchEventParticipants(selectedEvent.event_id, { silent: true });
       } catch (err: any) {
           toast.error("Error updating participant: " + err.message);
       } finally {
