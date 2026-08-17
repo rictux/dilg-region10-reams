@@ -58,6 +58,34 @@ const emptyForm: ItemFormState = {
 const isDuplicateCode = (err: unknown) =>
   typeof err === 'object' && err !== null && (err as { code?: string }).code === '23505';
 
+/**
+ * The same code the event QR uses: level H, black on white, DILG logo centred.
+ * Level H recovers 30% of the symbol, which is what lets the logo sit on top of
+ * it — so the logo and its white backing are held to roughly a quarter of the
+ * width, and both scale with `size` to keep that ratio at any rendering.
+ */
+const ItemQrCode: React.FC<{ value: string; size: number }> = ({ value, size }) => {
+  const logoSize = Math.round(size * 0.24);
+  const padding = Math.max(2, Math.round(size * 0.022));
+
+  return (
+    <div className="relative inline-block">
+      <QRCode value={value} size={size} level="H" fgColor="#000000" bgColor="#FFFFFF" />
+      <div
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
+        style={{ padding }}
+      >
+        <img
+          src="/assets/dilg_logo.png"
+          alt=""
+          className="rounded-full object-contain"
+          style={{ width: logoSize, height: logoSize }}
+        />
+      </div>
+    </div>
+  );
+};
+
 const ItemInventory: React.FC = () => {
   const { user } = useAuth();
   const [items, setItems] = useState<BorrowableItem[]>([]);
@@ -290,7 +318,7 @@ const ItemInventory: React.FC = () => {
                   title="View QR label"
                   className="shrink-0 rounded-lg border border-slate-200 bg-white p-1.5 transition-colors hover:border-indigo-400"
                 >
-                  <QRCode value={item.item_code} size={48} level="M" />
+                  <ItemQrCode value={item.item_code} size={56} />
                 </button>
 
                 <div className="min-w-0 flex-1">
@@ -565,10 +593,10 @@ const QrLabelModal: React.FC<{ item: BorrowableItem; onClose: () => void }> = ({
           <div className="flex justify-center">
             <div
               ref={labelRef}
-              className="inline-flex flex-col items-center rounded-xl border-2 border-slate-900 bg-white px-6 py-5"
+              className="inline-flex flex-col items-center rounded-xl border-4 border-[#111110] bg-white p-4"
             >
-              <QRCode value={item.item_code} size={168} level="H" fgColor="#000000" bgColor="#FFFFFF" />
-              <p className="mt-3 max-w-[180px] text-center text-sm font-bold leading-tight text-slate-900">
+              <ItemQrCode value={item.item_code} size={180} />
+              <p className="mt-3 max-w-[180px] text-center text-sm font-bold leading-tight text-[#111110]">
                 {item.item_name}
               </p>
               <p className="mt-1 font-mono text-xs tracking-wide text-slate-600">{item.item_code}</p>
