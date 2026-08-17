@@ -22,7 +22,8 @@ import {
   Loader2,
   Star,
   UserCheck,
-  Camera
+  Camera,
+  Package
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DelegateType, Event, GiveawayItem, PrincipalArrivalSource } from '../../types/database';
@@ -45,8 +46,9 @@ import {
   primeArrivalAudio,
   requestArrivalNotifications
 } from '../../lib/principalArrival';
+import BorrowScanner from './BorrowScanner';
 
-type ScanMode = 'attendance' | 'giveaway';
+type ScanMode = 'attendance' | 'giveaway' | 'borrow';
 
 interface RecentScan {
     id: string;
@@ -1413,7 +1415,7 @@ const Scanner: React.FC = () => {
                     <div className={`grid grid-cols-2 gap-1 sm:gap-2 md:items-start ${
                         scanMode === 'giveaway'
                             ? 'md:grid-cols-[minmax(0,1fr)_220px] xl:grid-cols-[minmax(0,1fr)_240px]'
-                            : 'md:grid-cols-[minmax(0,1fr)_220px_220px] xl:grid-cols-[minmax(0,1fr)_240px_240px]'
+                            : 'md:grid-cols-[minmax(0,1fr)_330px_220px] xl:grid-cols-[minmax(0,1fr)_360px_240px]'
                     }`}>
                         <div className="col-span-2 md:col-span-1 flex-1 w-full rounded-none sm:rounded-xl lg:rounded-2xl border border-[#2A2926] bg-[#111110]/70 p-0.5 sm:p-1.5">
                             <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-[#7C7A72]">Event</p>
@@ -1454,7 +1456,7 @@ const Scanner: React.FC = () => {
 
                         <div className={`${scanMode === 'giveaway' ? 'col-span-2 md:col-span-1' : 'col-span-1'} w-full xl:w-auto rounded-none sm:rounded-xl lg:rounded-2xl border border-[#2A2926] bg-[#111110]/70 p-0.5 sm:p-1.5 shadow-sm`}>
                             <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-[#7C7A72]">Mode</p>
-                            <div className="grid grid-cols-2 gap-1">
+                            <div className="grid grid-cols-3 gap-1">
                                 <button
                                     type="button"
                                     onClick={() => handleScanModeChange('attendance')}
@@ -1486,6 +1488,20 @@ const Scanner: React.FC = () => {
                                 >
                                     <Gift size={14} className="sm:w-4 sm:h-4" />
                                     Giveaway
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleScanModeChange('borrow')}
+                                    aria-pressed={scanMode === 'borrow'}
+                                    title="Borrow and return items"
+                                    className={`px-2 py-2 sm:px-3 sm:py-2.5 rounded-none sm:rounded-xl text-[11px] sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
+                                        ${scanMode === 'borrow'
+                                            ? 'bg-blue-500/20 border-blue-400/60 text-blue-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                                            : 'bg-[#0F0F0E]/60 border-[#2A2926] text-[#C5C2BA] hover:bg-blue-500/10'
+                                        }`}
+                                >
+                                    <Package size={14} className="sm:w-4 sm:h-4" />
+                                    Borrow
                                 </button>
                             </div>
                         </div>
@@ -1554,7 +1570,9 @@ const Scanner: React.FC = () => {
             </div>
 
                 <div ref={cameraViewportRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black sm:min-h-[520px] lg:min-h-0">
-                    {cameraError ? (
+                    {scanMode === 'borrow' && selectedEventId ? (
+                        <BorrowScanner eventId={parseInt(selectedEventId)} />
+                    ) : cameraError ? (
                         <div className="text-white text-center p-8 max-w-sm">
                             <div className="bg-red-500/20 p-6 rounded-full inline-block mb-6">
                                 <AlertTriangle size={48} className="text-red-500" />
