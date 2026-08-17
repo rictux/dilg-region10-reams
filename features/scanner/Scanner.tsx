@@ -188,7 +188,7 @@ const Scanner: React.FC = () => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const cameraViewportRef = useRef<HTMLDivElement | null>(null);
   const readerId = "qr-reader-viewport";
-  
+
   // Ref to hold selectedEventId to avoid restarting scanner on change
   const eventIdRef = useRef(selectedEventId);
   const selectedEventRef = useRef<Event | null>(null);
@@ -196,6 +196,11 @@ const Scanner: React.FC = () => {
   const sessionRef = useRef<'AM' | 'PM'>(session);
   const isProcessingRef = useRef(false);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Refs for borrow mode state to keep handleScan callback in sync
+  const borrowStepRef = useRef<'action' | 'participant' | 'item'>('action');
+  const borrowActionRef = useRef<'borrow' | 'return' | null>(null);
+  const borrowParticipantRef = useRef<any>(null);
 
   // What every log this page writes records as its `scanner_device`. Seeded
   // synchronously so a scan landing right after mount still names a device,
@@ -521,11 +526,18 @@ const Scanner: React.FC = () => {
   }, [isOnline, offlineQueue, syncOfflineScans]);
 
 
+  // Keep borrow state refs in sync with state
+  useEffect(() => {
+    borrowStepRef.current = borrowStep;
+    borrowActionRef.current = borrowAction;
+    borrowParticipantRef.current = borrowParticipant;
+  }, [borrowStep, borrowAction, borrowParticipant]);
+
   // --- 5. Scanner Initialization ---
   useEffect(() => {
     if (selectedEventId && !scanResult && !scanning && !cameraPaused) {
        startScanner();
-    } 
+    }
     else if ((!selectedEventId || scanResult || cameraPaused) && scanning) {
         cleanupScanner();
     }
@@ -957,27 +969,19 @@ const Scanner: React.FC = () => {
             }
         }
 
-        // Handle Borrow Mode
+        // Handle Borrow Mode (use refs to avoid closure issues)
         if (currentMode === 'borrow') {
             setBorrowParticipant(participant);
-            if (borrowStep === 'action') {
-                // First scan in borrow mode - show action modal only (no result overlay)
+            borrowParticipantRef.current = participant;
+
+            if (borrowStepRef.current === 'action') {
+                // First scan in borrow mode - show action modal and STOP scanner
+                // to prevent accidental scans while user is selecting action
                 setShowBorrowActionModal(true);
-                // Resume camera for next scan
-                try {
-                    if (scannerRef.current && !scannerRef.current.isScanning) {
-                        await scannerRef.current.start(
-                            { facingMode: 'environment' },
-                            { fps: 10, qrbox: 250, formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] },
-                            handleScan,
-                            undefined
-                        );
-                        setScanning(true);
-                    }
-                } catch (e) { console.error('Resume scanner error:', e); }
-            } else if (borrowStep === 'item' && borrowAction) {
+                setCameraPaused(true);  // Pause scanner while modal is open
+            } else if (borrowStepRef.current === 'item' && borrowActionRef.current) {
                 // Second scan - this is the item QR
-                await handleBorrowItemScan(qrToken, participant, eventId, borrowAction);
+                await handleBorrowItemScan(qrToken, participant, eventId, borrowActionRef.current);
             }
             return;
         }
@@ -2327,7 +2331,7 @@ const Scanner: React.FC = () => {
                             setBorrowAction('borrow');
                             setBorrowStep('item');
                             setShowBorrowActionModal(false);
-                            processScanResult(null, '', '', '', { autoReset: false });
+                            setCameraPaused(false);  // Resume scanner for item scan
                           }}
                           className="w-full py-3 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                         >
@@ -2340,7 +2344,7 @@ const Scanner: React.FC = () => {
                             setBorrowAction('return');
                             setBorrowStep('item');
                             setShowBorrowActionModal(false);
-                            processScanResult(null, '', '', '', { autoReset: false });
+                            setCameraPaused(false);  // Resume scanner for item scan
                           }}
                           className="w-full py-3 px-4 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
                         >
