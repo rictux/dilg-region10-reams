@@ -47,7 +47,8 @@ import {
   Megaphone,
   Palette,
   TrendingUp,
-  History
+  History,
+  Package
 } from 'lucide-react';
 import { Permission } from '../config/permissions';
 
@@ -72,9 +73,9 @@ const SETTINGS_SUBMENU: {
   adminOnly?: boolean;
   permission?: Permission;
 }[] = [
-  { name: 'Signatories',                 icon: FileSignature, view: 'signatories',         permission: 'MANAGE_CERTIFICATE_SETTINGS' },
-  { name: 'Partner Agency Signatories',  icon: Handshake,     view: 'partner-signatories', permission: 'MANAGE_CERTIFICATE_SETTINGS' },
-  { name: 'Announcements',               icon: Megaphone,     view: 'announcements',       adminOnly: true },
+  { name: 'Signatories',                 icon: FileSignature, view: 'signatories',          permission: 'MANAGE_CERTIFICATE_SETTINGS' },
+  { name: 'Partner Agency Signatories',  icon: Handshake,     view: 'partner-signatories',  permission: 'MANAGE_CERTIFICATE_SETTINGS' },
+  { name: 'Announcements',               icon: Megaphone,     view: 'announcements',        adminOnly: true },
   { name: 'Appearance',                  icon: Palette,       view: 'appearance' }, // available to every user
 ];
 
@@ -756,6 +757,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       case '/events': return 'Events';
       case '/attendance': return 'Attendance';
       case '/admin/lookup': return 'Name Lookup';
+      case '/items': return 'Items';
       case '/reports':
         return REPORT_SUBMENU.find((r) => r.report === activeReport)?.name || 'Reports';
       case '/users':
@@ -787,6 +789,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { label: 'Events',      path: '/events',       icon: Calendar,        section: 'Navigation', permission: 'MANAGE_EVENTS' },
     { label: 'Attendance',  path: '/attendance',   icon: ClipboardList,   section: 'Navigation', permission: 'VIEW_PARTICIPANTS' },
     { label: 'Name Lookup', path: '/admin/lookup', icon: Search,          section: 'Navigation' },
+    { label: 'Items',       path: '/items?tab=inventory',  icon: Package, section: 'Navigation', permission: 'MANAGE_EVENTS' },
+    { label: 'History Log', path: '/items?tab=history',    icon: History, section: 'Items',      permission: 'VIEW_REPORTS' },
     { label: 'Reports',     path: '/reports',      icon: BarChart3,       section: 'Navigation', permission: 'VIEW_REPORTS' },
     ...REPORT_SUBMENU.map((child) => ({
       label: child.name,
@@ -900,6 +904,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <NavItem to="/attendance" icon={ClipboardList} label="Attendance" />
             )}
             <NavItem to="/admin/lookup" icon={Search} label="Name Lookup" />
+            {(hasPermission('MANAGE_EVENTS') || hasPermission('VIEW_REPORTS')) && (
+                <NavItem to="/items" icon={Package} label="Items" />
+            )}
             {hasPermission('VIEW_REPORTS') && (
                 <div>
                   <button

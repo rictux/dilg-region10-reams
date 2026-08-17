@@ -22,7 +22,8 @@ import {
   Loader2,
   Star,
   UserCheck,
-  Camera
+  Camera,
+  Package
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DelegateType, Event, GiveawayItem, PrincipalArrivalSource } from '../../types/database';
@@ -45,8 +46,9 @@ import {
   primeArrivalAudio,
   requestArrivalNotifications
 } from '../../lib/principalArrival';
+import { borrowService, ActiveBorrow } from '../../lib/borrowService';
 
-type ScanMode = 'attendance' | 'giveaway';
+type ScanMode = 'attendance' | 'giveaway' | 'borrow';
 
 interface RecentScan {
     id: string;
@@ -122,6 +124,14 @@ interface GiveawayClaimDetails {
     alreadyClaimed: boolean;
 }
 
+/** "45m" / "2h" / "2h 15m" — how long a returned item was held. */
+const formatHeldFor = (minutes: number): string => {
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+};
+
 const Scanner: React.FC = () => {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -169,6 +179,15 @@ const Scanner: React.FC = () => {
   });
   const [autoRegSubmitting, setAutoRegSubmitting] = useState(false);
   const [isPromoting, setIsPromoting] = useState(false);
+
+  // Borrow Mode State
+  const [showBorrowActionModal, setShowBorrowActionModal] = useState(false);
+  const [borrowAction, setBorrowAction] = useState<'borrow' | 'return' | null>(null);
+  const [borrowStep, setBorrowStep] = useState<'action' | 'participant' | 'item'>('action');
+  const [borrowParticipant, setBorrowParticipant] = useState<any>(null);
+  const [borrowItem, setBorrowItem] = useState<any>(null);
+  const [borrowActiveBorrows, setBorrowActiveBorrows] = useState<ActiveBorrow[]>([]);
+
   // True once the scanner has picked a delegate type for the current scan, so
   // the card doesn't come straight back asking to correct the choice again.
   const [delegateTypeAssigned, setDelegateTypeAssigned] = useState(false);
@@ -177,7 +196,7 @@ const Scanner: React.FC = () => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const cameraViewportRef = useRef<HTMLDivElement | null>(null);
   const readerId = "qr-reader-viewport";
-  
+
   // Ref to hold selectedEventId to avoid restarting scanner on change
   const eventIdRef = useRef(selectedEventId);
   const selectedEventRef = useRef<Event | null>(null);
@@ -185,6 +204,11 @@ const Scanner: React.FC = () => {
   const sessionRef = useRef<'AM' | 'PM'>(session);
   const isProcessingRef = useRef(false);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Refs for borrow mode state to keep handleScan callback in sync
+  const borrowStepRef = useRef<'action' | 'participant' | 'item'>('action');
+  const borrowActionRef = useRef<'borrow' | 'return' | null>(null);
+  const borrowParticipantRef = useRef<any>(null);
 
   // What every log this page writes records as its `scanner_device`. Seeded
   // synchronously so a scan landing right after mount still names a device,
@@ -510,11 +534,18 @@ const Scanner: React.FC = () => {
   }, [isOnline, offlineQueue, syncOfflineScans]);
 
 
+  // Keep borrow state refs in sync with state
+  useEffect(() => {
+    borrowStepRef.current = borrowStep;
+    borrowActionRef.current = borrowAction;
+    borrowParticipantRef.current = borrowParticipant;
+  }, [borrowStep, borrowAction, borrowParticipant]);
+
   // --- 5. Scanner Initialization ---
   useEffect(() => {
     if (selectedEventId && !scanResult && !scanning && !cameraPaused) {
        startScanner();
-    } 
+    }
     else if ((!selectedEventId || scanResult || cameraPaused) && scanning) {
         cleanupScanner();
     }
@@ -886,6 +917,23 @@ const Scanner: React.FC = () => {
         return;
     }
 
+    // Second leg of the borrow flow: this QR is an item code, not a participant
+    // code, so it must never reach the participants lookup below. Read from refs
+    // — handleScan is handed to html5-qrcode once per camera start and would
+    // otherwise close over the step it had when that start happened.
+    if (currentMode === 'borrow'
+        && borrowStepRef.current === 'item'
+        && borrowParticipantRef.current
+        && borrowActionRef.current) {
+        await handleBorrowItemScan(
+            qrToken,
+            borrowParticipantRef.current,
+            eventId,
+            borrowActionRef.current
+        );
+        return;
+    }
+
     try {
         const { data: partData, error: partError } = await supabase
             .from('participants')
@@ -938,6 +986,29 @@ const Scanner: React.FC = () => {
                 processScanResult('Invalid', 'Not registered for this event.', participant.name, participant.position, { autoReset: currentMode !== 'giveaway' });
                 return;
             }
+        }
+
+        // First leg of the borrow flow: a participant was scanned, so ask what to
+        // do with them. The item scan is handled by the early return above, so
+        // this only ever runs for the 'action' step.
+        if (currentMode === 'borrow') {
+            // Refs are written alongside state so the next decoded QR sees the
+            // participant even though the effect that syncs them runs later.
+            borrowParticipantRef.current = participant;
+            setBorrowParticipant(participant);
+
+            // What they already hold decides whether Return is offered at all.
+            const activeBorrows = await borrowService.getActiveBorrows(
+                partData.participant_id,
+                eventId
+            );
+            setBorrowActiveBorrows(activeBorrows);
+
+            // Hold the camera while the choice is open, so a badge drifting back
+            // into frame cannot restart the flow underneath the modal.
+            setShowBorrowActionModal(true);
+            setCameraPaused(true);
+            return;
         }
 
         if (currentMode === 'giveaway') {
@@ -1335,9 +1406,13 @@ const Scanner: React.FC = () => {
       }
 
       resetTimerRef.current = setTimeout(() => {
+          // Borrow runs back-to-back like attendance — the next delegate is
+          // already waiting — so it keeps the camera live rather than parking it.
+          const keepsCameraLive = scanModeRef.current === 'attendance'
+              || scanModeRef.current === 'borrow';
           clearScanResult({
-              resumeCamera: scanModeRef.current === 'attendance',
-              pauseCamera: scanModeRef.current !== 'attendance'
+              resumeCamera: keepsCameraLive,
+              pauseCamera: !keepsCameraLive
           });
       }, 2000);
   };
@@ -1374,7 +1449,137 @@ const Scanner: React.FC = () => {
           clearScanResult({ pauseCamera: cameraPaused });
       }
 
+      // Leaving borrow mid-flow must not leave leg two armed — the next mode's
+      // scans would be read as item codes.
+      resetBorrowFlow();
+
       setScanMode(nextMode);
+  };
+
+  // Returns the flow to "waiting for a participant". Refs are cleared alongside
+  // state because the scan callback reads the refs, and React state would not be
+  // visible to a QR decoded before the next render.
+  const resetBorrowFlow = () => {
+      borrowStepRef.current = 'action';
+      borrowActionRef.current = null;
+      borrowParticipantRef.current = null;
+      setBorrowStep('action');
+      setBorrowAction(null);
+      setBorrowParticipant(null);
+      setBorrowActiveBorrows([]);
+      setShowBorrowActionModal(false);
+  };
+
+  // Arms leg two. The refs are what the scan callback reads, so they are set
+  // here rather than left to the sync effect — the camera restarts immediately
+  // and a QR can be decoded before React re-renders. Clearing isProcessingRef is
+  // what lets that next scan through at all: handleScan set it on the
+  // participant scan and nothing else releases it on this path.
+  const beginBorrowLeg = (action: 'borrow' | 'return') => {
+      borrowActionRef.current = action;
+      borrowStepRef.current = 'item';
+      setBorrowAction(action);
+      setBorrowStep('item');
+      setShowBorrowActionModal(false);
+      isProcessingRef.current = false;
+      setCameraPaused(false);
+  };
+
+  // Leg two of the flow: `itemCode` is an item QR, and `participant` is whoever
+  // was scanned in leg one. Every exit resets the flow so the next scan starts
+  // over at the participant step rather than half-way through this one.
+  const handleBorrowItemScan = async (
+      itemCode: string,
+      participant: ParticipantDetails,
+      eventId: number,
+      action: 'borrow' | 'return'
+  ) => {
+    const name = participant.name;
+    const position = participant.position;
+
+    if (!user?.office_id) {
+      resetBorrowFlow();
+      processScanResult('Invalid', 'Your account is not assigned to an office.', name, position);
+      return;
+    }
+
+    try {
+      const item = await borrowService.getItemByCode(itemCode, user.office_id);
+
+      if (!item) {
+        resetBorrowFlow();
+        processScanResult('Invalid', 'Item not found in this office inventory.', name, position);
+        return;
+      }
+
+      if (action === 'borrow') {
+        // getItemByCode no longer screens on status — it must not, or a Damaged
+        // item could never be scanned back in. Borrowing is where the lifecycle
+        // check belongs.
+        if (item.status !== 'Available') {
+          resetBorrowFlow();
+          processScanResult(
+              'Invalid',
+              `${item.item_name} is marked ${item.status.toLowerCase()} and cannot be lent out.`,
+              name,
+              position
+          );
+          return;
+        }
+
+        const result = await borrowService.borrowItem(
+            eventId,
+            participant.participantId || 0,
+            item.item_id,
+            deviceLabelRef.current
+        );
+
+        resetBorrowFlow();
+
+        if (result) {
+          processScanResult('Valid', `${item.item_name} → ${name}`, name, position);
+        } else {
+          // borrowItem swallows the RPC error, and the one it can raise is the
+          // uniqueness guard on an item that is already out.
+          processScanResult('Duplicate', `${item.item_name} is already borrowed.`, name, position);
+        }
+        return;
+      }
+
+      const activeBorrows = await borrowService.getActiveBorrows(
+          participant.participantId || 0,
+          eventId
+      );
+      const borrow = activeBorrows.find(b => b.item_id === item.item_id);
+
+      if (!borrow) {
+        resetBorrowFlow();
+        processScanResult('Invalid', `${name} is not holding ${item.item_name}.`, name, position);
+        return;
+      }
+
+      const result = await borrowService.returnItem(
+          borrow.borrow_id,
+          participant.participantId || 0,
+          deviceLabelRef.current
+      );
+
+      resetBorrowFlow();
+
+      if (result) {
+        const heldMinutes = Math.max(
+            0,
+            Math.round((Date.now() - new Date(borrow.borrowed_at).getTime()) / 60000)
+        );
+        processScanResult('Valid', `${item.item_name} returned after ${formatHeldFor(heldMinutes)}.`, name, position);
+      } else {
+        processScanResult('Invalid', `Could not return ${item.item_name}.`, name, position);
+      }
+    } catch (err) {
+      console.error('Borrow scan failed:', err);
+      resetBorrowFlow();
+      processScanResult('Invalid', 'Could not record that borrow.', name, position);
+    }
   };
 
   const getResultTitle = () => {
@@ -1410,10 +1615,13 @@ const Scanner: React.FC = () => {
                         </div>
                     )}
 
+                    {/* Keyed on 'attendance' because that is exactly when the
+                        Session block renders — keying on 'giveaway' left borrow
+                        mode reserving a third column with nothing in it. */}
                     <div className={`grid grid-cols-2 gap-1 sm:gap-2 md:items-start ${
-                        scanMode === 'giveaway'
-                            ? 'md:grid-cols-[minmax(0,1fr)_220px] xl:grid-cols-[minmax(0,1fr)_240px]'
-                            : 'md:grid-cols-[minmax(0,1fr)_220px_220px] xl:grid-cols-[minmax(0,1fr)_240px_240px]'
+                        scanMode === 'attendance'
+                            ? 'md:grid-cols-[minmax(0,1fr)_400px_150px] xl:grid-cols-[minmax(0,1fr)_440px_160px]'
+                            : 'md:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px]'
                     }`}>
                         <div className="col-span-2 md:col-span-1 flex-1 w-full rounded-none sm:rounded-xl lg:rounded-2xl border border-[#2A2926] bg-[#111110]/70 p-0.5 sm:p-1.5">
                             <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-[#7C7A72]">Event</p>
@@ -1452,9 +1660,9 @@ const Scanner: React.FC = () => {
                             )}
                         </div>
 
-                        <div className={`${scanMode === 'giveaway' ? 'col-span-2 md:col-span-1' : 'col-span-1'} w-full xl:w-auto rounded-none sm:rounded-xl lg:rounded-2xl border border-[#2A2926] bg-[#111110]/70 p-0.5 sm:p-1.5 shadow-sm`}>
+                        <div className={`${scanMode === 'attendance' ? 'col-span-1' : 'col-span-2 md:col-span-1'} w-full xl:w-auto rounded-none sm:rounded-xl lg:rounded-2xl border border-[#2A2926] bg-[#111110]/70 p-0.5 sm:p-1.5 shadow-sm`}>
                             <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-[#7C7A72]">Mode</p>
-                            <div className="grid grid-cols-2 gap-1">
+                            <div className="grid grid-cols-3 gap-1">
                                 <button
                                     type="button"
                                     onClick={() => handleScanModeChange('attendance')}
@@ -1486,6 +1694,20 @@ const Scanner: React.FC = () => {
                                 >
                                     <Gift size={14} className="sm:w-4 sm:h-4" />
                                     Giveaway
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleScanModeChange('borrow')}
+                                    aria-pressed={scanMode === 'borrow'}
+                                    title="Borrow and return items"
+                                    className={`px-2 py-2 sm:px-3 sm:py-2.5 rounded-none sm:rounded-xl text-[11px] sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
+                                        ${scanMode === 'borrow'
+                                            ? 'bg-blue-500/20 border-blue-400/60 text-blue-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                                            : 'bg-[#0F0F0E]/60 border-[#2A2926] text-[#C5C2BA] hover:bg-blue-500/10'
+                                        }`}
+                                >
+                                    <Package size={14} className="sm:w-4 sm:h-4" />
+                                    Borrow
                                 </button>
                             </div>
                         </div>
@@ -1588,7 +1810,7 @@ const Scanner: React.FC = () => {
                                         <div className="absolute bottom-0 right-0 w-9 h-9 sm:w-10 sm:h-10 border-b-4 border-r-4 border-white -mb-1 -mr-1 sm:rounded-br-xl"></div>
                                         <div className="absolute left-1/2 top-full mt-3 sm:mt-5 -translate-x-1/2 bg-black/75 backdrop-blur-md px-4 py-2 sm:px-6 sm:py-3 rounded-full text-white text-xs sm:text-sm font-bold border border-white/20 tracking-wide flex items-center justify-center gap-2 shadow-lg whitespace-nowrap min-w-[210px] sm:min-w-0">
                                             <div className="w-2 h-2 bg-[#6255E9] rounded-full animate-pulse"></div>
-                                            {scanMode === 'giveaway' ? 'Scan Giveaway Claim' : 'Focusing on QR Code...'}
+                                            {scanMode === 'giveaway' ? 'Scan Giveaway Claim' : scanMode === 'borrow' ? (borrowAction ? 'Scan Item QR Code' : 'Scan Participant QR Code') : 'Focusing on QR Code...'}
                                         </div>
                                     </div>
                                 </div>
@@ -2169,6 +2391,88 @@ const Scanner: React.FC = () => {
                   </div>
                 </div>
               )}
+
+            </div>
+          </div>
+        )}
+
+        {/* Borrow / Return choice — leg one of the borrow flow has just
+            identified a participant, and the camera is held until a choice is
+            made. */}
+        {showBorrowActionModal && borrowParticipant && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="border-b border-slate-100 bg-slate-50 p-5">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Participant</p>
+                <h3 className="mt-1 text-xl font-bold leading-tight text-slate-900">{borrowParticipant.name}</h3>
+                {borrowParticipant.position && (
+                  <p className="text-sm font-medium text-indigo-600">{borrowParticipant.position}</p>
+                )}
+                {borrowParticipant.office && (
+                  <p className="text-xs text-slate-500">{borrowParticipant.office}</p>
+                )}
+              </div>
+
+              <div className="p-5">
+                {borrowActiveBorrows.length > 0 ? (
+                  <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-amber-700">
+                      Currently holding {borrowActiveBorrows.length}
+                    </p>
+                    <ul className="mt-2 space-y-1">
+                      {borrowActiveBorrows.map((b) => (
+                        <li key={b.borrow_id} className="flex items-baseline justify-between gap-3 text-sm">
+                          <span className="font-semibold text-amber-900">{b.item_name}</span>
+                          <span className="shrink-0 text-xs text-amber-700">
+                            since {format(new Date(b.borrowed_at), 'h:mm a')}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-sm text-slate-500">No items currently borrowed.</p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => beginBorrowLeg('borrow')}
+                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-4 font-bold text-white transition-colors hover:bg-indigo-700"
+                  >
+                    <Package size={22} />
+                    Borrow
+                  </button>
+
+                  <button
+                    onClick={() => beginBorrowLeg('return')}
+                    disabled={borrowActiveBorrows.length === 0}
+                    title={borrowActiveBorrows.length === 0 ? 'Nothing to return' : undefined}
+                    className="flex flex-col items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-4 font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                  >
+                    <CheckCircle size={22} />
+                    Return
+                  </button>
+                </div>
+
+                <p className="mt-4 text-center text-xs font-medium text-slate-500">
+                  Then scan the item's QR code.
+                </p>
+              </div>
+
+              <div className="border-t border-slate-200 p-4">
+                <button
+                  onClick={() => {
+                    resetBorrowFlow();
+                    isProcessingRef.current = false;
+                    setCameraPaused(false);
+                  }}
+                  className="w-full rounded-xl px-5 py-2.5 font-semibold text-slate-500 transition-colors hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         )}

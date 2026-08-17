@@ -322,3 +322,56 @@ export interface AuditLog {
   user_agent?: string | null;
   created_at: string;
 }
+
+// ─── Item Borrowing / Lending ────────────────────────────────────────────────
+// Track borrowing of items (tablets, equipment) during events.
+// Participants scan QR codes to borrow and return items.
+
+export type BorrowableItemStatus = 'Available' | 'Damaged' | 'Archived';
+
+/** Master inventory of borrowable items */
+export interface BorrowableItem {
+  item_id: number;
+  item_code: string;  // QR code content
+  item_name: string;
+  item_description?: string | null;
+  item_category?: string | null;
+  status: BorrowableItemStatus;
+  created_at?: string;
+}
+
+/** Transaction log of borrow/return events */
+export interface BorrowedItem {
+  borrow_id: number;
+  event_id: number;
+  participant_id: number;
+  item_id: number;
+  borrowed_at: string;
+  returned_at?: string | null;
+  returned_by_participant_id?: number | null;
+  scanner_device?: string | null;
+  notes?: string | null;
+  created_at?: string;
+}
+
+/** Active (unreturned) borrow for display */
+export interface ActiveBorrow {
+  borrow_id: number;
+  item_id: number;
+  item_name: string;
+  item_code: string;
+  borrowed_at: string;
+}
+
+/** Borrow history for reports */
+export interface BorrowHistory {
+  borrow_id: number;
+  participant_id: number;
+  participant_name: string;
+  item_id: number;
+  item_name: string;
+  borrowed_at: string;
+  returned_at?: string | null;
+  duration_minutes: number;
+  status: 'Unreturned' | 'Returned';
+}

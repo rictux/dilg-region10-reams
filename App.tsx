@@ -27,6 +27,7 @@ import AuditLogs from './features/audit/AuditLogs';
 import Settings from './features/settings/Settings';
 import NameLookup from './features/lookup/NameLookup';
 import About from './features/about/About';
+import Items from './features/items/Items';
 import { Permission } from './config/permissions';
 
 const ProtectedRoute = ({ children, requiredPermission }: React.PropsWithChildren<{ requiredPermission?: Permission }>) => {
@@ -126,6 +127,13 @@ const App: React.FC = () => {
           <Route path="/reports" element={
             <ProtectedRoute requiredPermission="VIEW_REPORTS">
               <Layout><Reports /></Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* Items — inventory and lending history, gated per tab inside */}
+          <Route path="/items" element={
+            <ProtectedRoute>
+              <Layout><Items /></Layout>
             </ProtectedRoute>
           } />
           

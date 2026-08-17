@@ -1,0 +1,425 @@
+import { supabase } from './supabase';
+
+export interface BorrowableItem {
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  item_description?: string;
+  item_category?: string;
+  status: 'Available' | 'Damaged' | 'Archived';
+  created_at: string;
+}
+
+export interface BorrowRecord {
+  borrow_id: number;
+  event_id: number;
+  participant_id: number;
+  item_id: number;
+  borrowed_at: string;
+  returned_at?: string;
+  returned_by_participant_id?: number;
+  scanner_device?: string;
+  notes?: string;
+  created_at: string;
+}
+
+export interface ActiveBorrow {
+  borrow_id: number;
+  item_id: number;
+  item_name: string;
+  item_code: string;
+  borrowed_at: string;
+}
+
+/**
+ * An item that is out on loan right now. Whether an item is held is not part of
+ * `status` — that column is the item's lifecycle (Available / Damaged /
+ * Archived) and says nothing about where the item physically is. Being on loan
+ * is owned by borrowed_items.returned_at and is always derived from it, so the
+ * two can never drift apart.
+ */
+export interface ActiveLoan {
+  borrow_id: number;
+  item_id: number;
+  participant_id: number;
+  participant_name: string;
+  borrowed_at: string;
+}
+
+export interface BorrowHistory {
+  borrow_id: number;
+  participant_id: number;
+  participant_name: string;
+  item_id: number;
+  item_name: string;
+  borrowed_at: string;
+  returned_at?: string;
+  duration_minutes: number;
+  status: 'Unreturned' | 'Returned';
+}
+
+export interface ParticipantBorrowHistory {
+  borrow_id: number;
+  item_id: number;
+  item_name: string;
+  item_code: string;
+  borrowed_at: string;
+  returned_at?: string;
+  duration_minutes: number;
+  status: 'Unreturned' | 'Returned';
+}
+
+export const borrowService = {
+  // ==================== Item Lookup ====================
+
+  /**
+   * Lookup item by QR code (item_code) for a specific office.
+   *
+   * Deliberately does NOT filter on status. An item marked Damaged while it was
+   * out on loan still has to be scannable, or it can never be returned — the
+   * caller decides what each status permits. Borrowing checks for 'Available';
+   * returning accepts any.
+   */
+  async getItemByCode(itemCode: string, officeId: number): Promise<BorrowableItem | null> {
+    const { data, error } = await supabase
+      .from('borrowable_items')
+      .select('*')
+      .eq('item_code', itemCode.trim())
+      .eq('office_id', officeId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching item by code:', error);
+      return null;
+    }
+
+    return data;
+  },
+
+  /**
+   * Which of the given items are out on loan, and who holds them.
+   *
+   * Two plain queries rather than a PostgREST embed: borrowed_items carries two
+   * foreign keys to participants (participant_id and returned_by_participant_id),
+   * so an embed would be ambiguous and need a constraint-name hint that breaks
+   * if the constraint is ever renamed.
+   */
+  async getActiveLoansForItems(itemIds: number[]): Promise<ActiveLoan[]> {
+    if (itemIds.length === 0) return [];
+
+    const { data: loans, error } = await supabase
+      .from('borrowed_items')
+      .select('borrow_id, item_id, participant_id, borrowed_at')
+      .in('item_id', itemIds)
+      .is('returned_at', null);
+
+    if (error) {
+      console.error('Error fetching active loans:', error);
+      throw error;
+    }
+
+    const rows = loans || [];
+    if (rows.length === 0) return [];
+
+    const participantIds = Array.from(new Set(rows.map((r) => r.participant_id)));
+    const { data: people, error: peopleError } = await supabase
+      .from('participants')
+      .select('participant_id, full_name')
+      .in('participant_id', participantIds);
+
+    if (peopleError) {
+      console.error('Error fetching loan holders:', peopleError);
+      throw peopleError;
+    }
+
+    const nameById = new Map<number, string>(
+      (people || []).map((p: { participant_id: number; full_name: string }) => [
+        p.participant_id,
+        p.full_name,
+      ])
+    );
+
+    return rows.map((r) => ({
+      borrow_id: r.borrow_id,
+      item_id: r.item_id,
+      participant_id: r.participant_id,
+      participant_name: nameById.get(r.participant_id) ?? 'Unknown',
+      borrowed_at: r.borrowed_at,
+    }));
+  },
+
+  /**
+   * Get all available items for an office
+   */
+  async getAvailableItems(officeId: number): Promise<BorrowableItem[]> {
+    const { data, error } = await supabase
+      .from('borrowable_items')
+      .select('*')
+      .eq('office_id', officeId)
+      .eq('status', 'Available')
+      .order('item_name', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching available items:', error);
+      return [];
+    }
+
+    return data || [];
+  },
+
+  /**
+   * Get all items (including damaged/archived) for an office
+   */
+  async getAllItems(officeId: number): Promise<BorrowableItem[]> {
+    const { data, error } = await supabase
+      .from('borrowable_items')
+      .select('*')
+      .eq('office_id', officeId)
+      .order('item_name', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching all items:', error);
+      return [];
+    }
+
+    return data || [];
+  },
+
+  // ==================== Item Management ====================
+
+  /**
+   * Create a new borrowable item for an office.
+   *
+   * item_code is deliberately absent from the payload: the borrowable_items
+   * BEFORE INSERT trigger derives it from the category and a shared sequence
+   * (TAB-0001, LAP-0002, ...). Sending the key at all — even as null or '' —
+   * risks suppressing that, so it is omitted entirely and read back off the
+   * inserted row.
+   *
+   * Throws on failure so the caller can report the real cause rather than a
+   * generic "could not add".
+   */
+  async createItem(
+    officeId: number,
+    itemName: string,
+    itemDescription?: string,
+    itemCategory?: string
+  ): Promise<BorrowableItem> {
+    const { data, error } = await supabase
+      .from('borrowable_items')
+      .insert({
+        office_id: officeId,
+        item_name: itemName.trim(),
+        item_description: itemDescription?.trim() || null,
+        item_category: itemCategory?.trim() || null,
+        status: 'Available',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating item:', error);
+      throw error;
+    }
+
+    return data;
+  },
+
+  /**
+   * Update item details. Scoped by office so an id from another office cannot
+   * be edited even if it is guessed.
+   */
+  async updateItem(
+    itemId: number,
+    officeId: number,
+    updates: Partial<Omit<BorrowableItem, 'item_id' | 'office_id' | 'created_at'>>
+  ): Promise<BorrowableItem> {
+    const { data, error } = await supabase
+      .from('borrowable_items')
+      .update(updates)
+      .eq('item_id', itemId)
+      .eq('office_id', officeId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating item:', error);
+      throw error;
+    }
+
+    return data;
+  },
+
+  /**
+   * Move an item between Available / Damaged / Archived.
+   */
+  async setItemStatus(
+    itemId: number,
+    officeId: number,
+    status: BorrowableItem['status']
+  ): Promise<BorrowableItem> {
+    return this.updateItem(itemId, officeId, { status });
+  },
+
+  // ==================== Borrow Operations ====================
+
+  /**
+   * Create a borrow record (participant borrows an item)
+   */
+  async borrowItem(
+    eventId: number,
+    participantId: number,
+    itemId: number,
+    scannerDevice?: string
+  ): Promise<BorrowRecord | null> {
+    const { data, error } = await supabase
+      .rpc('create_borrow', {
+        p_event_id: eventId,
+        p_participant_id: participantId,
+        p_item_id: itemId,
+        p_scanner_device: scannerDevice,
+      });
+
+    if (error) {
+      console.error('Error creating borrow record:', error);
+      return null;
+    }
+
+    return data as BorrowRecord;
+  },
+
+  /**
+   * Return a borrowed item
+   */
+  async returnItem(
+    borrowId: number,
+    returnedByParticipantId: number,
+    scannerDevice?: string,
+    notes?: string
+  ): Promise<BorrowRecord | null> {
+    const { data, error } = await supabase
+      .rpc('return_borrow', {
+        p_borrow_id: borrowId,
+        p_returned_by_participant_id: returnedByParticipantId,
+        p_scanner_device: scannerDevice,
+        p_notes: notes,
+      });
+
+    if (error) {
+      console.error('Error returning item:', error);
+      return null;
+    }
+
+    return data as BorrowRecord;
+  },
+
+  // ==================== Query Operations ====================
+
+  /**
+   * Get active (unreturned) borrows for a participant in an event
+   */
+  async getActiveBorrows(
+    participantId: number,
+    eventId: number
+  ): Promise<ActiveBorrow[]> {
+    const { data, error } = await supabase
+      .rpc('get_active_borrows', {
+        p_participant_id: participantId,
+        p_event_id: eventId,
+      });
+
+    if (error) {
+      console.error('Error fetching active borrows:', error);
+      return [];
+    }
+
+    return data || [];
+  },
+
+  /**
+   * Event ids that have at least one borrow recorded against them.
+   * Lets the history page offer only events that have something to show,
+   * rather than every event the user can reach.
+   */
+  async getEventIdsWithBorrows(): Promise<number[]> {
+    const { data, error } = await supabase
+      .from('borrowed_items')
+      .select('event_id');
+
+    if (error) {
+      console.error('Error fetching events with borrows:', error);
+      throw error;
+    }
+
+    return Array.from(
+      new Set((data || []).map((row: { event_id: number }) => Number(row.event_id)))
+    ).filter((id) => Number.isSafeInteger(id) && id > 0);
+  },
+
+  /**
+   * Get full borrow history for an event.
+   * Throws rather than returning [] — a missing RPC or a permissions failure is
+   * indistinguishable from "nothing borrowed yet" once it is swallowed, and that
+   * is the one thing the history page must not get wrong.
+   */
+  async getBorrowHistory(eventId: number): Promise<BorrowHistory[]> {
+    const { data, error } = await supabase
+      .rpc('get_borrow_history', {
+        p_event_id: eventId,
+      });
+
+    if (error) {
+      console.error('Error fetching borrow history:', error);
+      throw error;
+    }
+
+    return data || [];
+  },
+
+  /**
+   * Get borrow history for a specific participant in an event
+   */
+  async getParticipantBorrowHistory(
+    participantId: number,
+    eventId: number
+  ): Promise<ParticipantBorrowHistory[]> {
+    const { data, error } = await supabase
+      .rpc('get_participant_borrow_history', {
+        p_participant_id: participantId,
+        p_event_id: eventId,
+      });
+
+    if (error) {
+      console.error('Error fetching participant borrow history:', error);
+      return [];
+    }
+
+    return data || [];
+  },
+
+  /**
+   * Find a borrow record by ID
+   */
+  async getBorrowById(borrowId: number): Promise<BorrowRecord | null> {
+    const { data, error } = await supabase
+      .from('borrowed_items')
+      .select('*')
+      .eq('borrow_id', borrowId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching borrow record:', error);
+      return null;
+    }
+
+    return data;
+  },
+
+  /**
+   * Get all unreturned items for an event (admin view)
+   */
+  async getUnreturnedItems(eventId: number): Promise<BorrowHistory[]> {
+    const history = await this.getBorrowHistory(eventId);
+    return history.filter((h) => h.status === 'Unreturned');
+  },
+};
