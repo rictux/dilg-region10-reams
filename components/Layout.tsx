@@ -47,7 +47,8 @@ import {
   Megaphone,
   Palette,
   TrendingUp,
-  History
+  History,
+  Package
 } from 'lucide-react';
 import { Permission } from '../config/permissions';
 
@@ -58,6 +59,7 @@ const REPORT_SUBMENU = [
   { name: 'Certificate of Participation', icon: Award,      report: 'participation' },
   { name: 'Giveaway Logs',                icon: Gift,       report: 'giveaways' },
   { name: 'Pre-test / Post-test',         icon: ClipboardList, report: 'tests' },
+  { name: 'Borrow History',               icon: Package,    report: 'borrow-history' },
 ];
 
 const USERS_SUBMENU = [
@@ -72,9 +74,10 @@ const SETTINGS_SUBMENU: {
   adminOnly?: boolean;
   permission?: Permission;
 }[] = [
-  { name: 'Signatories',                 icon: FileSignature, view: 'signatories',         permission: 'MANAGE_CERTIFICATE_SETTINGS' },
-  { name: 'Partner Agency Signatories',  icon: Handshake,     view: 'partner-signatories', permission: 'MANAGE_CERTIFICATE_SETTINGS' },
-  { name: 'Announcements',               icon: Megaphone,     view: 'announcements',       adminOnly: true },
+  { name: 'Signatories',                 icon: FileSignature, view: 'signatories',          permission: 'MANAGE_CERTIFICATE_SETTINGS' },
+  { name: 'Partner Agency Signatories',  icon: Handshake,     view: 'partner-signatories',  permission: 'MANAGE_CERTIFICATE_SETTINGS' },
+  { name: 'Borrowable Items',            icon: Package,       view: 'item-management',      permission: 'MANAGE_EVENTS' },
+  { name: 'Announcements',               icon: Megaphone,     view: 'announcements',        adminOnly: true },
   { name: 'Appearance',                  icon: Palette,       view: 'appearance' }, // available to every user
 ];
 
@@ -952,7 +955,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           <button
                             key={child.report}
                             onClick={() => {
-                              navigate(`/reports?report=${child.report}`);
+                              if (child.report === 'borrow-history') {
+                                navigate('/reports/borrow-history');
+                              } else {
+                                navigate(`/reports?report=${child.report}`);
+                              }
                               setIsMobileMenuOpen(false);
                             }}
                             className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-xs w-full text-left transition-all duration-150 ${
@@ -986,7 +993,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           <button
                             key={child.report}
                             onClick={() => {
-                              navigate(`/reports?report=${child.report}`);
+                              if (child.report === 'borrow-history') {
+                                navigate('/reports/borrow-history');
+                              } else {
+                                navigate(`/reports?report=${child.report}`);
+                              }
                               setCollapsedFlyout(null);
                             }}
                             className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-xs w-full text-left transition-all duration-150 ${
@@ -1175,7 +1186,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           <button
                             key={child.view}
                             onClick={() => {
-                              navigate(child.view === 'signatories' ? '/settings' : `/settings?view=${child.view}`);
+                              if (child.view === 'signatories') {
+                                navigate('/settings');
+                              } else if (child.view === 'item-management') {
+                                navigate('/settings/item-management');
+                              } else {
+                                navigate(`/settings?view=${child.view}`);
+                              }
                               setIsMobileMenuOpen(false);
                             }}
                             className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-xs w-full text-left transition-all duration-150 ${
@@ -1209,7 +1226,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           <button
                             key={child.view}
                             onClick={() => {
-                              navigate(child.view === 'signatories' ? '/settings' : `/settings?view=${child.view}`);
+                              if (child.view === 'signatories') {
+                                navigate('/settings');
+                              } else if (child.view === 'item-management') {
+                                navigate('/settings/item-management');
+                              } else {
+                                navigate(`/settings?view=${child.view}`);
+                              }
                               setCollapsedFlyout(null);
                             }}
                             className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-xs w-full text-left transition-all duration-150 ${
