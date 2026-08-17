@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { borrowService, BorrowableItem } from '../../lib/borrowService';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   Plus,
   Trash2,
@@ -10,6 +11,7 @@ import {
 import { toast } from 'sonner';
 
 const ItemManagement: React.FC = () => {
+  const { user } = useAuth();
   const [items, setItems] = useState<BorrowableItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -25,8 +27,9 @@ const ItemManagement: React.FC = () => {
   }, []);
 
   const loadItems = async () => {
+    if (!user?.office_id) return;
     setLoading(true);
-    const allItems = await borrowService.getAllItems();
+    const allItems = await borrowService.getAllItems(user.office_id);
     setItems(allItems);
     setLoading(false);
   };
@@ -34,12 +37,18 @@ const ItemManagement: React.FC = () => {
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!user?.office_id) {
+      toast.error('User office not found');
+      return;
+    }
+
     if (!formData.item_code || !formData.item_name) {
       toast.error('Item code and name are required');
       return;
     }
 
     const newItem = await borrowService.createItem(
+      user.office_id,
       formData.item_code,
       formData.item_name,
       formData.item_description,

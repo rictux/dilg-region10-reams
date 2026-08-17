@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { supabase } from '../../lib/supabase';
 import { borrowService, ActiveBorrow } from '../../lib/borrowService';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   CheckCircle,
   XCircle,
@@ -45,6 +46,7 @@ interface RecentScan {
 }
 
 const BorrowScanner: React.FC<{ eventId: number }> = ({ eventId }) => {
+  const { user } = useAuth();
   const qrRef = useRef<HTMLDivElement>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
 
@@ -162,14 +164,14 @@ const BorrowScanner: React.FC<{ eventId: number }> = ({ eventId }) => {
   };
 
   const handleItemScan = async (itemCode: string) => {
-    if (!scanState.selectedParticipant) return;
+    if (!scanState.selectedParticipant || !user?.office_id) return;
 
     try {
-      // Lookup item
-      const item = await borrowService.getItemByCode(itemCode);
+      // Lookup item (filtered by office)
+      const item = await borrowService.getItemByCode(itemCode, user.office_id);
 
       if (!item) {
-        toast.error('Item not found');
+        toast.error('Item not found in your office inventory');
         return;
       }
 

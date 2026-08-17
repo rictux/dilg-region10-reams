@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { borrowService, BorrowHistory } from '../../lib/borrowService';
+import { useAuth } from '../../contexts/AuthContext';
 import { Event } from '../../types/database';
 import { format, formatDuration, intervalToDuration } from 'date-fns';
 import {
@@ -18,6 +19,7 @@ interface BorrowHistoryPageProps {
 }
 
 const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialEventId }) => {
+  const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(initialEventId || null);
   const [loadingEvents, setLoadingEvents] = useState(true);
@@ -32,12 +34,17 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
   }, []);
 
   const loadEvents = async () => {
+    if (!user?.office_id) {
+      setLoadingEvents(false);
+      return;
+    }
+
     setLoadingEvents(true);
     const { data, error } = await supabase
       .from('events')
       .select('*')
-      .eq('status', 'Ongoing')
-      .or('status.eq.Completed')
+      .eq('organize_by', user.office_id)
+      .or('status.eq.Ongoing,status.eq.Completed')
       .order('start_date', { ascending: false });
 
     if (!error && data) {

@@ -58,13 +58,14 @@ export const borrowService = {
   // ==================== Item Lookup ====================
 
   /**
-   * Lookup item by QR code (item_code)
+   * Lookup item by QR code (item_code) for a specific office
    */
-  async getItemByCode(itemCode: string): Promise<BorrowableItem | null> {
+  async getItemByCode(itemCode: string, officeId: number): Promise<BorrowableItem | null> {
     const { data, error } = await supabase
       .from('borrowable_items')
       .select('*')
       .eq('item_code', itemCode.trim())
+      .eq('office_id', officeId)
       .eq('status', 'Available')
       .single();
 
@@ -77,12 +78,13 @@ export const borrowService = {
   },
 
   /**
-   * Get all available items
+   * Get all available items for an office
    */
-  async getAvailableItems(): Promise<BorrowableItem[]> {
+  async getAvailableItems(officeId: number): Promise<BorrowableItem[]> {
     const { data, error } = await supabase
       .from('borrowable_items')
       .select('*')
+      .eq('office_id', officeId)
       .eq('status', 'Available')
       .order('item_name', { ascending: true });
 
@@ -95,12 +97,13 @@ export const borrowService = {
   },
 
   /**
-   * Get all items (including damaged/archived)
+   * Get all items (including damaged/archived) for an office
    */
-  async getAllItems(): Promise<BorrowableItem[]> {
+  async getAllItems(officeId: number): Promise<BorrowableItem[]> {
     const { data, error } = await supabase
       .from('borrowable_items')
       .select('*')
+      .eq('office_id', officeId)
       .order('item_name', { ascending: true });
 
     if (error) {
@@ -114,9 +117,10 @@ export const borrowService = {
   // ==================== Item Management ====================
 
   /**
-   * Create a new borrowable item
+   * Create a new borrowable item for an office
    */
   async createItem(
+    officeId: number,
     itemCode: string,
     itemName: string,
     itemDescription?: string,
@@ -125,6 +129,7 @@ export const borrowService = {
     const { data, error } = await supabase
       .from('borrowable_items')
       .insert({
+        office_id: officeId,
         item_code: itemCode.trim(),
         item_name: itemName.trim(),
         item_description: itemDescription?.trim(),
