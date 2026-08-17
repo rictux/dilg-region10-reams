@@ -31,6 +31,21 @@ export interface ActiveBorrow {
   borrowed_at: string;
 }
 
+/**
+ * An item that is out on loan right now. Whether an item is held is not part of
+ * `status` — that column is the item's lifecycle (Available / Damaged /
+ * Archived) and says nothing about where the item physically is. Being on loan
+ * is owned by borrowed_items.returned_at and is always derived from it, so the
+ * two can never drift apart.
+ */
+export interface ActiveLoan {
+  borrow_id: number;
+  item_id: number;
+  participant_id: number;
+  participant_name: string;
+  borrowed_at: string;
+}
+
 export interface BorrowHistory {
   borrow_id: number;
   participant_id: number;
@@ -58,7 +73,12 @@ export const borrowService = {
   // ==================== Item Lookup ====================
 
   /**
-   * Lookup item by QR code (item_code) for a specific office
+   * Lookup item by QR code (item_code) for a specific office.
+   *
+   * Deliberately does NOT filter on status. An item marked Damaged while it was
+   * out on loan still has to be scannable, or it can never be returned — the
+   * caller decides what each status permits. Borrowing checks for 'Available';
+   * returning accepts any.
    */
   async getItemByCode(itemCode: string, officeId: number): Promise<BorrowableItem | null> {
     const { data, error } = await supabase
@@ -66,8 +86,7 @@ export const borrowService = {
       .select('*')
       .eq('item_code', itemCode.trim())
       .eq('office_id', officeId)
-      .eq('status', 'Available')
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error fetching item by code:', error);
@@ -75,6 +94,58 @@ export const borrowService = {
     }
 
     return data;
+  },
+
+  /**
+   * Which of the given items are out on loan, and who holds them.
+   *
+   * Two plain queries rather than a PostgREST embed: borrowed_items carries two
+   * foreign keys to participants (participant_id and returned_by_participant_id),
+   * so an embed would be ambiguous and need a constraint-name hint that breaks
+   * if the constraint is ever renamed.
+   */
+  async getActiveLoansForItems(itemIds: number[]): Promise<ActiveLoan[]> {
+    if (itemIds.length === 0) return [];
+
+    const { data: loans, error } = await supabase
+      .from('borrowed_items')
+      .select('borrow_id, item_id, participant_id, borrowed_at')
+      .in('item_id', itemIds)
+      .is('returned_at', null);
+
+    if (error) {
+      console.error('Error fetching active loans:', error);
+      throw error;
+    }
+
+    const rows = loans || [];
+    if (rows.length === 0) return [];
+
+    const participantIds = Array.from(new Set(rows.map((r) => r.participant_id)));
+    const { data: people, error: peopleError } = await supabase
+      .from('participants')
+      .select('participant_id, full_name')
+      .in('participant_id', participantIds);
+
+    if (peopleError) {
+      console.error('Error fetching loan holders:', peopleError);
+      throw peopleError;
+    }
+
+    const nameById = new Map<number, string>(
+      (people || []).map((p: { participant_id: number; full_name: string }) => [
+        p.participant_id,
+        p.full_name,
+      ])
+    );
+
+    return rows.map((r) => ({
+      borrow_id: r.borrow_id,
+      item_id: r.item_id,
+      participant_id: r.participant_id,
+      participant_name: nameById.get(r.participant_id) ?? 'Unknown',
+      borrowed_at: r.borrowed_at,
+    }));
   },
 
   /**
@@ -118,12 +189,18 @@ export const borrowService = {
 
   /**
    * Create a new borrowable item for an office.
-   * Throws on failure — the common one is the (office_id, item_code) uniqueness
-   * guard, and the caller has to be able to tell the user which code clashed.
+   *
+   * item_code is deliberately absent from the payload: the borrowable_items
+   * BEFORE INSERT trigger derives it from the category and a shared sequence
+   * (TAB-0001, LAP-0002, ...). Sending the key at all — even as null or '' —
+   * risks suppressing that, so it is omitted entirely and read back off the
+   * inserted row.
+   *
+   * Throws on failure so the caller can report the real cause rather than a
+   * generic "could not add".
    */
   async createItem(
     officeId: number,
-    itemCode: string,
     itemName: string,
     itemDescription?: string,
     itemCategory?: string
@@ -132,7 +209,6 @@ export const borrowService = {
       .from('borrowable_items')
       .insert({
         office_id: officeId,
-        item_code: itemCode.trim(),
         item_name: itemName.trim(),
         item_description: itemDescription?.trim() || null,
         item_category: itemCategory?.trim() || null,

@@ -1513,6 +1513,20 @@ const Scanner: React.FC = () => {
       }
 
       if (action === 'borrow') {
+        // getItemByCode no longer screens on status — it must not, or a Damaged
+        // item could never be scanned back in. Borrowing is where the lifecycle
+        // check belongs.
+        if (item.status !== 'Available') {
+          resetBorrowFlow();
+          processScanResult(
+              'Invalid',
+              `${item.item_name} is marked ${item.status.toLowerCase()} and cannot be lent out.`,
+              name,
+              position
+          );
+          return;
+        }
+
         const result = await borrowService.borrowItem(
             eventId,
             participant.participantId || 0,
