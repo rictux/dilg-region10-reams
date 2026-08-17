@@ -259,6 +259,26 @@ export const borrowService = {
   },
 
   /**
+   * Event ids that have at least one borrow recorded against them.
+   * Lets the history page offer only events that have something to show,
+   * rather than every event the user can reach.
+   */
+  async getEventIdsWithBorrows(): Promise<number[]> {
+    const { data, error } = await supabase
+      .from('borrowed_items')
+      .select('event_id');
+
+    if (error) {
+      console.error('Error fetching events with borrows:', error);
+      throw error;
+    }
+
+    return Array.from(
+      new Set((data || []).map((row: { event_id: number }) => Number(row.event_id)))
+    ).filter((id) => Number.isSafeInteger(id) && id > 0);
+  },
+
+  /**
    * Get full borrow history for an event.
    * Throws rather than returning [] — a missing RPC or a permissions failure is
    * indistinguishable from "nothing borrowed yet" once it is swallowed, and that
