@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabase';
 import { borrowService, BorrowHistory } from '../../lib/borrowService';
+import { Event } from '../../types/database';
 import { format, formatDuration, intervalToDuration } from 'date-fns';
 import {
   Download,
@@ -7,14 +9,18 @@ import {
   AlertCircle,
   CheckCircle,
   Package,
+  MapPin,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface BorrowHistoryPageProps {
-  eventId: number;
+  eventId?: number;
 }
 
-const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId }) => {
+const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialEventId }) => {
+  const [events, setEvents] = useState<Event[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(initialEventId || null);
+  const [loadingEvents, setLoadingEvents] = useState(true);
   const [history, setHistory] = useState<BorrowHistory[]>([]);
   const [filteredHistory, setFilteredHistory] = useState<BorrowHistory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,16 +28,41 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    loadHistory();
-  }, [eventId]);
+    loadEvents();
+  }, []);
+
+  const loadEvents = async () => {
+    setLoadingEvents(true);
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('status', 'Ongoing')
+      .or('status.eq.Completed')
+      .order('start_date', { ascending: false });
+
+    if (!error && data) {
+      setEvents(data);
+      if (data.length > 0 && !selectedEventId) {
+        setSelectedEventId(data[0].event_id);
+      }
+    }
+    setLoadingEvents(false);
+  };
+
+  useEffect(() => {
+    if (selectedEventId) {
+      loadHistory();
+    }
+  }, [selectedEventId]);
 
   useEffect(() => {
     filterHistory();
   }, [history, filterStatus, searchTerm]);
 
   const loadHistory = async () => {
+    if (!selectedEventId) return;
     setLoading(true);
-    const records = await borrowService.getBorrowHistory(eventId);
+    const records = await borrowService.getBorrowHistory(selectedEventId);
     setHistory(records);
     setLoading(false);
   };
@@ -101,14 +132,53 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId }) => {
   const unreturned = filteredHistory.filter((h) => h.status === 'Unreturned').length;
   const totalDuration = filteredHistory.reduce((acc, h) => acc + h.duration_minutes, 0);
 
+  if (loadingEvents) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-slate-600">Loading events...</div>
+      </div>
+    );
+  }
+
+  if (events.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Borrow History</h1>
+          <p className="text-sm text-slate-600 mt-1">
+            No ongoing or completed events available
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Borrow History</h1>
-        <p className="text-sm text-slate-600 mt-1">
-          Track all item borrowing and return transactions for this event
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Borrow History</h1>
+          <p className="text-sm text-slate-600 mt-1">
+            Track all item borrowing and return transactions for this event
+          </p>
+        </div>
+        <div className="w-64">
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Select Event
+          </label>
+          <select
+            value={selectedEventId || ''}
+            onChange={(e) => setSelectedEventId(parseInt(e.target.value))}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {events.map((event) => (
+              <option key={event.event_id} value={event.event_id}>
+                {event.event_name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Stats */}
