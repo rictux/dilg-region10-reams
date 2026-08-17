@@ -46,7 +46,7 @@ import {
   primeArrivalAudio,
   requestArrivalNotifications
 } from '../../lib/principalArrival';
-import BorrowScanner from './BorrowScanner';
+import { borrowService, ActiveBorrow } from '../../lib/borrowService';
 
 type ScanMode = 'attendance' | 'giveaway' | 'borrow';
 
@@ -171,6 +171,15 @@ const Scanner: React.FC = () => {
   });
   const [autoRegSubmitting, setAutoRegSubmitting] = useState(false);
   const [isPromoting, setIsPromoting] = useState(false);
+
+  // Borrow Mode State
+  const [showBorrowActionModal, setShowBorrowActionModal] = useState(false);
+  const [borrowAction, setBorrowAction] = useState<'borrow' | 'return' | null>(null);
+  const [borrowStep, setBorrowStep] = useState<'action' | 'participant' | 'item'>('action');
+  const [borrowParticipant, setBorrowParticipant] = useState<any>(null);
+  const [borrowItem, setBorrowItem] = useState<any>(null);
+  const [borrowActiveBorrows, setBorrowActiveBorrows] = useState<ActiveBorrow[]>([]);
+
   // True once the scanner has picked a delegate type for the current scan, so
   // the card doesn't come straight back asking to correct the choice again.
   const [delegateTypeAssigned, setDelegateTypeAssigned] = useState(false);
@@ -888,6 +897,12 @@ const Scanner: React.FC = () => {
         return;
     }
 
+    // For borrow mode item scanning, skip participant lookup
+    if (currentMode === 'borrow' && borrowStep === 'item' && borrowParticipant && borrowAction) {
+        await handleBorrowItemScan(qrToken, borrowParticipant, eventId, borrowAction);
+        return;
+    }
+
     try {
         const { data: partData, error: partError } = await supabase
             .from('participants')
@@ -940,6 +955,20 @@ const Scanner: React.FC = () => {
                 processScanResult('Invalid', 'Not registered for this event.', participant.name, participant.position, { autoReset: currentMode !== 'giveaway' });
                 return;
             }
+        }
+
+        // Handle Borrow Mode
+        if (currentMode === 'borrow') {
+            setBorrowParticipant(participant);
+            if (borrowStep === 'action') {
+                // First scan in borrow mode - show action modal
+                setShowBorrowActionModal(true);
+                processScanResult('Valid', 'Choose action: Borrow or Return', participant.name, participant.position, { autoReset: false });
+            } else if (borrowStep === 'item' && borrowAction) {
+                // Second scan - this is the item QR
+                await handleBorrowItemScan(qrToken, participant, eventId, borrowAction);
+            }
+            return;
         }
 
         if (currentMode === 'giveaway') {
@@ -1376,7 +1405,86 @@ const Scanner: React.FC = () => {
           clearScanResult({ pauseCamera: cameraPaused });
       }
 
+      // Reset borrow state when switching modes
+      if (nextMode !== 'borrow') {
+          setShowBorrowActionModal(false);
+          setBorrowAction(null);
+          setBorrowStep('action');
+          setBorrowParticipant(null);
+      }
+
       setScanMode(nextMode);
+  };
+
+  const handleBorrowItemScan = async (itemCode: string, participant: ParticipantDetails, eventId: number, action: 'borrow' | 'return') => {
+    if (!user?.office_id) {
+      processScanResult('Invalid', 'User office not found', participant.name, participant.position);
+      return;
+    }
+
+    try {
+      const item = await borrowService.getItemByCode(itemCode, user.office_id);
+
+      if (!item) {
+        processScanResult('Invalid', 'Item not found in your office inventory', participant.name, participant.position);
+        setBorrowStep('action');
+        setBorrowAction(null);
+        return;
+      }
+
+      if (action === 'borrow') {
+        const result = await borrowService.borrowItem(eventId, participant.participantId || 0, item.item_id, 'Scanner');
+        if (result) {
+          processScanResult('Valid', `${item.item_name} borrowed to ${participant.name}`, participant.name, participant.position);
+          const newScan: RecentScan = {
+            id: Date.now().toString(),
+            name: participant.name,
+            position: participant.position,
+            status: 'Valid',
+            message: `Borrowed: ${item.item_name}`,
+            timestamp: new Date()
+          };
+          setRecentScans(prev => [newScan, ...prev].slice(0, 20));
+        }
+      } else {
+        // Return flow
+        const activeBorrows = await borrowService.getActiveBorrows(participant.participantId || 0, eventId);
+        const borrow = activeBorrows.find(b => b.item_id === item.item_id);
+
+        if (!borrow) {
+          processScanResult('Invalid', `${participant.name} did not borrow this item`, participant.name, participant.position);
+          setBorrowStep('action');
+          setBorrowAction(null);
+          return;
+        }
+
+        const result = await borrowService.returnItem(borrow.borrow_id, participant.participantId || 0, 'Scanner');
+        if (result) {
+          const duration = result.returned_at ? Math.round((new Date(result.returned_at).getTime() - new Date(result.borrowed_at).getTime()) / 60000) : 0;
+          processScanResult('Valid', `${item.item_name} returned (borrowed ${duration}m)`, participant.name, participant.position);
+          const newScan: RecentScan = {
+            id: Date.now().toString(),
+            name: participant.name,
+            position: participant.position,
+            status: 'Valid',
+            message: `Returned: ${item.item_name}`,
+            timestamp: new Date()
+          };
+          setRecentScans(prev => [newScan, ...prev].slice(0, 20));
+        }
+      }
+
+      // Reset borrow state
+      setBorrowStep('action');
+      setBorrowAction(null);
+      setBorrowParticipant(null);
+      setShowBorrowActionModal(false);
+    } catch (err) {
+      console.error('Borrow error:', err);
+      processScanResult('Invalid', 'Error processing borrow/return', participant.name, participant.position);
+      setBorrowStep('action');
+      setBorrowAction(null);
+    }
   };
 
   const getResultTitle = () => {
@@ -1606,7 +1714,7 @@ const Scanner: React.FC = () => {
                                         <div className="absolute bottom-0 right-0 w-9 h-9 sm:w-10 sm:h-10 border-b-4 border-r-4 border-white -mb-1 -mr-1 sm:rounded-br-xl"></div>
                                         <div className="absolute left-1/2 top-full mt-3 sm:mt-5 -translate-x-1/2 bg-black/75 backdrop-blur-md px-4 py-2 sm:px-6 sm:py-3 rounded-full text-white text-xs sm:text-sm font-bold border border-white/20 tracking-wide flex items-center justify-center gap-2 shadow-lg whitespace-nowrap min-w-[210px] sm:min-w-0">
                                             <div className="w-2 h-2 bg-[#6255E9] rounded-full animate-pulse"></div>
-                                            {scanMode === 'giveaway' ? 'Scan Giveaway Claim' : 'Focusing on QR Code...'}
+                                            {scanMode === 'giveaway' ? 'Scan Giveaway Claim' : scanMode === 'borrow' ? (borrowAction ? 'Scan Item QR Code' : 'Scan Participant QR Code') : 'Focusing on QR Code...'}
                                         </div>
                                     </div>
                                 </div>
@@ -2184,6 +2292,73 @@ const Scanner: React.FC = () => {
                     >
                       Cancel
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Borrow Action Modal */}
+              {showBorrowActionModal && borrowParticipant && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-lg shadow-xl max-w-sm w-full">
+                    <div className="bg-blue-50 border-b border-blue-200 p-4">
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        {borrowParticipant.name}
+                      </h3>
+                      <p className="text-sm text-slate-600 mt-1">{borrowParticipant.position}</p>
+                    </div>
+
+                    <div className="p-6">
+                      <p className="text-sm text-slate-700 mb-6 font-medium">
+                        What would you like to do?
+                      </p>
+
+                      <div className="space-y-3">
+                        <button
+                          onClick={() => {
+                            setBorrowAction('borrow');
+                            setBorrowStep('item');
+                            setShowBorrowActionModal(false);
+                            processScanResult(null, '', '', '', { autoReset: false });
+                          }}
+                          className="w-full py-3 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Package size={18} />
+                          Borrow Item
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setBorrowAction('return');
+                            setBorrowStep('item');
+                            setShowBorrowActionModal(false);
+                            processScanResult(null, '', '', '', { autoReset: false });
+                          }}
+                          className="w-full py-3 px-4 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <CheckCircle size={18} />
+                          Return Item
+                        </button>
+                      </div>
+
+                      <p className="text-xs text-slate-500 mt-4 text-center">
+                        Next: Scan the item QR code
+                      </p>
+                    </div>
+
+                    <div className="flex gap-3 p-4 border-t border-slate-200">
+                      <button
+                        onClick={() => {
+                          setShowBorrowActionModal(false);
+                          setBorrowAction(null);
+                          setBorrowStep('action');
+                          setBorrowParticipant(null);
+                          isProcessingRef.current = false;
+                        }}
+                        className="flex-1 py-2 px-4 bg-slate-100 text-slate-900 font-medium rounded-lg hover:bg-slate-200 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
