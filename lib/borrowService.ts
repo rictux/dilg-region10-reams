@@ -117,7 +117,9 @@ export const borrowService = {
   // ==================== Item Management ====================
 
   /**
-   * Create a new borrowable item for an office
+   * Create a new borrowable item for an office.
+   * Throws on failure — the common one is the (office_id, item_code) uniqueness
+   * guard, and the caller has to be able to tell the user which code clashed.
    */
   async createItem(
     officeId: number,
@@ -125,15 +127,15 @@ export const borrowService = {
     itemName: string,
     itemDescription?: string,
     itemCategory?: string
-  ): Promise<BorrowableItem | null> {
+  ): Promise<BorrowableItem> {
     const { data, error } = await supabase
       .from('borrowable_items')
       .insert({
         office_id: officeId,
         item_code: itemCode.trim(),
         item_name: itemName.trim(),
-        item_description: itemDescription?.trim(),
-        item_category: itemCategory?.trim(),
+        item_description: itemDescription?.trim() || null,
+        item_category: itemCategory?.trim() || null,
         status: 'Available',
       })
       .select()
@@ -141,46 +143,46 @@ export const borrowService = {
 
     if (error) {
       console.error('Error creating item:', error);
-      return null;
+      throw error;
     }
 
     return data;
   },
 
   /**
-   * Update item details
+   * Update item details. Scoped by office so an id from another office cannot
+   * be edited even if it is guessed.
    */
   async updateItem(
     itemId: number,
-    updates: Partial<BorrowableItem>
-  ): Promise<BorrowableItem | null> {
+    officeId: number,
+    updates: Partial<Omit<BorrowableItem, 'item_id' | 'office_id' | 'created_at'>>
+  ): Promise<BorrowableItem> {
     const { data, error } = await supabase
       .from('borrowable_items')
       .update(updates)
       .eq('item_id', itemId)
+      .eq('office_id', officeId)
       .select()
       .single();
 
     if (error) {
       console.error('Error updating item:', error);
-      return null;
+      throw error;
     }
 
     return data;
   },
 
   /**
-   * Mark item as damaged
+   * Move an item between Available / Damaged / Archived.
    */
-  async markItemDamaged(itemId: number): Promise<BorrowableItem | null> {
-    return this.updateItem(itemId, { status: 'Damaged' });
-  },
-
-  /**
-   * Archive an item
-   */
-  async archiveItem(itemId: number): Promise<BorrowableItem | null> {
-    return this.updateItem(itemId, { status: 'Archived' });
+  async setItemStatus(
+    itemId: number,
+    officeId: number,
+    status: BorrowableItem['status']
+  ): Promise<BorrowableItem> {
+    return this.updateItem(itemId, officeId, { status });
   },
 
   // ==================== Borrow Operations ====================
