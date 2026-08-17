@@ -1678,9 +1678,7 @@ const Scanner: React.FC = () => {
             </div>
 
                 <div ref={cameraViewportRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black sm:min-h-[520px] lg:min-h-0">
-                    {scanMode === 'borrow' && selectedEventId ? (
-                        <BorrowScanner eventId={parseInt(selectedEventId)} />
-                    ) : cameraError ? (
+                    {cameraError ? (
                         <div className="text-white text-center p-8 max-w-sm">
                             <div className="bg-red-500/20 p-6 rounded-full inline-block mb-6">
                                 <AlertTriangle size={48} className="text-red-500" />
