@@ -259,7 +259,10 @@ export const borrowService = {
   },
 
   /**
-   * Get full borrow history for an event
+   * Get full borrow history for an event.
+   * Throws rather than returning [] — a missing RPC or a permissions failure is
+   * indistinguishable from "nothing borrowed yet" once it is swallowed, and that
+   * is the one thing the history page must not get wrong.
    */
   async getBorrowHistory(eventId: number): Promise<BorrowHistory[]> {
     const { data, error } = await supabase
@@ -269,7 +272,7 @@ export const borrowService = {
 
     if (error) {
       console.error('Error fetching borrow history:', error);
-      return [];
+      throw error;
     }
 
     return data || [];

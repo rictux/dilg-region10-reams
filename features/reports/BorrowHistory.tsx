@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabase';
 import { borrowService, BorrowHistory } from '../../lib/borrowService';
 import { useAuth } from '../../contexts/AuthContext';
+import { ALL_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
 import { Event } from '../../types/database';
 import { format, formatDuration, intervalToDuration } from 'date-fns';
 import {
@@ -31,34 +31,47 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
 
   useEffect(() => {
     loadEvents();
-  }, []);
+  }, [user]);
 
+  // Must match how the Scanner picks events, or a borrow recorded against an
+  // event the user scans by assignment lands in a report they cannot open.
+  // fetchAccessibleEvents covers all three routes: Admin, own office, and an
+  // explicit event_user_access row.
   const loadEvents = async () => {
-    if (!user?.office_id) {
+    if (!user) {
       setLoadingEvents(false);
       return;
     }
 
     setLoadingEvents(true);
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .eq('organize_by', user.office_id)
-      .or('status.eq.Ongoing,status.eq.Completed')
-      .order('start_date', { ascending: false });
+    try {
+      const accessible = await fetchAccessibleEvents(user, {
+        accessRoles: ALL_EVENT_ACCESS_ROLES,
+        deletedView: 'active',
+        excludeCancelled: true,
+        orderBy: 'start_date',
+        ascending: false
+      });
 
-    if (!error && data) {
-      setEvents(data);
-      if (data.length > 0 && !selectedEventId) {
-        setSelectedEventId(data[0].event_id);
-      }
+      setEvents(accessible);
+      setSelectedEventId((current) => {
+        if (current && accessible.some((e) => e.event_id === current)) return current;
+        return accessible[0]?.event_id ?? null;
+      });
+    } catch (err) {
+      console.error('Failed to load events:', err);
+      toast.error('Could not load events.');
+    } finally {
+      setLoadingEvents(false);
     }
-    setLoadingEvents(false);
   };
 
   useEffect(() => {
     if (selectedEventId) {
       loadHistory();
+    } else {
+      setHistory([]);
+      setLoading(false);
     }
   }, [selectedEventId]);
 
@@ -69,9 +82,16 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
   const loadHistory = async () => {
     if (!selectedEventId) return;
     setLoading(true);
-    const records = await borrowService.getBorrowHistory(selectedEventId);
-    setHistory(records);
-    setLoading(false);
+    try {
+      const records = await borrowService.getBorrowHistory(selectedEventId);
+      setHistory(records);
+    } catch (err) {
+      console.error('Failed to load borrow history:', err);
+      setHistory([]);
+      toast.error('Could not load borrow history for this event.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filterHistory = () => {
@@ -153,7 +173,7 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Borrow History</h1>
           <p className="text-sm text-slate-600 mt-1">
-            No ongoing or completed events available
+            You don't have access to any events yet.
           </p>
         </div>
       </div>
