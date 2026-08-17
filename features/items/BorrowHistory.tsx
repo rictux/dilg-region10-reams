@@ -169,35 +169,31 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
 
   if (events.length === 0) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Borrow History</h1>
-          <p className="text-sm text-slate-600 mt-1">
-            You don't have access to any events yet.
-          </p>
-        </div>
+      <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
+        <Package className="mx-auto mb-4 h-12 w-12 text-slate-300" />
+        <p className="font-medium text-slate-600">No events available</p>
+        <p className="mt-1 text-sm text-slate-500">
+          You don't have access to any events yet.
+        </p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Borrow History</h1>
-          <p className="text-sm text-slate-600 mt-1">
-            Track all item borrowing and return transactions for this event
-          </p>
-        </div>
-        <div className="w-64">
+      {/* The page title lives on the tab shell; this row carries only the scope. */}
+      <div className="flex items-end justify-between gap-4">
+        <p className="text-sm text-slate-600">
+          Every borrow and return recorded for the selected event.
+        </p>
+        <div className="w-64 shrink-0">
           <label className="block text-sm font-medium text-slate-700 mb-2">
-            Select Event
+            Event
           </label>
           <select
             value={selectedEventId || ''}
             onChange={(e) => setSelectedEventId(parseInt(e.target.value))}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             {events.map((event) => (
               <option key={event.event_id} value={event.event_id}>

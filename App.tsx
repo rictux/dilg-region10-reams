@@ -27,8 +27,7 @@ import AuditLogs from './features/audit/AuditLogs';
 import Settings from './features/settings/Settings';
 import NameLookup from './features/lookup/NameLookup';
 import About from './features/about/About';
-import ItemManagement from './features/scanner/ItemManagement';
-import BorrowHistory from './features/reports/BorrowHistory';
+import Items from './features/items/Items';
 import { Permission } from './config/permissions';
 
 const ProtectedRoute = ({ children, requiredPermission }: React.PropsWithChildren<{ requiredPermission?: Permission }>) => {
@@ -131,10 +130,10 @@ const App: React.FC = () => {
             </ProtectedRoute>
           } />
 
-          {/* Borrow History Report - Requires VIEW_REPORTS */}
-          <Route path="/reports/borrow-history" element={
-            <ProtectedRoute requiredPermission="VIEW_REPORTS">
-              <Layout><BorrowHistory /></Layout>
+          {/* Items — inventory and lending history, gated per tab inside */}
+          <Route path="/items" element={
+            <ProtectedRoute>
+              <Layout><Items /></Layout>
             </ProtectedRoute>
           } />
           
@@ -212,13 +211,6 @@ const App: React.FC = () => {
           <Route path="/settings" element={
             <ProtectedRoute>
               <Layout><Settings /></Layout>
-            </ProtectedRoute>
-          } />
-
-          {/* Item Management - Requires MANAGE_EVENTS */}
-          <Route path="/settings/item-management" element={
-            <ProtectedRoute requiredPermission="MANAGE_EVENTS">
-              <Layout><ItemManagement /></Layout>
             </ProtectedRoute>
           } />
 

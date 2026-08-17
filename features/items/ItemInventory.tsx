@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const ItemManagement: React.FC = () => {
+const ItemInventory: React.FC = () => {
   const { user } = useAuth();
   const [items, setItems] = useState<BorrowableItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,17 +112,14 @@ const ItemManagement: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Borrowable Items</h1>
-          <p className="text-sm text-slate-600 mt-1">
-            Manage the inventory of items available for borrowing
-          </p>
-        </div>
+      {/* The page title lives on the tab shell; this row carries only the action. */}
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm text-slate-600">
+          Items your office lends out during events. Each needs a QR code matching its item code.
+        </p>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+          className="flex shrink-0 items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium"
         >
           <Plus className="w-4 h-4" />
           Add Item
@@ -303,4 +300,4 @@ const ItemManagement: React.FC = () => {
   );
 };
 
-export default ItemManagement;
+export default ItemInventory;
