@@ -235,6 +235,9 @@ const TestResults: React.FC = () => {
     };
   }, [rows, tests]);
 
+  const completionRate =
+    rows.length === 0 ? null : (summary.completeCount / rows.length) * 100;
+
   // ── Per-question item analysis
   const itemAnalysis = useMemo(() => {
     const submissionsByTest = new Map<number, EventTestSubmission[]>();
@@ -424,10 +427,25 @@ const TestResults: React.FC = () => {
               </div>
             </React.Fragment>
           ))}
+          <div className="col-span-2 rounded-xl border border-[#E0DDD4] bg-white p-4">
+            <p className="text-[11px] uppercase tracking-wide text-[#9A9890]">
+              Completed {tests.length === 1 ? 'the test' : 'all tests'}
+            </p>
+            <p className="mt-1 font-mono text-2xl font-bold text-emerald-600">
+              {summary.completeCount}
+              <span className="text-base text-[#9A9890]"> / {rows.length}</span>
+            </p>
+            <p className="mt-1 text-[11px] text-[#9A9890]">
+              {formatPercent(completionRate)} of the roster
+              {summary.completeCount < rows.length
+                ? ` · ${rows.length - summary.completeCount} still incomplete`
+                : ''}
+            </p>
+          </div>
           {tests.length === 2 && (
-            <div className="col-span-2 rounded-xl border border-[#E0DDD4] bg-white p-4 sm:col-span-4">
+            <div className="col-span-2 rounded-xl border border-[#E0DDD4] bg-white p-4">
               <p className="text-[11px] uppercase tracking-wide text-[#9A9890]">
-                Average gain (post − pre, participants who took both)
+                Average gain (post − pre, took both)
               </p>
               <p className={`mt-1 font-mono text-2xl font-bold ${
                 (summary.meanGain ?? 0) > 0 ? 'text-emerald-600' : (summary.meanGain ?? 0) < 0 ? 'text-red-600' : ''
