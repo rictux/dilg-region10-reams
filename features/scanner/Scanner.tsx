@@ -961,9 +961,20 @@ const Scanner: React.FC = () => {
         if (currentMode === 'borrow') {
             setBorrowParticipant(participant);
             if (borrowStep === 'action') {
-                // First scan in borrow mode - show action modal
+                // First scan in borrow mode - show action modal only (no result overlay)
                 setShowBorrowActionModal(true);
-                processScanResult('Valid', 'Choose action: Borrow or Return', participant.name, participant.position, { autoReset: false });
+                // Resume camera for next scan
+                try {
+                    if (scannerRef.current && !scannerRef.current.isScanning) {
+                        await scannerRef.current.start(
+                            { facingMode: 'environment' },
+                            { fps: 10, qrbox: 250, formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] },
+                            handleScan,
+                            undefined
+                        );
+                        setScanning(true);
+                    }
+                } catch (e) { console.error('Resume scanner error:', e); }
             } else if (borrowStep === 'item' && borrowAction) {
                 // Second scan - this is the item QR
                 await handleBorrowItemScan(qrToken, participant, eventId, borrowAction);
