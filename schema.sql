@@ -954,12 +954,15 @@ CREATE OR REPLACE FUNCTION get_active_borrows(
     borrowed_at TIMESTAMP WITH TIME ZONE
 ) AS $$
 BEGIN
+    -- Every text column is cast explicitly: RETURN QUERY demands an exact type
+    -- match against the declared OUT columns and will not coerce a varchar(n)
+    -- to text on its own.
     RETURN QUERY
     SELECT
         bi.borrow_id,
         bi.item_id,
-        bItems.item_name,
-        bItems.item_code,
+        bItems.item_name::TEXT,
+        bItems.item_code::TEXT,
         bi.borrowed_at
     FROM borrowed_items bi
     JOIN borrowable_items bItems ON bi.item_id = bItems.item_id
@@ -985,17 +988,20 @@ CREATE OR REPLACE FUNCTION get_borrow_history(
     status TEXT
 ) AS $$
 BEGIN
+    -- participants.full_name is varchar(150) in deployed databases, so the cast
+    -- is required, not cosmetic: without it RETURN QUERY raises 42804 and the
+    -- whole report comes back as an error.
     RETURN QUERY
     SELECT
         bi.borrow_id,
         bi.participant_id,
-        p.full_name,
+        p.full_name::TEXT,
         bi.item_id,
-        bItems.item_name,
+        bItems.item_name::TEXT,
         bi.borrowed_at,
         bi.returned_at,
         EXTRACT(EPOCH FROM (COALESCE(bi.returned_at, NOW()) - bi.borrowed_at))::INT / 60,
-        CASE WHEN bi.returned_at IS NULL THEN 'Unreturned' ELSE 'Returned' END
+        (CASE WHEN bi.returned_at IS NULL THEN 'Unreturned' ELSE 'Returned' END)::TEXT
     FROM borrowed_items bi
     JOIN participants p ON bi.participant_id = p.participant_id
     JOIN borrowable_items bItems ON bi.item_id = bItems.item_id
@@ -1023,12 +1029,12 @@ BEGIN
     SELECT
         bi.borrow_id,
         bi.item_id,
-        bItems.item_name,
-        bItems.item_code,
+        bItems.item_name::TEXT,
+        bItems.item_code::TEXT,
         bi.borrowed_at,
         bi.returned_at,
         EXTRACT(EPOCH FROM (COALESCE(bi.returned_at, NOW()) - bi.borrowed_at))::INT / 60,
-        CASE WHEN bi.returned_at IS NULL THEN 'Unreturned' ELSE 'Returned' END
+        (CASE WHEN bi.returned_at IS NULL THEN 'Unreturned' ELSE 'Returned' END)::TEXT
     FROM borrowed_items bi
     JOIN borrowable_items bItems ON bi.item_id = bItems.item_id
     WHERE bi.participant_id = p_participant_id
