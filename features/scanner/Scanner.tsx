@@ -1615,10 +1615,13 @@ const Scanner: React.FC = () => {
                         </div>
                     )}
 
+                    {/* Keyed on 'attendance' because that is exactly when the
+                        Session block renders — keying on 'giveaway' left borrow
+                        mode reserving a third column with nothing in it. */}
                     <div className={`grid grid-cols-2 gap-1 sm:gap-2 md:items-start ${
-                        scanMode === 'giveaway'
-                            ? 'md:grid-cols-[minmax(0,1fr)_220px] xl:grid-cols-[minmax(0,1fr)_240px]'
-                            : 'md:grid-cols-[minmax(0,1fr)_330px_220px] xl:grid-cols-[minmax(0,1fr)_360px_240px]'
+                        scanMode === 'attendance'
+                            ? 'md:grid-cols-[minmax(0,1fr)_400px_150px] xl:grid-cols-[minmax(0,1fr)_440px_160px]'
+                            : 'md:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px]'
                     }`}>
                         <div className="col-span-2 md:col-span-1 flex-1 w-full rounded-none sm:rounded-xl lg:rounded-2xl border border-[#2A2926] bg-[#111110]/70 p-0.5 sm:p-1.5">
                             <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-[#7C7A72]">Event</p>
@@ -1657,7 +1660,7 @@ const Scanner: React.FC = () => {
                             )}
                         </div>
 
-                        <div className={`${scanMode === 'giveaway' ? 'col-span-2 md:col-span-1' : 'col-span-1'} w-full xl:w-auto rounded-none sm:rounded-xl lg:rounded-2xl border border-[#2A2926] bg-[#111110]/70 p-0.5 sm:p-1.5 shadow-sm`}>
+                        <div className={`${scanMode === 'attendance' ? 'col-span-1' : 'col-span-2 md:col-span-1'} w-full xl:w-auto rounded-none sm:rounded-xl lg:rounded-2xl border border-[#2A2926] bg-[#111110]/70 p-0.5 sm:p-1.5 shadow-sm`}>
                             <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-[#7C7A72]">Mode</p>
                             <div className="grid grid-cols-3 gap-1">
                                 <button
