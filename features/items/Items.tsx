@@ -60,14 +60,8 @@ const Items: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Items</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Equipment lent to participants during events.
-        </p>
-      </div>
-
-      {/* A single tab is not a choice, so the strip is hidden when only one
+      {/* No page heading here — the layout header already names the page.
+          A single tab is not a choice, so the strip is hidden when only one
           view is available to this user. */}
       {visibleTabs.length > 1 && (
         <div className="border-b border-slate-200">
