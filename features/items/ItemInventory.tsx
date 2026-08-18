@@ -1,7 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'react-qr-code';
 import { toPng } from 'html-to-image';
-import { borrowService, BorrowableItem, ActiveLoan } from '../../lib/borrowService';
+import {
+  borrowService,
+  BorrowableItem,
+  ActiveLoan,
+  ItemBorrowHistory,
+  formatBorrowDuration,
+} from '../../lib/borrowService';
 import { useAuth } from '../../contexts/AuthContext';
 import { format } from 'date-fns';
 import {
@@ -10,7 +16,6 @@ import {
   CheckCircle,
   Package,
   Pencil,
-  QrCode,
   Download,
   Search,
   Loader2,
@@ -18,6 +23,8 @@ import {
   RotateCcw,
   X,
   UserCheck,
+  History,
+  Calendar,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -99,6 +106,9 @@ const ItemInventory: React.FC = () => {
   const [saving, setSaving] = useState(false);
 
   const [qrItem, setQrItem] = useState<BorrowableItem | null>(null);
+
+  /** The item whose borrow/return trail is open, from clicking its card. */
+  const [historyItem, setHistoryItem] = useState<BorrowableItem | null>(null);
 
   /** item_id → the open loan holding it. Absent means the item is on hand. */
   const [loansByItem, setLoansByItem] = useState<Map<number, ActiveLoan>>(new Map());
@@ -324,13 +334,31 @@ const ItemInventory: React.FC = () => {
             return (
             <div
               key={item.item_id}
-              className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+              role="button"
+              tabIndex={0}
+              onClick={() => setHistoryItem(item)}
+              onKeyDown={(e) => {
+                // Only the card's own key presses open the history — the nested
+                // buttons handle Enter/Space themselves and their events bubble.
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setHistoryItem(item);
+                }
+              }}
+              aria-label={`View borrow history for ${item.item_name}`}
+              className="flex cursor-pointer flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:border-indigo-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               <div className="flex items-start gap-3">
-                {/* Thumbnail doubles as the "open label" affordance. */}
+                {/* The thumbnail is the way into the label from the grid. Every
+                    control on the card stops propagation, or it would also
+                    trigger the card's own history click. */}
                 <button
                   type="button"
-                  onClick={() => setQrItem(item)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setQrItem(item);
+                  }}
                   title="View QR label"
                   className="shrink-0 rounded-lg border border-slate-200 bg-white p-1.5 transition-colors hover:border-indigo-400"
                 >
@@ -378,23 +406,21 @@ const ItemInventory: React.FC = () => {
 
               <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
                 <button
-                  onClick={() => openEdit(item)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEdit(item);
+                  }}
                   className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
                 >
                   <Pencil className="h-3.5 w-3.5" />
                   Edit
                 </button>
-                <button
-                  onClick={() => setQrItem(item)}
-                  className="flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
-                >
-                  <QrCode className="h-3.5 w-3.5" />
-                  QR Label
-                </button>
-
                 {item.status === 'Available' && (
                   <button
-                    onClick={() => changeStatus(item, 'Damaged')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      changeStatus(item, 'Damaged');
+                    }}
                     className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
                   >
                     <AlertCircle className="h-3.5 w-3.5" />
@@ -403,7 +429,10 @@ const ItemInventory: React.FC = () => {
                 )}
                 {item.status !== 'Available' && (
                   <button
-                    onClick={() => changeStatus(item, 'Available')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      changeStatus(item, 'Available');
+                    }}
                     className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
@@ -412,7 +441,10 @@ const ItemInventory: React.FC = () => {
                 )}
                 {item.status !== 'Archived' && (
                   <button
-                    onClick={() => changeStatus(item, 'Archived')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      changeStatus(item, 'Archived');
+                    }}
                     disabled={Boolean(loan)}
                     title={loan ? 'Cannot archive an item that is out on loan' : undefined}
                     className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-slate-100"
@@ -440,6 +472,225 @@ const ItemInventory: React.FC = () => {
       )}
 
       {qrItem && <QrLabelModal item={qrItem} onClose={() => setQrItem(null)} />}
+
+      {historyItem && (
+        <ItemHistoryModal item={historyItem} onClose={() => setHistoryItem(null)} />
+      )}
+    </div>
+  );
+};
+
+// ─── Borrow / return history ────────────────────────────────────────────────
+
+/**
+ * Where this one item has been: every loan against it, newest first, across all
+ * events. Loaded on open rather than with the grid — most cards are never
+ * opened, and the trail is only meaningful once you are looking at one item.
+ */
+const ItemHistoryModal: React.FC<{ item: BorrowableItem; onClose: () => void }> = ({
+  item,
+  onClose,
+}) => {
+  const [records, setRecords] = useState<ItemBorrowHistory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      setFailed(false);
+      try {
+        const rows = await borrowService.getItemBorrowHistory(item.item_id);
+        if (!cancelled) setRecords(rows);
+      } catch (err) {
+        console.error('Failed to load item history:', err);
+        if (!cancelled) {
+          setRecords([]);
+          setFailed(true);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [item.item_id]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
+  const openLoans = records.filter((r) => r.status === 'Unreturned').length;
+  const totalMinutes = records.reduce((sum, r) => sum + r.duration_minutes, 0);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Borrow history for ${item.item_name}`}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200"
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-slate-50 px-5 py-4">
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
+              <History className="h-4 w-4 shrink-0 text-indigo-600" />
+              <span className="truncate">{item.item_name}</span>
+            </h2>
+            <p className="mt-0.5 font-mono text-xs text-slate-500">{item.item_code}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Label beside the trail, not behind another click: whoever is auditing
+            an item's movements is also the person most likely to need its tag
+            reprinted. Stacks above the history until there is room for a column. */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+          <aside className="shrink-0 border-b border-slate-100 bg-slate-50/60 p-5 lg:w-72 lg:border-b-0 lg:border-r">
+            <ItemLabel item={item} size={190} />
+            <p className="mt-3 text-center text-xs text-slate-500">
+              Print and attach to the item.
+            </p>
+          </aside>
+
+          <div className="flex min-h-0 flex-1 flex-col">
+            {!loading && !failed && records.length > 0 && (
+              <div className="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100">
+                <div className="px-5 py-3">
+                  <p className="text-[11px] font-medium uppercase text-slate-500">No. of Records</p>
+                  <p className="mt-0.5 text-xl font-bold text-slate-900">{records.length}</p>
+                </div>
+                <div className="px-5 py-3">
+                  <p className="text-[11px] font-medium uppercase text-slate-500">Out Now</p>
+                  <p
+                    className={`mt-0.5 text-xl font-bold ${
+                      openLoans > 0 ? 'text-amber-600' : 'text-slate-900'
+                    }`}
+                  >
+                    {openLoans}
+                  </p>
+                </div>
+                <div className="px-5 py-3">
+                  <p className="text-[11px] font-medium uppercase text-slate-500">Total Time Out</p>
+                  <p className="mt-0.5 text-xl font-bold text-slate-900">
+                    {formatBorrowDuration(totalMinutes)}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* On a narrow screen the whole body scrolls as one; from lg the history
+                gets its own scroller so the label column stays put. */}
+            <div className="flex-1 lg:min-h-0 lg:overflow-y-auto">
+              {loading ? (
+                <div className="flex items-center justify-center gap-2 py-12 text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading history...
+                </div>
+              ) : failed ? (
+                <div className="px-5 py-12 text-center">
+                  <AlertCircle className="mx-auto mb-3 h-10 w-10 text-red-200" />
+                  <p className="font-medium text-slate-600">Could not load history</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Check your connection and open the card again.
+                  </p>
+                </div>
+              ) : records.length === 0 ? (
+                <div className="px-5 py-12 text-center">
+                  <Package className="mx-auto mb-3 h-10 w-10 text-slate-200" />
+                  <p className="font-medium text-slate-600">Never borrowed</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    This item has no borrow or return records yet.
+                  </p>
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
+                    <tr>
+                      <th className="px-5 py-2.5 text-left text-xs font-semibold text-slate-700">
+                        Borrower
+                      </th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-700">
+                        Event
+                      </th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-700">
+                        Borrowed
+                      </th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-700">
+                        Returned
+                      </th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-700">
+                        Held
+                      </th>
+                      <th className="px-5 py-2.5 text-center text-xs font-semibold text-slate-700">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {records.map((record) => (
+                      <tr key={record.borrow_id} className="transition hover:bg-slate-50">
+                        <td className="px-5 py-3 text-sm font-medium text-slate-900">
+                          {record.participant_name}
+                        </td>
+                        <td className="max-w-[14rem] px-3 py-3 text-sm text-slate-600">
+                          <span className="flex items-start gap-1.5">
+                            <Calendar className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                            <span className="leading-snug">{record.event_name}</span>
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3 text-sm text-slate-600">
+                          {format(new Date(record.borrowed_at), 'MMM d, yyyy h:mm a')}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3 text-sm text-slate-600">
+                          {record.returned_at
+                            ? format(new Date(record.returned_at), 'MMM d, yyyy h:mm a')
+                            : '—'}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3 text-sm text-slate-600">
+                          {formatBorrowDuration(record.duration_minutes)}
+                        </td>
+                        <td className="px-5 py-3 text-center">
+                          {record.status === 'Returned' ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-green-50 px-2 py-1 text-xs font-medium text-green-700">
+                              <CheckCircle className="h-3 w-3" />
+                              Returned
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
+                              <AlertCircle className="h-3 w-3" />
+                              Out
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -574,14 +825,13 @@ const ItemFormModal: React.FC<ItemFormModalProps> = ({
 // ─── QR label ───────────────────────────────────────────────────────────────
 
 /**
- * The printable label. Everything inside `labelRef` is what gets rasterised, so
- * it carries the human-readable name and code alongside the code itself — a
- * label whose QR will not scan still has to be identifiable by eye.
+ * The printable label and its download control, shared by the label modal and
+ * the history modal so a label downloaded from either is byte-for-byte the same
+ * artefact. Everything inside `labelRef` is what gets rasterised, so it carries
+ * the human-readable name alongside the code — a label whose QR will not scan
+ * still has to be identifiable by eye.
  */
-const QrLabelModal: React.FC<{ item: BorrowableItem; onClose: () => void }> = ({
-  item,
-  onClose,
-}) => {
+const ItemLabel: React.FC<{ item: BorrowableItem; size?: number }> = ({ item, size = 180 }) => {
   const labelRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
 
@@ -609,47 +859,54 @@ const QrLabelModal: React.FC<{ item: BorrowableItem; onClose: () => void }> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-4">
-          <h2 className="text-lg font-bold text-slate-900">QR Label</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="p-5">
-          <div className="flex justify-center">
-            {/* p-4 is the QR quiet zone, not decoration — scanners need clear
-                margin around the symbol, so it stays even without a frame. */}
-            <div ref={labelRef} className="inline-flex flex-col items-center bg-white p-4">
-              <ItemQrCode value={item.item_code} size={180} />
-              <p className="mt-3 max-w-[180px] text-center text-sm leading-tight text-[#111110]">
-                {item.item_name}
-              </p>
-            </div>
-          </div>
-
-          <p className="mt-4 text-center text-xs text-slate-500">
-            Print and attach to the item.
-          </p>
-
-          <button
-            onClick={download}
-            disabled={downloading}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            {downloading ? 'Preparing...' : 'Download PNG'}
-          </button>
-        </div>
+    <div className="flex flex-col items-center">
+      {/* p-4 is the QR quiet zone, not decoration — scanners need clear
+          margin around the symbol, so it stays even without a frame. */}
+      <div ref={labelRef} className="inline-flex flex-col items-center bg-white p-4">
+        <ItemQrCode value={item.item_code} size={size} />
+        <p
+          className="mt-3 text-center text-sm leading-tight text-[#111110]"
+          style={{ maxWidth: size }}
+        >
+          {item.item_name}
+        </p>
       </div>
+
+      <button
+        onClick={download}
+        disabled={downloading}
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
+      >
+        {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+        {downloading ? 'Preparing...' : 'Download PNG'}
+      </button>
     </div>
   );
 };
+
+const QrLabelModal: React.FC<{ item: BorrowableItem; onClose: () => void }> = ({
+  item,
+  onClose,
+}) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+    <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-4">
+        <h2 className="text-lg font-bold text-slate-900">QR Label</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="p-5">
+        <ItemLabel item={item} size={180} />
+        <p className="mt-3 text-center text-xs text-slate-500">Print and attach to the item.</p>
+      </div>
+    </div>
+  </div>
+);
 
 export default ItemInventory;

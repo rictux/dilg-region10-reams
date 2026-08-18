@@ -58,6 +58,31 @@ export interface BorrowHistory {
   status: 'Unreturned' | 'Returned';
 }
 
+/**
+ * One loan in a single item's lifetime, across every event it was lent at.
+ * Where BorrowHistory answers "what happened at this event", this answers
+ * "where has this item been".
+ */
+export interface ItemBorrowHistory {
+  borrow_id: number;
+  event_id: number;
+  event_name: string;
+  participant_id: number;
+  participant_name: string;
+  borrowed_at: string;
+  returned_at?: string;
+  duration_minutes: number;
+  status: 'Unreturned' | 'Returned';
+}
+
+/** Per-record outcome of a bulk return, so partial success is reportable. */
+export interface BulkReturnResult {
+  returned: number[];
+  /** Closed by someone else before this call landed — not an error. */
+  alreadyReturned: number[];
+  failed: number[];
+}
+
 export interface ParticipantBorrowHistory {
   borrow_id: number;
   item_id: number;
@@ -67,6 +92,15 @@ export interface ParticipantBorrowHistory {
   returned_at?: string;
   duration_minutes: number;
   status: 'Unreturned' | 'Returned';
+}
+
+/** "45m", "2h", "2h 15m" — the shared reading of a loan's length. */
+export function formatBorrowDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
 }
 
 export const borrowService = {
@@ -146,6 +180,84 @@ export const borrowService = {
       participant_name: nameById.get(r.participant_id) ?? 'Unknown',
       borrowed_at: r.borrowed_at,
     }));
+  },
+
+  /**
+   * Every loan this item has ever been part of, newest first.
+   *
+   * Three plain queries rather than embeds, for the same reason
+   * getActiveLoansForItems uses two: the double participant foreign key makes an
+   * embed ambiguous. Duration mirrors get_borrow_history — minutes held so far
+   * for an open loan, total held for a closed one — so a row reads the same here
+   * as it does in the History Log.
+   */
+  async getItemBorrowHistory(itemId: number): Promise<ItemBorrowHistory[]> {
+    const { data: borrows, error } = await supabase
+      .from('borrowed_items')
+      .select('borrow_id, event_id, participant_id, borrowed_at, returned_at')
+      .eq('item_id', itemId)
+      .order('borrowed_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching item borrow history:', error);
+      throw error;
+    }
+
+    const rows = borrows || [];
+    if (rows.length === 0) return [];
+
+    const [people, events] = await Promise.all([
+      supabase
+        .from('participants')
+        .select('participant_id, full_name')
+        .in('participant_id', Array.from(new Set(rows.map((r) => r.participant_id)))),
+      supabase
+        .from('events')
+        .select('event_id, event_name')
+        .in('event_id', Array.from(new Set(rows.map((r) => r.event_id)))),
+    ]);
+
+    if (people.error) {
+      console.error('Error fetching borrowers:', people.error);
+      throw people.error;
+    }
+    if (events.error) {
+      console.error('Error fetching events for item history:', events.error);
+      throw events.error;
+    }
+
+    const nameById = new Map<number, string>(
+      (people.data || []).map((p: { participant_id: number; full_name: string }) => [
+        p.participant_id,
+        p.full_name,
+      ])
+    );
+    const eventById = new Map<number, string>(
+      (events.data || []).map((e: { event_id: number; event_name: string }) => [
+        e.event_id,
+        e.event_name,
+      ])
+    );
+
+    return rows.map((r) => {
+      const end = r.returned_at ? new Date(r.returned_at) : new Date();
+      const minutes = Math.max(
+        0,
+        Math.floor((end.getTime() - new Date(r.borrowed_at).getTime()) / 60000)
+      );
+
+      return {
+        borrow_id: r.borrow_id,
+        event_id: r.event_id,
+        event_name: eventById.get(r.event_id) ?? 'Unknown event',
+        participant_id: r.participant_id,
+        participant_name: nameById.get(r.participant_id) ?? 'Unknown',
+        borrowed_at: r.borrowed_at,
+        returned_at: r.returned_at ?? undefined,
+        duration_minutes: minutes,
+        status: r.returned_at ? 'Returned' : 'Unreturned',
+      };
+    });
   },
 
   /**
@@ -311,6 +423,60 @@ export const borrowService = {
     }
 
     return data as BorrowRecord;
+  },
+
+  /**
+   * Close several borrows at once, for a desk return recorded off-scanner.
+   *
+   * Each entry carries its own participant id because return_borrow stamps
+   * returned_by_participant_id, and a manual return has no scanning participant
+   * to attribute it to — the borrower is recorded as having brought the item
+   * back, which is what actually happened.
+   *
+   * A row someone else closed between the page load and this call is reported
+   * separately rather than as a failure: the caller's intent (the item is back)
+   * already holds, so there is nothing for the operator to retry.
+   */
+  async returnItems(
+    borrows: { borrowId: number; participantId: number }[],
+    notes?: string
+  ): Promise<BulkReturnResult> {
+    const result: BulkReturnResult = { returned: [], alreadyReturned: [], failed: [] };
+
+    // Small concurrent batches: a bulk return is a handful to a few dozen rows,
+    // and one round-trip each would leave the operator watching a spinner.
+    const BATCH_SIZE = 8;
+    for (let i = 0; i < borrows.length; i += BATCH_SIZE) {
+      const batch = borrows.slice(i, i + BATCH_SIZE);
+      await Promise.all(
+        batch.map(async ({ borrowId, participantId }) => {
+          const { error } = await supabase.rpc('return_borrow', {
+            p_borrow_id: borrowId,
+            p_returned_by_participant_id: participantId,
+            p_scanner_device: null,
+            p_notes: notes,
+          });
+
+          if (!error) {
+            result.returned.push(borrowId);
+            return;
+          }
+
+          // P0002 is the SQLSTATE behind the RPC's no_data_found guard, raised
+          // when the row is gone or already closed. The message check is a
+          // fallback for deployments that surface the raise without the code.
+          if (error.code === 'P0002' || /already returned/i.test(error.message || '')) {
+            result.alreadyReturned.push(borrowId);
+            return;
+          }
+
+          console.error(`Error returning borrow ${borrowId}:`, error);
+          result.failed.push(borrowId);
+        })
+      );
+    }
+
+    return result;
   },
 
   // ==================== Query Operations ====================

@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { borrowService, BorrowHistory } from '../../lib/borrowService';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { borrowService, BorrowHistory, formatBorrowDuration } from '../../lib/borrowService';
 import { useAuth } from '../../contexts/AuthContext';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { ALL_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
 import { Event } from '../../types/database';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
@@ -14,6 +15,8 @@ import {
   ChevronDown,
   Check,
   Search,
+  Undo2,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -40,7 +43,7 @@ interface BorrowHistoryPageProps {
 }
 
 const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialEventId }) => {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(initialEventId || null);
   const [loadingEvents, setLoadingEvents] = useState(true);
@@ -49,6 +52,13 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<'all' | 'unreturned' | 'returned'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Manual returns. Viewing the log is a report permission; closing a loan from
+  // it is a write, so it sits behind the same gate as other manual log edits.
+  const canReturn = hasPermission('MANAGE_PARTICIPANTS');
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [pendingReturn, setPendingReturn] = useState<BorrowHistory[] | null>(null);
+  const [isReturning, setIsReturning] = useState(false);
 
   // Event picker (mirrors the Attendance tab's searchable dropdown)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -158,6 +168,88 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
     }
 
     setFilteredHistory(filtered);
+  };
+
+  // A row that falls out of the current filter, or that a reload now shows as
+  // returned, must not stay selected — the bulk action would otherwise reach
+  // records the operator can no longer see.
+  useEffect(() => {
+    setSelectedIds((current) => {
+      if (current.length === 0) return current;
+      const returnable = new Set(
+        filteredHistory.filter((h) => h.status === 'Unreturned').map((h) => h.borrow_id)
+      );
+      const next = current.filter((id) => returnable.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [filteredHistory]);
+
+  const returnableRows = useMemo(
+    () => filteredHistory.filter((h) => h.status === 'Unreturned'),
+    [filteredHistory]
+  );
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const allReturnableSelected =
+    returnableRows.length > 0 && returnableRows.every((h) => selectedSet.has(h.borrow_id));
+
+  const toggleRow = (borrowId: number) => {
+    setSelectedIds((current) =>
+      current.includes(borrowId)
+        ? current.filter((id) => id !== borrowId)
+        : [...current, borrowId]
+    );
+  };
+
+  const toggleAllReturnable = () => {
+    setSelectedIds(allReturnableSelected ? [] : returnableRows.map((h) => h.borrow_id));
+  };
+
+  const confirmReturn = async () => {
+    if (!pendingReturn || pendingReturn.length === 0) return;
+
+    setIsReturning(true);
+    try {
+      // The borrower is recorded as the returning participant, and the note
+      // keeps the paper trail that this was a desk return, not a scan.
+      const result = await borrowService.returnItems(
+        pendingReturn.map((record) => ({
+          borrowId: record.borrow_id,
+          participantId: record.participant_id,
+        })),
+        `Manually returned via History Log by ${user?.full_name || 'staff'}`
+      );
+
+      if (result.returned.length > 0) {
+        toast.success(
+          result.returned.length === 1
+            ? `${pendingReturn[0].item_name} marked as returned.`
+            : `${result.returned.length} items marked as returned.`
+        );
+      }
+      if (result.alreadyReturned.length > 0) {
+        toast.info(
+          `${result.alreadyReturned.length} ${
+            result.alreadyReturned.length === 1 ? 'item was' : 'items were'
+          } already returned.`
+        );
+      }
+      if (result.failed.length > 0) {
+        toast.error(
+          `Could not return ${result.failed.length} ${
+            result.failed.length === 1 ? 'item' : 'items'
+          }. Please try again.`
+        );
+      }
+
+      setPendingReturn(null);
+      setSelectedIds([]);
+      await loadHistory();
+    } catch (err) {
+      console.error('Manual return failed:', err);
+      toast.error('Could not record the return.');
+    } finally {
+      setIsReturning(false);
+    }
   };
 
   const exportToCSV = () => {
@@ -419,10 +511,53 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto bg-white rounded-lg border border-slate-200">
+        <div className="bg-white rounded-lg border border-slate-200">
+          {/* Bulk action bar — only present once something is selected, so the
+              table keeps its full width in the common read-only case. */}
+          {canReturn && selectedIds.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100 bg-indigo-50 px-4 py-3">
+              <p className="text-sm font-medium text-indigo-900">
+                {selectedIds.length} {selectedIds.length === 1 ? 'item' : 'items'} selected
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds([])}
+                  className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-slate-800"
+                >
+                  <X className="h-4 w-4" />
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPendingReturn(returnableRows.filter((h) => selectedSet.has(h.borrow_id)))
+                  }
+                  className="flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                >
+                  <Undo2 className="h-4 w-4" />
+                  Return selected
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
+                {canReturn && (
+                  <th className="w-10 px-4 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all unreturned records"
+                      checked={allReturnableSelected}
+                      disabled={returnableRows.length === 0}
+                      onChange={toggleAllReturnable}
+                      className="h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+                    />
+                  </th>
+                )}
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">
                   Participant
                 </th>
@@ -441,11 +576,29 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
                 <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700">
                   Status
                 </th>
+                {canReturn && (
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">
+                    Action
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {filteredHistory.map((record) => (
                 <tr key={record.borrow_id} className="hover:bg-slate-50 transition">
+                  {canReturn && (
+                    <td className="px-4 py-3">
+                      {record.status === 'Unreturned' && (
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${record.item_name} borrowed by ${record.participant_name}`}
+                          checked={selectedSet.has(record.borrow_id)}
+                          onChange={() => toggleRow(record.borrow_id)}
+                          className="h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                      )}
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-sm text-slate-900 font-medium">
                     {record.participant_name}
                   </td>
@@ -461,7 +614,7 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
                       : '—'}
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600">
-                    {formatDurationMinutes(record.duration_minutes)}
+                    {formatBorrowDuration(record.duration_minutes)}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {record.status === 'Returned' ? (
@@ -476,10 +629,25 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
                       </span>
                     )}
                   </td>
+                  {canReturn && (
+                    <td className="px-4 py-3 text-right">
+                      {record.status === 'Unreturned' && (
+                        <button
+                          type="button"
+                          onClick={() => setPendingReturn([record])}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700"
+                        >
+                          <Undo2 className="h-3.5 w-3.5" />
+                          Return
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -497,24 +665,34 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
           </p>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={pendingReturn !== null}
+        title={
+          pendingReturn && pendingReturn.length === 1 ? 'Return this item?' : 'Return these items?'
+        }
+        description={
+          pendingReturn && pendingReturn.length === 1 ? (
+            <>
+              <strong>{pendingReturn[0].item_name}</strong> will be marked as returned by{' '}
+              <strong>{pendingReturn[0].participant_name}</strong>, timestamped now. This cannot be
+              undone from here.
+            </>
+          ) : (
+            <>
+              <strong>{pendingReturn?.length ?? 0} items</strong> will be marked as returned by
+              their borrowers, timestamped now. This cannot be undone from here.
+            </>
+          )
+        }
+        confirmLabel="Mark returned"
+        confirmingLabel="Returning…"
+        isConfirming={isReturning}
+        onConfirm={confirmReturn}
+        onCancel={() => setPendingReturn(null)}
+      />
     </div>
   );
 };
-
-// Helper to format duration nicely
-function formatDurationMinutes(minutes: number): string {
-  if (minutes < 60) {
-    return `${minutes}m`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-
-  if (mins === 0) {
-    return `${hours}h`;
-  }
-
-  return `${hours}h ${mins}m`;
-}
 
 export default BorrowHistoryPage;
