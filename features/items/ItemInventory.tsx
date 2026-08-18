@@ -38,6 +38,12 @@ type StatusFilter = 'all' | DisplayState;
 
 const CATEGORIES = ['Tablet', 'Laptop', 'Equipment', 'Other'];
 
+/**
+ * Width in pixels the QR is rasterised to on download, whatever size it is drawn
+ * at on screen. Keeps a printed label crisp when its preview is small.
+ */
+const LABEL_EXPORT_PX = 540;
+
 const STATE_CHIP: Record<DisplayState, string> = {
   Available: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   Borrowed: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -542,7 +548,7 @@ const ItemHistoryModal: React.FC<{ item: BorrowableItem; onClose: () => void }> 
         aria-modal="true"
         aria-label={`Borrow history for ${item.item_name}`}
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
-        className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200"
+        className="flex max-h-[92vh] w-full max-w-[92rem] flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200"
       >
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-slate-50 px-5 py-4">
           <div className="min-w-0">
@@ -565,9 +571,9 @@ const ItemHistoryModal: React.FC<{ item: BorrowableItem; onClose: () => void }> 
             an item's movements is also the person most likely to need its tag
             reprinted. Stacks above the history until there is room for a column. */}
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
-          <aside className="shrink-0 border-b border-slate-100 bg-slate-50/60 p-5 lg:w-72 lg:border-b-0 lg:border-r">
-            <ItemLabel item={item} size={190} />
-            <p className="mt-3 text-center text-xs text-slate-500">
+          <aside className="shrink-0 border-b border-slate-100 bg-slate-50/60 p-4 lg:w-48 lg:border-b-0 lg:border-r">
+            <ItemLabel item={item} size={130} compact />
+            <p className="mt-2 text-center text-[11px] leading-snug text-slate-500">
               Print and attach to the item.
             </p>
           </aside>
@@ -623,25 +629,29 @@ const ItemHistoryModal: React.FC<{ item: BorrowableItem; onClose: () => void }> 
                   </p>
                 </div>
               ) : (
-                <table className="w-full">
+                <table className="w-full table-auto">
+                  {/* Auto layout with the slack given to the two columns that
+                      hold free text: the event name takes what is left over, the
+                      borrower gets a quarter, and the rest are w-px + nowrap,
+                      which auto layout resolves as "no wider than the content". */}
                   <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
                     <tr>
-                      <th className="px-5 py-2.5 text-left text-xs font-semibold text-slate-700">
+                      <th className="w-1/4 px-5 py-2.5 text-left text-xs font-semibold text-slate-700">
                         Borrower
                       </th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-700">
+                      <th className="w-1/2 px-3 py-2.5 text-left text-xs font-semibold text-slate-700">
                         Event
                       </th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-700">
+                      <th className="w-px whitespace-nowrap px-3 py-2.5 text-left text-xs font-semibold text-slate-700">
                         Borrowed
                       </th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-700">
+                      <th className="w-px whitespace-nowrap px-3 py-2.5 text-left text-xs font-semibold text-slate-700">
                         Returned
                       </th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-700">
+                      <th className="w-px whitespace-nowrap px-3 py-2.5 text-left text-xs font-semibold text-slate-700">
                         Held
                       </th>
-                      <th className="px-5 py-2.5 text-center text-xs font-semibold text-slate-700">
+                      <th className="w-px whitespace-nowrap px-5 py-2.5 text-center text-xs font-semibold text-slate-700">
                         Status
                       </th>
                     </tr>
@@ -652,10 +662,15 @@ const ItemHistoryModal: React.FC<{ item: BorrowableItem; onClose: () => void }> 
                         <td className="px-5 py-3 text-sm font-medium text-slate-900">
                           {record.participant_name}
                         </td>
-                        <td className="max-w-[14rem] px-3 py-3 text-sm text-slate-600">
-                          <span className="flex items-start gap-1.5">
-                            <Calendar className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-                            <span className="leading-snug">{record.event_name}</span>
+                        {/* max-w-0 lets the column keep the width its header
+                            asked for: without it auto layout would grow the
+                            table to fit the longest name rather than clip it. */}
+                        <td className="max-w-0 px-3 py-3 text-sm text-slate-600">
+                          <span className="flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                            <span className="min-w-0 truncate" title={record.event_name}>
+                              {record.event_name}
+                            </span>
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-3 py-3 text-sm text-slate-600">
@@ -669,7 +684,7 @@ const ItemHistoryModal: React.FC<{ item: BorrowableItem; onClose: () => void }> 
                         <td className="whitespace-nowrap px-3 py-3 text-sm text-slate-600">
                           {formatBorrowDuration(record.duration_minutes)}
                         </td>
-                        <td className="px-5 py-3 text-center">
+                        <td className="whitespace-nowrap px-5 py-3 text-center">
                           {record.status === 'Returned' ? (
                             <span className="inline-flex items-center gap-1 rounded bg-green-50 px-2 py-1 text-xs font-medium text-green-700">
                               <CheckCircle className="h-3 w-3" />
@@ -826,12 +841,15 @@ const ItemFormModal: React.FC<ItemFormModalProps> = ({
 
 /**
  * The printable label and its download control, shared by the label modal and
- * the history modal so a label downloaded from either is byte-for-byte the same
- * artefact. Everything inside `labelRef` is what gets rasterised, so it carries
- * the human-readable name alongside the code — a label whose QR will not scan
- * still has to be identifiable by eye.
+ * the history modal. Everything inside `labelRef` is what gets rasterised, so it
+ * carries the human-readable name alongside the code — a label whose QR will not
+ * scan still has to be identifiable by eye.
  */
-const ItemLabel: React.FC<{ item: BorrowableItem; size?: number }> = ({ item, size = 180 }) => {
+const ItemLabel: React.FC<{ item: BorrowableItem; size?: number; compact?: boolean }> = ({
+  item,
+  size = 180,
+  compact = false,
+}) => {
   const labelRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
 
@@ -842,8 +860,10 @@ const ItemLabel: React.FC<{ item: BorrowableItem; size?: number }> = ({ item, si
       const dataUrl = await toPng(labelRef.current, {
         cacheBust: true,
         backgroundColor: '#ffffff',
-        // 3x keeps the modules crisp when the label is printed small.
-        pixelRatio: 3,
+        // Export resolution is pinned to the label's print size rather than to
+        // however large it happens to be drawn, so a small on-screen preview
+        // still downloads a label you can print. 180 @ 3x is the baseline.
+        pixelRatio: LABEL_EXPORT_PX / size,
       });
       const link = document.createElement('a');
       link.download = `${item.item_code.replace(/[^a-zA-Z0-9-_]/g, '_')}-label.png`;
@@ -862,10 +882,15 @@ const ItemLabel: React.FC<{ item: BorrowableItem; size?: number }> = ({ item, si
     <div className="flex flex-col items-center">
       {/* p-4 is the QR quiet zone, not decoration — scanners need clear
           margin around the symbol, so it stays even without a frame. */}
-      <div ref={labelRef} className="inline-flex flex-col items-center bg-white p-4">
+      <div
+        ref={labelRef}
+        className={`inline-flex flex-col items-center bg-white ${compact ? 'p-3' : 'p-4'}`}
+      >
         <ItemQrCode value={item.item_code} size={size} />
         <p
-          className="mt-3 text-center text-sm leading-tight text-[#111110]"
+          className={`text-center leading-tight text-[#111110] ${
+            compact ? 'mt-2 text-xs' : 'mt-3 text-sm'
+          }`}
           style={{ maxWidth: size }}
         >
           {item.item_name}
@@ -875,9 +900,15 @@ const ItemLabel: React.FC<{ item: BorrowableItem; size?: number }> = ({ item, si
       <button
         onClick={download}
         disabled={downloading}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
+        className={`flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50 ${
+          compact ? 'mt-2 px-3 py-1.5 text-xs' : 'mt-4 px-4 py-2.5'
+        }`}
       >
-        {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+        {downloading ? (
+          <Loader2 className={compact ? 'h-3.5 w-3.5 animate-spin' : 'h-4 w-4 animate-spin'} />
+        ) : (
+          <Download className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+        )}
         {downloading ? 'Preparing...' : 'Download PNG'}
       </button>
     </div>

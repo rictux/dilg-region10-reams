@@ -59,7 +59,10 @@ const Items: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    // The layout's <main> is overflow-hidden and hands each page a fixed-height
+    // box, so a page that runs long has to own its own scrolling or it is simply
+    // clipped — which is what happened to the stacked mobile layout here.
+    <div className="h-full min-h-0 overflow-y-auto p-6 space-y-6">
       {/* No page heading here — the layout header already names the page.
           A single tab is not a choice, so the strip is hidden when only one
           view is available to this user. */}
