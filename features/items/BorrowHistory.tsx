@@ -2,12 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { borrowService, BorrowHistory, formatBorrowDuration } from '../../lib/borrowService';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import { FilterChip, LedgerStrip, MICRO } from './itemsUi';
 import { ALL_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../../lib/eventAccess';
 import { Event } from '../../types/database';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import {
   Download,
-  Filter,
   AlertCircle,
   CheckCircle,
   Package,
@@ -297,6 +297,9 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
   );
 
   const unreturned = filteredHistory.filter((h) => h.status === 'Unreturned').length;
+  // Chip counts describe the whole event, not the current view — a tally that
+  // shrinks as you filter by it cannot be used to decide what to filter by.
+  const unreturnedTotal = history.filter((h) => h.status === 'Unreturned').length;
   const totalDuration = filteredHistory.reduce((acc, h) => acc + h.duration_minutes, 0);
 
   if (loadingEvents) {
@@ -309,7 +312,7 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
 
   if (events.length === 0) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
+      <div className="rounded-lg border border-slate-200 bg-card p-8 text-center">
         <Package className="mx-auto mb-4 h-12 w-12 text-slate-300" />
         <p className="font-medium text-slate-600">No borrowing recorded yet</p>
         <p className="mt-1 text-sm text-slate-500">
@@ -400,97 +403,72 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
         )}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg border border-slate-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-600 uppercase">Total Borrows</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">
-                {filteredHistory.length}
-              </p>
-            </div>
-            <Package className="w-8 h-8 text-blue-600 opacity-20" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border border-slate-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-600 uppercase">
-                Unreturned Items
-              </p>
-              <p className="text-2xl font-bold text-red-600 mt-1">{unreturned}</p>
-            </div>
-            <AlertCircle className="w-8 h-8 text-red-600 opacity-20" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border border-slate-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-600 uppercase">
-                Avg Duration
-              </p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">
-                {filteredHistory.length > 0
+      {/* Three tiles, each holding one number, became one line of a ledger: the
+          same figures close enough to read against each other, and roughly a
+          quarter of the vertical space on a stacked mobile layout. */}
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-card">
+        <LedgerStrip
+          figures={[
+            { label: 'Records', value: filteredHistory.length },
+            { label: 'Unreturned', value: unreturned, alert: unreturned > 0 },
+            {
+              label: 'Avg held',
+              value: formatBorrowDuration(
+                filteredHistory.length > 0
                   ? Math.round(totalDuration / filteredHistory.length)
-                  : 0}{' '}
-                min
-              </p>
-            </div>
-            <CheckCircle className="w-8 h-8 text-green-600 opacity-20" />
-          </div>
-        </div>
+                  : 0
+              ),
+            },
+          ]}
+        />
       </div>
 
-      {/* Filters & Controls */}
-      <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-slate-600" />
-            <span className="text-sm font-medium text-slate-700">Filters:</span>
-          </div>
-          <button
-            onClick={exportToCSV}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition text-sm font-medium"
-          >
-            <Download className="w-4 h-4" />
-            Export CSV
-          </button>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-4">
-          {/* Status Filter */}
-          <div className="flex-1">
-            <label className="text-sm font-medium text-slate-700 mb-2 block">
-              Status
-            </label>
-            <select
-              value={filterStatus}
-              onChange={(e) =>
-                setFilterStatus(e.target.value as 'all' | 'unreturned' | 'returned')
-              }
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="all">All</option>
-              <option value="returned">Returned</option>
-              <option value="unreturned">Unreturned</option>
-            </select>
-          </div>
-
-          {/* Search */}
-          <div className="flex-1">
-            <label className="text-sm font-medium text-slate-700 mb-2 block">
-              Search
-            </label>
-            <input
-              type="text"
-              placeholder="Participant or item name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+      {/* One row, and the same chips the inventory tab filters with — a labelled
+          select stacked over a labelled search was two rows of chrome around two
+          controls, and the counts were nowhere. */}
+      <div className="rounded-lg border border-slate-200 bg-card p-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap gap-1.5">
+            <FilterChip
+              label="All"
+              count={history.length}
+              active={filterStatus === 'all'}
+              onClick={() => setFilterStatus('all')}
             />
+            <FilterChip
+              label="Returned"
+              count={history.length - unreturnedTotal}
+              dot="bg-emerald-500"
+              active={filterStatus === 'returned'}
+              onClick={() => setFilterStatus('returned')}
+            />
+            <FilterChip
+              label="Unreturned"
+              count={unreturnedTotal}
+              dot="bg-amber-500"
+              active={filterStatus === 'unreturned'}
+              onClick={() => setFilterStatus('unreturned')}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Participant or item name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-card py-2 pl-9 pr-3 text-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+            <button
+              onClick={exportToCSV}
+              className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
+            >
+              <Download className="h-4 w-4" />
+              Export CSV
+            </button>
           </div>
         </div>
       </div>
@@ -501,7 +479,7 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
           <div className="text-slate-600">Loading history...</div>
         </div>
       ) : filteredHistory.length === 0 ? (
-        <div className="bg-white rounded-lg border border-slate-200 p-8 text-center">
+        <div className="bg-card rounded-lg border border-slate-200 p-8 text-center">
           <Package className="w-12 h-12 text-slate-300 mx-auto mb-4" />
           <p className="text-slate-600 font-medium">No records found</p>
           <p className="text-sm text-slate-500 mt-1">
@@ -511,11 +489,13 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-slate-200">
+        // The panel chrome is desktop-only: on mobile the cards carry their own
+        // borders, and wrapping them in a second bordered box would frame a frame.
+        <div className="md:overflow-hidden md:rounded-lg md:border md:border-slate-200 md:bg-card">
           {/* Bulk action bar — only present once something is selected, so the
               table keeps its full width in the common read-only case. */}
           {canReturn && selectedIds.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100 bg-indigo-50 px-4 py-3">
+            <div className="mb-2.5 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-indigo-50 px-4 py-3 md:mb-0 md:rounded-none md:border-b md:border-indigo-100">
               <p className="text-sm font-medium text-indigo-900">
                 {selectedIds.length} {selectedIds.length === 1 ? 'item' : 'items'} selected
               </p>
@@ -523,7 +503,7 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
                 <button
                   type="button"
                   onClick={() => setSelectedIds([])}
-                  className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-slate-800"
+                  className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-card hover:text-slate-800"
                 >
                   <X className="h-4 w-4" />
                   Clear
@@ -542,7 +522,41 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
             </div>
           )}
 
-          <div className="overflow-x-auto">
+          {/* Eight columns do not survive a 375px screen: scrolling right to see
+              whether something came back takes the participant's name off the
+              edge, so every row costs a scroll out and back. Below md the same
+              records render as cards, matching the audit log and user list. */}
+          <div className="space-y-2.5 md:hidden">
+            {canReturn && returnableRows.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleAllReturnable}
+                className="flex w-full items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+              >
+                <input
+                  type="checkbox"
+                  readOnly
+                  tabIndex={-1}
+                  checked={allReturnableSelected}
+                  className="pointer-events-none h-4 w-4 rounded border-slate-300 text-indigo-600"
+                />
+                {allReturnableSelected ? 'Clear selection' : `Select all ${returnableRows.length} unreturned`}
+              </button>
+            )}
+
+            {filteredHistory.map((record) => (
+              <HistoryCard
+                key={record.borrow_id}
+                record={record}
+                canReturn={canReturn}
+                selected={selectedSet.has(record.borrow_id)}
+                onToggle={() => toggleRow(record.borrow_id)}
+                onReturn={() => setPendingReturn([record])}
+              />
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
@@ -558,26 +572,26 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
                     />
                   </th>
                 )}
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">
+                <th className={`px-4 py-3 text-left ${MICRO}`}>
                   Participant
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">
+                <th className={`px-4 py-3 text-left ${MICRO}`}>
                   Item
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">
+                <th className={`px-4 py-3 text-left ${MICRO}`}>
                   Borrowed
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">
+                <th className={`px-4 py-3 text-left ${MICRO}`}>
                   Returned
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">
+                <th className={`px-4 py-3 text-left ${MICRO}`}>
                   Duration
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700">
+                <th className={`px-4 py-3 text-center ${MICRO}`}>
                   Status
                 </th>
                 {canReturn && (
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">
+                  <th className={`px-4 py-3 text-right ${MICRO}`}>
                     Action
                   </th>
                 )}
@@ -599,32 +613,34 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
                       )}
                     </td>
                   )}
-                  <td className="px-4 py-3 text-sm text-slate-900 font-medium">
+                  <td className="px-4 py-3 text-sm font-medium text-slate-900">
                     {record.participant_name}
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-700">
+                  <td className="px-4 py-3 text-sm text-slate-600">
                     {record.item_name}
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-600">
+                  {/* Timestamps and durations are figures: mono and tabular, so
+                      the columns line up digit for digit down the page. */}
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs tabular-nums text-slate-600">
                     {format(new Date(record.borrowed_at), 'MMM dd, HH:mm')}
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-600">
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs tabular-nums text-slate-600">
                     {record.returned_at
                       ? format(new Date(record.returned_at), 'MMM dd, HH:mm')
-                      : '—'}
+                      : <span className="text-slate-300">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-600">
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs tabular-nums text-slate-600">
                     {formatBorrowDuration(record.duration_minutes)}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {record.status === 'Returned' ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded text-xs font-medium">
-                        <CheckCircle className="w-3 h-3" />
+                      <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
+                        <CheckCircle className="h-3 w-3" />
                         Returned
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 rounded text-xs font-medium">
-                        <AlertCircle className="w-3 h-3" />
+                      <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
+                        <AlertCircle className="h-3 w-3" />
                         Unreturned
                       </span>
                     )}
@@ -651,19 +667,23 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
         </div>
       )}
 
-      {/* Summary */}
+      {/* A caption, not a panel. The figures already sit in the ledger above, so
+          this only has to say how much of the set the filters are hiding — and
+          blue appeared nowhere else in this palette and is not themed. */}
       {filteredHistory.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-900">
-            <strong>Showing {filteredHistory.length}</strong> of{' '}
-            <strong>{history.length}</strong> total records
-            {unreturned > 0 && (
-              <>
-                • <strong>{unreturned} unreturned items</strong> require follow-up
-              </>
-            )}
-          </p>
-        </div>
+        <p className="flex flex-wrap items-center gap-x-2 px-1 text-xs text-slate-500">
+          <span className="tabular-nums">
+            Showing {filteredHistory.length} of {history.length} records
+          </span>
+          {unreturned > 0 && (
+            <>
+              <span className="text-slate-300">·</span>
+              <span className="font-semibold tabular-nums text-amber-700">
+                {unreturned} still out
+              </span>
+            </>
+          )}
+        </p>
       )}
 
       <ConfirmDialog
@@ -694,5 +714,106 @@ const BorrowHistoryPage: React.FC<BorrowHistoryPageProps> = ({ eventId: initialE
     </div>
   );
 };
+
+// ─── Mobile record card ─────────────────────────────────────────────────────
+
+interface HistoryCardProps {
+  record: BorrowHistory;
+  canReturn: boolean;
+  selected: boolean;
+  onToggle: () => void;
+  onReturn: () => void;
+}
+
+/**
+ * One borrow record on a narrow screen.
+ *
+ * Participant leads and item follows, the same order the table's columns run in,
+ * so turning the phone sideways does not reshuffle what the eye is hunting for.
+ * The three time fields become label/value pairs rather than a repeated header
+ * row — with only three of them, a header costs more than it explains.
+ */
+const HistoryCard: React.FC<HistoryCardProps> = ({
+  record,
+  canReturn,
+  selected,
+  onToggle,
+  onReturn,
+}) => {
+  const isOut = record.status === 'Unreturned';
+  const selectable = canReturn && isOut;
+
+  return (
+    <div
+      className={`rounded-lg border p-3.5 transition-colors ${
+        selected ? 'border-indigo-300 bg-indigo-50/40' : 'border-slate-200 bg-card'
+      }`}
+    >
+      <div className="flex items-start gap-2.5">
+        {selectable && (
+          <input
+            type="checkbox"
+            aria-label={`Select ${record.item_name} borrowed by ${record.participant_name}`}
+            checked={selected}
+            onChange={onToggle}
+            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-slate-900">{record.participant_name}</p>
+          <p className="truncate text-xs text-slate-600">{record.item_name}</p>
+        </div>
+        {isOut ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
+            <AlertCircle className="h-3 w-3" />
+            Unreturned
+          </span>
+        ) : (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
+            <CheckCircle className="h-3 w-3" />
+            Returned
+          </span>
+        )}
+      </div>
+
+      <dl className="mt-3 space-y-1">
+        <CardField label="Borrowed" value={format(new Date(record.borrowed_at), 'MMM dd, HH:mm')} />
+        <CardField
+          label="Returned"
+          value={record.returned_at ? format(new Date(record.returned_at), 'MMM dd, HH:mm') : '—'}
+          muted={!record.returned_at}
+        />
+        <CardField label="Held" value={formatBorrowDuration(record.duration_minutes)} />
+      </dl>
+
+      {canReturn && isOut && (
+        <button
+          type="button"
+          onClick={onReturn}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 py-2 text-xs font-medium text-slate-700 transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700"
+        >
+          <Undo2 className="h-3.5 w-3.5" />
+          Return
+        </button>
+      )}
+    </div>
+  );
+};
+
+/** Label/value pair. The fixed label column keeps the figures aligned. */
+const CardField: React.FC<{ label: string; value: string; muted?: boolean }> = ({
+  label,
+  value,
+  muted = false,
+}) => (
+  <div className="flex items-baseline gap-3">
+    <dt className={`w-16 shrink-0 ${MICRO}`}>{label}</dt>
+    <dd
+      className={`font-mono text-xs tabular-nums ${muted ? 'text-slate-300' : 'text-slate-600'}`}
+    >
+      {value}
+    </dd>
+  </div>
+);
 
 export default BorrowHistoryPage;

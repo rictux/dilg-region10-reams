@@ -154,6 +154,10 @@
             sans: ['Inter', 'system-ui', 'sans-serif'],
             serif: ['ui-serif', 'Georgia', 'Cambria', '"Times New Roman"', 'Times', 'serif'],
             mono: ['"DM Mono"', '"Fira Code"', 'monospace'],
+            // Archivo is already loaded above and carries real 700-900 weights,
+            // which Inter (300-600) does not — so any figure meant to read as
+            // heavy uses `font-display` rather than a browser-synthesised bold.
+            display: ['Archivo', 'Inter', 'system-ui', 'sans-serif'],
           },
           extend: {
             colors: {
@@ -216,6 +220,21 @@
           font-family: 'Inter', system-ui, sans-serif;
           background-color: rgb(var(--neu-50));
           color: rgb(var(--neu-900));
+      }
+
+      /* Honour the OS "reduce motion" setting. Spinners are deliberately exempt:
+         they are the only signal that a slow request is still running, and every
+         one of them is paired with text, so freezing them would remove feedback
+         rather than calm it. */
+      @media (prefers-reduced-motion: reduce) {
+          *:not(.animate-spin),
+          *:not(.animate-spin)::before,
+          *:not(.animate-spin)::after {
+              animation-duration: 0.01ms !important;
+              animation-iteration-count: 1 !important;
+              transition-duration: 0.01ms !important;
+              scroll-behavior: auto !important;
+          }
       }
 
       :root[data-mode="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),

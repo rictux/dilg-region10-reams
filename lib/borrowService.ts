@@ -94,6 +94,11 @@ export interface ParticipantBorrowHistory {
   status: 'Unreturned' | 'Returned';
 }
 
+/** How long an open loan has been running, in minutes, as of right now. */
+export function elapsedMinutes(since: string): number {
+  return Math.max(0, Math.floor((Date.now() - new Date(since).getTime()) / 60000));
+}
+
 /** "45m", "2h", "2h 15m" — the shared reading of a loan's length. */
 export function formatBorrowDuration(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;

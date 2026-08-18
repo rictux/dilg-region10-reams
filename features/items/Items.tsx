@@ -47,7 +47,7 @@ const Items: React.FC = () => {
   if (visibleTabs.length === 0) {
     return (
       <div className="p-6">
-        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
+        <div className="rounded-lg border border-slate-200 bg-card p-8 text-center">
           <Package className="mx-auto mb-4 h-12 w-12 text-slate-300" />
           <p className="font-medium text-slate-600">No access</p>
           <p className="mt-1 text-sm text-slate-500">
@@ -78,7 +78,7 @@ const Items: React.FC = () => {
                   type="button"
                   onClick={() => selectTab(tab.key)}
                   aria-current={isActive ? 'page' : undefined}
-                  className={`flex items-center gap-2 border-b-2 px-1 pb-3 text-sm font-semibold transition-colors ${
+                  className={`flex items-center gap-2 border-b-2 px-1 pb-3 text-xs font-semibold uppercase tracking-[0.08em] transition-colors ${
                     isActive
                       ? 'border-indigo-600 text-indigo-700'
                       : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'

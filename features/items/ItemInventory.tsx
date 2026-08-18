@@ -7,8 +7,10 @@ import {
   ActiveLoan,
   ItemBorrowHistory,
   formatBorrowDuration,
+  elapsedMinutes,
 } from '../../lib/borrowService';
 import { useAuth } from '../../contexts/AuthContext';
+import { FilterChip, LedgerStrip, MICRO } from './itemsUi';
 import { format } from 'date-fns';
 import {
   Plus,
@@ -50,6 +52,19 @@ const STATE_CHIP: Record<DisplayState, string> = {
   Damaged: 'bg-red-50 text-red-700 border-red-200',
   Archived: 'bg-slate-100 text-slate-600 border-slate-200',
 };
+
+/**
+ * The custody ledger's four states, in the order stock moves through them.
+ * Amber is load-bearing and appears nowhere else on the page: it means an item
+ * is in someone's hands right now. It is also one of the few hues the theme
+ * system does not remap, so that meaning survives every colour template.
+ */
+const CUSTODY_SEGMENTS: { key: DisplayState; label: string; bar: string; dot: string }[] = [
+  { key: 'Available', label: 'On hand', bar: 'bg-emerald-500', dot: 'bg-emerald-500' },
+  { key: 'Borrowed', label: 'Out', bar: 'bg-amber-500', dot: 'bg-amber-500' },
+  { key: 'Damaged', label: 'Damaged', bar: 'bg-red-500', dot: 'bg-red-500' },
+  { key: 'Archived', label: 'Archived', bar: 'bg-slate-300', dot: 'bg-slate-300' },
+];
 
 interface ItemFormState {
   item_code: string;
@@ -259,7 +274,7 @@ const ItemInventory: React.FC = () => {
 
   if (!user?.office_id) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
+      <div className="rounded-lg border border-slate-200 bg-card p-8 text-center">
         <Package className="mx-auto mb-4 h-12 w-12 text-slate-300" />
         <p className="font-medium text-slate-600">No office assigned</p>
         <p className="mt-1 text-sm text-slate-500">
@@ -271,47 +286,14 @@ const ItemInventory: React.FC = () => {
 
   return (
     <div className="space-y-5">
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="relative w-full lg:max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search name, code, or description..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 bg-card py-2 pl-9 pr-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          />
-        </div>
-
-        <div className="flex flex-1 flex-wrap items-center gap-1.5">
-          {(['all', 'Available', 'Borrowed', 'Damaged', 'Archived'] as StatusFilter[]).map((status) => (
-            <button
-              key={status}
-              type="button"
-              onClick={() => setStatusFilter(status)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                statusFilter === status
-                  ? 'border-indigo-600 bg-indigo-600 text-white'
-                  : 'border-slate-200 bg-card text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-              }`}
-            >
-              {status === 'all' ? 'All' : status}
-              <span className={statusFilter === status ? 'ml-1.5 text-indigo-200' : 'ml-1.5 text-slate-400'}>
-                {counts[status === 'all' ? 'all' : status]}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <button
-          onClick={openAdd}
-          className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white transition hover:bg-indigo-700"
-        >
-          <Plus className="h-4 w-4" />
-          Add Item
-        </button>
-      </div>
+      <CustodyStrip
+        counts={counts}
+        statusFilter={statusFilter}
+        onFilter={setStatusFilter}
+        searchTerm={searchTerm}
+        onSearch={setSearchTerm}
+        onAdd={openAdd}
+      />
 
       {/* List */}
       {loading ? (
@@ -320,7 +302,7 @@ const ItemInventory: React.FC = () => {
           Loading items...
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
+        <div className="rounded-lg border border-slate-200 bg-card p-8 text-center">
           <Package className="mx-auto mb-4 h-12 w-12 text-slate-300" />
           <p className="font-medium text-slate-600">No items yet</p>
           <p className="mt-1 text-sm text-slate-500">
@@ -328,7 +310,7 @@ const ItemInventory: React.FC = () => {
           </p>
         </div>
       ) : visibleItems.length === 0 ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
+        <div className="rounded-lg border border-slate-200 bg-card p-8 text-center">
           <p className="font-medium text-slate-600">No matching items</p>
           <p className="mt-1 text-sm text-slate-500">Try a different search or filter.</p>
         </div>
@@ -353,7 +335,11 @@ const ItemInventory: React.FC = () => {
                 }
               }}
               aria-label={`View borrow history for ${item.item_name}`}
-              className="flex cursor-pointer flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:border-indigo-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              className={`flex cursor-pointer flex-col rounded-xl border bg-card p-4 shadow-sm transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                loan
+                  ? 'border-amber-200 hover:shadow-md'
+                  : 'border-slate-200 hover:border-indigo-300 hover:shadow-md'
+              } ${state === 'Archived' ? 'opacity-75' : ''}`}
             >
               <div className="flex items-start gap-3">
                 {/* The thumbnail is the way into the label from the grid. Every
@@ -371,18 +357,35 @@ const ItemInventory: React.FC = () => {
                   <ItemQrCode value={item.item_code} size={56} />
                 </button>
 
+                {/* The code leads, not the name: it is what is printed on the
+                    label, what the scanner reads, and what staff say out loud.
+                    The name is a description, and descriptions repeat. */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="truncate font-semibold text-slate-900">{item.item_name}</h3>
-                    <span
-                      className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${STATE_CHIP[state]}`}
-                    >
-                      {state}
-                    </span>
+                    <h3 className="truncate font-mono text-[15px] font-medium tracking-tight text-slate-900">
+                      {item.item_code}
+                    </h3>
+                    {/* On hand carries no badge at all. Most of the kit is on
+                        hand most of the time, and a badge on every card is a
+                        badge that says nothing — the eye should land on the
+                        exceptions. Only "Out" gets a filled chip. */}
+                    {state !== 'Available' && (
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${
+                          state === 'Borrowed'
+                            ? 'bg-amber-700 text-white'
+                            : `border ${STATE_CHIP[state]}`
+                        }`}
+                      >
+                        {state === 'Borrowed' ? 'Out' : state}
+                      </span>
+                    )}
                   </div>
-                  <p className="mt-0.5 font-mono text-xs text-slate-500">{item.item_code}</p>
+                  <p className="mt-1 truncate text-sm font-medium text-slate-600">
+                    {item.item_name}
+                  </p>
                   {item.item_category && (
-                    <p className="mt-1 text-xs text-slate-400">{item.item_category}</p>
+                    <p className={`mt-1.5 ${MICRO}`}>{item.item_category}</p>
                   )}
                 </div>
               </div>
@@ -392,21 +395,32 @@ const ItemInventory: React.FC = () => {
                   different heights across the row. */}
               <div className="flex-1">
                 {item.item_description && (
-                  <p className="mt-3 line-clamp-2 text-sm text-slate-600">{item.item_description}</p>
+                  <p className="mt-3 line-clamp-2 text-sm text-slate-500">{item.item_description}</p>
                 )}
 
-                {loan && (
-                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                    <UserCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-amber-900">
-                        {loan.participant_name}
-                      </p>
-                      <p className="text-xs text-amber-700">
-                        since {format(new Date(loan.borrowed_at), 'MMM d, h:mm a')}
-                      </p>
+                {loan ? (
+                  <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2.5">
+                    <div className="flex items-start gap-2">
+                      <UserCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-amber-900">
+                          {loan.participant_name}
+                        </p>
+                        <p className="mt-0.5 font-mono text-xs tabular-nums text-amber-700">
+                          {format(new Date(loan.borrowed_at), 'MMM d, h:mm a')}
+                          <span className="mx-1.5 text-amber-400">·</span>
+                          {formatBorrowDuration(elapsedMinutes(loan.borrowed_at))}
+                        </p>
+                      </div>
                     </div>
                   </div>
+                ) : (
+                  state === 'Available' && (
+                    <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-slate-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      On hand
+                    </p>
+                  )
                 )}
               </div>
 
@@ -548,11 +562,11 @@ const ItemHistoryModal: React.FC<{ item: BorrowableItem; onClose: () => void }> 
         aria-modal="true"
         aria-label={`Borrow history for ${item.item_name}`}
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
-        className="flex max-h-[92vh] w-full max-w-[92rem] flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200"
+        className="flex max-h-[92vh] w-full max-w-[92rem] flex-col overflow-hidden rounded-2xl border border-slate-100 bg-card shadow-2xl animate-in zoom-in-95 duration-200"
       >
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-slate-50 px-5 py-4">
           <div className="min-w-0">
-            <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
+            <h2 className="flex items-center gap-2 font-display text-lg font-bold text-slate-900">
               <History className="h-4 w-4 shrink-0 text-indigo-600" />
               <span className="truncate">{item.item_name}</span>
             </h2>
@@ -580,28 +594,14 @@ const ItemHistoryModal: React.FC<{ item: BorrowableItem; onClose: () => void }> 
 
           <div className="flex min-h-0 flex-1 flex-col">
             {!loading && !failed && records.length > 0 && (
-              <div className="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100">
-                <div className="px-5 py-3">
-                  <p className="text-[11px] font-medium uppercase text-slate-500">No. of Records</p>
-                  <p className="mt-0.5 text-xl font-bold text-slate-900">{records.length}</p>
-                </div>
-                <div className="px-5 py-3">
-                  <p className="text-[11px] font-medium uppercase text-slate-500">Out Now</p>
-                  <p
-                    className={`mt-0.5 text-xl font-bold ${
-                      openLoans > 0 ? 'text-amber-600' : 'text-slate-900'
-                    }`}
-                  >
-                    {openLoans}
-                  </p>
-                </div>
-                <div className="px-5 py-3">
-                  <p className="text-[11px] font-medium uppercase text-slate-500">Total Time Out</p>
-                  <p className="mt-0.5 text-xl font-bold text-slate-900">
-                    {formatBorrowDuration(totalMinutes)}
-                  </p>
-                </div>
-              </div>
+              <LedgerStrip
+                className="border-b border-slate-100"
+                figures={[
+                  { label: 'No. of Records', value: records.length },
+                  { label: 'Out now', value: openLoans, alert: openLoans > 0 },
+                  { label: 'Total time out', value: formatBorrowDuration(totalMinutes) },
+                ]}
+              />
             )}
 
             {/* On a narrow screen the whole body scrolls as one; from lg the history
@@ -686,7 +686,7 @@ const ItemHistoryModal: React.FC<{ item: BorrowableItem; onClose: () => void }> 
                         </td>
                         <td className="whitespace-nowrap px-5 py-3 text-center">
                           {record.status === 'Returned' ? (
-                            <span className="inline-flex items-center gap-1 rounded bg-green-50 px-2 py-1 text-xs font-medium text-green-700">
+                            <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
                               <CheckCircle className="h-3 w-3" />
                               Returned
                             </span>
@@ -710,6 +710,120 @@ const ItemHistoryModal: React.FC<{ item: BorrowableItem; onClose: () => void }> 
   );
 };
 
+// ─── Custody strip ──────────────────────────────────────────────────────────
+
+interface CustodyStripProps {
+  counts: Record<'all' | DisplayState, number>;
+  statusFilter: StatusFilter;
+  onFilter: (status: StatusFilter) => void;
+  searchTerm: string;
+  onSearch: (term: string) => void;
+  onAdd: () => void;
+}
+
+/**
+ * The office's whole kit as one bar: how much is on hand, how much is in
+ * someone else's hands, how much is out of service.
+ *
+ * It answers the only question this page exists for, and it is also the filter —
+ * the tally and the control are the same object rather than a count row above a
+ * chip row. The headline figure is items *out*, not items owned: a total is a
+ * fact about the cupboard, while what is missing from it is the thing anyone
+ * standing at the desk actually needs.
+ */
+const CustodyStrip: React.FC<CustodyStripProps> = ({
+  counts,
+  statusFilter,
+  onFilter,
+  searchTerm,
+  onSearch,
+  onAdd,
+}) => {
+  const out = counts.Borrowed;
+  const tracked = CUSTODY_SEGMENTS.reduce((sum, s) => sum + counts[s.key], 0);
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-card p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex items-baseline gap-3">
+          <span
+            className={`font-display text-[2.75rem] font-extrabold leading-none tabular-nums ${
+              out > 0 ? 'text-amber-600' : 'text-slate-500'
+            }`}
+          >
+            {out}
+          </span>
+          <div>
+            <p className={MICRO}>{out === 1 ? 'Item out' : 'Items out'}</p>
+            <p className="mt-0.5 text-xs tabular-nums text-slate-500">
+              of {counts.all} tracked
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search name, code, or holder..."
+              value={searchTerm}
+              onChange={(e) => onSearch(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-card py-2 pl-9 pr-3 text-sm shadow-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <button
+            onClick={onAdd}
+            className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          >
+            <Plus className="h-4 w-4" />
+            Add Item
+          </button>
+        </div>
+      </div>
+
+      {/* Proportional stock bar. Segments are sized by count with a floor, so a
+          single damaged item stays visible against nineteen that are fine. */}
+      {tracked > 0 && (
+        <div
+          role="img"
+          aria-label={CUSTODY_SEGMENTS.filter((s) => counts[s.key] > 0)
+            .map((s) => `${counts[s.key]} ${s.label.toLowerCase()}`)
+            .join(', ')}
+          className="mt-4 flex h-1.5 gap-px overflow-hidden rounded-full bg-slate-100"
+        >
+          {CUSTODY_SEGMENTS.filter((s) => counts[s.key] > 0).map((s) => (
+            <div
+              key={s.key}
+              className={s.bar}
+              style={{ flexGrow: counts[s.key], minWidth: '0.375rem' }}
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        <FilterChip
+          label="All"
+          count={counts.all}
+          active={statusFilter === 'all'}
+          onClick={() => onFilter('all')}
+        />
+        {CUSTODY_SEGMENTS.map((s) => (
+          <FilterChip
+            key={s.key}
+            label={s.label}
+            count={counts[s.key]}
+            dot={s.dot}
+            active={statusFilter === s.key}
+            onClick={() => onFilter(s.key)}
+          />
+        ))}
+      </div>
+    </section>
+  );
+};
+
 // ─── Add / Edit form ────────────────────────────────────────────────────────
 
 interface ItemFormModalProps {
@@ -730,9 +844,9 @@ const ItemFormModal: React.FC<ItemFormModalProps> = ({
   onClose,
 }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-    <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+    <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-100 bg-card shadow-2xl animate-in zoom-in-95 duration-200">
       <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-4">
-        <h2 className="text-lg font-bold text-slate-900">
+        <h2 className="font-display text-lg font-bold text-slate-900">
           {mode === 'add' ? 'Add Item' : 'Edit Item'}
         </h2>
         <button
@@ -920,9 +1034,9 @@ const QrLabelModal: React.FC<{ item: BorrowableItem; onClose: () => void }> = ({
   onClose,
 }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-    <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+    <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-slate-100 bg-card shadow-2xl animate-in zoom-in-95 duration-200">
       <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-4">
-        <h2 className="text-lg font-bold text-slate-900">QR Label</h2>
+        <h2 className="font-display text-lg font-bold text-slate-900">QR Label</h2>
         <button
           type="button"
           onClick={onClose}
