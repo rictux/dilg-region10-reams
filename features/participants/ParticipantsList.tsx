@@ -163,6 +163,7 @@ const AttendanceList: React.FC = () => {
       office: '',
       mobile_no: '',
       position: '',
+      prc_license_no: '',
       gender: '',
       age_group: '18-24',
       pwd: 'No',
@@ -904,6 +905,7 @@ const AttendanceList: React.FC = () => {
           office: p.office || '',
           mobile_no: p.mobile_no || '',
           position: p.position || '',
+          prc_license_no: p.prc_license_no || '',
           gender: p.gender || '',
           age_group: p.age_group || '18-24',
           pwd: p.pwd || 'No',
@@ -1001,6 +1003,11 @@ const AttendanceList: React.FC = () => {
           return;
       }
 
+      if (newParticipant.prc_license_no && !/^[0-9]{1,20}$/.test(newParticipant.prc_license_no)) {
+          toast.error("PRC License No. must contain 1 to 20 digits only.");
+          return;
+      }
+
       const suffixTrimmed = newParticipant.suffix.trim().toLowerCase();
       if (suffixTrimmed && ['none', 'n/a', 'na'].includes(suffixTrimmed)) {
           toast.error("Not a valid Suffix.");
@@ -1049,6 +1056,7 @@ const AttendanceList: React.FC = () => {
                 location_id: finalLocationId,
                 mobile_no: newParticipant.mobile_no || null,
                 position: newParticipant.position || 'N/A',
+                prc_license_no: newParticipant.prc_license_no.trim() || null,
                 gender: newParticipant.gender,
                 age_group: newParticipant.age_group,
                 pwd: newParticipant.pwd,
@@ -1088,6 +1096,7 @@ const AttendanceList: React.FC = () => {
                         location_id: finalLocationId,
                         mobile_no: newParticipant.mobile_no || null,
                         position: newParticipant.position || 'N/A',
+                        prc_license_no: newParticipant.prc_license_no.trim() || null,
                         gender: newParticipant.gender,
                         age_group: newParticipant.age_group,
                         pwd: newParticipant.pwd,
@@ -1119,6 +1128,7 @@ const AttendanceList: React.FC = () => {
                         office: finalOfficeName,
                         location_id: finalLocationId,
                         position: newParticipant.position || 'N/A',
+                        prc_license_no: newParticipant.prc_license_no.trim() || null,
                         mobile_no: newParticipant.mobile_no || null,
                         age_group: newParticipant.age_group,
                         pwd: newParticipant.pwd,
@@ -1142,6 +1152,7 @@ const AttendanceList: React.FC = () => {
                     office: finalOfficeName,
                     location_id: finalLocationId,
                     position: newParticipant.position || 'N/A',
+                    prc_license_no: newParticipant.prc_license_no.trim() || null,
                     gender: newParticipant.gender,
                     mobile_no: newParticipant.mobile_no || null,
                     age_group: newParticipant.age_group,
@@ -1252,6 +1263,7 @@ const AttendanceList: React.FC = () => {
               office: '',
               mobile_no: '',
               position: '',
+              prc_license_no: '',
               gender: '',
               age_group: '18-24',
               pwd: 'No',
@@ -1900,6 +1912,31 @@ const AttendanceList: React.FC = () => {
                                     value={newParticipant.position}
                                     onChange={e => setNewParticipant({...newParticipant, position: e.target.value})}
                                 />
+                            </div>
+
+                            <div>
+                                <label htmlFor="participant-list-prc-license" className="block text-sm font-medium text-slate-700 mb-1">
+                                    PRC License No. <span className="text-xs font-normal text-slate-500">(Optional)</span>
+                                </label>
+                                <input
+                                    id="participant-list-prc-license"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    maxLength={20}
+                                    autoComplete="off"
+                                    placeholder="e.g. 0132655"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                    value={newParticipant.prc_license_no}
+                                    onChange={e => setNewParticipant({
+                                        ...newParticipant,
+                                        prc_license_no: e.target.value.replace(/[^0-9]/g, '')
+                                    })}
+                                    aria-describedby="participant-list-prc-license-help"
+                                />
+                                <p id="participant-list-prc-license-help" className="mt-1 text-xs text-slate-500">
+                                    Numbers only. Leading zeroes are preserved.
+                                </p>
                             </div>
                     
                             <div className="pt-1">

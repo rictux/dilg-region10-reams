@@ -193,6 +193,7 @@ CREATE TABLE IF NOT EXISTS participants (
     mobile_no TEXT,
     gender TEXT,
     position TEXT,
+    prc_license_no TEXT CHECK (prc_license_no IS NULL OR prc_license_no ~ '^[0-9]{1,20}$'),
     office TEXT, -- Text representation of office/LGU if not linked strictly
     location_id BIGINT REFERENCES ref_locations(location_id) ON DELETE SET NULL,
     age_group TEXT,

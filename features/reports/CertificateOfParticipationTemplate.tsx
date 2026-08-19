@@ -57,7 +57,7 @@ type CoPTemplateProps = {
   /** When set (> 0), appends "with a credit of <word> (<n>) training hours." to the body. */
   creditHours?: number | null;
   includeSignature?: boolean;
-  /** Adds a blank "PRC License No:" line under the participant's name. */
+  /** Adds the participant's PRC License No. under their name, with a blank fallback. */
   showPrcLicenseNo?: boolean;
   /** Accreditation line shown above the primary signatory. */
   accreditationMode?: CoPAccreditationMode;
@@ -310,6 +310,9 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
 
   // Auto-shrink name to fit within ~70% of the certificate width on one line
   const fullName      = formatParticipantOfficialName(participantRecord.participant);
+  const prcLicenseLine = participantRecord.participant.prc_license_no?.trim()
+    ? `PRC License No: ${participantRecord.participant.prc_license_no.trim()}`
+    : PRC_LICENSE_LINE;
   const maxNameWidth  = widthPx * 0.70;
   const baseNameSz    = s(32);
   const minNameSz     = s(17);
@@ -629,7 +632,7 @@ const CertificateOfParticipationCard: React.FC<CoPTemplateProps> = ({
               letterSpacing: '0.04em',
               whiteSpace: 'nowrap',
             }}>
-              {PRC_LICENSE_LINE}
+              {prcLicenseLine}
             </p>
           )}
 

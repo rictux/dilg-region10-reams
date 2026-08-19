@@ -22,7 +22,6 @@ import CertificateOfParticipationCard, {
   CoPTitle,
   DEFAULT_COP_BODY_TEXT,
   DEFAULT_PRC_ACCREDITATION_SUFFIX,
-  PRC_LICENSE_LINE,
   formatAttendanceDates,
   getCoP_HeightPx,
   getCoP_WidthPx,
@@ -519,7 +518,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               <span>
                 <span className="block font-semibold">Show “PRC License No.” line</span>
                 <span className="block text-xs text-[#9A9890]">
-                  Prints <span className="font-medium text-[#7C7A72]">{PRC_LICENSE_LINE}</span> under the participant’s name.
+                  Prints the participant’s saved PRC License No. under their name. Missing values remain blank for manual entry.
                 </span>
               </span>
               <input

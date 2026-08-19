@@ -179,6 +179,7 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
   email: 'Email',
   mobile_no: 'Mobile No.',
   position: 'Position',
+  prc_license_no: 'PRC License No.',
   office: 'Office',
   location_id: 'Location',
   gender: 'Gender',

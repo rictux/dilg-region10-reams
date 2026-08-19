@@ -99,6 +99,7 @@ export interface Participant {
   suffix?: string | null;
   gender?: string | null;
   position?: string | null;
+  prc_license_no?: string | null;
   office?: string | null;
   email?: string | null;
   created_at?: string;

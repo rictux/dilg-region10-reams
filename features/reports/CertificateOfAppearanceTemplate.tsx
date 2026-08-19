@@ -14,6 +14,21 @@ export type CertificateParticipantRecord = {
   needs_accommodation: boolean;
   date_accommodation: string[];
   log_dates: string[];
+  attendance_logs?: Array<{
+    attendance_date: string;
+    scan_time: string;
+  }>;
+};
+
+export type FoodServingTimeSettings = {
+  breakfast: {
+    enabled: boolean;
+    until: string;
+  };
+  dinner: {
+    enabled: boolean;
+    from: string;
+  };
 };
 
 export type CertificateSignatory = {
@@ -40,6 +55,7 @@ type CertificateCardProps = {
   signatory: CertificateSignatory;
   dateString: string;
   eventFoodInclusionMap: Record<string, string[]>;
+  foodServingTimeSettings?: FoodServingTimeSettings;
   certificateSerialNumber?: string | null;
   templateVariant?: CertificateTemplateVariant | null;
   signatureAdjustment?: Partial<SignatureAdjustment> | null;
@@ -114,6 +130,64 @@ const formatFoodInclusion = (meals: string[]) => {
   return meals.length > 0 ? meals.join(', ') : '-';
 };
 
+const MANILA_TIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Manila',
+  hourCycle: 'h23',
+  hour: '2-digit',
+  minute: '2-digit'
+});
+
+const parseTimeInputToMinutes = (value: string) => {
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+
+  return (hours * 60) + minutes;
+};
+
+const getManilaScanTimeMinutes = (scanTime: string) => {
+  const date = new Date(scanTime);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const parts = MANILA_TIME_FORMATTER.formatToParts(date);
+  const hours = Number(parts.find((part) => part.type === 'hour')?.value);
+  const minutes = Number(parts.find((part) => part.type === 'minute')?.value);
+
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  return (hours * 60) + minutes;
+};
+
+const applyFoodServingTimeSettings = (
+  meals: string[],
+  date: string,
+  participantRecord: CertificateParticipantRecord,
+  settings?: FoodServingTimeSettings
+) => {
+  if (!settings?.breakfast.enabled && !settings?.dinner.enabled) return meals;
+
+  const scanMinutes = (participantRecord.attendance_logs || [])
+    .filter((log) => log.attendance_date === date)
+    .map((log) => getManilaScanTimeMinutes(log.scan_time))
+    .filter((minutes): minutes is number => minutes !== null);
+
+  return meals.filter((meal) => {
+    if (meal === 'Breakfast' && settings?.breakfast.enabled) {
+      const cutoff = parseTimeInputToMinutes(settings.breakfast.until);
+      return cutoff === null || scanMinutes.some((minutes) => minutes <= cutoff);
+    }
+
+    if (meal === 'Dinner' && settings?.dinner.enabled) {
+      const start = parseTimeInputToMinutes(settings.dinner.from);
+      return start === null || scanMinutes.some((minutes) => minutes >= start);
+    }
+
+    return true;
+  });
+};
+
 type CertificateTableRow = {
   key: string;
   label: string;
@@ -144,12 +218,18 @@ const buildCertificateTableRows = (
   event: Event,
   participantRecord: CertificateParticipantRecord,
   eventFoodInclusionMap: Record<string, string[]>,
-  eventAccommodationDates: Set<string>
+  eventAccommodationDates: Set<string>,
+  foodServingTimeSettings?: FoodServingTimeSettings
 ): CertificateTableRow[] => {
   const baseRows: CertificateTableRow[] = getParticipantDateRows(event, participantRecord).map((row) => ({
     key: row.key,
     label: row.label,
-    meals: eventFoodInclusionMap[row.key] || [],
+    meals: applyFoodServingTimeSettings(
+      eventFoodInclusionMap[row.key] || [],
+      row.key,
+      participantRecord,
+      foodServingTimeSettings
+    ),
     hasAccommodation:
       participantRecord.needs_accommodation &&
       participantRecord.date_accommodation
@@ -199,13 +279,20 @@ const CertificateOfAppearanceCard: React.FC<CertificateCardProps> = ({
   signatory,
   dateString,
   eventFoodInclusionMap,
+  foodServingTimeSettings,
   certificateSerialNumber,
   templateVariant,
   signatureAdjustment,
   showDivider = false
 }) => {
   const eventAccommodationDates = new Set(getEventAccommodationDates(event));
-  const tableRows = buildCertificateTableRows(event, participantRecord, eventFoodInclusionMap, eventAccommodationDates);
+  const tableRows = buildCertificateTableRows(
+    event,
+    participantRecord,
+    eventFoodInclusionMap,
+    eventAccommodationDates,
+    foodServingTimeSettings
+  );
   const tableRowCount = tableRows.length + 1;
   const layoutMode = getCertificateLayoutMode(tableRowCount);
   const isDenseLayout = layoutMode !== 'default';

@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { Event, Participant, RefLocation } from '../../types/database';
 import { DelegateChoice, delegateTypeFromChoice } from '../../lib/delegates';
 import QRCode from 'react-qr-code';
-import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock, Landmark, Download, Info, Gift, Star, UserCheck, Upload } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, User, Mail, Briefcase, Building, Loader2, Phone, Heart, Users, Home, AlertCircle, Lock, Landmark, Download, Info, Gift, Hash, Star, UserCheck, Upload } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import { toPng } from 'html-to-image';
 import { toast } from 'sonner';
@@ -75,6 +75,7 @@ const EventRegistration: React.FC = () => {
   const [applyingExistingRecord, setApplyingExistingRecord] = useState(false);
   const [revealEmail, setRevealEmail] = useState(false);
   const [revealMobile, setRevealMobile] = useState(false);
+  const [revealPrcLicense, setRevealPrcLicense] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
   const [showEmailInfo, setShowEmailInfo] = useState(false);
   
@@ -121,6 +122,7 @@ const EventRegistration: React.FC = () => {
     email: '',
     gender: '',
     position: '',
+    prc_license_no: '',
     office: '',
     mobile_no: '',
     age_group: '',
@@ -258,6 +260,12 @@ const EventRegistration: React.FC = () => {
     return `${value.slice(0, 2)}${stars}${value.slice(-3)}`;
   };
 
+  const maskPrcLicense = (value?: string | null) => {
+    if (!value) return '';
+    if (value.length <= 3) return '*'.repeat(value.length);
+    return `${'*'.repeat(value.length - 3)}${value.slice(-3)}`;
+  };
+
   const getParticipantDisplayName = (match: ParticipantMatch) => {
     const parts = [
       match.f_name || '',
@@ -338,6 +346,12 @@ const EventRegistration: React.FC = () => {
     if (normalizedEmail && !isValidEmailAddress(normalizedEmail)) {
       setEmailTouched(true);
       setError("Please enter a valid email address, or leave the email field blank.");
+      return null;
+    }
+
+    const normalizedPrcLicenseNo = formData.prc_license_no.trim();
+    if (normalizedPrcLicenseNo && !/^\d+$/.test(normalizedPrcLicenseNo)) {
+      setError("PRC License No. must contain numbers only.");
       return null;
     }
 
@@ -424,6 +438,7 @@ const EventRegistration: React.FC = () => {
       finalOfficeName,
       finalEmail: normalizedEmail || null,
       finalMobile: formData.mobile_no.trim() === '' ? null : formData.mobile_no.trim(),
+      finalPrcLicenseNo: normalizedPrcLicenseNo || null,
       normalizedAccommodationDates,
       normalizedGiveawaySelections
     };
@@ -530,6 +545,7 @@ const EventRegistration: React.FC = () => {
         email: data.email || '',
         gender: data.gender || '',
         position: data.position || '',
+        prc_license_no: data.prc_license_no || '',
         office: data.office || '',
         mobile_no: data.mobile_no || '',
         age_group: normalizeAgeGroup(data.age_group),
@@ -556,6 +572,7 @@ const EventRegistration: React.FC = () => {
       setInlineMatchDismissed(true);
       setRevealEmail(false);
       setRevealMobile(false);
+      setRevealPrcLicense(false);
       toast.success('Existing record loaded. Review your details and complete registration.');
     } catch (err) {
       console.error('Failed to apply existing record', err);
@@ -578,7 +595,7 @@ const EventRegistration: React.FC = () => {
       if (!event.registration_open) throw new Error("Registration for this event is closed.");
 
       const id = parseInt(eventId!);
-      const { finalLocationId, finalOfficeName, finalEmail, finalMobile, normalizedAccommodationDates, normalizedGiveawaySelections } = submissionContext;
+      const { finalLocationId, finalOfficeName, finalEmail, finalMobile, finalPrcLicenseNo, normalizedAccommodationDates, normalizedGiveawaySelections } = submissionContext;
 
       let participantId: number;
       let finalParticipantCode = '';
@@ -637,6 +654,7 @@ const EventRegistration: React.FC = () => {
             email: finalEmail,
             gender: formData.gender,
             position: formData.position,
+            prc_license_no: finalPrcLicenseNo,
             office: finalOfficeName,
             location_id: finalLocationId,
             mobile_no: finalMobile,
@@ -662,6 +680,7 @@ const EventRegistration: React.FC = () => {
             mobile_no: finalMobile,
             gender: formData.gender,
             position: formData.position,
+            prc_license_no: finalPrcLicenseNo,
             office: finalOfficeName,
             location_id: finalLocationId,
             age_group: formData.age_group,
@@ -755,6 +774,7 @@ const EventRegistration: React.FC = () => {
           email: data.email || '',
           gender: data.gender || '',
           position: data.position || '',
+          prc_license_no: data.prc_license_no || '',
           office: data.office || '',
           mobile_no: data.mobile_no || '',
           age_group: normalizeAgeGroup(data.age_group),
@@ -778,6 +798,7 @@ const EventRegistration: React.FC = () => {
         }
         setRevealEmail(false);
         setRevealMobile(false);
+        setRevealPrcLicense(false);
         setError(null);
       }
     } catch (err: any) {
@@ -1346,18 +1367,61 @@ const EventRegistration: React.FC = () => {
                     <div className="space-y-4">
                          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b pb-2 mb-4 pt-4">Professional Details</h3>
                          
-                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Position / Title<RequiredMark /></label>
-                            <div className="relative">
-                                <Briefcase className="absolute left-3 top-3 text-slate-400" size={18} />
-                                <input 
-                                    required 
-                                    type="text"
-                                    className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                                    placeholder="Manager"
-                                    value={formData.position}
-                                    onChange={e => setFormData({...formData, position: e.target.value})}
-                                />
+                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">Position / Title<RequiredMark /></label>
+                                <div className="relative">
+                                    <Briefcase className="absolute left-3 top-3 text-slate-400" size={18} />
+                                    <input
+                                        required
+                                        type="text"
+                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                        placeholder="Manager"
+                                        value={formData.position}
+                                        onChange={e => setFormData({...formData, position: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label htmlFor="registration-prc-license" className="block text-sm font-medium text-slate-700 mb-1.5">
+                                    PRC License No. <span className="text-xs font-normal text-slate-500">(Optional)</span>
+                                </label>
+                                <div className="relative">
+                                    <Hash className="absolute left-3 top-3 text-slate-400" size={18} />
+                                    <input
+                                        id="registration-prc-license"
+                                        type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        maxLength={20}
+                                        autoComplete="off"
+                                        className={`w-full pl-10 ${!!formData.participant_code && !!formData.prc_license_no && !revealPrcLicense ? 'pr-16 bg-slate-50 text-slate-500 font-mono cursor-not-allowed' : 'pr-4'} py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none`}
+                                        placeholder="e.g. 0123456"
+                                        value={!!formData.participant_code && !!formData.prc_license_no && !revealPrcLicense ? maskPrcLicense(formData.prc_license_no) : formData.prc_license_no}
+                                        onChange={(e) => setFormData({
+                                            ...formData,
+                                            prc_license_no: e.target.value.replace(/[^0-9]/g, '')
+                                        })}
+                                        readOnly={!!formData.participant_code && !!formData.prc_license_no && !revealPrcLicense}
+                                        aria-describedby="registration-prc-license-help"
+                                    />
+                                    {!!formData.participant_code && !!formData.prc_license_no && !revealPrcLicense && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setRevealPrcLicense(true);
+                                                setFormData({ ...formData, prc_license_no: '' });
+                                            }}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                                        >
+                                            Edit
+                                        </button>
+                                    )}
+                                </div>
+                                <p id="registration-prc-license-help" className="mt-1.5 text-xs text-slate-500">
+                                    Numbers only. Leading zeroes are preserved.
+                                </p>
                             </div>
                         </div>
 

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Event } from '../../types/database';
-import { ArrowLeft, Download, FileSpreadsheet, Hash, Info, Loader2, Mail, Printer, RotateCcw, Search, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Clock3, Download, FileSpreadsheet, Hash, Info, Loader2, Mail, Printer, RotateCcw, Search, Settings2, SlidersHorizontal, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { toJpeg } from 'html-to-image';
@@ -16,6 +16,7 @@ import CertificateOfAppearanceCard, {
   buildEventDateString,
   CertificateParticipantRecord,
   CertificateSignatory,
+  FoodServingTimeSettings,
   getEventDateRows
 } from './CertificateOfAppearanceTemplate';
 import {
@@ -475,7 +476,29 @@ const CertificateOfAppearancePrint: React.FC = () => {
     DEFAULT_SIGNATURE_ADJUSTMENT
   );
   const [showSignatureControls, setShowSignatureControls] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [checkBreakfastServingTime, setCheckBreakfastServingTime] = useState(false);
+  const [breakfastServingUntil, setBreakfastServingUntil] = useState('10:00');
+  const [checkDinnerServingTime, setCheckDinnerServingTime] = useState(false);
+  const [dinnerServingFrom, setDinnerServingFrom] = useState('18:00');
   const isPreparingPrint = printPhase !== 'idle';
+
+  useEffect(() => {
+    if (!showSettingsModal) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowSettingsModal(false);
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showSettingsModal]);
 
   // Load the calibration belonging to whichever signatory is active.
   useEffect(() => {
@@ -552,6 +575,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
       if (!eventData) throw new Error('Event not found');
       setEvent(eventData);
+      if (eventData.food_inclusion == null) setShowSettingsModal(false);
       setSignatory(null);
       setSignatories([]);
       setSelectedSignatoryId('');
@@ -600,7 +624,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
       const logs = await fetchAllSupabaseRows<any>(() =>
         supabase
           .from('attendance_logs')
-          .select('attendance_id, participant_id, attendance_date')
+          .select('attendance_id, participant_id, attendance_date, scan_time')
           .eq('event_id', id)
           .in('scan_status', [...PRESENT_ATTENDANCE_STATUSES])
           .order('attendance_id', { ascending: true })
@@ -608,6 +632,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
 
       const uniqueParticipantIds = Array.from(new Set(logs.map((log) => log.participant_id)));
       const logDatesByParticipant = new Map<number, Set<string>>();
+      const attendanceLogsByParticipant = new Map<number, Array<{ attendance_date: string; scan_time: string }>>();
 
       logs.forEach((log) => {
         if (!log.participant_id || !log.attendance_date) return;
@@ -615,6 +640,16 @@ const CertificateOfAppearancePrint: React.FC = () => {
           logDatesByParticipant.set(log.participant_id, new Set<string>());
         }
         logDatesByParticipant.get(log.participant_id)?.add(log.attendance_date);
+
+        if (log.scan_time) {
+          if (!attendanceLogsByParticipant.has(log.participant_id)) {
+            attendanceLogsByParticipant.set(log.participant_id, []);
+          }
+          attendanceLogsByParticipant.get(log.participant_id)?.push({
+            attendance_date: log.attendance_date,
+            scan_time: log.scan_time
+          });
+        }
       });
 
       if (uniqueParticipantIds.length === 0) {
@@ -646,6 +681,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
           needs_accommodation: !!record.needs_accommodation,
           date_accommodation: (record.date_accommodation || []).filter(Boolean),
           log_dates: Array.from(logDatesByParticipant.get(record.participant_id) || []).sort(),
+          attendance_logs: attendanceLogsByParticipant.get(record.participant_id) || [],
           ca_serial_no: record.ca_serial_no ?? null,
           role: (record.role as CertificateParticipant['role']) || 'Delegate',
           need_ca: record.need_ca ?? null,
@@ -764,6 +800,25 @@ const CertificateOfAppearancePrint: React.FC = () => {
       getEventDateRows(event).map((row) => row.key)
     );
   }, [event]);
+
+  const hasFoodInclusionConfiguration = event?.food_inclusion != null;
+
+  const foodServingTimeSettings = useMemo<FoodServingTimeSettings>(() => ({
+    breakfast: {
+      enabled: hasFoodInclusionConfiguration && checkBreakfastServingTime,
+      until: breakfastServingUntil
+    },
+    dinner: {
+      enabled: hasFoodInclusionConfiguration && checkDinnerServingTime,
+      from: dinnerServingFrom
+    }
+  }), [
+    breakfastServingUntil,
+    checkBreakfastServingTime,
+    checkDinnerServingTime,
+    dinnerServingFrom,
+    hasFoodInclusionConfiguration
+  ]);
 
   const chunkedPrintQueue = useMemo(() => {
     const chunks: CertificateParticipant[][] = [];
@@ -1200,6 +1255,24 @@ const CertificateOfAppearancePrint: React.FC = () => {
                   )}
                 </button>
               )}
+              {hasFoodInclusionConfiguration && (
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsModal(true)}
+                  aria-haspopup="dialog"
+                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    checkBreakfastServingTime || checkDinnerServingTime
+                      ? 'border-[#C3BEF4] bg-[#EEEDFC] text-[#251E7C] hover:bg-[#E3E1FA]'
+                      : 'border-[#E0DDD4] bg-white text-[#4A4843] hover:bg-[#EDEAE2]'
+                  }`}
+                >
+                  <Settings2 size={14} />
+                  Settings
+                  {(checkBreakfastServingTime || checkDinnerServingTime) && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#4B3FE4]" title="Certificate settings enabled" />
+                  )}
+                </button>
+              )}
               <button
                 onClick={handleSaveCertificate}
                 disabled={(!selectedParticipant && selectedDownloadParticipants.length === 0) || isSavingCertificate}
@@ -1281,6 +1354,24 @@ const CertificateOfAppearancePrint: React.FC = () => {
                 )}
               </button>
             )}
+            {hasFoodInclusionConfiguration && (
+              <button
+                type="button"
+                onClick={() => setShowSettingsModal(true)}
+                aria-haspopup="dialog"
+                className={`inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+                  checkBreakfastServingTime || checkDinnerServingTime
+                    ? 'border-[#C3BEF4] bg-[#EEEDFC] text-[#251E7C] hover:bg-[#E3E1FA]'
+                    : 'border-[#E0DDD4] bg-white text-[#4A4843] hover:bg-[#EDEAE2]'
+                }`}
+              >
+                <Settings2 size={14} />
+                Settings
+                {(checkBreakfastServingTime || checkDinnerServingTime) && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#4B3FE4]" title="Certificate settings enabled" />
+                )}
+              </button>
+            )}
             <button
               onClick={handleSaveCertificate}
               disabled={(!selectedParticipant && selectedDownloadParticipants.length === 0) || isSavingCertificate}
@@ -1339,6 +1430,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
               </span>
             </div>
           )}
+
         </div>
       </div>
 
@@ -1646,6 +1738,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                         signatory={signatory}
                         dateString={dateString}
                         eventFoodInclusionMap={eventFoodInclusionMap}
+                        foodServingTimeSettings={foodServingTimeSettings}
                         certificateSerialNumber={resolveCertificateSerial(selectedParticipant)}
                         signatureAdjustment={signatureAdjustment}
                       />
@@ -1676,6 +1769,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                 signatory={signatory}
                 dateString={dateString}
                 eventFoodInclusionMap={eventFoodInclusionMap}
+                foodServingTimeSettings={foodServingTimeSettings}
                 certificateSerialNumber={resolveCertificateSerial(participantRecord)}
                 signatureAdjustment={signatureAdjustment}
                 showDivider={index === 0}
@@ -1694,6 +1788,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
               signatory={signatory}
               dateString={dateString}
               eventFoodInclusionMap={eventFoodInclusionMap}
+              foodServingTimeSettings={foodServingTimeSettings}
               certificateSerialNumber={resolveCertificateSerial(selectedParticipant)}
               signatureAdjustment={signatureAdjustment}
             />
@@ -1717,12 +1812,146 @@ const CertificateOfAppearancePrint: React.FC = () => {
                 signatory={signatory}
                 dateString={dateString}
                 eventFoodInclusionMap={eventFoodInclusionMap}
+                foodServingTimeSettings={foodServingTimeSettings}
                 certificateSerialNumber={resolveCertificateSerial(participantRecord)}
                 signatureAdjustment={signatureAdjustment}
               />
             </div>
           ))}
       </div>
+
+      {hasFoodInclusionConfiguration && showSettingsModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 print:hidden"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setShowSettingsModal(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="certificate-settings-title"
+            aria-describedby="certificate-settings-description"
+            className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[#E0DDD4] bg-white shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-[#E0DDD4] px-5 py-4 sm:px-6">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-[#2A2926]">
+                  <Settings2 size={18} className="shrink-0 text-[#4B3FE4]" />
+                  <h2 id="certificate-settings-title" className="text-base font-bold">
+                    Certificate Settings
+                  </h2>
+                </div>
+                <p id="certificate-settings-description" className="mt-1 text-xs leading-relaxed text-[#7C7A72]">
+                  Configure how attendance information appears on generated certificates.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSettingsModal(false)}
+                autoFocus
+                className="shrink-0 rounded-lg p-2 text-[#7C7A72] transition-colors hover:bg-[#EDEAE2] hover:text-[#2A2926] focus:outline-none focus:ring-2 focus:ring-[#6255E9]/30"
+                aria-label="Close certificate settings"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+              <section aria-labelledby="food-inclusion-settings-title">
+                <div className="flex items-start gap-2">
+                  <Clock3 size={16} className="mt-0.5 shrink-0 text-orange-700" />
+                  <div>
+                    <h3 id="food-inclusion-settings-title" className="text-sm font-semibold text-[#2A2926]">
+                      Food Inclusion Times
+                    </h3>
+                    <p className="mt-0.5 text-xs leading-relaxed text-[#7C7A72]">
+                      Use attendance scan times to decide whether Breakfast or Dinner appears in Food Inclusion.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-orange-200 bg-orange-50/60 p-4">
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={checkBreakfastServingTime}
+                        onChange={(e) => setCheckBreakfastServingTime(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-[#C5C2BA] text-orange-600 focus:ring-orange-500"
+                      />
+                      <span>
+                        <span className="block text-sm font-semibold text-[#2A2926]">Breakfast cutoff</span>
+                        <span className="mt-0.5 block text-[11px] leading-relaxed text-[#7C7A72]">
+                          Include Breakfast only when there is a scan at or before the cutoff.
+                        </span>
+                      </span>
+                    </label>
+                    {checkBreakfastServingTime && (
+                      <label className="mt-4 flex items-center justify-between gap-3 border-t border-orange-200 pt-3 text-xs font-medium text-[#4A4843]">
+                        <span>Served until</span>
+                        <input
+                          type="time"
+                          value={breakfastServingUntil}
+                          onChange={(e) => {
+                            if (e.target.value) setBreakfastServingUntil(e.target.value);
+                          }}
+                          required
+                          aria-label="Breakfast served until"
+                          className="rounded-lg border border-[#C5C2BA] bg-white px-3 py-2 text-sm text-[#2A2926] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-orange-200 bg-orange-50/60 p-4">
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={checkDinnerServingTime}
+                        onChange={(e) => setCheckDinnerServingTime(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-[#C5C2BA] text-orange-600 focus:ring-orange-500"
+                      />
+                      <span>
+                        <span className="block text-sm font-semibold text-[#2A2926]">Dinner start time</span>
+                        <span className="mt-0.5 block text-[11px] leading-relaxed text-[#7C7A72]">
+                          Include Dinner only when there is a scan at or after the start time.
+                        </span>
+                      </span>
+                    </label>
+                    {checkDinnerServingTime && (
+                      <label className="mt-4 flex items-center justify-between gap-3 border-t border-orange-200 pt-3 text-xs font-medium text-[#4A4843]">
+                        <span>Served from</span>
+                        <input
+                          type="time"
+                          value={dinnerServingFrom}
+                          onChange={(e) => {
+                            if (e.target.value) setDinnerServingFrom(e.target.value);
+                          }}
+                          required
+                          aria-label="Dinner served from"
+                          className="rounded-lg border border-[#C5C2BA] bg-white px-3 py-2 text-sm text-[#2A2926] outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-[#E0DDD4] bg-[#F9F8F5] px-5 py-3 sm:px-6">
+              <p className="text-[11px] text-[#7C7A72]">Changes apply immediately to the preview and generated files.</p>
+              <button
+                type="button"
+                onClick={() => setShowSettingsModal(false)}
+                className="shrink-0 rounded-lg bg-[#4B3FE4] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#3B30C4] focus:outline-none focus:ring-2 focus:ring-[#6255E9]/30 focus:ring-offset-2"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <EmailProgressModal isOpen={isSendingEmails} progress={emailProgress} />
 
