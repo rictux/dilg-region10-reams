@@ -18,6 +18,7 @@ import { diffRecords, logAudit } from '../../lib/auditLog';
 import { formatParticipantOfficialName, formatSuffix, toProperCase } from '../../lib/participantName';
 import { DELEGATE_CHIP_CLASS, DELEGATE_ROW_CLASS, readDelegateType } from '../../lib/delegates';
 import { readDeviceLabelSync, resolveDeviceLabel } from '../../lib/deviceLabel';
+import ChangeParticipantNameModal from '../../components/ChangeParticipantNameModal';
 
 const PARTICIPANT_SUGGESTION_DEBOUNCE_MS = 400;
 
@@ -960,14 +961,15 @@ const AttendanceList: React.FC = () => {
 
       setNewParticipant((prev: any) => ({
           ...prev,
-          [pendingNameChange.field]: pendingNameChange.value,
-          participant_id: null
+          [pendingNameChange.field]: pendingNameChange.value
       }));
 
+      setSelectedParticipantName(prev => prev ? {
+          ...prev,
+          [pendingNameChange.field]: pendingNameChange.value
+      } : prev);
       setShowNameChangeConfirm(false);
       setPendingNameChange(null);
-      setSelectedParticipantName(null);
-      setSelectedExistingParticipant(null);
   };
 
   const handleCancelNameChange = () => {
@@ -1036,7 +1038,8 @@ const AttendanceList: React.FC = () => {
           return;
       }
 
-      if (newParticipant.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newParticipant.email)) {
+      const trimmedEmail = newParticipant.email.trim();
+      if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
           toast.error("Please enter a valid email address.");
           return;
       }
@@ -1080,33 +1083,38 @@ const AttendanceList: React.FC = () => {
           }
       }
 
+      const participantPayload = {
+          f_name: toProperCase(newParticipant.f_name.trim()),
+          l_name: toProperCase(newParticipant.l_name.trim()),
+          m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
+          suffix: newParticipant.suffix.trim() === '' ? null : formatSuffix(newParticipant.suffix.trim()),
+          email: trimmedEmail || null,
+          office: finalOfficeName.trim(),
+          location_id: finalLocationId,
+          mobile_no: newParticipant.mobile_no.trim() || null,
+          position: newParticipant.position.trim() || 'N/A',
+          prc_license_no: newParticipant.prc_license_no.trim() || null,
+          gender: newParticipant.gender,
+          age_group: newParticipant.age_group,
+          pwd: newParticipant.pwd,
+          indigenous_people: newParticipant.indigenous_people
+      };
+
       setIsAddingParticipant(true);
       
       try {
-          // 1. Check or Create Participant
+          // Only an explicitly selected suggestion may update an existing participant.
+          // Shared contact details (including email, office, and location) do not prove identity.
           let participantId: number;
           
           if (newParticipant.participant_id) {
              participantId = newParticipant.participant_id;
-             // Optional: Update participant details if changed
-             const participantPayload = {
-                f_name: toProperCase(newParticipant.f_name.trim()),
-                l_name: toProperCase(newParticipant.l_name.trim()),
-                m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                suffix: newParticipant.suffix.trim() === '' ? null : formatSuffix(newParticipant.suffix.trim()),
-                email: newParticipant.email || null,
-                office: finalOfficeName,
-                location_id: finalLocationId,
-                mobile_no: newParticipant.mobile_no || null,
-                position: newParticipant.position || 'N/A',
-                prc_license_no: newParticipant.prc_license_no.trim() || null,
-                gender: newParticipant.gender,
-                age_group: newParticipant.age_group,
-                pwd: newParticipant.pwd,
-                indigenous_people: newParticipant.indigenous_people
-             };
+             const { error: updateError } = await supabase
+                .from('participants')
+                .update(participantPayload)
+                .eq('participant_id', participantId);
 
-             await supabase.from('participants').update(participantPayload).eq('participant_id', participantId);
+             if (updateError) throw updateError;
 
              logAudit({
                  actor: user,
@@ -1119,89 +1127,11 @@ const AttendanceList: React.FC = () => {
                  changes: diffRecords(selectedExistingParticipant, participantPayload)
              });
 
-          } else if (newParticipant.email) {
-               // Full row (not just the id) so an update here can be diffed for the audit trail.
-               const { data: existingUser } = await supabase
-                .from('participants')
-                .select('*')
-                .eq('email', newParticipant.email)
-                .single();
-
-               if (existingUser) {
-                   participantId = existingUser.participant_id;
-                   // Update details
-                   const participantPayload = {
-                        f_name: toProperCase(newParticipant.f_name.trim()),
-                        l_name: toProperCase(newParticipant.l_name.trim()),
-                        m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                        suffix: newParticipant.suffix.trim() === '' ? null : formatSuffix(newParticipant.suffix.trim()),
-                        office: finalOfficeName,
-                        location_id: finalLocationId,
-                        mobile_no: newParticipant.mobile_no || null,
-                        position: newParticipant.position || 'N/A',
-                        prc_license_no: newParticipant.prc_license_no.trim() || null,
-                        gender: newParticipant.gender,
-                        age_group: newParticipant.age_group,
-                        pwd: newParticipant.pwd,
-                        indigenous_people: newParticipant.indigenous_people
-                    };
-
-                   await supabase.from('participants').update(participantPayload).eq('participant_id', participantId);
-
-                   logAudit({
-                       actor: user,
-                       action: 'Update',
-                       entityType: 'Participant',
-                       entityId: participantId,
-                       entityLabel: formatParticipantOfficialName(participantPayload),
-                       eventId: selectedEvent.event_id,
-                       eventName: selectedEvent.event_name,
-                       changes: diffRecords(existingUser, participantPayload)
-                   });
-               } else {
-                   // Create
-                    const { data: newUser, error: createError } = await supabase
-                    .from('participants')
-                    .insert([{
-                        f_name: toProperCase(newParticipant.f_name.trim()),
-                        l_name: toProperCase(newParticipant.l_name.trim()),
-                        m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                        suffix: newParticipant.suffix.trim() === '' ? null : formatSuffix(newParticipant.suffix.trim()),
-                        email: newParticipant.email,
-                        office: finalOfficeName,
-                        location_id: finalLocationId,
-                        position: newParticipant.position || 'N/A',
-                        prc_license_no: newParticipant.prc_license_no.trim() || null,
-                        mobile_no: newParticipant.mobile_no || null,
-                        age_group: newParticipant.age_group,
-                        pwd: newParticipant.pwd,
-                        indigenous_people: newParticipant.indigenous_people
-                    }])
-                    .select()
-                    .single();
-                    if(createError) throw createError;
-                    participantId = newUser.participant_id;
-               }
           } else {
-               // Create (No Email provided)
+               // A typed participant is always a new identity, even when contact fields match.
                const { data: newUser, error: createError } = await supabase
                 .from('participants')
-                .insert([{
-                    f_name: toProperCase(newParticipant.f_name.trim()),
-                    l_name: toProperCase(newParticipant.l_name.trim()),
-                    m_initial: newParticipant.m_initial.trim() === '' ? null : newParticipant.m_initial.trim().toUpperCase(),
-                    suffix: newParticipant.suffix.trim() === '' ? null : formatSuffix(newParticipant.suffix.trim()),
-                    email: null,
-                    office: finalOfficeName,
-                    location_id: finalLocationId,
-                    position: newParticipant.position || 'N/A',
-                    prc_license_no: newParticipant.prc_license_no.trim() || null,
-                    gender: newParticipant.gender,
-                    mobile_no: newParticipant.mobile_no || null,
-                    age_group: newParticipant.age_group,
-                    pwd: newParticipant.pwd,
-                    indigenous_people: newParticipant.indigenous_people
-                }])
+                .insert([participantPayload])
                 .select()
                 .single();
                 if(createError) throw createError;
@@ -2362,45 +2292,14 @@ const AttendanceList: React.FC = () => {
 
       {/* Name Change Confirmation Modal */}
       {showNameChangeConfirm && pendingNameChange && selectedParticipantName && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCancelNameChange}></div>
-            <div className="bg-card rounded-xl shadow-2xl w-full max-w-sm p-6 relative z-20 animate-in zoom-in-95 duration-200">
-                <div className="flex flex-col items-center text-center">
-                    <div className="bg-red-100 p-3 rounded-full mb-4">
-                        <AlertCircle className="text-red-600" size={32} />
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-2">Change Participant Name?</h3>
-                    <p className="text-sm text-slate-500 mb-4">
-                        You are editing the name of an existing participant. Changing the participant's name will update it across all attendance records associated with this participant.
-                    </p>
-                    <div className="w-full mb-6 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-left space-y-2">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-1">Previous {pendingNameChange.field === 'f_name' ? 'First' : 'Last'} Name</p>
-                            <p className="text-sm font-medium text-red-900">{selectedParticipantName[pendingNameChange.field] || '(blank)'}</p>
-                        </div>
-                        <div className="border-t border-red-200 pt-2">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-1">New {pendingNameChange.field === 'f_name' ? 'First' : 'Last'} Name</p>
-                            <p className="text-sm font-medium text-red-900">{pendingNameChange.value || '(blank)'}</p>
-                        </div>
-                    </div>
-                    <div className="flex gap-3 w-full">
-                        <button
-                            type="button"
-                            onClick={handleKeepOriginalName}
-                            className="flex-1 px-4 py-2.5 bg-card border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
-                        >
-                            Keep Original
-                        </button>
-                        <button
-                            onClick={handleConfirmNameChange}
-                            className="flex-1 px-4 py-2.5 bg-indigo-600 dark:bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
-                        >
-                            Change Name
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <ChangeParticipantNameModal
+          field={pendingNameChange.field}
+          previousName={selectedParticipantName[pendingNameChange.field]}
+          newName={pendingNameChange.value}
+          onDismiss={handleCancelNameChange}
+          onKeepOriginal={handleKeepOriginalName}
+          onConfirm={handleConfirmNameChange}
+        />
       )}
 
       {showManualModal && manualParticipant && (

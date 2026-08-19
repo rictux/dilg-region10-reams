@@ -32,6 +32,7 @@ import {
 import { downloadQrCodePng, qrFileSlug } from '../../lib/qrDownload';
 import { hasSeenGuide, markGuideSeen } from '../../lib/userGuides';
 import { GuidedTour } from '../../components/GuidedTour';
+import ChangeParticipantNameModal from '../../components/ChangeParticipantNameModal';
 import { buildEventsTourSteps, EventsTutorialButton, type EventsTourStage } from './EventsListTour';
 import {
   buildSampleAccessList,
@@ -1319,14 +1320,15 @@ const EventsList: React.FC = () => {
 
       setNewParticipant(prev => ({
           ...prev,
-          [pendingNameChange.field]: pendingNameChange.value,
-          participant_id: null
+          [pendingNameChange.field]: pendingNameChange.value
       }));
 
-      setSelectedExistingParticipant(null);
+      setSelectedParticipantName(prev => prev ? {
+          ...prev,
+          [pendingNameChange.field]: pendingNameChange.value
+      } : prev);
       setShowNameChangeConfirm(false);
       setPendingNameChange(null);
-      setSelectedParticipantName(null);
   };
 
   const handleCancelNameChange = () => {
@@ -1750,7 +1752,8 @@ const EventsList: React.FC = () => {
       setIsAddingParticipant(true);
       
       try {
-          // 1. Check or Create Participant
+          // Only an explicitly selected suggestion may update an existing participant.
+          // Shared contact details (including email, office, and location) do not prove identity.
           let participantId: number;
           
           if (newParticipant.participant_id) {
@@ -1774,46 +1777,8 @@ const EventsList: React.FC = () => {
                  changes: diffRecords(selectedExistingParticipant, submission.participantPayload)
              });
 
-          } else if (submission.participantPayload.email) {
-               // Full row (not just the id) so an update here can be diffed for the audit trail.
-               const { data: existingUser } = await supabase
-                .from('participants')
-                .select('*')
-                .eq('email', submission.participantPayload.email)
-                .single();
-
-               if (existingUser) {
-                   participantId = existingUser.participant_id;
-                   // Update details
-                   const { error: updateError } = await supabase
-                    .from('participants')
-                    .update(submission.participantPayload)
-                    .eq('participant_id', participantId);
-
-                   if (updateError) throw updateError;
-
-                   logAudit({
-                       actor: user,
-                       action: 'Update',
-                       entityType: 'Participant',
-                       entityId: participantId,
-                       entityLabel: formatParticipantOfficialName(submission.participantPayload),
-                       eventId: selectedEvent.event_id,
-                       eventName: selectedEvent.event_name,
-                       changes: diffRecords(existingUser, submission.participantPayload)
-                   });
-               } else {
-                   // Create
-                    const { data: newUser, error: createError } = await supabase
-                    .from('participants')
-                    .insert([submission.participantPayload])
-                    .select()
-                    .single();
-                    if(createError) throw createError;
-                    participantId = newUser.participant_id;
-               }
           } else {
-               // Create (No Email provided)
+               // A typed participant is always a new identity, even when contact fields match.
                const { data: newUser, error: createError } = await supabase
                 .from('participants')
                 .insert([submission.participantPayload])
@@ -4326,45 +4291,14 @@ const EventsList: React.FC = () => {
 
       {/* Name Change Confirmation Modal */}
       {showNameChangeConfirm && pendingNameChange && selectedParticipantName && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCancelNameChange}></div>
-            <div className="bg-card rounded-xl shadow-2xl w-full max-w-sm p-6 relative z-20 animate-in zoom-in-95 duration-200">
-                <div className="flex flex-col items-center text-center">
-                    <div className="bg-red-100 p-3 rounded-full mb-4">
-                        <AlertTriangle className="text-red-600" size={32} />
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-2">Change Participant Name?</h3>
-                    <p className="text-sm text-slate-500 mb-4">
-                        You are editing the name of an existing participant. Changing the participant's name will update it across all attendance records associated with this participant.
-                    </p>
-                    <div className="w-full mb-6 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-left space-y-2">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-1">Previous {pendingNameChange.field === 'f_name' ? 'First' : 'Last'} Name</p>
-                            <p className="text-sm font-medium text-red-900">{selectedParticipantName[pendingNameChange.field] || '(blank)'}</p>
-                        </div>
-                        <div className="border-t border-red-200 pt-2">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-1">New {pendingNameChange.field === 'f_name' ? 'First' : 'Last'} Name</p>
-                            <p className="text-sm font-medium text-red-900">{pendingNameChange.value || '(blank)'}</p>
-                        </div>
-                    </div>
-                    <div className="flex gap-3 w-full">
-                        <button
-                            type="button"
-                            onClick={handleKeepOriginalName}
-                            className="flex-1 px-4 py-2.5 bg-card border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
-                        >
-                            Keep Original
-                        </button>
-                        <button
-                            onClick={handleConfirmNameChange}
-                            className="flex-1 px-4 py-2.5 bg-indigo-600 dark:bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
-                        >
-                            Change Name
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <ChangeParticipantNameModal
+          field={pendingNameChange.field}
+          previousName={selectedParticipantName[pendingNameChange.field]}
+          newName={pendingNameChange.value}
+          onDismiss={handleCancelNameChange}
+          onKeepOriginal={handleKeepOriginalName}
+          onConfirm={handleConfirmNameChange}
+        />
       )}
 
       {/* Delete Confirmation Modal for Participant */}
