@@ -41,6 +41,8 @@ import {
 } from './tutorialSampleEvent';
 import EventTestBuilder from './EventTestBuilder';
 
+const PARTICIPANT_SUGGESTION_DEBOUNCE_MS = 400;
+
 type ParticipantFormData = {
   f_name: string;
   l_name: string;
@@ -247,6 +249,8 @@ const EventsList: React.FC = () => {
   // Auto-suggestion state
   const [suggestions, setSuggestions] = useState<Participant[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestionDebounceTimerRef = useRef<number | null>(null);
+  const suggestionRequestIdRef = useRef(0);
   
   // Selection States
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -362,6 +366,25 @@ const EventsList: React.FC = () => {
         };
     }
   }, [showParticipantsModal, selectedEvent]);
+
+  useEffect(() => {
+    if (showParticipantsModal && participantModalView === 'add') return;
+
+    if (suggestionDebounceTimerRef.current !== null) {
+      window.clearTimeout(suggestionDebounceTimerRef.current);
+      suggestionDebounceTimerRef.current = null;
+    }
+    suggestionRequestIdRef.current += 1;
+    setSuggestions([]);
+    setShowSuggestions(false);
+  }, [showParticipantsModal, participantModalView]);
+
+  useEffect(() => () => {
+    if (suggestionDebounceTimerRef.current !== null) {
+      window.clearTimeout(suggestionDebounceTimerRef.current);
+    }
+    suggestionRequestIdRef.current += 1;
+  }, []);
 
   useEffect(() => {
     if (!showEventModal) {
@@ -1311,6 +1334,11 @@ const EventsList: React.FC = () => {
       setPendingNameChange(null);
   };
 
+  const handleKeepOriginalName = () => {
+      setParticipantModalView('list');
+      resetParticipantForm();
+  };
+
   const closeParticipantsModal = () => {
       setShowParticipantsModal(false);
       setParticipantModalView('list');
@@ -1415,7 +1443,7 @@ const EventsList: React.FC = () => {
       }
   };
 
-  const handleNameChange = async (e: React.ChangeEvent<HTMLInputElement>, field: 'f_name' | 'l_name') => {
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'f_name' | 'l_name') => {
     const value = e.target.value;
     const shouldSearchExistingParticipants = participantModalView === 'add';
 
@@ -1434,18 +1462,30 @@ const EventsList: React.FC = () => {
         participant_id: shouldSearchExistingParticipants ? null : prev.participant_id
     }));
 
+    if (suggestionDebounceTimerRef.current !== null) {
+        window.clearTimeout(suggestionDebounceTimerRef.current);
+        suggestionDebounceTimerRef.current = null;
+    }
+
+    const requestId = ++suggestionRequestIdRef.current;
+    setSuggestions([]);
+    setShowSuggestions(false);
+
     if (!shouldSearchExistingParticipants) {
-        setSuggestions([]);
-        setShowSuggestions(false);
         return;
     }
 
-    if (value.length >= 2) {
+    const searchValue = value.trim();
+    if (searchValue.length >= 2) {
+      suggestionDebounceTimerRef.current = window.setTimeout(async () => {
+        suggestionDebounceTimerRef.current = null;
         const { data } = await supabase
             .from('participants')
             .select('*')
-            .ilike('full_name', `%${value}%`)
+            .ilike('full_name', `%${searchValue}%`)
             .limit(5);
+
+        if (requestId !== suggestionRequestIdRef.current) return;
 
         if (data && data.length > 0) {
             setSuggestions(data);
@@ -1454,9 +1494,7 @@ const EventsList: React.FC = () => {
             setSuggestions([]);
             setShowSuggestions(false);
         }
-    } else {
-        setSuggestions([]);
-        setShowSuggestions(false);
+      }, PARTICIPANT_SUGGESTION_DEBOUNCE_MS);
     }
   };
 
@@ -4311,7 +4349,8 @@ const EventsList: React.FC = () => {
                     </div>
                     <div className="flex gap-3 w-full">
                         <button
-                            onClick={handleCancelNameChange}
+                            type="button"
+                            onClick={handleKeepOriginalName}
                             className="flex-1 px-4 py-2.5 bg-card border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
                         >
                             Keep Original
