@@ -579,6 +579,7 @@ const EventsList: React.FC = () => {
                 m_initial,
                 suffix,
                 position,
+                prc_license_no,
                 office,
                 mobile_no,
                 gender,
@@ -2292,7 +2293,7 @@ const EventsList: React.FC = () => {
       };
 
       // Excel table column names must be unique — dedupe giveaway labels against fixed headers.
-      const usedColumnNames = new Set(['Participant Name', 'Gender', 'Position', 'Office', 'Age Group', 'Mobile Number', 'Email', 'Role', 'Delegate Type', 'Accommodation', 'Photo/Video', 'Data Storage']);
+      const usedColumnNames = new Set(['Participant Name', 'Gender', 'Position', 'PRC License No.', 'Office', 'Age Group', 'Mobile Number', 'Email', 'Role', 'Delegate Type', 'Accommodation', 'Photo/Video', 'Data Storage']);
       const giveawayHeaders = giveaways.map((g) => {
           const base = g.label || 'Giveaway';
           let name = base;
@@ -2308,6 +2309,7 @@ const EventsList: React.FC = () => {
           record.participants?.full_name || '',
           record.participants?.gender || '',
           record.participants?.position || '',
+          record.participants?.prc_license_no || '',
           record.participants?.office || '',
           record.participants?.age_group || '',
           record.participants?.mobile_no || '',
@@ -2336,6 +2338,7 @@ const EventsList: React.FC = () => {
               { name: 'Participant Name', filterButton: true },
               { name: 'Gender', filterButton: true },
               { name: 'Position', filterButton: true },
+              { name: 'PRC License No.', filterButton: true },
               { name: 'Office', filterButton: true },
               { name: 'Age Group', filterButton: true },
               { name: 'Mobile Number', filterButton: true },
@@ -2350,7 +2353,7 @@ const EventsList: React.FC = () => {
           rows
       });
 
-      [32, 10, 28, 34, 12, 16, 30, 14, ...(includeDelegateType ? [16] : []), ...(includeAccommodation ? [14] : []), ...giveaways.map(() => 16), 14, 14].forEach((w, idx) => {
+      [32, 10, 28, 18, 34, 12, 16, 30, 14, ...(includeDelegateType ? [16] : []), ...(includeAccommodation ? [14] : []), ...giveaways.map(() => 16), 14, 14].forEach((w, idx) => {
           worksheet.getColumn(idx + 1).width = w;
       });
 
