@@ -1009,6 +1009,16 @@ const ItemLabel: React.FC<{ item: BorrowableItem; size?: number; compact?: boole
         >
           {item.item_name}
         </p>
+        {item.item_description && (
+          <p
+            className={`mt-1 break-words text-center leading-snug text-slate-600 ${
+              compact ? 'text-[10px]' : 'text-xs'
+            }`}
+            style={{ maxWidth: size }}
+          >
+            {item.item_description}
+          </p>
+        )}
       </div>
 
       <button
