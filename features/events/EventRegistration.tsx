@@ -69,9 +69,8 @@ const EventRegistration: React.FC = () => {
   const [decodingQrFile, setDecodingQrFile] = useState(false);
   const [showMatchPrompt, setShowMatchPrompt] = useState(false);
   const [potentialMatches, setPotentialMatches] = useState<ParticipantMatch[]>([]);
-  const [inlineMatches, setInlineMatches] = useState<ParticipantMatch[]>([]);
-  const [inlineMatchDismissed, setInlineMatchDismissed] = useState(false);
-  const [inlineLookupLoading, setInlineLookupLoading] = useState(false);
+  const [nameMatchDismissed, setNameMatchDismissed] = useState(false);
+  const [nameLookupLoading, setNameLookupLoading] = useState(false);
   const [applyingExistingRecord, setApplyingExistingRecord] = useState(false);
   const [revealEmail, setRevealEmail] = useState(false);
   const [revealMobile, setRevealMobile] = useState(false);
@@ -219,7 +218,16 @@ const EventRegistration: React.FC = () => {
     }
   };
 
-  const normalizeNamePart = (value: string) => value.trim().toLowerCase();
+  const normalizeNamePart = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+
+  // A complete leading given name may match a longer stored first name.
+  // For example, "Jose" matches "Jose Miguel", while "Jo" does not match "Jose".
+  const firstNamesMatch = (storedName: string, enteredName: string) => {
+    const normalizedStoredName = normalizeNamePart(storedName);
+    const normalizedEnteredName = normalizeNamePart(enteredName);
+    return normalizedStoredName === normalizedEnteredName ||
+      normalizedStoredName.startsWith(`${normalizedEnteredName} `);
+  };
 
   // Hyphenated married surnames (e.g. "Cruz-Santos") should match records stored
   // under either segment ("Cruz" or "Santos") and vice versa.
@@ -301,9 +309,14 @@ const EventRegistration: React.FC = () => {
     const participantIds = matches.map((match) => match.participant_id);
     const { data, error } = await supabase
       .from('attendance_logs')
-      .select('participant_id, event_id')
+      .select(`
+        participant_id,
+        event_id,
+        events!inner (deleted_at)
+      `)
       .in('participant_id', participantIds)
-      .in('scan_status', [...PRESENT_ATTENDANCE_STATUSES]);
+      .in('scan_status', [...PRESENT_ATTENDANCE_STATUSES])
+      .is('events.deleted_at', null);
 
     if (error) throw error;
 
@@ -463,26 +476,38 @@ const EventRegistration: React.FC = () => {
     const { data, error } = await supabase
       .from('participants')
       .select('participant_id, participant_code, full_name, f_name, l_name, m_initial, suffix, email, mobile_no, office, position')
-      .ilike('f_name', formData.f_name.trim())
+      .ilike('f_name', `${formData.f_name.trim()}%`)
       .or(lastNameSegments.map((segment) => `l_name.ilike.%${segment}%`).join(','))
       .limit(25);
 
     if (error) throw error;
 
     const baseMatches = (data || []).filter((participant) =>
-      normalizeNamePart(participant.f_name || '') === normalizedFirstName &&
+      firstNamesMatch(participant.f_name || '', normalizedFirstName) &&
       (normalizeNamePart(participant.l_name || '') === normalizedLastName ||
         lastNamesShareSegment(participant.l_name || '', formData.l_name))
     );
 
-    // Exact last-name matches appear before hyphen-segment matches.
-    baseMatches.sort((a, b) => {
-      const aExact = normalizeNamePart(a.l_name || '') === normalizedLastName ? 0 : 1;
-      const bExact = normalizeNamePart(b.l_name || '') === normalizedLastName ? 0 : 1;
-      return aExact - bExact;
+    const matchesWithCounts = await attachParticipationCounts(baseMatches);
+
+    // Show the most active participant first. Exact-name proximity and the
+    // display name provide deterministic ordering when event counts are tied.
+    matchesWithCounts.sort((a, b) => {
+      const countDifference = (b.participatedEventsCount ?? 0) - (a.participatedEventsCount ?? 0);
+      if (countDifference !== 0) return countDifference;
+
+      const aLastExact = normalizeNamePart(a.l_name || '') === normalizedLastName ? 0 : 1;
+      const bLastExact = normalizeNamePart(b.l_name || '') === normalizedLastName ? 0 : 1;
+      if (aLastExact !== bLastExact) return aLastExact - bLastExact;
+
+      const aFirstExact = normalizeNamePart(a.f_name || '') === normalizedFirstName ? 0 : 1;
+      const bFirstExact = normalizeNamePart(b.f_name || '') === normalizedFirstName ? 0 : 1;
+      if (aFirstExact !== bFirstExact) return aFirstExact - bFirstExact;
+
+      return getParticipantDisplayName(a).localeCompare(getParticipantDisplayName(b), undefined, { sensitivity: 'base' });
     });
 
-    return attachParticipationCounts(baseMatches);
+    return matchesWithCounts;
   };
 
   useEffect(() => {
@@ -490,35 +515,42 @@ const EventRegistration: React.FC = () => {
     const l = formData.l_name.trim();
 
     if (formData.participant_code) {
-      setInlineMatches([]);
+      closeMatchPrompt();
       return;
     }
 
     if (!f || !l) {
-      setInlineMatches([]);
+      closeMatchPrompt();
       return;
     }
 
-    setInlineMatchDismissed(false);
+    setNameMatchDismissed(false);
+    let cancelled = false;
 
     const handle = setTimeout(async () => {
-      setInlineLookupLoading(true);
+      setNameLookupLoading(true);
       try {
         const matches = await findPotentialNameMatches();
-        setInlineMatches(matches);
+        if (cancelled) return;
+
+        setPotentialMatches(matches);
+        setShowMatchPrompt(matches.length > 0);
       } catch (err) {
         console.error('Name lookup failed', err);
       } finally {
-        setInlineLookupLoading(false);
+        if (!cancelled) setNameLookupLoading(false);
       }
     }, 600);
 
-    return () => clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [formData.f_name, formData.l_name, formData.participant_code]);
 
-  const dismissInlineMatch = () => {
-    setInlineMatches([]);
-    setInlineMatchDismissed(true);
+  const dismissNameMatches = () => {
+    setNameMatchDismissed(true);
+    closeMatchPrompt();
   };
 
   const applyExistingRecord = async (match: ParticipantMatch) => {
@@ -568,8 +600,8 @@ const EventRegistration: React.FC = () => {
         setAffiliationType('Office');
       }
 
-      setInlineMatches([]);
-      setInlineMatchDismissed(true);
+      setNameMatchDismissed(true);
+      closeMatchPrompt();
       setRevealEmail(false);
       setRevealMobile(false);
       setRevealPrcLicense(false);
@@ -582,7 +614,7 @@ const EventRegistration: React.FC = () => {
     }
   };
 
-  const processRegistration = async (options?: { existingUser?: ParticipantMatch | null; skipPotentialMatch?: boolean }) => {
+  const processRegistration = async (options?: { skipPotentialMatch?: boolean }) => {
     const submissionContext = getSubmissionContext();
     if (!submissionContext) return;
 
@@ -599,9 +631,9 @@ const EventRegistration: React.FC = () => {
 
       let participantId: number;
       let finalParticipantCode = '';
-      let existingUser = options?.existingUser || null;
+      let existingUser: ParticipantMatch | null = null;
 
-      if (!existingUser && formData.participant_code) {
+      if (formData.participant_code) {
         const { data } = await supabase
           .from('participants')
           .select('participant_id, participant_code')
@@ -611,26 +643,9 @@ const EventRegistration: React.FC = () => {
         existingUser = data;
       }
 
-      if (!existingUser && finalEmail) {
-        const { data } = await supabase
-          .from('participants')
-          .select('participant_id, participant_code')
-          .eq('email', finalEmail)
-          .limit(1)
-          .maybeSingle();
-        existingUser = data;
-      }
-
-      if (!existingUser && finalMobile) {
-        const { data } = await supabase
-          .from('participants')
-          .select('participant_id, participant_code')
-          .eq('mobile_no', finalMobile)
-          .limit(1)
-          .maybeSingle();
-        existingUser = data;
-      }
-
+      // Email addresses and mobile numbers may be shared by multiple people.
+      // Reuse a record only through its unique participant code or an explicit
+      // name-match selection, which loads that code into the form.
       if (!existingUser && !options?.skipPotentialMatch) {
         const matches = await findPotentialNameMatches();
         if (matches.length > 0) {
@@ -835,8 +850,7 @@ const EventRegistration: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const skipPotentialMatch = inlineMatchDismissed || inlineMatches.length > 0;
-    await processRegistration({ skipPotentialMatch });
+    await processRegistration({ skipPotentialMatch: nameMatchDismissed });
   };
 
   const handleDownload = async () => {
@@ -1100,64 +1114,10 @@ const EventRegistration: React.FC = () => {
                             </div>
                         </div>
 
-                        {inlineLookupLoading && inlineMatches.length === 0 && !inlineMatchDismissed && (
+                        {nameLookupLoading && (
                             <div className="flex items-center gap-2 text-xs text-slate-500">
                                 <Loader2 size={14} className="animate-spin" />
                                 Checking for existing records...
-                            </div>
-                        )}
-
-                        {inlineMatches.length > 0 && !inlineMatchDismissed && (
-                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                                <div className="flex items-start gap-3">
-                                    <Info className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
-                                    <div className="flex-1">
-                                        <p className="text-sm font-bold text-amber-900">
-                                            {inlineMatches.length === 1
-                                                ? 'We found an existing record matching your name'
-                                                : `We found ${inlineMatches.length} existing records matching your name`}
-                                        </p>
-                                        <p className="text-xs text-amber-800 mt-1 leading-relaxed">
-                                            Selecting an existing record will autofill the rest of the form. Sensitive details are partially hidden for your privacy.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="mt-4 space-y-3">
-                                    {inlineMatches.map((match) => (
-                                        <div key={match.participant_id} className="bg-card border border-amber-200 rounded-lg p-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                                            <div className="flex-1 min-w-0 space-y-1">
-                                                <p className="text-sm font-bold text-slate-900">{getParticipantDisplayName(match)}</p>
-                                                <p className="text-xs text-slate-500">
-                                                    Past events: <span className="font-medium text-slate-700">{match.participatedEventsCount ?? 0}</span>
-                                                    {match.position && <> · {match.position}</>}
-                                                </p>
-                                                {match.office && <p className="text-xs text-slate-500 truncate">{match.office}</p>}
-                                                {match.email && <p className="text-xs text-slate-500 font-mono">{maskEmail(match.email)}</p>}
-                                                {match.mobile_no && <p className="text-xs text-slate-500 font-mono">{maskMobile(match.mobile_no)}</p>}
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => applyExistingRecord(match)}
-                                                disabled={applyingExistingRecord}
-                                                className="whitespace-nowrap bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                                            >
-                                                {applyingExistingRecord && <Loader2 size={14} className="animate-spin" />}
-                                                Use this record
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="mt-3 flex justify-end">
-                                    <button
-                                        type="button"
-                                        onClick={dismissInlineMatch}
-                                        className="text-xs font-medium text-amber-800 hover:text-amber-900 underline underline-offset-2"
-                                    >
-                                        Not me, continue with new registration
-                                    </button>
-                                </div>
                             </div>
                         )}
 
@@ -1802,94 +1762,53 @@ const EventRegistration: React.FC = () => {
     </div>
     {showMatchPrompt && (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={closeMatchPrompt}></div>
-        <div className="relative z-10 w-full max-w-2xl rounded-2xl bg-card shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="name-match-title"
+          aria-describedby="name-match-description"
+          className="relative z-10 w-full max-w-2xl rounded-2xl bg-card shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200"
+        >
           <div className="px-6 py-5 border-b border-slate-100 bg-slate-50">
-            <h3 className="text-xl font-bold text-slate-900">
-              {potentialMatches.length === 1 ? 'We found a possible existing record' : 'Possible matches'}
+            <h3 id="name-match-title" className="text-xl font-bold text-slate-900">
+              {potentialMatches.length === 1 ? 'Existing record found' : 'Existing records found'}
             </h3>
-            <p className="text-sm text-slate-600 mt-2">
+            <p id="name-match-description" className="text-sm text-slate-600 mt-2">
               {potentialMatches.length === 1
-                ? 'We found an existing record with similar details. Is this you?'
-                : 'We found multiple participant records with similar details. Please select your existing record, or create a new one.'}
+                ? 'This participant name matches the name you entered. Select it to autofill the registration form.'
+                : 'These participant names match the name you entered. Select your record to autofill the registration form.'}
             </p>
           </div>
 
           <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-            {potentialMatches.length === 1 ? (
-              <>
-                {renderPotentialMatchCard(potentialMatches[0])}
-                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            {potentialMatches.map((match) => (
+              <div key={match.participant_id}>
+                {renderPotentialMatchCard(
+                  match,
                   <button
                     type="button"
-                    onClick={async () => {
-                      const selectedMatch = potentialMatches[0];
-                      closeMatchPrompt();
-                      await processRegistration({ existingUser: selectedMatch, skipPotentialMatch: true });
-                    }}
-                    className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors"
+                    onClick={() => applyExistingRecord(match)}
+                    disabled={applyingExistingRecord}
+                    className="mt-1 inline-flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Yes, use existing record
+                    {applyingExistingRecord && <Loader2 size={16} className="animate-spin" />}
+                    Use this record
                   </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      closeMatchPrompt();
-                      await processRegistration({ skipPotentialMatch: true });
-                    }}
-                    className="flex-1 bg-card text-slate-700 py-3 rounded-xl font-semibold border border-slate-300 hover:bg-slate-50 transition-colors"
-                  >
-                    No, create new registration
-                  </button>
-                  <button
-                    type="button"
-                    onClick={closeMatchPrompt}
-                    className="sm:w-auto px-5 py-3 rounded-xl font-semibold text-slate-500 hover:bg-slate-100 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                {potentialMatches.map((match) => (
-                  <div key={match.participant_id}>
-                    {renderPotentialMatchCard(
-                      match,
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          closeMatchPrompt();
-                          await processRegistration({ existingUser: match, skipPotentialMatch: true });
-                        }}
-                        className="mt-1 inline-flex items-center justify-center bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors"
-                      >
-                        Use this record
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      closeMatchPrompt();
-                      await processRegistration({ skipPotentialMatch: true });
-                    }}
-                    className="flex-1 bg-card text-slate-700 py-3 rounded-xl font-semibold border border-slate-300 hover:bg-slate-50 transition-colors"
-                  >
-                    None of these, create new record
-                  </button>
-                  <button
-                    type="button"
-                    onClick={closeMatchPrompt}
-                    className="sm:w-auto px-5 py-3 rounded-xl font-semibold text-slate-500 hover:bg-slate-100 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </>
-            )}
+                )}
+              </div>
+            ))}
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={dismissNameMatches}
+                disabled={applyingExistingRecord}
+                className="w-full bg-card text-slate-700 py-3 rounded-xl font-semibold border border-slate-300 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                None of these records are mine
+              </button>
+            </div>
           </div>
         </div>
       </div>
