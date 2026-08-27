@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { DelegateType, Participant, Event, GiveawayItem } from '../../types/database';
-import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Bed, ChevronDown, Check, UserPlus, Building, Landmark, Download, Gift, Mail } from 'lucide-react';
+import { X, User, Printer, Calendar, RefreshCw, PlusCircle, Clock, Save, Loader2, UserCheck, UserX, AlertCircle, CheckCircle, Users, Search, Bed, ChevronDown, Check, UserPlus, Building, Landmark, Download, Gift, Mail, Edit, XCircle } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import QRCodeLib from 'qrcode';
 import { sendQrEmail, sendParticipantQrById } from '../../lib/emailService';
@@ -16,7 +16,7 @@ import { fetchAllSupabaseRows } from '../../lib/supabasePagination';
 import { PRESENT_ATTENDANCE_STATUSES } from '../../lib/attendance';
 import { diffRecords, logAudit } from '../../lib/auditLog';
 import { formatParticipantOfficialName, formatSuffix, toProperCase } from '../../lib/participantName';
-import { DELEGATE_CHIP_CLASS, DELEGATE_ROW_CLASS, readDelegateType } from '../../lib/delegates';
+import { DELEGATE_CHIP_CLASS, DELEGATE_ROW_CLASS, DELEGATE_TYPES, delegateTypeForRole, readDelegateType } from '../../lib/delegates';
 import { readDeviceLabelSync, resolveDeviceLabel } from '../../lib/deviceLabel';
 import ChangeParticipantNameModal from '../../components/ChangeParticipantNameModal';
 
@@ -120,6 +120,8 @@ const AttendanceList: React.FC = () => {
   const [qrToken, setQrToken] = useState<string>('');
   const [sendingQr, setSendingQr] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingRole, setEditingRole] = useState<{ participantId: number; role: string; delegate_type: string } | null>(null);
+  const [savingRoleParticipantId, setSavingRoleParticipantId] = useState<number | null>(null);
   
   // Event Selection State
   const [events, setEvents] = useState<Event[]>([]);
@@ -419,6 +421,7 @@ const AttendanceList: React.FC = () => {
   const handleEventSelect = (event: Event) => {
       setSelectedEventId(event.event_id);
       setSelectedEvent(event);
+      setEditingRole(null);
       if (event.session !== 'All_Day' && (filter === 'No PM' || filter === 'Complete Logs')) {
           setFilter('Show All');
       }
@@ -570,6 +573,59 @@ const AttendanceList: React.FC = () => {
     if (selectedEventId && selectedDate) {
         fetchAttendance(selectedEventId, selectedDate);
     }
+  };
+
+  const handleUpdateRole = async () => {
+      if (!editingRole || !selectedEvent) return;
+
+      const previousRow = data.find((row) => row.participant.participant_id === editingRole.participantId);
+      const previousRole = previousRow?.role || 'Delegate';
+      const previousDelegateType = previousRow?.delegate_type || null;
+      const nextDelegateType = selectedEvent.has_principal_delegates
+          ? delegateTypeForRole(editingRole.role, editingRole.delegate_type)
+          : null;
+      const nextChanges = {
+          role: editingRole.role,
+          delegate_type: nextDelegateType
+      };
+
+      setSavingRoleParticipantId(editingRole.participantId);
+      try {
+          const { error } = await supabase
+              .from('event_participants')
+              .update(nextChanges)
+              .eq('event_id', selectedEvent.event_id)
+              .eq('participant_id', editingRole.participantId);
+
+          if (error) throw error;
+
+          setData((current) => current.map((row) =>
+              row.participant.participant_id === editingRole.participantId
+                  ? { ...row, ...nextChanges }
+                  : row
+          ));
+
+          logAudit({
+              actor: user,
+              action: 'Update',
+              entityType: 'EventParticipant',
+              entityId: editingRole.participantId,
+              entityLabel: previousRow?.participant.full_name || null,
+              eventId: selectedEvent.event_id,
+              eventName: selectedEvent.event_name,
+              changes: diffRecords(
+                  { role: previousRole, delegate_type: previousDelegateType },
+                  nextChanges
+              )
+          });
+
+          setEditingRole(null);
+          toast.success('Participant role updated.');
+      } catch (err: any) {
+          toast.error('Error updating role: ' + err.message);
+      } finally {
+          setSavingRoleParticipantId(null);
+      }
   };
 
   const generateReport = () => {
@@ -1322,6 +1378,99 @@ const AttendanceList: React.FC = () => {
           ? 'grid-cols-4 sm:[grid-template-columns:repeat(4,minmax(0,1fr))]'
           : 'sm:[grid-template-columns:repeat(3,minmax(0,1fr))]';
 
+  const renderRoleEditor = (row: AttendanceRow, compact = false) => {
+      const participantId = row.participant.participant_id;
+      const isEditing = editingRole?.participantId === participantId;
+      const isSaving = savingRoleParticipantId === participantId;
+
+      if (isEditing && editingRole) {
+          return (
+              <div
+                  className={`flex items-center gap-1.5 ${compact ? 'flex-wrap' : 'flex-col items-stretch xl:flex-row xl:items-center'}`}
+                  onClick={(event) => event.stopPropagation()}
+              >
+                  <select
+                      value={editingRole.role}
+                      onChange={(event) => setEditingRole({ ...editingRole, role: event.target.value })}
+                      disabled={isSaving}
+                      className="min-w-0 rounded border border-slate-300 bg-card px-1.5 py-1 text-xs focus:border-indigo-500 focus:outline-none disabled:opacity-60"
+                      aria-label={`Role for ${row.participant.full_name}`}
+                  >
+                      <option value="Delegate">Delegate</option>
+                      <option value="Speaker">Speaker</option>
+                      <option value="Secretariat">Secretariat</option>
+                      <option value="Guest">Guest</option>
+                      <option value="VIP">VIP</option>
+                  </select>
+                  {selectedEvent?.has_principal_delegates && editingRole.role === 'Delegate' && (
+                      <select
+                          value={editingRole.delegate_type}
+                          onChange={(event) => setEditingRole({ ...editingRole, delegate_type: event.target.value })}
+                          disabled={isSaving}
+                          className="min-w-0 rounded border border-slate-300 bg-card px-1.5 py-1 text-xs focus:border-amber-500 focus:outline-none disabled:opacity-60"
+                          aria-label={`Delegate type for ${row.participant.full_name}`}
+                      >
+                          <option value="">Attendee</option>
+                          {DELEGATE_TYPES.map((type) => (
+                              <option key={type} value={type}>{type}</option>
+                          ))}
+                      </select>
+                  )}
+                  <div className="flex shrink-0 items-center gap-0.5">
+                      <button
+                          type="button"
+                          onClick={handleUpdateRole}
+                          disabled={isSaving}
+                          className="rounded p-1 text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+                          title="Save role"
+                          aria-label={`Save role for ${row.participant.full_name}`}
+                      >
+                          {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                      </button>
+                      <button
+                          type="button"
+                          onClick={() => setEditingRole(null)}
+                          disabled={isSaving}
+                          className="rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                          title="Cancel role edit"
+                          aria-label={`Cancel role edit for ${row.participant.full_name}`}
+                      >
+                          <XCircle size={15} />
+                      </button>
+                  </div>
+              </div>
+          );
+      }
+
+      return (
+          <div className="flex min-w-0 items-center gap-1.5">
+              {row.delegate_type ? (
+                  <span className={`inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${DELEGATE_CHIP_CLASS[row.delegate_type]}`}>
+                      {row.delegate_type}
+                  </span>
+              ) : (
+                  <span className="truncate text-xs leading-snug">{row.role || 'Delegate'}</span>
+              )}
+              <button
+                  type="button"
+                  onClick={(event) => {
+                      event.stopPropagation();
+                      setEditingRole({
+                          participantId,
+                          role: row.role || 'Delegate',
+                          delegate_type: row.delegate_type || ''
+                      });
+                  }}
+                  className="shrink-0 rounded p-1 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                  title="Edit role"
+                  aria-label={`Edit role for ${row.participant.full_name}`}
+              >
+                  <Edit size={13} />
+              </button>
+          </div>
+      );
+  };
+
   return (
     <div className="attendance-page min-h-0 flex flex-col gap-2 overflow-y-auto -m-4 h-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] p-4 md:py-8 md:px-12 lg:px-16">
       <div className="attendance-toolbar">
@@ -1547,7 +1696,7 @@ const AttendanceList: React.FC = () => {
                             <th className="px-1 py-1.5 lg:py-1.5 w-9 bg-slate-50 text-center">#</th>
                             <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[26%] bg-slate-50">Name</th>
                             <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[18%] bg-slate-50">Position</th>
-                            <th className="px-4 py-1.5 lg:px-5 lg:py-1.5 w-[12%] bg-slate-50">Role</th>
+                            <th className="px-4 py-1.5 lg:px-5 lg:py-1.5 w-[16%] bg-slate-50">Role</th>
                             <th className="px-5 py-1.5 lg:px-6 lg:py-1.5 w-[20%] bg-slate-50">Office</th>
                             {visibleSessions.map((session) => (
                                 <th key={session} className="px-4 py-1.5 lg:px-5 lg:py-1.5 w-[112px] text-center bg-slate-50">
@@ -1606,13 +1755,7 @@ const AttendanceList: React.FC = () => {
                                     </div>
                                 </td>
                                 <td className="px-4 py-1.5 lg:px-5 lg:py-1.5 text-slate-600">
-                                    {row.delegate_type ? (
-                                        <span className={`inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${DELEGATE_CHIP_CLASS[row.delegate_type]}`}>
-                                            {row.delegate_type}
-                                        </span>
-                                    ) : (
-                                        <span className="text-xs leading-snug">{row.role || 'Delegate'}</span>
-                                    )}
+                                    {renderRoleEditor(row)}
                                 </td>
                                 <td className="px-5 py-1.5 lg:px-6 lg:py-1.5 text-slate-600">
                                     <div className="whitespace-normal break-words leading-snug">
@@ -1728,6 +1871,13 @@ const AttendanceList: React.FC = () => {
                                     >
                                         <PlusCircle size={16} />
                                     </button>
+                                </div>
+
+                                <div className="mt-1.5 flex items-center gap-2 border-t border-slate-100 pt-1.5">
+                                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Role</span>
+                                    <div className="min-w-0 flex-1">
+                                        {renderRoleEditor(row, true)}
+                                    </div>
                                 </div>
 
                                 <div className={`mt-1.5 grid gap-1.5 ${hasMultipleSessions ? 'grid-cols-2' : 'grid-cols-1'}`}>
