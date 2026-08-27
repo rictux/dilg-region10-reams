@@ -416,7 +416,7 @@ const AttendanceList: React.FC = () => {
       if (!event.has_accommodation && filter === 'Accommodation') {
           setFilter('Show All');
       }
-      if (!event.has_principal_delegates && filter === 'Principal') {
+      if (!event.has_principal_delegates && filter === 'Prin/Rep') {
           setFilter('Show All');
       }
       setSelectedManualIds([]);
@@ -543,7 +543,7 @@ const AttendanceList: React.FC = () => {
         case 'No PM': return hasMultipleSessions && hasAM && !hasPM;
         case 'Complete Logs': return hasMultipleSessions && hasAM && hasPM;
         case 'Accommodation': return !!row.needs_accommodation;
-        case 'Principal': return row.delegate_type === 'Principal';
+        case 'Prin/Rep': return row.delegate_type === 'Principal' || row.delegate_type === 'Representative';
         case 'Show All':
         default: return true;
     }
@@ -1301,8 +1301,10 @@ const AttendanceList: React.FC = () => {
   const completeLogsCount = hasMultipleSessions ? data.filter(r => r.amLog && r.pmLog).length : 0;
   const hasAccommodationFilter = !!selectedEvent?.has_accommodation;
   const accommodationCount = hasAccommodationFilter ? data.filter(r => r.needs_accommodation).length : 0;
-  const hasPrincipalFilter = !!selectedEvent?.has_principal_delegates;
-  const principalCount = hasPrincipalFilter ? data.filter(r => r.delegate_type === 'Principal').length : 0;
+  const hasPrinRepFilter = !!selectedEvent?.has_principal_delegates;
+  const prinRepCount = hasPrinRepFilter
+      ? data.filter(r => r.delegate_type === 'Principal' || r.delegate_type === 'Representative').length
+      : 0;
   const statsGridClassName = hasMultipleSessions
       ? hasAccommodationFilter
           ? 'grid-cols-6 xl:[grid-template-columns:repeat(6,minmax(0,1fr))]'
@@ -1424,7 +1426,7 @@ const AttendanceList: React.FC = () => {
                   { value: 'No Logs', label: 'Not Present', shortLabel: 'Not Present', count: notPresentCount, show: true },
                   { value: 'No PM', label: 'No PM', shortLabel: 'No PM', count: noPmCount, show: hasMultipleSessions },
                   { value: 'Complete Logs', label: 'Complete', shortLabel: 'Complete', count: completeLogsCount, show: hasMultipleSessions },
-                  { value: 'Principal', label: 'Principal', shortLabel: 'Principal', count: principalCount, show: hasPrincipalFilter },
+                  { value: 'Prin/Rep', label: 'Prin/Rep', shortLabel: 'Prin/Rep', count: prinRepCount, show: hasPrinRepFilter },
                   { value: 'Accommodation', label: 'Accommodation', shortLabel: 'Accomm', count: accommodationCount, show: hasAccommodationFilter },
               ].filter(tab => tab.show).map(tab => (
                   <button
