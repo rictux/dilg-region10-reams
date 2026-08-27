@@ -719,8 +719,9 @@ const CertificateOfAppearancePrint: React.FC = () => {
     return workingParticipants.filter((record: CertificateParticipant) => {
       const fullName = (record.participant.full_name || '').toLowerCase();
       const displayName = buildParticipantListName(record.participant).toLowerCase();
+      const office = (record.participant.office || '').toLowerCase();
 
-      return fullName.includes(search) || displayName.includes(search);
+      return fullName.includes(search) || displayName.includes(search) || office.includes(search);
     });
   }, [participantSearch, participants, showMissingSerialOnly, showWantsCaOnly]);
 
@@ -1443,7 +1444,7 @@ const CertificateOfAppearancePrint: React.FC = () => {
                 type="text"
                 value={participantSearch}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setParticipantSearch(e.target.value)}
-                placeholder="Type participant name..."
+                placeholder="Type participant name or office..."
                 className="w-full rounded-lg border border-[#C5C2BA] py-2.5 pl-10 pr-14 text-sm text-[#111110] focus:border-[#6255E9] focus:outline-none focus:ring-2 focus:ring-[#6255E9]/20"
               />
               {participantSearch && (
