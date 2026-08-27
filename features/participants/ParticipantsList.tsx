@@ -416,6 +416,9 @@ const AttendanceList: React.FC = () => {
       if (!event.has_accommodation && filter === 'Accommodation') {
           setFilter('Show All');
       }
+      if (!event.has_principal_delegates && filter === 'Principal') {
+          setFilter('Show All');
+      }
       setSelectedManualIds([]);
       
       const start = parseISO(event.start_date);
@@ -474,7 +477,7 @@ const AttendanceList: React.FC = () => {
                     const pLogs = logs?.filter(l => l.participant_id === p.participant_id) || [];
                     const daysLogs = pLogs.filter(l => l.attendance_date === dateStr);
 
-                    const amLogs = daysLogs.filter(l => l.action_session === 'AM').sort((a,b) => a.scan_time.localeCompare(b.scan_time));
+                    const amLogs = daysLogs.filter(l => l.action_session === 'AM').sort((a,b) => b.scan_time.localeCompare(a.scan_time));
                     const pmLogs = daysLogs.filter(l => l.action_session === 'PM').sort((a,b) => b.scan_time.localeCompare(a.scan_time));
 
                     return {
@@ -488,9 +491,8 @@ const AttendanceList: React.FC = () => {
                     };
                 });
 
-            // Sorting logic: logged participants on top, sorted by scan time ascending, then
-            // alphabetically for those without. PM-only events sort by their PM log — every other
-            // event (All_Day and AM-only) sorts by AM.
+            // Sorting logic: logged participants on top, then
+            // alphabetically for those without. AM views show the latest scan first.
             const sortSession = getVisibleSessions(selectedEvent)[0];
             const sortLogOf = (row: AttendanceRow) => (sortSession === 'PM' ? row.pmLog : row.amLog);
 
@@ -502,8 +504,9 @@ const AttendanceList: React.FC = () => {
                 if (!logA && logB) return 1;
 
                 if (logA && logB) {
-                    // Both logged for the sorted session, order by time ASC
-                    return logA.time.localeCompare(logB.time);
+                    return sortSession === 'AM'
+                        ? logB.time.localeCompare(logA.time)
+                        : logA.time.localeCompare(logB.time);
                 }
 
                 // Neither is logged, sort alphabetically
@@ -540,6 +543,7 @@ const AttendanceList: React.FC = () => {
         case 'No PM': return hasMultipleSessions && hasAM && !hasPM;
         case 'Complete Logs': return hasMultipleSessions && hasAM && hasPM;
         case 'Accommodation': return !!row.needs_accommodation;
+        case 'Principal': return row.delegate_type === 'Principal';
         case 'Show All':
         default: return true;
     }
@@ -1297,6 +1301,8 @@ const AttendanceList: React.FC = () => {
   const completeLogsCount = hasMultipleSessions ? data.filter(r => r.amLog && r.pmLog).length : 0;
   const hasAccommodationFilter = !!selectedEvent?.has_accommodation;
   const accommodationCount = hasAccommodationFilter ? data.filter(r => r.needs_accommodation).length : 0;
+  const hasPrincipalFilter = !!selectedEvent?.has_principal_delegates;
+  const principalCount = hasPrincipalFilter ? data.filter(r => r.delegate_type === 'Principal').length : 0;
   const statsGridClassName = hasMultipleSessions
       ? hasAccommodationFilter
           ? 'grid-cols-6 xl:[grid-template-columns:repeat(6,minmax(0,1fr))]'
@@ -1418,6 +1424,7 @@ const AttendanceList: React.FC = () => {
                   { value: 'No Logs', label: 'Not Present', shortLabel: 'Not Present', count: notPresentCount, show: true },
                   { value: 'No PM', label: 'No PM', shortLabel: 'No PM', count: noPmCount, show: hasMultipleSessions },
                   { value: 'Complete Logs', label: 'Complete', shortLabel: 'Complete', count: completeLogsCount, show: hasMultipleSessions },
+                  { value: 'Principal', label: 'Principal', shortLabel: 'Principal', count: principalCount, show: hasPrincipalFilter },
                   { value: 'Accommodation', label: 'Accommodation', shortLabel: 'Accomm', count: accommodationCount, show: hasAccommodationFilter },
               ].filter(tab => tab.show).map(tab => (
                   <button
