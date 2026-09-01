@@ -224,7 +224,7 @@ const Scanner: React.FC = () => {
 
   const getDefaultSessionForEvent = (event?: Event): 'AM' | 'PM' => {
     if (!event || event.session === 'All_Day') {
-      return new Date().getHours() < 12 ? 'AM' : 'PM';
+      return 'AM';
     }
 
     return event.session;
@@ -1831,7 +1831,7 @@ const Scanner: React.FC = () => {
 
                         <div className={`${scanMode === 'attendance' ? 'col-span-1' : 'col-span-2 md:col-span-1'} w-full xl:w-auto rounded-none sm:rounded-xl lg:rounded-2xl border border-[#2A2926] bg-[#111110]/70 p-0.5 sm:p-1.5 shadow-sm`}>
                             <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-[#7C7A72]">Mode</p>
-                            <div className="grid grid-cols-3 gap-1">
+                            <div className={`grid gap-1 ${selectedEventHasGiveaways ? 'grid-cols-3' : 'grid-cols-2'}`}>
                                 <button
                                     type="button"
                                     onClick={() => handleScanModeChange('attendance')}
@@ -1845,25 +1845,27 @@ const Scanner: React.FC = () => {
                                     <CheckCircle size={14} className="sm:w-4 sm:h-4" />
                                     Attendance
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleScanModeChange('giveaway')}
-                                    disabled={!selectedEventHasGiveaways || !isOnline}
-                                    aria-pressed={scanMode === 'giveaway'}
-                                    title={!selectedEventHasGiveaways ? 'No giveaways configured for this event' : !isOnline ? 'Giveaway claims require internet connection' : 'Scan giveaway claims'}
-                                    className={`px-2 py-2 sm:px-3 sm:py-2.5 rounded-none sm:rounded-xl text-[11px] sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
-                                        ${scanMode === 'giveaway'
-                                            ? 'bg-fuchsia-500/20 border-fuchsia-400/60 text-fuchsia-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-                                            : 'bg-[#0F0F0E]/60 border-[#2A2926] text-[#C5C2BA]'
-                                        }
-                                        ${selectedEventHasGiveaways && isOnline
-                                            ? 'hover:bg-fuchsia-500/10'
-                                            : 'opacity-40 cursor-not-allowed text-[#7C7A72]'
-                                        }`}
-                                >
-                                    <Gift size={14} className="sm:w-4 sm:h-4" />
-                                    Giveaway
-                                </button>
+                                {selectedEventHasGiveaways && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleScanModeChange('giveaway')}
+                                        disabled={!isOnline}
+                                        aria-pressed={scanMode === 'giveaway'}
+                                        title={isOnline ? 'Scan giveaway claims' : 'Giveaway claims require internet connection'}
+                                        className={`px-2 py-2 sm:px-3 sm:py-2.5 rounded-none sm:rounded-xl text-[11px] sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
+                                            ${scanMode === 'giveaway'
+                                                ? 'bg-fuchsia-500/20 border-fuchsia-400/60 text-fuchsia-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                                                : 'bg-[#0F0F0E]/60 border-[#2A2926] text-[#C5C2BA]'
+                                            }
+                                            ${isOnline
+                                                ? 'hover:bg-fuchsia-500/10'
+                                                : 'opacity-40 cursor-not-allowed text-[#7C7A72]'
+                                            }`}
+                                    >
+                                        <Gift size={14} className="sm:w-4 sm:h-4" />
+                                        Giveaway
+                                    </button>
+                                )}
                                  <button
                                      type="button"
                                      onClick={() => handleScanModeChange('borrow')}
