@@ -97,7 +97,7 @@ const getRoleChipClass = (role: string) => {
 
 const getRoleChipLabel = (role: string) => (role === 'Guest' || role === 'VIP' ? 'Guest/VIP' : role);
 
-type EventAccessUser = Pick<User, 'user_id' | 'full_name' | 'username' | 'office_id' | 'status'> & {
+type EventAccessUser = Pick<User, 'user_id' | 'full_name' | 'username' | 'office_id' | 'role' | 'status'> & {
   offices?: Pick<Office, 'code' | 'name'> | null;
 };
 
@@ -546,14 +546,15 @@ const EventsList: React.FC = () => {
       setLoadingEventAccess(false);
   };
 
-  const fetchEventAccessUsers = async () => {
-      const { data, error } = await supabase
+  const fetchEventAccessUsers = async (eventOfficeId?: number | null) => {
+      let query = supabase
         .from('users')
         .select(`
           user_id,
           full_name,
           username,
           office_id,
+          role,
           status,
           offices (
             code,
@@ -561,8 +562,15 @@ const EventsList: React.FC = () => {
           )
         `)
         .eq('status', 'Active')
-        .neq('role', 'Admin')
-        .order('full_name', { ascending: true });
+        .neq('role', 'Admin');
+
+      // Users in the event's owning office already inherit access to the event.
+      // Keep unassigned users eligible because they do not belong to that office.
+      if (eventOfficeId != null) {
+          query = query.or(`office_id.is.null,office_id.neq.${eventOfficeId}`);
+      }
+
+      const { data, error } = await query.order('full_name', { ascending: true });
 
       if (error) {
         console.error('Error fetching users for event access:', error);
@@ -908,7 +916,7 @@ const EventsList: React.FC = () => {
       setActionMenuPosition(null);
       setShowEventAccessModal(true);
       fetchEventAccess(event.event_id);
-      fetchEventAccessUsers();
+      fetchEventAccessUsers(event.organize_by);
   };
 
   const closeEventAccessModal = () => {
@@ -1070,6 +1078,19 @@ const EventsList: React.FC = () => {
 
       if (!canSetEventAccess(selectedAccessEvent)) {
           toast.error('Only Admin or the owning Office Manager can assign users to this event.');
+          return;
+      }
+
+      const accessUser = eventAccessUsers.find(
+          (candidate) => candidate.user_id === Number(selectedAccessUserId)
+      );
+      const isFromOwningOffice =
+          selectedAccessEvent.organize_by != null &&
+          accessUser?.office_id === selectedAccessEvent.organize_by;
+
+      if (!accessUser || accessUser.role === 'Admin' || isFromOwningOffice) {
+          toast.error('Select an active non-admin user from outside the event office.');
+          setSelectedAccessUserId('');
           return;
       }
 
@@ -2460,7 +2481,16 @@ const EventsList: React.FC = () => {
       .map((access) => access.user_id)
   );
   const filteredEventAccessUsers = eventAccessUsers.filter((accessUser) => {
-    if (accessUser.user_id === user?.user_id || activeAssignedUserIds.has(accessUser.user_id)) return false;
+    const isFromOwningOffice =
+      selectedAccessEvent?.organize_by != null &&
+      accessUser.office_id === selectedAccessEvent.organize_by;
+
+    if (
+      accessUser.role === 'Admin' ||
+      isFromOwningOffice ||
+      accessUser.user_id === user?.user_id ||
+      activeAssignedUserIds.has(accessUser.user_id)
+    ) return false;
 
     const normalizedSearch = accessUserSearch.trim().toLowerCase();
     if (!normalizedSearch) return true;
@@ -2812,7 +2842,7 @@ const EventsList: React.FC = () => {
       setIsAccessUserDropdownOpen(false);
       setShowEventAccessModal(true);
       fetchEventAccess(tourEvent.event_id);
-      fetchEventAccessUsers();
+      fetchEventAccessUsers(tourEvent.organize_by);
     }
   };
 
