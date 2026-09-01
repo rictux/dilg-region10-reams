@@ -15,6 +15,7 @@ interface ColumnSettings {
   consent1: boolean;
   consent2: boolean;
   ageGroup: boolean;
+  accommodation: boolean;
   giveaways: boolean;
   am: boolean;
   pm: boolean;
@@ -23,6 +24,8 @@ interface ColumnSettings {
 interface AttendanceRow {
     participant: Participant;
     giveaway_selections?: Record<string, string | boolean> | null;
+    needs_accommodation?: boolean | null;
+    date_accommodation?: string[] | null;
     amLog?: { time: string, status: string };
     pmLog?: { time: string, status: string };
 }
@@ -53,6 +56,25 @@ const renderCellText = (text: string | null | undefined, threshold1: number, thr
 
 const getAttendanceGiveaways = (event: Event | null): GiveawayItem[] =>
     (event?.giveaways || []).filter((item) => item.include_in_attendance);
+
+const getEventAccommodationDates = (event: Event, eventDates: Date[]): Set<string> => {
+    if (!event.has_accommodation) return new Set<string>();
+    const savedDates = (event.dates_with_accom || []).filter(Boolean);
+    if (savedDates.length > 0) return new Set(savedDates);
+    return new Set(eventDates.map((date) => format(date, 'yyyy-MM-dd')));
+};
+
+// Rows saved before per-date accommodation was captured carry no dates; treat
+// those as booked for every accommodation date of the event.
+const hasAccommodationOnDate = (
+    row: Pick<AttendanceRow, 'needs_accommodation' | 'date_accommodation'>,
+    dateStr: string,
+    eventAccommodationDates: Set<string>,
+) => {
+    if (!row.needs_accommodation || !eventAccommodationDates.has(dateStr)) return false;
+    const dates = (row.date_accommodation || []).filter(Boolean);
+    return dates.length === 0 || dates.includes(dateStr);
+};
 
 const formatGiveawayAttendanceValue = (
     item: GiveawayItem,
@@ -96,6 +118,7 @@ const AttendanceSheetPrint: React.FC = () => {
     consent1: true,
     consent2: true,
     ageGroup: false,
+    accommodation: false,
     giveaways: false,
     am: true,
     pm: true,
@@ -144,7 +167,7 @@ const AttendanceSheetPrint: React.FC = () => {
         const eventParticipants = await fetchAllSupabaseRows<any>(() =>
             supabase
                 .from('event_participants')
-                .select('accept_photo_video, store_to_db, giveaway_selections, role, participants(*)')
+                .select('accept_photo_video, store_to_db, giveaway_selections, needs_accommodation, date_accommodation, role, participants(*)')
                 .eq('event_id', id)
                 .order('participant_id', { ascending: true })
         );
@@ -155,6 +178,8 @@ const AttendanceSheetPrint: React.FC = () => {
                 accept_photo_video: ep.accept_photo_video,
                 store_to_db: ep.store_to_db,
                 giveaway_selections: ep.giveaway_selections,
+                needs_accommodation: ep.needs_accommodation,
+                date_accommodation: ep.date_accommodation,
                 role: ep.role
             };
         }).filter((p: any) => p !== null);
@@ -183,6 +208,8 @@ const AttendanceSheetPrint: React.FC = () => {
               return {
                   participant: p,
                   giveaway_selections: (p as any).giveaway_selections,
+                  needs_accommodation: (p as any).needs_accommodation,
+                  date_accommodation: (p as any).date_accommodation,
                   amLog: amLogs.length > 0 ? { time: amLogs[0].scan_time, status: amLogs[0].scan_status } : undefined,
                   pmLog: pmLogs.length > 0 ? { time: pmLogs[pmLogs.length - 1].scan_time, status: pmLogs[pmLogs.length - 1].scan_status } : undefined,
               };
@@ -216,8 +243,10 @@ const AttendanceSheetPrint: React.FC = () => {
       ? (event.session === 'All_Day' ? ['AM', 'PM'] : [event.session])
       : (columnSettings.am ? ['AM'] : columnSettings.pm ? ['PM'] : []);
   const attendanceGiveaways = columnSettings.giveaways ? getAttendanceGiveaways(event) : [];
+  const showAccommodation = !!event.has_accommodation && columnSettings.accommodation;
+  const eventAccommodationDates = getEventAccommodationDates(event, eventDates);
 
-  const optionalColumnsCount = (columnSettings.ageGroup ? 1 : 0) + (columnSettings.giveaways ? 1 : 0) + attendanceGiveaways.length;
+  const optionalColumnsCount = (columnSettings.ageGroup ? 1 : 0) + (showAccommodation ? 1 : 0) + (columnSettings.giveaways ? 1 : 0) + attendanceGiveaways.length;
 
   const getNameWidth = () => {
     if (optionalColumnsCount === 0) return 'w-44';
@@ -241,6 +270,7 @@ const AttendanceSheetPrint: React.FC = () => {
   if (columnSettings.ageGroup) totalColumnCount++;
   if (columnSettings.consent1) totalColumnCount++;
   if (columnSettings.consent2) totalColumnCount++;
+  if (showAccommodation) totalColumnCount++;
   totalColumnCount += attendanceGiveaways.length;
   totalColumnCount += visibleSessions.length;
 
@@ -292,6 +322,12 @@ const AttendanceSheetPrint: React.FC = () => {
                         <input type="checkbox" checked={columnSettings.consent2} onChange={(e) => setColumnSettings({...columnSettings, consent2: e.target.checked})} className="w-4 h-4" />
                         <span className="text-sm">Consent 2</span>
                     </label>
+                    {event.has_accommodation && (
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={columnSettings.accommodation} onChange={(e) => setColumnSettings({...columnSettings, accommodation: e.target.checked})} className="w-4 h-4" />
+                            <span className="text-sm">Accommodation</span>
+                        </label>
+                    )}
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" checked={columnSettings.giveaways} onChange={(e) => setColumnSettings({...columnSettings, giveaways: e.target.checked})} className="w-4 h-4" />
                         <span className="text-sm">Giveaways</span>
@@ -339,7 +375,7 @@ const AttendanceSheetPrint: React.FC = () => {
 
         {eventDates.map((date) => {
             const allRows = getRowsForDate(date);
-            const rowChunks = allRows.length > 0 ? chunkArray(allRows, ROWS_PER_PAGE) : [[]];
+            const rowChunks: AttendanceRow[][] = allRows.length > 0 ? chunkArray(allRows, ROWS_PER_PAGE) : [[]];
 
             return rowChunks.map((rows, chunkIndex) => (
                 <div key={`${date.toISOString()}-${chunkIndex}`} className="w-[297mm] h-[210mm] mx-auto bg-white shadow-xl mb-10 print:mb-0 print:shadow-none print:w-[297mm] print:h-[210mm] print:max-w-none page-break-after relative overflow-hidden flex flex-col">
@@ -380,6 +416,7 @@ const AttendanceSheetPrint: React.FC = () => {
                                     {columnSettings.ageGroup && <th rowSpan={2} className="border border-black px-1 py-0.5 w-20">AGE GROUP</th>}
                                     {columnSettings.consent1 && <th rowSpan={2} className="border border-black px-1 py-0.5 w-20 text-[6.5px] leading-[1.05] normal-case font-normal align-top">I consent to the capture of my photo, video, and audio for use in DILG publications.</th>}
                                     {columnSettings.consent2 && <th rowSpan={2} className="border border-black px-1 py-0.5 w-20 text-[6.5px] leading-[1.05] normal-case font-normal align-top">I consent to the storage of my data in the organizer’s database for future document processing.</th>}
+                                    {showAccommodation && <th rowSpan={2} className="border border-black px-1 py-0.5 w-16 text-[8px] leading-[1.05]">ACCOMMODATION</th>}
                                     {columnSettings.giveaways && attendanceGiveaways.map((item) => (
                                         <th key={item.key} rowSpan={2} className="border border-black px-1 py-0.5 w-20 text-[8px] leading-[1.05]">
                                             {item.label}
@@ -429,6 +466,7 @@ const AttendanceSheetPrint: React.FC = () => {
                                                 </td>}
                                                 {columnSettings.consent1 && <td className="px-1 py-0.5 font-bold border border-black">{(row.participant as any).accept_photo_video ? '✓' : ''}</td>}
                                                 {columnSettings.consent2 && <td className="px-1 py-0.5 font-bold border border-black">{(row.participant as any).store_to_db ? '✓' : ''}</td>}
+                                                {showAccommodation && <td className="px-1 py-0.5 font-bold border border-black">{hasAccommodationOnDate(row, format(date, 'yyyy-MM-dd'), eventAccommodationDates) ? '✓' : ''}</td>}
                                                 {columnSettings.giveaways && attendanceGiveaways.map((item) => (
                                                     <td key={item.key} className="px-1 py-0.5 border border-black">
                                                         {renderCellText(formatGiveawayAttendanceValue(item, row.giveaway_selections), 8, 14)}
