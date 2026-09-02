@@ -4,10 +4,11 @@ import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { User, Office, UserRole } from '../../types/database';
-import { Trash2, UserPlus, Shield, CheckCircle, XCircle, Search, Mail, Briefcase, Lock, X, Loader2, AlertCircle, Edit, Building2, Eye, EyeOff, SlidersHorizontal, ChevronDown, Users } from 'lucide-react';
+import { Trash2, UserPlus, Shield, CheckCircle, XCircle, Search, Mail, Briefcase, X, Loader2, AlertCircle, Edit, Building2, Eye, EyeOff, SlidersHorizontal, ChevronDown, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import bcrypt from 'bcryptjs';
 import ParticipantsList from './ParticipantsList';
+import AuthenticationBadge from '../../components/AuthenticationBadge';
 import { diffRecords, logAudit, sanitizeSnapshot } from '../../lib/auditLog';
 
 // Extend User type locally to include joined office data
@@ -32,20 +33,6 @@ const ROLE_BADGE_STYLES: Record<string, string> = {
     EventManager: 'border-blue-200 bg-blue-50 text-blue-700',
     OfficeManager: 'border-teal-200 bg-teal-50 text-teal-700',
     Scanner: 'border-orange-200 bg-orange-50 text-orange-700'
-};
-
-const AuthenticationBadge: React.FC<{ authUserId?: string | null }> = ({ authUserId }) => {
-    if (authUserId == null) return null;
-
-    return (
-      <span
-        className="inline-flex w-fit items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700"
-        title="Linked to an authentication account"
-      >
-        <Lock size={10} aria-hidden="true" />
-        Authenticated
-      </span>
-    );
 };
 
 const UserManagement: React.FC = () => {

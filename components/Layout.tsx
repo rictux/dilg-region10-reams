@@ -9,6 +9,7 @@ import {
 } from '../lib/principalArrival';
 import { ALL_EVENT_ACCESS_ROLES, fetchAccessibleEvents } from '../lib/eventAccess';
 import PrincipalArrivalModal from './PrincipalArrivalModal';
+import AuthenticationBadge from './AuthenticationBadge';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -536,8 +537,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 user?.full_name?.charAt(0) || <User size={32} />
                             )}
                         </div>
-                        <h2 className="text-lg font-medium text-slate-900">{user?.full_name}</h2>
-                        <p className="text-sm text-slate-600 mb-6">{user?.position || 'No Position Set'}</p>
+                        <div className="flex flex-col items-center gap-1 mb-6">
+                            <h2 className="text-lg font-medium text-slate-900">{user?.full_name}</h2>
+                            <p className="text-sm text-slate-600">{user?.position || 'No Position Set'}</p>
+                            {/* Only rendered when the account is linked to Supabase Auth (auth_user_id set). */}
+                            <AuthenticationBadge authUserId={user?.auth_user_id} />
+                        </div>
 
                         <div className="w-full space-y-0 mb-6">
                             <div className="flex justify-between items-center py-2.5 border-b border-[rgb(var(--ink)/0.06)]">
@@ -656,7 +661,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="absolute right-0 top-full mt-2 w-52 bg-card rounded-lg shadow-lg border border-[rgb(var(--ink)/0.10)] overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
         <div className="px-4 py-3 border-b border-[rgb(var(--ink)/0.06)]">
             <p className="text-sm font-medium text-slate-900 truncate">{user?.full_name}</p>
-            <p className="text-xs text-slate-600 capitalize font-mono">{user?.role}</p>
+            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                <p className="text-xs text-slate-600 capitalize font-mono">{user?.role}</p>
+                {/* Only rendered when the account is linked to Supabase Auth (auth_user_id set). */}
+                <AuthenticationBadge authUserId={user?.auth_user_id} />
+            </div>
         </div>
         <button
             onClick={() => {
