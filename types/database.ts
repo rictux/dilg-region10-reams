@@ -84,6 +84,7 @@ export interface Event {
   // When enabled, Delegates are further classified as Principal or Representative,
   // and Principal arrivals are announced on scan.
   has_principal_delegates?: boolean | null;
+  has_item_borrowing?: boolean | null;
   deleted_at?: string | null;
   deleted_by?: number | null;
   delete_reason?: string | null;

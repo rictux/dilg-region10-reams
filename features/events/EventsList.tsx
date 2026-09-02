@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { DelegateType, Event, Participant, Office, GiveawayItem, EventAccessRole, EventUserAccess, User } from '../../types/database';
-import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift, Settings, ChevronDown, Hash, Utensils, QrCode, ClipboardList, GraduationCap } from 'lucide-react';
+import { CalendarPlus, Trash2, X, MapPin, Type, Clock, Share2, Edit, Users, Calendar, Check, Copy, Bed, Lock, UserPlus, Loader2, ArrowRight, Search, Building2, Save, XCircle, AlertTriangle, MoreVertical, Building, Landmark, Download, Info, RotateCcw, CameraOff, DatabaseBackup, Gift, Settings, ChevronDown, Hash, Utensils, QrCode, ClipboardList, GraduationCap, Package } from 'lucide-react';
 import { eachDayOfInterval, format, isSameMonth, isSameYear, parseISO } from 'date-fns';
 import QRCode from 'react-qr-code';
 import ExcelJS from 'exceljs';
@@ -43,6 +43,7 @@ import {
 import EventTestBuilder from './EventTestBuilder';
 
 const PARTICIPANT_SUGGESTION_DEBOUNCE_MS = 400;
+const ITEM_BORROWING_OFFICE_IDS = new Set([3, 12]);
 
 type ParticipantFormData = {
   f_name: string;
@@ -290,6 +291,7 @@ const EventsList: React.FC = () => {
       registration_open: true,
       auto_attendance_on_registration: false,
       has_principal_delegates: false,
+      has_item_borrowing: false,
       session: 'All_Day' as const,
       days_accommodation: 0,
       dates_with_accom: [] as string[],
@@ -297,6 +299,8 @@ const EventsList: React.FC = () => {
       giveaways_open: true
   };
   const [formData, setFormData] = useState<Partial<Event>>(initialFormState);
+  const borrowingOptionVisible =
+      formData.organize_by != null && ITEM_BORROWING_OFFICE_IDS.has(formData.organize_by);
   const [foodInclusionByDate, setFoodInclusionByDate] = useState<EventFoodInclusionMap>({});
   const [hasEventCode, setHasEventCode] = useState(false);
   const [showEventCodeInfo, setShowEventCodeInfo] = useState(false);
@@ -526,6 +530,7 @@ const EventsList: React.FC = () => {
             full_name,
             username,
             office_id,
+            role,
             status,
             offices (
               code,
@@ -540,7 +545,7 @@ const EventsList: React.FC = () => {
         console.error('Error fetching event access:', error);
         toast.error('Unable to load event access list.');
       } else {
-        setEventAccessList((data || []) as EventAccessRecord[]);
+        setEventAccessList((data || []) as unknown as EventAccessRecord[]);
       }
 
       setLoadingEventAccess(false);
@@ -578,7 +583,7 @@ const EventsList: React.FC = () => {
         return;
       }
 
-      setEventAccessUsers((data || []) as EventAccessUser[]);
+      setEventAccessUsers((data || []) as unknown as EventAccessUser[]);
   };
 
   // `silent` refetches in the background: the rows swap in place instead of the
@@ -874,6 +879,7 @@ const EventsList: React.FC = () => {
           registration_open: event.registration_open,
           auto_attendance_on_registration: event.auto_attendance_on_registration ?? false,
           has_principal_delegates: event.has_principal_delegates ?? false,
+          has_item_borrowing: event.has_item_borrowing ?? false,
           session: event.session || 'All_Day',
           days_accommodation: event.days_accommodation || 0,
           dates_with_accom: event.dates_with_accom || [],
@@ -988,6 +994,9 @@ const EventsList: React.FC = () => {
       const validEventDates = getFormEventDateOptions(formData.start_date, formData.end_date);
       const normalizedFoodInclusion = serializeFoodInclusion(foodInclusionByDate, validEventDates);
       const normalizedEventSerial = hasEventCode ? formData.event_serial?.trim() : '';
+      const owningOfficeId = user?.role === 'Admin'
+        ? (formData.organize_by ?? null)
+        : (editingEventId ? (formData.organize_by ?? null) : (user?.office_id ?? null));
 
       let payload = {
           ...formData,
@@ -996,7 +1005,10 @@ const EventsList: React.FC = () => {
           dates_with_accom: formData.has_accommodation ? normalizedAccommodationDates : null,
           days_accommodation: formData.has_accommodation ? normalizedAccommodationDates.length : 0,
           food_inclusion: normalizedFoodInclusion,
-          giveaways: normalizeGiveaways(formData.giveaways as GiveawayItem[])
+          giveaways: normalizeGiveaways(formData.giveaways as GiveawayItem[]),
+          has_item_borrowing: owningOfficeId != null
+            && ITEM_BORROWING_OFFICE_IDS.has(owningOfficeId)
+            && Boolean(formData.has_item_borrowing)
       };
       if (user?.role !== 'Admin') {
           payload.organize_by = editingEventId ? (formData.organize_by || null) : (user?.office_id || null);
@@ -4770,7 +4782,16 @@ const EventsList: React.FC = () => {
                               <select
                                   className="block w-full pl-10 pr-8 py-2.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm bg-card transition-all appearance-none"
                                   value={formData.organize_by || ''}
-                                  onChange={e => setFormData({...formData, organize_by: e.target.value ? Number(e.target.value) : null})}
+                                  onChange={e => {
+                                      const nextOfficeId = e.target.value ? Number(e.target.value) : null;
+                                      setFormData({
+                                          ...formData,
+                                          organize_by: nextOfficeId,
+                                          has_item_borrowing: nextOfficeId != null && ITEM_BORROWING_OFFICE_IDS.has(nextOfficeId)
+                                            ? formData.has_item_borrowing
+                                            : false
+                                      });
+                                  }}
                               >
                                   <option value="">-- Select Office --</option>
                                   {offices.map(office => (
@@ -5276,6 +5297,55 @@ const EventsList: React.FC = () => {
                       {formData.registration_open ? 'Open' : 'Closed'}
                   </button>
                 </div>
+
+                {borrowingOptionVisible && (
+                  <div className={`rounded-xl border px-4 py-3.5 transition-colors ${
+                      formData.has_item_borrowing
+                        ? 'border-blue-200 bg-blue-50/70'
+                        : 'border-slate-200 bg-slate-50/60'
+                  }`}>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <label
+                          htmlFor="has-item-borrowing"
+                          className="block cursor-pointer text-sm font-semibold text-slate-800"
+                        >
+                          Item borrowing
+                        </label>
+                        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                          Show Borrow in Scan Mode so registered participants can borrow and return office inventory items during this event.
+                        </p>
+                      </div>
+                      <button
+                        id="has-item-borrowing"
+                        type="button"
+                        role="switch"
+                        aria-checked={Boolean(formData.has_item_borrowing)}
+                        aria-label="Enable item borrowing for this event"
+                        onClick={() => setFormData({
+                          ...formData,
+                          has_item_borrowing: !formData.has_item_borrowing
+                        })}
+                        className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                          formData.has_item_borrowing ? 'bg-blue-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                            formData.has_item_borrowing ? 'translate-x-5' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    <p className={`mt-2 flex items-center gap-1.5 text-[11px] font-semibold ${
+                      formData.has_item_borrowing ? 'text-blue-700' : 'text-slate-500'
+                    }`}>
+                      <Package size={13} />
+                      {formData.has_item_borrowing ? 'Enabled in Scan Mode' : 'Off by default'}
+                    </p>
+                  </div>
+                )}
 
                 <div className={`rounded-xl border px-4 py-3.5 transition-colors ${
                     formData.auto_attendance_on_registration

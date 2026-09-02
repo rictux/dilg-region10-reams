@@ -136,6 +136,7 @@ CREATE TABLE IF NOT EXISTS events (
     registration_open BOOLEAN DEFAULT TRUE,
     auto_attendance_on_registration BOOLEAN NOT NULL DEFAULT FALSE,
     has_principal_delegates BOOLEAN NOT NULL DEFAULT FALSE,
+    has_item_borrowing BOOLEAN NOT NULL DEFAULT FALSE,
     session TEXT NOT NULL DEFAULT 'All_Day' CHECK (session IN ('AM', 'PM', 'All_Day')),
     days_accommodation SMALLINT,
     dates_with_accom DATE[],
@@ -156,6 +157,8 @@ ALTER TABLE events
     ADD COLUMN IF NOT EXISTS giveaways_open BOOLEAN DEFAULT TRUE,
     -- When TRUE, Delegates are further classified as Principal or Representative.
     ADD COLUMN IF NOT EXISTS has_principal_delegates BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Item borrowing is available only to events owned by the inventory-enabled offices.
+    ADD COLUMN IF NOT EXISTS has_item_borrowing BOOLEAN NOT NULL DEFAULT FALSE,
     ADD COLUMN IF NOT EXISTS cop_primary_signatory_id BIGINT REFERENCES tbl_signatory(id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS cop_secondary_signatory_id BIGINT REFERENCES tbl_signatory(id) ON DELETE SET NULL;
 
@@ -173,6 +176,20 @@ BEGIN
                 cop_secondary_signatory_id IS NULL
                 OR cop_primary_signatory_id IS DISTINCT FROM cop_secondary_signatory_id
             );
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'events_item_borrowing_office_chk'
+          AND conrelid = 'public.events'::regclass
+    ) THEN
+        ALTER TABLE public.events
+            ADD CONSTRAINT events_item_borrowing_office_chk
+            CHECK (NOT has_item_borrowing OR organize_by IN (3, 12));
     END IF;
 END $$;
 

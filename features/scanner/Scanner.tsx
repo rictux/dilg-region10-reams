@@ -238,6 +238,12 @@ const Scanner: React.FC = () => {
   const selectedEvent = events.find((event) => event.event_id.toString() === selectedEventId);
   const selectedEventGiveaways = selectedEvent?.giveaways || [];
   const selectedEventHasGiveaways = selectedEventGiveaways.length > 0;
+  const selectedEventHasItemBorrowing = Boolean(selectedEvent?.has_item_borrowing);
+  const scanModeGridClass = selectedEventHasGiveaways && selectedEventHasItemBorrowing
+    ? 'grid-cols-3'
+    : selectedEventHasGiveaways || selectedEventHasItemBorrowing
+      ? 'grid-cols-2'
+      : 'grid-cols-1';
   const selectedEventHasPrincipals = Boolean(selectedEvent?.has_principal_delegates);
 
   // Which delegate types the scanned participant can still be reassigned to.
@@ -288,6 +294,7 @@ const Scanner: React.FC = () => {
 
   useEffect(() => {
     if ((scanMode === 'giveaway' && !selectedEventHasGiveaways)
+        || (scanMode === 'borrow' && !selectedEventHasItemBorrowing)
         || ((scanMode === 'giveaway' || scanMode === 'borrow') && !isOnline)) {
       resetBorrowFlow();
       scanModeRef.current = 'attendance';
@@ -295,7 +302,7 @@ const Scanner: React.FC = () => {
       isProcessingRef.current = false;
       setCameraPaused(false);
     }
-  }, [scanMode, selectedEventHasGiveaways, isOnline]);
+  }, [scanMode, selectedEventHasGiveaways, selectedEventHasItemBorrowing, isOnline]);
 
   useEffect(() => {
     const updateFocusBoxSize = () => {
@@ -1521,6 +1528,7 @@ const Scanner: React.FC = () => {
       if (nextMode === scanMode) return;
 
       if ((nextMode === 'giveaway' && !selectedEventHasGiveaways)
+          || (nextMode === 'borrow' && !selectedEventHasItemBorrowing)
           || ((nextMode === 'giveaway' || nextMode === 'borrow') && !isOnline)) {
           return;
       }
@@ -1831,7 +1839,7 @@ const Scanner: React.FC = () => {
 
                         <div className={`${scanMode === 'attendance' ? 'col-span-1' : 'col-span-2 md:col-span-1'} w-full xl:w-auto rounded-none sm:rounded-xl lg:rounded-2xl border border-[#2A2926] bg-[#111110]/70 p-0.5 sm:p-1.5 shadow-sm`}>
                             <p className="px-2 pb-0.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.24em] text-[#7C7A72]">Mode</p>
-                            <div className={`grid gap-1 ${selectedEventHasGiveaways ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                            <div className={`grid gap-1 ${scanModeGridClass}`}>
                                 <button
                                     type="button"
                                     onClick={() => handleScanModeChange('attendance')}
@@ -1866,22 +1874,24 @@ const Scanner: React.FC = () => {
                                         Giveaway
                                     </button>
                                 )}
-                                 <button
-                                     type="button"
-                                     onClick={() => handleScanModeChange('borrow')}
-                                     disabled={!isOnline}
-                                     aria-pressed={scanMode === 'borrow'}
-                                     title={isOnline ? 'Borrow and return items' : 'Borrow and return require internet connection'}
-                                     className={`px-2 py-2 sm:px-3 sm:py-2.5 rounded-none sm:rounded-xl text-[11px] sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
-                                         ${scanMode === 'borrow'
-                                             ? 'bg-blue-500/20 border-blue-400/60 text-blue-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-                                             : 'bg-[#0F0F0E]/60 border-[#2A2926] text-[#C5C2BA]'
-                                         }
-                                         ${isOnline ? 'hover:bg-blue-500/10' : 'cursor-not-allowed opacity-40 text-[#7C7A72]'}`}
-                                >
-                                    <Package size={14} className="sm:w-4 sm:h-4" />
-                                    Borrow
-                                </button>
+                                {selectedEventHasItemBorrowing && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleScanModeChange('borrow')}
+                                        disabled={!isOnline}
+                                        aria-pressed={scanMode === 'borrow'}
+                                        title={isOnline ? 'Borrow and return items' : 'Borrow and return require internet connection'}
+                                        className={`px-2 py-2 sm:px-3 sm:py-2.5 rounded-none sm:rounded-xl text-[11px] sm:text-sm font-bold flex items-center justify-center gap-1 transition-all border
+                                            ${scanMode === 'borrow'
+                                                ? 'bg-blue-500/20 border-blue-400/60 text-blue-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                                                : 'bg-[#0F0F0E]/60 border-[#2A2926] text-[#C5C2BA]'
+                                            }
+                                            ${isOnline ? 'hover:bg-blue-500/10' : 'cursor-not-allowed opacity-40 text-[#7C7A72]'}`}
+                                    >
+                                        <Package size={14} className="sm:w-4 sm:h-4" />
+                                        Borrow
+                                    </button>
+                                )}
                             </div>
                         </div>
                         

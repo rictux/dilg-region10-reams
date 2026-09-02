@@ -164,6 +164,7 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
   registration_open: 'Registration Open',
   auto_attendance_on_registration: 'Auto Attendance on Registration',
   has_principal_delegates: 'Principal / Representative Delegates',
+  has_item_borrowing: 'Item Borrowing',
   cop_primary_signatory_id: 'COP Primary Signatory',
   cop_secondary_signatory_id: 'COP Secondary Signatory',
   deleted_at: 'Deleted At',

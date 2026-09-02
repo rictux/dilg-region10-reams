@@ -19,7 +19,7 @@ type UserLoginActivity = {
     created_at: string;
 };
 
-interface UserWithOffice extends User {
+interface UserWithOffice extends Omit<User, 'password_hash'> {
     offices?: {
         code: string;
         name: string;
@@ -32,6 +32,20 @@ const ROLE_BADGE_STYLES: Record<string, string> = {
     EventManager: 'border-blue-200 bg-blue-50 text-blue-700',
     OfficeManager: 'border-teal-200 bg-teal-50 text-teal-700',
     Scanner: 'border-orange-200 bg-orange-50 text-orange-700'
+};
+
+const AuthenticationBadge: React.FC<{ authUserId?: string | null }> = ({ authUserId }) => {
+    if (authUserId == null) return null;
+
+    return (
+      <span
+        className="inline-flex w-fit items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700"
+        title="Linked to an authentication account"
+      >
+        <Lock size={10} aria-hidden="true" />
+        Authenticated
+      </span>
+    );
 };
 
 const UserManagement: React.FC = () => {
@@ -98,7 +112,19 @@ const UserManagement: React.FC = () => {
     try {
       let query = supabase
         .from('users')
-        .select('*, offices(code, name)')
+        .select(`
+          user_id,
+          full_name,
+          email,
+          username,
+          role,
+          status,
+          created_at,
+          position,
+          office_id,
+          auth_user_id,
+          offices(code, name)
+        `)
         .order('created_at', { ascending: false });
 
       if (isOfficeManager) {
@@ -113,7 +139,9 @@ const UserManagement: React.FC = () => {
       const { data, error } = await query;
       if (error) throw error;
 
-      const userRows = (data as UserWithOffice[] || []);
+      // The office foreign-key relation is returned as one object at runtime,
+      // although the untyped Supabase select parser models it as an array.
+      const userRows = (data as unknown as UserWithOffice[] || []);
       const userIds = userRows.map((user) => user.user_id);
 
       if (userIds.length === 0) {
@@ -602,7 +630,10 @@ const UserManagement: React.FC = () => {
                                           </div>
                                           <div className="min-w-0">
                                               <div className="text-sm font-medium text-slate-900 leading-tight">{user.full_name}</div>
-                                              <div className="text-xs text-slate-500 font-mono">@{user.username}</div>
+                                              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                                  <span className="text-xs text-slate-500 font-mono">@{user.username}</span>
+                                                  <AuthenticationBadge authUserId={user.auth_user_id} />
+                                              </div>
                                           </div>
                                       </div>
                                   </td>
@@ -703,7 +734,10 @@ const UserManagement: React.FC = () => {
                                   </div>
                                   <div className="min-w-0">
                                       <div className="text-sm font-medium text-slate-900 truncate">{user.full_name}</div>
-                                      <div className="text-xs text-slate-500 font-mono">@{user.username}</div>
+                                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                          <span className="text-xs text-slate-500 font-mono">@{user.username}</span>
+                                          <AuthenticationBadge authUserId={user.auth_user_id} />
+                                      </div>
                                   </div>
                               </div>
                               <span className={`inline-flex items-center gap-1.5 text-xs font-medium shrink-0 ${
