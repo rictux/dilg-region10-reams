@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ClipboardList, Loader2, Printer, Search } from 'lucide-react';
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns';
+import ExcelJS from 'exceljs';
 import { supabase } from '../../lib/supabase';
 import { fetchAllSupabaseRows } from '../../lib/supabasePagination';
 import {
@@ -39,6 +40,8 @@ type ResultRow = RosterRow & {
 };
 
 type Filter = 'All' | 'Complete' | 'Incomplete';
+
+type ExportColumn = { name: string; width: number; text?: boolean; date?: boolean };
 
 const formatEventDate = (start: string, end?: string | null) => {
   if (!start) return '';
@@ -268,23 +271,22 @@ const TestResults: React.FC = () => {
     });
   }, [questions, rows, tests]);
 
-  const downloadCsv = () => {
-    const header = [
-      'Name',
-      'Office',
-      'Role',
+  const downloadExcel = async () => {
+    const columns: ExportColumn[] = [
+      { name: 'Name', width: 32 },
+      { name: 'Office', width: 30 },
+      { name: 'Role', width: 14 },
       ...tests.flatMap(test => [
-        `${EVENT_TEST_LABEL[test.test_type]} Score`,
-        `${EVENT_TEST_LABEL[test.test_type]} %`,
-        `${EVENT_TEST_LABEL[test.test_type]} Submitted`,
+        // "8/10" is read as a date by Excel unless the cell is explicitly text.
+        { name: `${EVENT_TEST_LABEL[test.test_type]} Score`, width: 16, text: true },
+        { name: `${EVENT_TEST_LABEL[test.test_type]} %`, width: 12 },
+        { name: `${EVENT_TEST_LABEL[test.test_type]} Submitted`, width: 20, date: true },
       ]),
-      'Gain',
-      'Complete',
+      { name: 'Gain', width: 10 },
+      { name: 'Complete', width: 12 },
     ];
 
-    const escape = (value: string) => `"${value.replace(/"/g, '""')}"`;
-
-    const lines = filteredRows.map(row => {
+    const rows = filteredRows.map(row => {
       const pre = row.submissions.Pre;
       const post = row.submissions.Post;
       const prePercent = pre ? scorePercent(Number(pre.score), Number(pre.max_score)) : null;
@@ -292,29 +294,55 @@ const TestResults: React.FC = () => {
       const gain = prePercent !== null && postPercent !== null ? postPercent - prePercent : null;
 
       return [
-        escape(row.name),
-        escape(row.office || ''),
-        escape(row.role),
+        row.name,
+        row.office || '',
+        row.role,
         ...tests.flatMap(test => {
           const submission = row.submissions[test.test_type];
-          if (!submission) return ['', '', ''];
+          if (!submission) return [null, null, null];
+          const percent = scorePercent(Number(submission.score), Number(submission.max_score));
           return [
             `${Number(submission.score)}/${Number(submission.max_score)}`,
-            String(Math.round(scorePercent(Number(submission.score), Number(submission.max_score)) ?? 0)),
-            format(new Date(submission.submitted_at), 'yyyy-MM-dd HH:mm'),
+            percent === null ? null : Math.round(percent),
+            submission.submitted_at ? new Date(submission.submitted_at) : null,
           ];
         }),
-        gain === null ? '' : String(Math.round(gain)),
+        gain === null ? null : Math.round(gain),
         isComplete(row) ? 'Yes' : 'No',
-      ].join(',');
+      ];
     });
 
-    const csv = [header.map(escape).join(','), ...lines].join('\r\n');
-    const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Test Results');
+
+    worksheet.addTable({
+      name: 'TestResults',
+      ref: 'A1',
+      headerRow: true,
+      totalsRow: false,
+      style: { theme: 'TableStyleMedium2', showRowStripes: true },
+      columns: columns.map(column => ({ name: column.name, filterButton: true })),
+      rows,
+    });
+
+    columns.forEach((column, index) => {
+      const sheetColumn = worksheet.getColumn(index + 1);
+      sheetColumn.width = column.width;
+      if (column.text) {
+        sheetColumn.numFmt = '@';
+        sheetColumn.alignment = { horizontal: 'left' };
+      }
+      if (column.date) sheetColumn.numFmt = 'yyyy-mm-dd hh:mm';
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${(event?.event_name || 'event').replace(/[^a-z0-9]+/gi, '_').toLowerCase()}_test_results.csv`;
+    link.download = `${(event?.event_name || 'event').replace(/[^a-z0-9]+/gi, '_').toLowerCase()}_test_results.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -367,10 +395,10 @@ const TestResults: React.FC = () => {
             Complete: {summary.completeCount} / {rows.length}
           </span>
           <button
-            onClick={downloadCsv}
+            onClick={() => void downloadExcel()}
             className="rounded-lg border border-[#E0DDD4] bg-white px-4 py-2 text-sm font-medium text-[#4A4843] transition-colors hover:bg-[#F5F3EE]"
           >
-            Export CSV
+            Export Excel
           </button>
           <button
             onClick={() => window.print()}
